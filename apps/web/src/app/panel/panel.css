@@ -155,10 +155,56 @@ html:has(.panel-shell) {
   padding: 16px 16px calc(98px + var(--panel-safe-bottom));
 }
 
+.workspace-switcher-mobile,
+.workspace-switcher-desktop {
+  display: grid;
+  gap: 6px;
+}
+
+.workspace-switcher-mobile {
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  background: var(--panel-surface);
+}
+
+.workspace-switcher-mobile span,
+.workspace-switcher-desktop span {
+  color: var(--panel-muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workspace-switcher-mobile select,
+.workspace-switcher-desktop select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 34px 0 11px;
+  border: 1px solid #c9d0ca;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--panel-dark);
+  font-size: 16px;
+  font-weight: 750;
+}
+
+.workspace-switcher-desktop select {
+  border-color: #424842;
+  background: #242825;
+  color: #fff;
+  font-size: 13px;
+}
+
 .panel-sidebar a:focus-visible,
 .panel-logout:focus-visible,
 .panel-mobile-nav a:focus-visible,
 .security-banner a:focus-visible,
+.workspace-switcher-mobile select:focus,
+.workspace-switcher-desktop select:focus,
+.table-action button:focus-visible,
 .tenant-form input:focus,
 .tenant-form select:focus,
 .tenant-form button:focus-visible,
@@ -364,6 +410,17 @@ html:has(.panel-shell) {
   font-size: 11px;
 }
 
+.operational-note {
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--panel-line);
+  background: #fff8dd;
+  color: #6e5a21;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .tenant-table-wrap {
   overflow-x: hidden;
 }
@@ -427,6 +484,41 @@ html:has(.panel-shell) {
 
 .tenant-table td small {
   color: var(--panel-muted);
+}
+
+.table-action {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+}
+
+.table-action button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid #313632;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--panel-dark);
+  cursor: pointer;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.table-action button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.table-action small {
+  max-width: 220px;
+  color: var(--panel-danger);
+  line-height: 1.35;
+  text-align: right;
+}
+
+.table-muted {
+  color: var(--panel-muted);
+  font-size: 12px;
 }
 
 .status {
@@ -598,6 +690,135 @@ html:has(.panel-shell) {
   margin-top: 14px;
 }
 
+.workspace-configuration {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.settings-readonly {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.settings-readonly > p,
+.structure-empty {
+  margin: 0;
+  color: var(--panel-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.settings-readonly dl {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.settings-readonly dl > div {
+  display: grid;
+  gap: 3px;
+}
+
+.settings-readonly dt {
+  color: var(--panel-muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.settings-readonly dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.color-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.color-fields label {
+  display: grid;
+  gap: 7px;
+}
+
+.color-fields input[type="color"] {
+  min-height: 48px;
+  padding: 5px;
+  cursor: pointer;
+}
+
+.structure-grid {
+  display: grid;
+  gap: 22px;
+  padding: 16px;
+}
+
+.structure-grid > section,
+.operations-grid > section {
+  min-width: 0;
+}
+
+.structure-grid h3,
+.operations-grid h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.structure-list {
+  display: grid;
+  gap: 8px;
+}
+
+.structure-item {
+  display: flex;
+  min-height: 66px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: 9px;
+  background: #fafbfa;
+}
+
+.structure-item > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.structure-item strong,
+.structure-item small {
+  overflow-wrap: anywhere;
+}
+
+.structure-item strong {
+  font-size: 13px;
+}
+
+.structure-item small {
+  color: var(--panel-muted);
+  font-size: 11px;
+}
+
+.operations-grid {
+  display: grid;
+  gap: 22px;
+  padding: 18px 16px;
+  border-top: 1px solid var(--panel-line);
+  background: #fafbfa;
+}
+
+.operations-grid .tenant-form {
+  padding: 0;
+}
+
 .control-list {
   display: grid;
 }
@@ -736,6 +957,20 @@ html:has(.panel-shell) {
   .tenant-table td:first-child {
     display: grid;
     margin-bottom: 0;
+  }
+
+  .table-action {
+    justify-items: start;
+  }
+
+  .table-action small {
+    text-align: left;
+  }
+
+  .workspace-configuration,
+  .structure-grid,
+  .operations-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -887,6 +1122,14 @@ html:has(.panel-shell) {
     padding: 28px clamp(24px, 4vw, 56px) 64px;
   }
 
+  .workspace-switcher-mobile {
+    display: none;
+  }
+
+  .workspace-switcher-desktop {
+    margin-top: 8px;
+  }
+
   .security-banner {
     max-width: 1440px;
     margin: 0 auto 20px;
@@ -950,6 +1193,16 @@ html:has(.panel-shell) {
 
   .activity-card {
     margin-top: 20px;
+  }
+
+  .workspace-configuration {
+    gap: 20px;
+    margin-top: 20px;
+  }
+
+  .structure-grid,
+  .operations-grid {
+    padding: 20px 22px;
   }
 }
 

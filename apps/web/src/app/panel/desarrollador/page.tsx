@@ -3,6 +3,7 @@ import type { PlatformOverview } from "../../../lib/platform";
 import { serverApi } from "../../../lib/server-api";
 import { InviteUserForm } from "../InviteUserForm";
 import { CreateTenantForm } from "./CreateTenantForm";
+import { TenantStatusButton } from "./TenantStatusButton";
 
 const statusLabels = {
   draft: "Borrador",
@@ -63,6 +64,9 @@ export default async function DeveloperDashboard() {
             </div>
             <span>{overview.tenants.length} registros</span>
           </div>
+          <p className="operational-note">
+            Activar habilita el espacio de trabajo. No aprueba créditos ni movimientos de dinero.
+          </p>
           {overview.tenants.length ? (
             <div className="tenant-table-wrap">
               <table className="tenant-table">
@@ -72,6 +76,7 @@ export default async function DeveloperDashboard() {
                     <th>Estado</th>
                     <th>Miembros</th>
                     <th>Creada</th>
+                    <th>Acción</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -91,6 +96,9 @@ export default async function DeveloperDashboard() {
                         {new Intl.DateTimeFormat("es-CO", { dateStyle: "medium" }).format(
                           new Date(tenant.createdAt),
                         )}
+                      </td>
+                      <td data-label="Acción">
+                        <TenantStatusButton status={tenant.status} tenantId={tenant.id} />
                       </td>
                     </tr>
                   ))}

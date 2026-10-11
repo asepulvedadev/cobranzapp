@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import type { CurrentUser, TenantOverview } from "../../../../lib/platform";
 import { serverApi } from "../../../../lib/server-api";
 import { InviteUserForm } from "../../InviteUserForm";
+import { CreateBranchForm, CreateTeamForm, WorkspaceSettingsForm } from "./WorkspaceOperations";
 
 export const metadata: Metadata = { title: "Espacio empresarial" };
 
@@ -63,14 +64,14 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
           <small>Estructura operativa</small>
         </article>
         <article>
+          <span>Equipos activos</span>
+          <strong>{overview.metrics.teams}</strong>
+          <small>Grupos de operación</small>
+        </article>
+        <article className="metric-accent">
           <span>Invitaciones pendientes</span>
           <strong>{overview.metrics.pendingInvitations}</strong>
           <small>Vencen automáticamente</small>
-        </article>
-        <article className="metric-accent">
-          <span>Moneda</span>
-          <strong>{overview.tenant.currency}</strong>
-          <small>{overview.tenant.locale}</small>
         </article>
       </section>
 
@@ -153,7 +154,102 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
         )}
       </div>
 
-      <section className="dashboard-card activity-card" id="configuracion">
+      <section className="workspace-configuration" id="configuracion">
+        <div className="dashboard-card settings-card">
+          <div className="card-heading">
+            <div>
+              <span className="panel-eyebrow">Datos operativos</span>
+              <h2>Configuración de la empresa</h2>
+            </div>
+          </div>
+          {overview.actorRole === "owner" ? (
+            <WorkspaceSettingsForm settings={overview.settings} tenantId={overview.tenant.id} />
+          ) : (
+            <div className="settings-readonly">
+              <p>Solo el propietario puede modificar esta información.</p>
+              <dl>
+                <div>
+                  <dt>Correo</dt>
+                  <dd>{overview.settings.contactEmail ?? "Sin registrar"}</dd>
+                </div>
+                <div>
+                  <dt>Teléfono</dt>
+                  <dd>{overview.settings.contactPhone ?? "Sin registrar"}</dd>
+                </div>
+                <div>
+                  <dt>Dirección</dt>
+                  <dd>{overview.settings.address ?? "Sin registrar"}</dd>
+                </div>
+              </dl>
+            </div>
+          )}
+        </div>
+
+        <div className="dashboard-card structure-card">
+          <div className="card-heading">
+            <div>
+              <span className="panel-eyebrow">Organización</span>
+              <h2>Sedes y equipos</h2>
+            </div>
+          </div>
+          <div className="structure-grid">
+            <section>
+              <h3>Sedes</h3>
+              {overview.branches.length ? (
+                <div className="structure-list">
+                  {overview.branches.map((branch) => (
+                    <article className="structure-item" key={branch.id}>
+                      <span>
+                        <strong>{branch.displayName}</strong>
+                        <small>Código: {branch.code}</small>
+                      </span>
+                      <span className={`status status-${branch.status}`}>
+                        {branch.status === "active" ? "Activa" : "Inactiva"}
+                      </span>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="structure-empty">Aún no hay sedes registradas.</p>
+              )}
+            </section>
+            <section>
+              <h3>Equipos</h3>
+              {overview.teams.length ? (
+                <div className="structure-list">
+                  {overview.teams.map((team) => (
+                    <article className="structure-item" key={team.id}>
+                      <span>
+                        <strong>{team.displayName}</strong>
+                        <small>{team.branchName ?? "Sin sede asignada"}</small>
+                      </span>
+                      <span className={`status status-${team.status}`}>
+                        {team.status === "active" ? "Activo" : "Inactivo"}
+                      </span>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="structure-empty">Aún no hay equipos registrados.</p>
+              )}
+            </section>
+          </div>
+          {canSeeTeam ? (
+            <div className="operations-grid">
+              <section>
+                <h3>Nueva sede</h3>
+                <CreateBranchForm tenantId={overview.tenant.id} />
+              </section>
+              <section>
+                <h3>Nuevo equipo</h3>
+                <CreateTeamForm branches={overview.branches} tenantId={overview.tenant.id} />
+              </section>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="dashboard-card activity-card">
         <div className="card-heading">
           <div>
             <span className="panel-eyebrow">Activación operativa</span>

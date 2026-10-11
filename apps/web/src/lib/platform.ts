@@ -50,7 +50,15 @@ export type TenantOverview = {
     currency: string;
   };
   actorRole: "owner" | "supervisor" | "collector" | "customer";
-  metrics: { members: number; branches: number; pendingInvitations: number };
+  metrics: { members: number; branches: number; teams: number; pendingInvitations: number };
+  settings: {
+    primaryColor: string;
+    accentColor: string;
+    contactEmail: string | null;
+    contactPhone: string | null;
+    address: string | null;
+    version: number;
+  };
   members: Array<{
     userId: string;
     displayName: string;
@@ -62,6 +70,13 @@ export type TenantOverview = {
   branches: Array<{
     id: string;
     code: string;
+    displayName: string;
+    status: "active" | "inactive";
+  }>;
+  teams: Array<{
+    id: string;
+    branchId: string | null;
+    branchName: string | null;
     displayName: string;
     status: "active" | "inactive";
   }>;

@@ -7,6 +7,7 @@ import type { CurrentUser } from "../../lib/platform";
 import { serverApi } from "../../lib/server-api";
 import { LogoutButton } from "./LogoutButton";
 import { PanelNavigation } from "./PanelNavigation";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import "./panel.css";
 
 export const metadata: Metadata = {
@@ -34,9 +35,16 @@ export default async function PanelLayout({ children }: { children: ReactNode })
         <Brand href={dashboardHref} light />
         <div className="panel-context">
           <span>{user.platformRole === "developer" ? "Plataforma" : "Empresa"}</span>
-          <strong>
-            {user.platformRole === "developer" ? "Administración" : primaryMembership?.tenantName}
-          </strong>
+          {user.platformRole === "developer" ? (
+            <strong>Administración</strong>
+          ) : user.memberships.length > 1 ? (
+            <WorkspaceSwitcher
+              className="workspace-switcher-desktop"
+              memberships={user.memberships}
+            />
+          ) : (
+            <strong>{primaryMembership?.tenantName}</strong>
+          )}
         </div>
         <PanelNavigation
           dashboardHref={dashboardHref}
@@ -54,6 +62,9 @@ export default async function PanelLayout({ children }: { children: ReactNode })
         </div>
       </aside>
       <main className="panel-main" id="contenido">
+        {user.platformRole !== "developer" ? (
+          <WorkspaceSwitcher className="workspace-switcher-mobile" memberships={user.memberships} />
+        ) : null}
         {user.mustChangePassword ? (
           <div className="security-banner" role="status">
             <div>

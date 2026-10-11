@@ -27,6 +27,8 @@ export function PanelNavigation({
 }) {
   const pathname = usePathname();
   const [hash, setHash] = useState("");
+  const currentTenantPath = pathname.match(/^\/panel\/empresa\/[^/]+/)?.[0];
+  const effectiveDashboardHref = isDeveloper ? dashboardHref : (currentTenantPath ?? dashboardHref);
 
   useEffect(() => {
     const syncHash = () => setHash(window.location.hash);
@@ -41,16 +43,16 @@ export function PanelNavigation({
 
   const items: NavigationItem[] = isDeveloper
     ? [
-        { href: dashboardHref, label: "Inicio", icon: Gauge },
+        { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },
         { href: "/panel/desarrollador#empresas", label: "Empresas", icon: Buildings },
         { href: "/panel/desarrollador#actividad", label: "Actividad", icon: Pulse },
         { href: "/panel/seguridad", label: "Seguridad", icon: ShieldCheck },
       ]
     : [
-        { href: dashboardHref, label: "Inicio", icon: Gauge },
-        { href: `${dashboardHref}#equipo`, label: "Equipo", icon: UsersThree },
+        { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },
+        { href: `${effectiveDashboardHref}#equipo`, label: "Equipo", icon: UsersThree },
         {
-          href: `${dashboardHref}#configuracion`,
+          href: `${effectiveDashboardHref}#configuracion`,
           label: "Configurar",
           icon: SlidersHorizontal,
         },
