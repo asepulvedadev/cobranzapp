@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useSensitiveFetch } from "../ReauthenticationProvider";
 
 type TenantStatus = "draft" | "active" | "suspended" | "archived";
 
@@ -19,6 +20,7 @@ export function TenantStatusButton({
   status: TenantStatus;
 }) {
   const router = useRouter();
+  const sensitiveFetch = useSensitiveFetch();
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const action = actions[status];
@@ -29,7 +31,7 @@ export function TenantStatusButton({
     if (!action) return;
     setMessage("");
     setIsSubmitting(true);
-    const response = await fetch(`/api/v1/platform/tenants/${tenantId}/status`, {
+    const response = await sensitiveFetch(`/api/v1/platform/tenants/${tenantId}/status`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ status: action.target }),

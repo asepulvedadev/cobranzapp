@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { TenantOverview } from "../../../../lib/platform";
+import { useSensitiveFetch } from "../../ReauthenticationProvider";
 
 type ManagedRole = "supervisor" | "collector" | "customer";
 type ManagedStatus = "active" | "suspended" | "revoked";
@@ -22,6 +23,7 @@ export function MemberAccessControl({
   tenantId: string;
 }) {
   const router = useRouter();
+  const sensitiveFetch = useSensitiveFetch();
   const [role, setRole] = useState(member.role as ManagedRole);
   const [status, setStatus] = useState(member.status as ManagedStatus);
   const [message, setMessage] = useState("");
@@ -42,11 +44,11 @@ export function MemberAccessControl({
     setMessage("");
     setIsError(false);
     setIsSubmitting(true);
-    const response = await fetch(`/api/v1/tenants/${tenantId}/members/${member.userId}`, {
+    const response = await sensitiveFetch(`/api/v1/tenants/${tenantId}/members/${member.userId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ role, status: nextStatus }),
-    }).catch(() => null);
+    });
     if (!response?.ok) {
       setMessage(await responseError(response));
       setIsError(true);

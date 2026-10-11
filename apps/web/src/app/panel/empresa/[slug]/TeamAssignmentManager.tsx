@@ -3,6 +3,7 @@
 import type { FormEvent } from "react";
 import { useMemo, useState } from "react";
 import type { TenantOverview } from "../../../../lib/platform";
+import { useSensitiveFetch } from "../../ReauthenticationProvider";
 
 type Member = TenantOverview["members"][number];
 type Team = TenantOverview["teams"][number];
@@ -23,6 +24,7 @@ export function TeamAssignmentManager({
   teams: Team[];
   tenantId: string;
 }) {
+  const sensitiveFetch = useSensitiveFetch();
   const [teams, setTeams] = useState(initialTeams);
   const activeTeams = teams.filter((team) => team.status === "active");
   const [teamId, setTeamId] = useState(
@@ -50,9 +52,10 @@ export function TeamAssignmentManager({
     setPending("assign");
     setMessage("");
     setIsError(false);
-    const response = await fetch(`/api/v1/tenants/${tenantId}/teams/${teamId}/members/${userId}`, {
-      method: "PUT",
-    }).catch(() => null);
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/teams/${teamId}/members/${userId}`,
+      { method: "PUT" },
+    );
     if (!response?.ok) {
       setMessage(await responseMessage(response));
       setIsError(true);
@@ -77,10 +80,10 @@ export function TeamAssignmentManager({
     setPending(operationId);
     setMessage("");
     setIsError(false);
-    const response = await fetch(
+    const response = await sensitiveFetch(
       `/api/v1/tenants/${tenantId}/teams/${team.id}/members/${member.userId}`,
       { method: "DELETE" },
-    ).catch(() => null);
+    );
     if (!response?.ok) {
       setMessage(await responseMessage(response));
       setIsError(true);

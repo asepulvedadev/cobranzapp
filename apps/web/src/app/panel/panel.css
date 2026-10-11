@@ -214,7 +214,9 @@ html:has(.panel-shell) {
 .tenant-form select:focus,
 .tenant-form button:focus-visible,
 .password-form input:focus,
-.password-form button:focus-visible {
+.password-form button:focus-visible,
+.reauthentication-dialog input:focus,
+.reauthentication-dialog button:focus-visible {
   outline: 3px solid var(--panel-yellow);
   outline-offset: 2px;
 }
@@ -773,6 +775,110 @@ html:has(.panel-shell) {
   color: #991b1b;
 }
 
+.reauthentication-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  align-items: end;
+  padding: 12px 12px max(12px, var(--panel-safe-bottom));
+  background: rgba(12, 15, 13, 0.68);
+  backdrop-filter: blur(3px);
+}
+
+.reauthentication-dialog {
+  display: grid;
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid #d6dbd7;
+  border-radius: 14px;
+  background: var(--panel-surface);
+  box-shadow: 0 24px 70px rgba(16, 20, 17, 0.28);
+}
+
+.reauthentication-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 11px;
+  background: #fff2bb;
+  color: #6d5100;
+}
+
+.reauthentication-dialog h2 {
+  margin: 3px 0 7px;
+  font-size: 23px;
+  letter-spacing: -0.035em;
+}
+
+.reauthentication-dialog p {
+  margin: 0;
+  color: var(--panel-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.reauthentication-dialog form,
+.reauthentication-dialog label {
+  display: grid;
+  gap: 8px;
+}
+
+.reauthentication-dialog label {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.reauthentication-dialog input {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 12px;
+  border: 1px solid #c9d0ca;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--panel-dark);
+  font-size: 16px;
+}
+
+.reauthentication-dialog form > div {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.reauthentication-dialog button {
+  min-height: 48px;
+  border: 1px solid var(--panel-dark);
+  border-radius: 8px;
+  background: var(--panel-dark);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.reauthentication-dialog .reauthentication-cancel {
+  background: #fff;
+  color: var(--panel-dark);
+}
+
+.reauthentication-dialog button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.reauthentication-dialog .reauthentication-message {
+  padding: 10px;
+  border-radius: 7px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-weight: 700;
+}
+
 .activity-card {
   margin-top: 14px;
 }
@@ -1244,6 +1350,24 @@ html:has(.panel-shell) {
 }
 
 @media (min-width: 700px) {
+  .reauthentication-backdrop {
+    align-items: center;
+    padding: 24px;
+  }
+
+  .reauthentication-dialog {
+    padding: 24px;
+  }
+
+  .reauthentication-dialog form > div {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .reauthentication-dialog .reauthentication-cancel {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
   .panel-main {
     padding-inline: 24px;
   }

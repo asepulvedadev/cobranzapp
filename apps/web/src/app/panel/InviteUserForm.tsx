@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
+import { useSensitiveFetch } from "./ReauthenticationProvider";
 
 type Role = "owner" | "supervisor" | "collector" | "customer";
 
@@ -22,6 +23,7 @@ export function InviteUserForm({
   tenantId?: string;
   tenants?: Array<{ id: string; displayName: string }>;
 }) {
+  const sensitiveFetch = useSensitiveFetch();
   const [message, setMessage] = useState("");
   const [acceptanceUrl, setAcceptanceUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,7 +36,7 @@ export function InviteUserForm({
     const form = new FormData(event.currentTarget);
     const selectedTenant = tenantId ?? String(form.get("tenantId") ?? "");
     const prefix = platform ? "/api/v1/platform/tenants" : "/api/v1/tenants";
-    const response = await fetch(`${prefix}/${selectedTenant}/invitations`, {
+    const response = await sensitiveFetch(`${prefix}/${selectedTenant}/invitations`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: form.get("email"), role: form.get("role") }),

@@ -11,6 +11,7 @@ const actionLabels: Record<string, string> = {
   "team.member_assigned": "Asignó un integrante a un equipo",
   "team.member_removed": "Retiró un integrante de un equipo",
   "membership.updated": "Actualizó el acceso de un integrante",
+  "auth.reauthenticated": "Confirmó su identidad",
 };
 
 type ActivityItem = AuditActivity & { tenantName?: string | null };

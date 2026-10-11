@@ -7,6 +7,7 @@ import type { CurrentUser } from "../../lib/platform";
 import { serverApi } from "../../lib/server-api";
 import { LogoutButton } from "./LogoutButton";
 import { PanelNavigation } from "./PanelNavigation";
+import { ReauthenticationProvider } from "./ReauthenticationProvider";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import "./panel.css";
 
@@ -30,52 +31,57 @@ export default async function PanelLayout({ children }: { children: ReactNode })
       : `/panel/empresa/${primaryMembership?.tenantSlug}`;
 
   return (
-    <div className="panel-shell">
-      <aside className="panel-sidebar">
-        <Brand href={dashboardHref} light />
-        <div className="panel-context">
-          <span>{user.platformRole === "developer" ? "Plataforma" : "Empresa"}</span>
-          {user.platformRole === "developer" ? (
-            <strong>Administración</strong>
-          ) : user.memberships.length > 1 ? (
+    <ReauthenticationProvider username={user.username}>
+      <div className="panel-shell">
+        <aside className="panel-sidebar">
+          <Brand href={dashboardHref} light />
+          <div className="panel-context">
+            <span>{user.platformRole === "developer" ? "Plataforma" : "Empresa"}</span>
+            {user.platformRole === "developer" ? (
+              <strong>Administración</strong>
+            ) : user.memberships.length > 1 ? (
+              <WorkspaceSwitcher
+                className="workspace-switcher-desktop"
+                memberships={user.memberships}
+              />
+            ) : (
+              <strong>{primaryMembership?.tenantName}</strong>
+            )}
+          </div>
+          <PanelNavigation
+            dashboardHref={dashboardHref}
+            isDeveloper={user.platformRole === "developer"}
+          />
+          <div className="panel-sidebar-footer">
+            <div className="panel-profile">
+              <span>{user.displayName.slice(0, 1).toUpperCase()}</span>
+              <div>
+                <strong>{user.displayName}</strong>
+                <small>@{user.username}</small>
+              </div>
+            </div>
+            <LogoutButton />
+          </div>
+        </aside>
+        <main className="panel-main" id="contenido">
+          {user.platformRole !== "developer" ? (
             <WorkspaceSwitcher
-              className="workspace-switcher-desktop"
+              className="workspace-switcher-mobile"
               memberships={user.memberships}
             />
-          ) : (
-            <strong>{primaryMembership?.tenantName}</strong>
-          )}
-        </div>
-        <PanelNavigation
-          dashboardHref={dashboardHref}
-          isDeveloper={user.platformRole === "developer"}
-        />
-        <div className="panel-sidebar-footer">
-          <div className="panel-profile">
-            <span>{user.displayName.slice(0, 1).toUpperCase()}</span>
-            <div>
-              <strong>{user.displayName}</strong>
-              <small>@{user.username}</small>
+          ) : null}
+          {user.mustChangePassword ? (
+            <div className="security-banner" role="status">
+              <div>
+                <strong>Protege tu cuenta</strong>
+                <span>Cambia la contraseña inicial antes de continuar con datos reales.</span>
+              </div>
+              <Link href="/panel/seguridad">Cambiar contraseña</Link>
             </div>
-          </div>
-          <LogoutButton />
-        </div>
-      </aside>
-      <main className="panel-main" id="contenido">
-        {user.platformRole !== "developer" ? (
-          <WorkspaceSwitcher className="workspace-switcher-mobile" memberships={user.memberships} />
-        ) : null}
-        {user.mustChangePassword ? (
-          <div className="security-banner" role="status">
-            <div>
-              <strong>Protege tu cuenta</strong>
-              <span>Cambia la contraseña inicial antes de continuar con datos reales.</span>
-            </div>
-            <Link href="/panel/seguridad">Cambiar contraseña</Link>
-          </div>
-        ) : null}
-        {children}
-      </main>
-    </div>
+          ) : null}
+          {children}
+        </main>
+      </div>
+    </ReauthenticationProvider>
   );
 }

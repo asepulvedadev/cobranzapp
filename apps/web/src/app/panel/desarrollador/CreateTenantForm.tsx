@@ -2,9 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { useSensitiveFetch } from "../ReauthenticationProvider";
 
 export function CreateTenantForm() {
   const router = useRouter();
+  const sensitiveFetch = useSensitiveFetch();
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -14,7 +16,7 @@ export function CreateTenantForm() {
     setMessage("");
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const response = await fetch("/api/v1/platform/tenants", {
+    const response = await sensitiveFetch("/api/v1/platform/tenants", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ displayName: form.get("displayName"), slug: form.get("slug") }),
