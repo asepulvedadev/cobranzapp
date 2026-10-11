@@ -30,6 +30,20 @@ export type AuditActivity = {
   happenedAt: string;
 };
 
+export type SupportAccessRecord = {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  requestedByDisplayName: string;
+  purpose: string;
+  requestedDurationMinutes: number;
+  status: "pending" | "active" | "denied" | "revoked" | "expired";
+  requestedAt: string;
+  reviewedByDisplayName: string | null;
+  reviewedAt: string | null;
+  expiresAt: string | null;
+};
+
 export type PlatformOverview = {
   metrics: {
     tenants: number;

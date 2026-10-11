@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
-import type { PlatformOverview } from "../../../lib/platform";
+import type { PlatformOverview, SupportAccessRecord } from "../../../lib/platform";
 import { serverApi } from "../../../lib/server-api";
 import { ActivityFeed } from "../ActivityFeed";
 import { InviteUserForm } from "../InviteUserForm";
 import { CreateTenantForm } from "./CreateTenantForm";
+import { SupportAccessControl } from "./SupportAccessControl";
 import { TenantReadiness } from "./TenantReadiness";
 import { TenantStatusButton } from "./TenantStatusButton";
 
@@ -15,11 +16,16 @@ const statusLabels = {
 };
 
 export default async function DeveloperDashboard() {
-  const response = await serverApi("/v1/platform/overview");
+  const [response, supportResponse] = await Promise.all([
+    serverApi("/v1/platform/overview"),
+    serverApi("/v1/platform/support-access"),
+  ]);
   if (response.status === 401) redirect("/ingresar");
   if (response.status === 403) redirect("/ingresar?error=sin-acceso");
   if (!response.ok) throw new Error("No fue posible cargar la consola de plataforma");
+  if (!supportResponse.ok) throw new Error("No fue posible cargar los accesos de soporte");
   const overview = (await response.json()) as PlatformOverview;
+  const { access } = (await supportResponse.json()) as { access: SupportAccessRecord[] };
 
   return (
     <div className="dashboard-page">
@@ -78,6 +84,7 @@ export default async function DeveloperDashboard() {
                     <th>Estado</th>
                     <th>Miembros</th>
                     <th>Preparación</th>
+                    <th>Soporte</th>
                     <th>Creada</th>
                     <th>Acción</th>
                   </tr>
@@ -97,6 +104,12 @@ export default async function DeveloperDashboard() {
                       <td data-label="Miembros">{tenant.members}</td>
                       <td data-label="Preparación">
                         <TenantReadiness readiness={tenant.readiness} />
+                      </td>
+                      <td data-label="Soporte">
+                        <SupportAccessControl
+                          access={access.find((item) => item.tenantId === tenant.id) ?? null}
+                          tenantId={tenant.id}
+                        />
                       </td>
                       <td data-label="Creada">
                         {new Intl.DateTimeFormat("es-CO", { dateStyle: "medium" }).format(

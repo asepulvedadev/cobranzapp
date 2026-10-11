@@ -18,6 +18,7 @@ const roleLabels = {
   supervisor: "Supervisor",
   collector: "Cobrador",
   customer: "Cliente",
+  support: "Soporte temporal",
 };
 
 const statusLabels = {

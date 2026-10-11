@@ -620,6 +620,138 @@ html:has(.panel-shell) {
   background: #10b981;
 }
 
+.support-access-control {
+  display: grid;
+  width: min(100%, 250px);
+  justify-items: stretch;
+  gap: 7px;
+  text-align: left;
+}
+
+.support-access-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.support-access-state small,
+.support-access-control > small {
+  color: var(--panel-muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.support-status {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 9px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.support-status-active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.support-status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.support-status-denied,
+.support-status-revoked {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.support-access-control button,
+.support-primary-action,
+.support-request summary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 11px;
+  border: 1px solid #c9d0ca;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--panel-dark);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+.support-primary-action {
+  border-color: var(--panel-dark);
+  background: var(--panel-dark);
+  color: #fff;
+}
+
+.support-access-control button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.support-request summary {
+  list-style: none;
+}
+
+.support-request summary::-webkit-details-marker {
+  display: none;
+}
+
+.support-request[open] summary {
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.support-request form {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid #c9d0ca;
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  background: #fafbfa;
+}
+
+.support-request label {
+  display: grid;
+  gap: 4px;
+  color: var(--panel-muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.support-request textarea,
+.support-request select {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px;
+  border: 1px solid #c9d0ca;
+  border-radius: 7px;
+  background: #fff;
+  color: var(--panel-dark);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.support-request textarea {
+  min-height: 78px;
+  resize: vertical;
+}
+
 .table-muted {
   color: var(--panel-muted);
   font-size: 12px;
