@@ -225,10 +225,38 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       requestId: `team-${suffix}`,
     });
     expect(team).toMatchObject({ displayName: "Ruta Centro", branchName: "Sede Centro" });
+    await expect(
+      tenancy.addTeamMember(
+        ownerActor,
+        tenant.id,
+        team?.id ?? "",
+        memberId,
+        `team-member-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "updated" });
 
     const configuredOverview = await tenancy.overview(ownerActor, tenant.id);
     expect(configuredOverview?.metrics).toMatchObject({ branches: 1, teams: 1 });
     expect(configuredOverview?.settings.contactEmail).toBe(`operations-${suffix}@example.com`);
+    expect(configuredOverview?.teams[0]?.memberIds).toContain(memberId);
+    await expect(
+      tenancy.removeTeamMember(
+        ownerActor,
+        tenant.id,
+        team?.id ?? "",
+        memberId,
+        `team-member-remove-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "updated" });
+    await expect(
+      tenancy.addTeamMember(
+        ownerActor,
+        tenant.id,
+        team?.id ?? "",
+        memberId,
+        `team-member-reassign-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "updated" });
     await expect(
       platform.updateTenantStatus(developerId, tenant.id, "active", `activate-${suffix}`),
     ).resolves.toMatchObject({ status: "updated", tenant: { status: "active" } });
@@ -279,6 +307,15 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
         requestId: `team-cross-tenant-${suffix}`,
       }),
     ).resolves.toBeNull();
+    await expect(
+      tenancy.addTeamMember(
+        ownerActor,
+        tenant.id,
+        otherBranch?.id ?? "",
+        memberId,
+        `team-member-cross-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "team_not_found" });
 
     const anonymous = await runtimePool.query<{ count: string }>(
       "SELECT count(*) FROM tenants WHERE slug = ANY($1::citext[])",
@@ -307,6 +344,9 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
         requestId: `member-revoke-${suffix}`,
       }),
     ).resolves.toMatchObject({ status: "updated", member: { status: "revoked" } });
+    expect((await tenancy.overview(ownerActor, tenant.id))?.teams[0]?.memberIds).not.toContain(
+      memberId,
+    );
     expect((await auth.authenticate(memberLogin?.token ?? ""))?.memberships).not.toContainEqual(
       expect.objectContaining({ tenantId: tenant.id }),
     );

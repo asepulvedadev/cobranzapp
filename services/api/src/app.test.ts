@@ -143,7 +143,10 @@ function dependencies(overrides?: { authService?: Partial<AuthService> }) {
       branchName: input.branchId ? "Sede Centro" : null,
       displayName: input.displayName,
       status: "active",
+      memberIds: [],
     })),
+    addTeamMember: vi.fn(async () => ({ status: "updated" })),
+    removeTeamMember: vi.fn(async () => ({ status: "updated" })),
     updateMember: vi.fn(async (_actor, _tenantId, userId, input) => ({
       status: "updated",
       member: {
@@ -412,6 +415,36 @@ describe("tenant onboarding", () => {
     });
     expect(team.statusCode).toBe(201);
     expect(team.json()).toMatchObject({ team: { displayName: "Ruta Centro" } });
+
+    const userId = "7727df33-e22e-4b17-9b4a-0e27f84b3da1";
+    const teamId = "4ffec9ec-1e7a-4a25-93f7-6b57776ce8af";
+    const assigned = await app.inject({
+      method: "PUT",
+      url: `/v1/tenants/${tenantId}/teams/${teamId}/members/${userId}`,
+      headers,
+    });
+    expect(assigned.statusCode).toBe(200);
+    expect(deps.tenancyService.addTeamMember).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantRole: "owner" }),
+      tenantId,
+      teamId,
+      userId,
+      expect.any(String),
+    );
+
+    const removed = await app.inject({
+      method: "DELETE",
+      url: `/v1/tenants/${tenantId}/teams/${teamId}/members/${userId}`,
+      headers,
+    });
+    expect(removed.statusCode).toBe(204);
+    expect(deps.tenancyService.removeTeamMember).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantRole: "owner" }),
+      tenantId,
+      teamId,
+      userId,
+      expect.any(String),
+    );
   });
 
   it("lets an owner change a non-owner membership", async () => {

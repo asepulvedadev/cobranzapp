@@ -60,6 +60,7 @@ export type TenantOverview = {
     branchName: string | null;
     displayName: string;
     status: "active" | "inactive";
+    memberIds: string[];
   }>;
   pendingInvitations: Array<{
     id: string;
@@ -76,6 +77,12 @@ export type MemberUpdateResult =
   | { status: "not_found" }
   | { status: "protected" }
   | { status: "invalid_transition" };
+
+export type TeamMemberUpdateResult =
+  | { status: "updated" }
+  | { status: "team_not_found" }
+  | { status: "member_not_found" }
+  | { status: "member_ineligible" };
 
 export type InvitationAcceptanceInput =
   | { existingUserId: string }
@@ -127,6 +134,20 @@ export interface TenancyService {
     tenantId: string,
     input: { branchId: string | null; displayName: string; requestId: string },
   ): Promise<TenantOverview["teams"][number] | null>;
+  addTeamMember(
+    actor: TenantActor,
+    tenantId: string,
+    teamId: string,
+    userId: string,
+    requestId: string,
+  ): Promise<TeamMemberUpdateResult>;
+  removeTeamMember(
+    actor: TenantActor,
+    tenantId: string,
+    teamId: string,
+    userId: string,
+    requestId: string,
+  ): Promise<TeamMemberUpdateResult>;
   updateMember(
     actor: TenantActor,
     tenantId: string,

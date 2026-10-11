@@ -31,6 +31,11 @@ const tenantSchema = z.object({
 });
 const tenantIdParamsSchema = z.object({ tenantId: z.uuid() });
 const tenantMemberParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
+const tenantTeamMemberParamsSchema = z.object({
+  tenantId: z.uuid(),
+  teamId: z.uuid(),
+  userId: z.uuid(),
+});
 const sessionIdParamsSchema = z.object({ sessionId: z.uuid() });
 const tenantStatusSchema = z.object({ status: z.enum(["active", "suspended", "archived"]) });
 const invitationTokenParamsSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{40,60}$/) });
@@ -832,6 +837,85 @@ export function buildApp(dependencies: AppDependencies) {
       );
     return reply.code(201).send({ team });
   });
+
+  async function manageTeamMember(
+    request: FastifyRequest,
+    reply: FastifyReply,
+    operation: "add" | "remove",
+  ) {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantTeamMemberParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_TEAM_MEMBER",
+        "Revisa el equipo y el integrante.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (membership?.role !== "owner" && membership?.role !== "supervisor") {
+      return sendError(
+        reply,
+        403,
+        "MANAGER_REQUIRED",
+        "Solo propietarios y supervisores pueden administrar equipos.",
+        request.id,
+      );
+    }
+    const actor = {
+      userId: session.user.id,
+      platformRole: session.user.platformRole,
+      tenantRole: membership.role,
+    };
+    const result =
+      operation === "add"
+        ? await dependencies.tenancyService.addTeamMember(
+            actor,
+            params.data.tenantId,
+            params.data.teamId,
+            params.data.userId,
+            request.id,
+          )
+        : await dependencies.tenancyService.removeTeamMember(
+            actor,
+            params.data.tenantId,
+            params.data.teamId,
+            params.data.userId,
+            request.id,
+          );
+    if (result.status === "team_not_found") {
+      return sendError(reply, 404, "TEAM_NOT_FOUND", "El equipo no existe.", request.id);
+    }
+    if (result.status === "member_not_found") {
+      return sendError(reply, 404, "MEMBER_NOT_FOUND", "El integrante no existe.", request.id);
+    }
+    if (result.status === "member_ineligible") {
+      return sendError(
+        reply,
+        409,
+        "MEMBER_INELIGIBLE",
+        "Solo supervisores y cobradores activos pueden pertenecer a un equipo.",
+        request.id,
+      );
+    }
+    return reply
+      .code(operation === "add" ? 200 : 204)
+      .send(operation === "add" ? { assigned: true } : undefined);
+  }
+
+  app.put("/v1/tenants/:tenantId/teams/:teamId/members/:userId", (request, reply) =>
+    manageTeamMember(request, reply, "add"),
+  );
+
+  app.delete("/v1/tenants/:tenantId/teams/:teamId/members/:userId", (request, reply) =>
+    manageTeamMember(request, reply, "remove"),
+  );
 
   app.setErrorHandler((cause, request, reply) => {
     request.log.error({ err: cause }, "Unhandled request error");

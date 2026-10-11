@@ -349,13 +349,22 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           branch_name: string | null;
           display_name: string;
           status: "active" | "inactive";
+          member_ids: string[];
         }>(
           `SELECT team.id, team.branch_id, branch.display_name AS branch_name,
-                  team.display_name, team.status
+                  team.display_name, team.status,
+                  COALESCE(
+                    array_agg(team_member.user_id ORDER BY team_member.created_at)
+                      FILTER (WHERE team_member.user_id IS NOT NULL),
+                    '{}'::uuid[]
+                  ) AS member_ids
              FROM teams team
              LEFT JOIN branches branch
                ON branch.tenant_id = team.tenant_id AND branch.id = team.branch_id
+             LEFT JOIN team_memberships team_member
+               ON team_member.tenant_id = team.tenant_id AND team_member.team_id = team.id
             WHERE team.tenant_id = $1
+            GROUP BY team.id, team.branch_id, team.display_name, team.status, branch.display_name
             ORDER BY team.display_name`,
           [tenantId],
         );
@@ -442,6 +451,7 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
             branchName: team.branch_name,
             displayName: team.display_name,
             status: team.status,
+            memberIds: mayManagePeople ? team.member_ids : [],
           })),
           pendingInvitations: invitations.rows.map((invitation) => ({
             id: invitation.id,
@@ -632,7 +642,113 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           branchName: branch.rows[0]?.display_name ?? null,
           displayName: team.display_name,
           status: team.status,
+          memberIds: [],
         };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async addTeamMember(actor, tenantId, teamId, userId, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setActorContext(client, actor, tenantId);
+        const team = await client.query<{ id: string }>(
+          "SELECT id FROM teams WHERE tenant_id = $1 AND id = $2 AND status = 'active'",
+          [tenantId, teamId],
+        );
+        if (!team.rows[0]) {
+          await client.query("ROLLBACK");
+          return { status: "team_not_found" };
+        }
+        const member = await client.query<{ role: TenantRole; status: string }>(
+          `SELECT role, status
+             FROM tenant_memberships
+            WHERE tenant_id = $1 AND user_id = $2`,
+          [tenantId, userId],
+        );
+        const membership = member.rows[0];
+        if (!membership) {
+          await client.query("ROLLBACK");
+          return { status: "member_not_found" };
+        }
+        if (
+          membership.status !== "active" ||
+          !["supervisor", "collector"].includes(membership.role)
+        ) {
+          await client.query("ROLLBACK");
+          return { status: "member_ineligible" };
+        }
+        const assigned = await client.query<{ user_id: string }>(
+          `INSERT INTO team_memberships (tenant_id, team_id, user_id, created_by)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (tenant_id, team_id, user_id) DO NOTHING
+           RETURNING user_id`,
+          [tenantId, teamId, userId, actor.userId],
+        );
+        if (assigned.rows[0]) {
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+             VALUES ($1, $2, 'team.member_assigned', 'team', $3, $4,
+                     jsonb_build_object('userId', $5::text))`,
+            [tenantId, actor.userId, teamId, requestId, userId],
+          );
+        }
+        await client.query("COMMIT");
+        return { status: "updated" };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async removeTeamMember(actor, tenantId, teamId, userId, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setActorContext(client, actor, tenantId);
+        const team = await client.query<{ id: string }>(
+          "SELECT id FROM teams WHERE tenant_id = $1 AND id = $2",
+          [tenantId, teamId],
+        );
+        if (!team.rows[0]) {
+          await client.query("ROLLBACK");
+          return { status: "team_not_found" };
+        }
+        const member = await client.query<{ exists: boolean }>(
+          `SELECT EXISTS (
+             SELECT 1 FROM tenant_memberships WHERE tenant_id = $1 AND user_id = $2
+           ) AS exists`,
+          [tenantId, userId],
+        );
+        if (!member.rows[0]?.exists) {
+          await client.query("ROLLBACK");
+          return { status: "member_not_found" };
+        }
+        const removed = await client.query<{ user_id: string }>(
+          `DELETE FROM team_memberships
+            WHERE tenant_id = $1 AND team_id = $2 AND user_id = $3
+          RETURNING user_id`,
+          [tenantId, teamId, userId],
+        );
+        if (removed.rows[0]) {
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+             VALUES ($1, $2, 'team.member_removed', 'team', $3, $4,
+                     jsonb_build_object('userId', $5::text))`,
+            [tenantId, actor.userId, teamId, requestId, userId],
+          );
+        }
+        await client.query("COMMIT");
+        return { status: "updated" };
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -689,6 +805,12 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
         if (!member) {
           await client.query("ROLLBACK");
           return { status: "not_found" };
+        }
+        if (member.role === "customer" || member.status === "revoked") {
+          await client.query("DELETE FROM team_memberships WHERE tenant_id = $1 AND user_id = $2", [
+            tenantId,
+            userId,
+          ]);
         }
         await client.query(
           `INSERT INTO audit_events
