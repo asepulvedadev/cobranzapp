@@ -4,6 +4,7 @@ import { z } from "zod";
 import { LoginRateLimiter } from "./auth/login-rate-limiter.js";
 import type { AuthenticatedUser, AuthService } from "./auth/types.js";
 import type { PlatformService } from "./platform/types.js";
+import type { TenancyService } from "./tenancy/types.js";
 
 const sessionCookieName = "cobranzapp_session";
 const loginSchema = z.object({
@@ -28,6 +29,21 @@ const tenantSchema = z.object({
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
     .max(63),
 });
+const tenantIdParamsSchema = z.object({ tenantId: z.uuid() });
+const invitationTokenParamsSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{40,60}$/) });
+const invitationSchema = z.object({
+  email: z.email().transform((value) => value.toLowerCase()),
+  role: z.enum(["owner", "supervisor", "collector", "customer"]),
+});
+const invitationAcceptanceSchema = z.object({
+  username: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9._-]{3,40}$/),
+  displayName: z.string().trim().min(2).max(100),
+  password: z.string().min(12).max(256),
+});
 
 export interface AppDependencies {
   allowedWebOrigins?: string[];
@@ -36,6 +52,7 @@ export interface AppDependencies {
   isProduction?: boolean;
   platformService: PlatformService;
   sessionTtlHours?: number;
+  tenancyService: TenancyService;
   version: string;
 }
 
@@ -109,6 +126,11 @@ export function buildApp(dependencies: AppDependencies) {
       return null;
     }
     return { token, user };
+  }
+
+  async function optionalUser(request: FastifyRequest) {
+    const token = parseCookies(request.headers.cookie).get(sessionCookieName);
+    return token ? dependencies.authService.authenticate(token) : null;
   }
 
   function requireDeveloper(user: AuthenticatedUser, request: FastifyRequest, reply: FastifyReply) {
@@ -276,6 +298,186 @@ export function buildApp(dependencies: AppDependencies) {
       requestId: request.id,
     });
     return reply.code(201).send({ tenant });
+  });
+
+  app.post("/v1/platform/tenants/:tenantId/invitations", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = invitationSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_INVITATION",
+        "Revisa el correo, el rol y la empresa.",
+        request.id,
+      );
+    }
+    const invitation = await dependencies.tenancyService.createInvitation(
+      { userId: session.user.id, platformRole: "developer", tenantRole: null },
+      params.data.tenantId,
+      { ...body.data, requestId: request.id },
+    );
+    if (!invitation)
+      return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
+    return reply.code(201).send({ invitation });
+  });
+
+  app.get("/v1/invitations/:token", async (request, reply) => {
+    const params = invitationTokenParamsSchema.safeParse(request.params);
+    if (!params.success)
+      return sendError(reply, 404, "INVITATION_INVALID", "La invitación no es válida.", request.id);
+    const invitation = await dependencies.tenancyService.previewInvitation(params.data.token);
+    if (!invitation) {
+      return sendError(
+        reply,
+        404,
+        "INVITATION_INVALID",
+        "La invitación venció o ya no es válida.",
+        request.id,
+      );
+    }
+    return { invitation };
+  });
+
+  app.post("/v1/invitations/:token/accept", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const params = invitationTokenParamsSchema.safeParse(request.params);
+    if (!params.success)
+      return sendError(reply, 404, "INVITATION_INVALID", "La invitación no es válida.", request.id);
+    const user = await optionalUser(request);
+    let acceptanceInput: { existingUserId: string } | z.infer<typeof invitationAcceptanceSchema>;
+    if (user) {
+      acceptanceInput = { existingUserId: user.id };
+    } else {
+      const body = invitationAcceptanceSchema.safeParse(request.body);
+      if (!body.success) {
+        return sendError(
+          reply,
+          400,
+          "INVALID_ACCOUNT",
+          "Revisa el nombre, usuario y contraseña.",
+          request.id,
+        );
+      }
+      acceptanceInput = body.data;
+    }
+    const result = await dependencies.tenancyService.acceptInvitation(
+      params.data.token,
+      acceptanceInput,
+      request.id,
+    );
+    switch (result.status) {
+      case "accepted":
+        return reply.send({ tenantSlug: result.tenantSlug });
+      case "account_exists":
+        return sendError(
+          reply,
+          409,
+          "ACCOUNT_EXISTS",
+          "Inicia sesión con esa cuenta para aceptar la invitación.",
+          request.id,
+        );
+      case "email_mismatch":
+        return sendError(
+          reply,
+          403,
+          "INVITATION_EMAIL_MISMATCH",
+          "La invitación corresponde a otra cuenta.",
+          request.id,
+        );
+      case "username_unavailable":
+        return sendError(
+          reply,
+          409,
+          "USERNAME_UNAVAILABLE",
+          "Ese nombre de usuario no está disponible.",
+          request.id,
+        );
+      case "expired":
+        return sendError(reply, 410, "INVITATION_EXPIRED", "La invitación venció.", request.id);
+      default:
+        return sendError(
+          reply,
+          404,
+          "INVITATION_INVALID",
+          "La invitación ya no es válida.",
+          request.id,
+        );
+    }
+  });
+
+  app.get("/v1/tenants/:tenantId/overview", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    if (!params.success)
+      return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (!membership)
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a esta empresa.", request.id);
+    const overview = await dependencies.tenancyService.overview(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+    );
+    if (!overview)
+      return sendError(
+        reply,
+        404,
+        "TENANT_NOT_FOUND",
+        "La empresa no está disponible.",
+        request.id,
+      );
+    return overview;
+  });
+
+  app.post("/v1/tenants/:tenantId/invitations", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = invitationSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_INVITATION",
+        "Revisa el correo, el rol y la empresa.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (membership?.role !== "owner") {
+      return sendError(
+        reply,
+        403,
+        "OWNER_REQUIRED",
+        "Solo el propietario puede invitar usuarios.",
+        request.id,
+      );
+    }
+    const invitation = await dependencies.tenancyService.createInvitation(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      { ...body.data, requestId: request.id },
+    );
+    if (!invitation)
+      return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
+    return reply.code(201).send({ invitation });
   });
 
   app.setErrorHandler((cause, request, reply) => {

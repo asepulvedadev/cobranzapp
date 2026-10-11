@@ -88,6 +88,11 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
         const tenant = result.rows[0];
         if (!tenant) throw new Error("Tenant insert did not return a record");
         await client.query(
+          `INSERT INTO tenant_settings (tenant_id, updated_by)
+           VALUES ($1, $2)`,
+          [tenant.id, actorUserId],
+        );
+        await client.query(
           `INSERT INTO audit_events (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
            VALUES ($1, $2, 'tenant.created', 'tenant', $1, $3, jsonb_build_object('slug', $4::text))`,
           [tenant.id, actorUserId, input.requestId, tenant.slug],

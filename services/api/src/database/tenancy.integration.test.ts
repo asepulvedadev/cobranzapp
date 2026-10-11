@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { hashPassword } from "../auth/password.js";
 import { createPostgresAuthService } from "../auth/postgres-auth-service.js";
 import { createPostgresPlatformService } from "../platform/postgres-platform-service.js";
+import { createPostgresTenancyService } from "../tenancy/postgres-tenancy-service.js";
 
 const runtimeUrl = process.env.TEST_DATABASE_URL;
 const ownerUrl = process.env.TEST_MIGRATION_DATABASE_URL;
@@ -13,6 +14,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
   const memberId = crypto.randomUUID();
   const slug = `tenant-${suffix}`;
   const password = "integration-password-123";
+  const invitedUsername = `owner-${suffix}`;
   let runtimePool: pg.Pool;
   let ownerPool: pg.Pool;
 
@@ -53,6 +55,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       await ownerPool.query("DELETE FROM users WHERE id = ANY($1::uuid[])", [
         [developerId, memberId],
       ]);
+      await ownerPool.query("DELETE FROM users WHERE username = $1", [invitedUsername]);
       await ownerPool.end();
     }
     if (runtimePool) await runtimePool.end();
@@ -74,6 +77,39 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       requestId: `test-${suffix}`,
     });
     expect(tenant.status).toBe("draft");
+
+    const tenancy = createPostgresTenancyService(runtimePool, "https://cobranzaap.tech");
+    const invitation = await tenancy.createInvitation(
+      { userId: developerId, platformRole: "developer", tenantRole: null },
+      tenant.id,
+      {
+        email: `owner-${suffix}@example.com`,
+        role: "owner",
+        requestId: `invite-${suffix}`,
+      },
+    );
+    expect(invitation?.acceptanceUrl).toContain("https://cobranzaap.tech/activar?token=");
+    const invitationToken = new URL(invitation?.acceptanceUrl ?? "").searchParams.get("token");
+    expect(invitationToken).toBeTruthy();
+    const preview = await tenancy.previewInvitation(invitationToken ?? "");
+    expect(preview).toMatchObject({ tenantSlug: slug, accountExists: false });
+    const accepted = await tenancy.acceptInvitation(
+      invitationToken ?? "",
+      { username: invitedUsername, displayName: "Invited Owner", password },
+      `accept-${suffix}`,
+    );
+    expect(accepted).toEqual({ status: "accepted", tenantSlug: slug });
+    const ownerLogin = await auth.login(`owner-${suffix}@example.com`, password, {});
+    expect(ownerLogin?.user.memberships).toContainEqual(
+      expect.objectContaining({ tenantId: tenant.id, role: "owner" }),
+    );
+    const ownerOverview = await tenancy.overview(
+      { userId: ownerLogin?.user.id ?? "", platformRole: null, tenantRole: "owner" },
+      tenant.id,
+    );
+    expect(ownerOverview?.tenant.slug).toBe(slug);
+    expect(ownerOverview?.metrics.members).toBe(1);
+
     await ownerPool.query(
       `INSERT INTO tenant_memberships (tenant_id, user_id, role, created_by)
        VALUES ($1, $2, 'owner', $3)`,

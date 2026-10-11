@@ -8,6 +8,7 @@ const configSchema = z.object({
   SESSION_TTL_HOURS: z.coerce.number().int().positive().max(168).default(8),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  PUBLIC_WEB_URL: z.url().default("http://localhost:3000"),
 });
 
 export type ApiConfig = z.infer<typeof configSchema>;

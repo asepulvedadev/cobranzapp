@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "./app.js";
 import type { AuthenticatedUser, AuthService } from "./auth/types.js";
 import type { PlatformService } from "./platform/types.js";
+import type { TenancyService } from "./tenancy/types.js";
 
 const developer: AuthenticatedUser = {
   id: "8a44ba60-9500-4dd0-85b8-d428194165f2",
@@ -35,12 +36,48 @@ function dependencies(overrides?: { authService?: Partial<AuthService> }) {
       createdAt: "2026-10-11T00:00:00.000Z",
     })),
   };
+  const tenancyService: TenancyService = {
+    createInvitation: vi.fn(async (_actor, _tenantId, input) => ({
+      id: "ac08c04c-1026-4700-975c-38844928f89c",
+      email: input.email,
+      role: input.role,
+      expiresAt: "2026-10-14T00:00:00.000Z",
+      acceptanceUrl:
+        "https://cobranzaap.tech/activar?token=valid-invitation-token-abcdefghijklmnopqrstuvwxyz",
+    })),
+    previewInvitation: vi.fn(async () => ({
+      email: "owner@example.com",
+      role: "owner",
+      tenantName: "Empresa Uno",
+      tenantSlug: "empresa-uno",
+      expiresAt: "2026-10-14T00:00:00.000Z",
+      accountExists: false,
+    })),
+    acceptInvitation: vi.fn(async () => ({ status: "accepted", tenantSlug: "empresa-uno" })),
+    overview: vi.fn(async () => ({
+      tenant: {
+        id: "5c58269f-ce16-4250-82e2-c0c16621b0fb",
+        slug: "empresa-uno",
+        displayName: "Empresa Uno",
+        status: "draft",
+        locale: "es-CO",
+        timezone: "America/Bogota",
+        currency: "COP",
+      },
+      actorRole: "owner",
+      metrics: { members: 1, branches: 0, pendingInvitations: 0 },
+      members: [],
+      branches: [],
+      pendingInvitations: [],
+    })),
+  };
   return {
     allowedWebOrigins: ["https://cobranzaap.tech"],
     authService,
     checkDatabase: async () => undefined,
     isProduction: true,
     platformService,
+    tenancyService,
     version: "test",
   };
 }
@@ -149,5 +186,45 @@ describe("developer platform", () => {
     });
     expect(response.statusCode).toBe(201);
     expect(response.json()).toMatchObject({ tenant: { slug: "empresa-uno", status: "draft" } });
+  });
+
+  it("creates a tenant invitation for the developer", async () => {
+    const app = buildApp(dependencies());
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/platform/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/invitations",
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { email: "owner@example.com", role: "owner" },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({ invitation: { role: "owner" } });
+  });
+});
+
+describe("tenant onboarding", () => {
+  it("previews and accepts a valid invitation", async () => {
+    const app = buildApp(dependencies());
+    apps.push(app);
+    const token = "valid-invitation-token-abcdefghijklmnopqrstuvwxyz";
+    const preview = await app.inject({ method: "GET", url: `/v1/invitations/${token}` });
+    expect(preview.statusCode).toBe(200);
+    expect(preview.json()).toMatchObject({ invitation: { tenantSlug: "empresa-uno" } });
+
+    const acceptance = await app.inject({
+      method: "POST",
+      url: `/v1/invitations/${token}/accept`,
+      headers: { origin: "https://cobranzaap.tech" },
+      payload: {
+        username: "nuevo.propietario",
+        displayName: "Nuevo Propietario",
+        password: "new-owner-password",
+      },
+    });
+    expect(acceptance.statusCode).toBe(200);
+    expect(acceptance.json()).toEqual({ tenantSlug: "empresa-uno" });
   });
 });

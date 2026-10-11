@@ -1,0 +1,87 @@
+import type { PlatformRole, TenantRole } from "../auth/types.js";
+
+export type TenantActor = {
+  userId: string;
+  platformRole: PlatformRole;
+  tenantRole: TenantRole | null;
+};
+
+export type InvitationPreview = {
+  email: string;
+  role: TenantRole;
+  tenantName: string;
+  tenantSlug: string;
+  expiresAt: string;
+  accountExists: boolean;
+};
+
+export type TenantOverview = {
+  tenant: {
+    id: string;
+    slug: string;
+    displayName: string;
+    status: "draft" | "active" | "suspended" | "archived";
+    locale: string;
+    timezone: string;
+    currency: string;
+  };
+  actorRole: TenantRole;
+  metrics: {
+    members: number;
+    branches: number;
+    pendingInvitations: number;
+  };
+  members: Array<{
+    userId: string;
+    displayName: string;
+    email: string;
+    username: string;
+    role: TenantRole;
+    status: "invited" | "active" | "suspended" | "revoked";
+  }>;
+  branches: Array<{
+    id: string;
+    code: string;
+    displayName: string;
+    status: "active" | "inactive";
+  }>;
+  pendingInvitations: Array<{
+    id: string;
+    email: string;
+    role: TenantRole;
+    expiresAt: string;
+  }>;
+};
+
+export type InvitationAcceptanceInput =
+  | { existingUserId: string }
+  | { username: string; displayName: string; password: string };
+
+export type InvitationAcceptanceResult =
+  | { status: "accepted"; tenantSlug: string }
+  | { status: "invalid" }
+  | { status: "expired" }
+  | { status: "account_exists" }
+  | { status: "email_mismatch" }
+  | { status: "username_unavailable" };
+
+export interface TenancyService {
+  createInvitation(
+    actor: TenantActor,
+    tenantId: string,
+    input: { email: string; role: TenantRole; requestId: string },
+  ): Promise<{
+    id: string;
+    email: string;
+    role: TenantRole;
+    expiresAt: string;
+    acceptanceUrl: string;
+  } | null>;
+  previewInvitation(token: string): Promise<InvitationPreview | null>;
+  acceptInvitation(
+    token: string,
+    input: InvitationAcceptanceInput,
+    requestId: string,
+  ): Promise<InvitationAcceptanceResult>;
+  overview(actor: TenantActor, tenantId: string): Promise<TenantOverview | null>;
+}

@@ -31,6 +31,7 @@ services:
       DATABASE_URL: postgresql://${APP_DATABASE_USER}:${APP_DATABASE_PASSWORD}@postgres:5432/${POSTGRES_DB}
       ALLOWED_WEB_ORIGINS: ${ALLOWED_WEB_ORIGINS}
       SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-8}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL}
     depends_on:
       postgres:
         condition: service_healthy
