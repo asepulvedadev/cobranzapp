@@ -106,6 +106,14 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       requestId: `test-secondary-${suffix}`,
     });
     expect(tenant.status).toBe("draft");
+    const platformOverview = await platform.overview(developerId);
+    expect(platformOverview.activity).toContainEqual(
+      expect.objectContaining({
+        action: "tenant.created",
+        actorUsername: `developer-${suffix}`,
+        tenantId: tenant.id,
+      }),
+    );
 
     const tenancy = createPostgresTenancyService(runtimePool, "https://cobranzaap.tech");
     const invitation = await tenancy.createInvitation(
@@ -239,6 +247,12 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     expect(configuredOverview?.metrics).toMatchObject({ branches: 1, teams: 1 });
     expect(configuredOverview?.settings.contactEmail).toBe(`operations-${suffix}@example.com`);
     expect(configuredOverview?.teams[0]?.memberIds).toContain(memberId);
+    expect(configuredOverview?.activity).toContainEqual(
+      expect.objectContaining({
+        action: "team.member_assigned",
+        actorUsername: invitedUsername,
+      }),
+    );
     await expect(
       tenancy.removeTeamMember(
         ownerActor,

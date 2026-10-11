@@ -68,6 +68,13 @@ export type TenantOverview = {
     role: TenantRole;
     expiresAt: string;
   }>;
+  activity: Array<{
+    id: string;
+    action: string;
+    actorDisplayName: string | null;
+    actorUsername: string | null;
+    happenedAt: string;
+  }>;
 };
 
 export type ManagedMember = TenantOverview["members"][number];

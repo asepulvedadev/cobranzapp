@@ -369,6 +369,26 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           [tenantId],
         );
         const mayManagePeople = actor.tenantRole === "owner" || actor.tenantRole === "supervisor";
+        const activity = mayManagePeople
+          ? await client.query<{
+              id: string;
+              action: string;
+              actor_display_name: string | null;
+              actor_username: string | null;
+              happened_at: Date;
+            }>(
+              `SELECT event.id, event.action,
+                      actor.display_name AS actor_display_name,
+                      actor.username AS actor_username,
+                      event.happened_at
+                 FROM audit_events event
+                 LEFT JOIN users actor ON actor.id = event.actor_user_id
+                WHERE event.tenant_id = $1
+                ORDER BY event.happened_at DESC, event.id DESC
+                LIMIT 12`,
+              [tenantId],
+            )
+          : { rows: [] };
         const members = mayManagePeople
           ? await client.query<{
               user_id: string;
@@ -458,6 +478,13 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
             email: invitation.email,
             role: invitation.role,
             expiresAt: invitation.expires_at.toISOString(),
+          })),
+          activity: activity.rows.map((event) => ({
+            id: event.id,
+            action: event.action,
+            actorDisplayName: event.actor_display_name,
+            actorUsername: event.actor_username,
+            happenedAt: event.happened_at.toISOString(),
           })),
         } satisfies TenantOverview;
       } catch (error) {

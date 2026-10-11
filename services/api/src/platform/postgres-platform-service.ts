@@ -45,7 +45,28 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
                LEFT JOIN tenant_memberships membership ON membership.tenant_id = tenant.id
               GROUP BY tenant.id
               ORDER BY tenant.created_at DESC
-              LIMIT 100`,
+          LIMIT 100`,
+        );
+        const activityResult = await client.query<{
+          id: string;
+          action: string;
+          actor_display_name: string | null;
+          actor_username: string | null;
+          tenant_id: string | null;
+          tenant_name: string | null;
+          happened_at: Date;
+        }>(
+          `SELECT event.id, event.action,
+                  actor.display_name AS actor_display_name,
+                  actor.username AS actor_username,
+                  tenant.id AS tenant_id,
+                  tenant.display_name AS tenant_name,
+                  event.happened_at
+             FROM audit_events event
+             LEFT JOIN users actor ON actor.id = event.actor_user_id
+             LEFT JOIN tenants tenant ON tenant.id = event.tenant_id
+            ORDER BY event.happened_at DESC, event.id DESC
+            LIMIT 12`,
         );
         await client.query("COMMIT");
         const metrics = metricsResult.rows[0];
@@ -63,6 +84,15 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             status: tenant.status,
             members: Number(tenant.members),
             createdAt: tenant.created_at.toISOString(),
+          })),
+          activity: activityResult.rows.map((event) => ({
+            id: event.id,
+            action: event.action,
+            actorDisplayName: event.actor_display_name,
+            actorUsername: event.actor_username,
+            tenantId: event.tenant_id,
+            tenantName: event.tenant_name,
+            happenedAt: event.happened_at.toISOString(),
           })),
         };
       } catch (error) {

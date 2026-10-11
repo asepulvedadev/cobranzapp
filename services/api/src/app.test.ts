@@ -56,6 +56,7 @@ function dependencies(overrides?: { authService?: Partial<AuthService> }) {
     overview: vi.fn(async () => ({
       metrics: { tenants: 0, activeTenants: 0, users: 1, activeMemberships: 0 },
       tenants: [],
+      activity: [],
     })),
     createTenant: vi.fn(async (_actor, input) => ({
       id: "5c58269f-ce16-4250-82e2-c0c16621b0fb",
@@ -119,6 +120,7 @@ function dependencies(overrides?: { authService?: Partial<AuthService> }) {
       branches: [],
       teams: [],
       pendingInvitations: [],
+      activity: [],
     })),
     updateSettings: vi.fn(async (_actor, _tenantId, input) => ({
       status: "updated",

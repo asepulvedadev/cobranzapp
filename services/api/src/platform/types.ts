@@ -13,6 +13,15 @@ export type PlatformOverview = {
     members: number;
     createdAt: string;
   }>;
+  activity: Array<{
+    id: string;
+    action: string;
+    actorDisplayName: string | null;
+    actorUsername: string | null;
+    tenantId: string | null;
+    tenantName: string | null;
+    happenedAt: string;
+  }>;
 };
 
 export type TenantStatus = PlatformOverview["tenants"][number]["status"];
