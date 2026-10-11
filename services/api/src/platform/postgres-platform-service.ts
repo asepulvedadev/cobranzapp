@@ -13,6 +13,19 @@ async function setPlatformContext(client: Pick<PoolClient, "query">, actorUserId
 
 export function createPostgresPlatformService(pool: Pool): PlatformService {
   return {
+    async systemStatus() {
+      const result = await pool.query<{ schema_version: string | null; checked_at: Date }>(
+        `SELECT max(name) AS schema_version, now() AS checked_at
+           FROM schema_migrations`,
+      );
+      const status = result.rows[0];
+      if (!status) throw new Error("Database status query did not return a record");
+      return {
+        schemaVersion: status.schema_version,
+        checkedAt: status.checked_at.toISOString(),
+      };
+    },
+
     async overview(actorUserId) {
       const client = await pool.connect();
       try {

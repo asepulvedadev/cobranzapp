@@ -73,6 +73,10 @@ function dependencies(overrides?: {
     ...overrides?.authService,
   };
   const platformService: PlatformService = {
+    systemStatus: vi.fn(async () => ({
+      schemaVersion: "0008_runtime_schema_visibility.sql",
+      checkedAt: "2026-10-11T00:00:00.000Z",
+    })),
     overview: vi.fn(async () => ({
       metrics: { tenants: 0, activeTenants: 0, users: 1, activeMemberships: 0 },
       tenants: [],
@@ -366,6 +370,39 @@ describe("authentication", () => {
 });
 
 describe("developer platform", () => {
+  it("reports a sanitized system status only to the developer", async () => {
+    const app = buildApp(dependencies());
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/platform/system-status",
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      api: { status: "operational", version: "test" },
+      database: {
+        status: "operational",
+        schemaVersion: "0008_runtime_schema_visibility.sql",
+      },
+      checkedAt: "2026-10-11T00:00:00.000Z",
+    });
+  });
+
+  it("denies system status to a tenant user", async () => {
+    const app = buildApp(
+      dependencies({ authService: { authenticate: vi.fn(async () => tenantOwner) } }),
+    );
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/platform/system-status",
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ error: { code: "DEVELOPER_REQUIRED" } });
+  });
+
   it("returns the overview for an authenticated developer", async () => {
     const app = buildApp(dependencies());
     apps.push(app);

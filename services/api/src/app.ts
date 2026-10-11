@@ -440,6 +440,17 @@ export function buildApp(dependencies: AppDependencies) {
     return dependencies.platformService.overview(session.user.id);
   });
 
+  app.get("/v1/platform/system-status", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const database = await dependencies.platformService.systemStatus();
+    return {
+      api: { status: "operational", version: dependencies.version },
+      database: { status: "operational", schemaVersion: database.schemaVersion },
+      checkedAt: database.checkedAt,
+    };
+  });
+
   app.post("/v1/platform/tenants", async (request, reply) => {
     if (!requireAllowedOrigin(request, reply)) return;
     const session = await requireUser(request, reply);

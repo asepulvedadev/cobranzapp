@@ -31,6 +31,11 @@ export type PlatformOverview = {
 
 export type TenantStatus = PlatformOverview["tenants"][number]["status"];
 
+export type PlatformDatabaseStatus = {
+  schemaVersion: string | null;
+  checkedAt: string;
+};
+
 export type TenantStatusUpdateResult =
   | {
       status: "updated";
@@ -45,6 +50,7 @@ export type TenantStatusUpdateResult =
 
 export interface PlatformService {
   overview(actorUserId: string): Promise<PlatformOverview>;
+  systemStatus(): Promise<PlatformDatabaseStatus>;
   createTenant(
     actorUserId: string,
     input: { displayName: string; slug: string; requestId: string },

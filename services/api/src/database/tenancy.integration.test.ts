@@ -127,6 +127,10 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
 
     const platform = createPostgresPlatformService(runtimePool);
     const supportAccess = createPostgresSupportAccessService(runtimePool);
+    await expect(platform.systemStatus()).resolves.toMatchObject({
+      schemaVersion: "0008_runtime_schema_visibility.sql",
+      checkedAt: expect.any(String),
+    });
     const tenant = await platform.createTenant(developerId, {
       displayName: "Tenant Integration",
       slug,
