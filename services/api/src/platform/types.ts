@@ -31,6 +31,23 @@ export type PlatformOverview = {
 
 export type TenantStatus = PlatformOverview["tenants"][number]["status"];
 
+export type TenantDirectoryQuery = {
+  search: string | null;
+  status: TenantStatus | null;
+  page: number;
+  pageSize: number;
+};
+
+export type TenantDirectory = {
+  tenants: PlatformOverview["tenants"];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
 export type PlatformDatabaseStatus = {
   schemaVersion: string | null;
   checkedAt: string;
@@ -50,6 +67,7 @@ export type TenantStatusUpdateResult =
 
 export interface PlatformService {
   overview(actorUserId: string): Promise<PlatformOverview>;
+  listTenants(actorUserId: string, query: TenantDirectoryQuery): Promise<TenantDirectory>;
   systemStatus(): Promise<PlatformDatabaseStatus>;
   createTenant(
     actorUserId: string,

@@ -82,6 +82,10 @@ function dependencies(overrides?: {
       tenants: [],
       activity: [],
     })),
+    listTenants: vi.fn(async (_actor, query) => ({
+      tenants: [],
+      pagination: { page: query.page, pageSize: query.pageSize, total: 0, totalPages: 1 },
+    })),
     createTenant: vi.fn(async (_actor, input) => ({
       id: "5c58269f-ce16-4250-82e2-c0c16621b0fb",
       displayName: input.displayName,
@@ -413,6 +417,56 @@ describe("developer platform", () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ metrics: { users: 1 }, tenants: [] });
+  });
+
+  it("filters and paginates the tenant directory for the developer", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/platform/tenants?q=Acme&status=active&page=2&pageSize=10",
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(deps.platformService.listTenants).toHaveBeenCalledWith(developer.id, {
+      search: "Acme",
+      status: "active",
+      page: 2,
+      pageSize: 10,
+    });
+    expect(response.json()).toEqual({
+      tenants: [],
+      pagination: { page: 2, pageSize: 10, total: 0, totalPages: 1 },
+    });
+  });
+
+  it("rejects invalid tenant directory filters", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/platform/tenants?status=unknown&page=0",
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ error: { code: "INVALID_TENANT_FILTERS" } });
+    expect(deps.platformService.listTenants).not.toHaveBeenCalled();
+  });
+
+  it("denies the tenant directory to tenant users", async () => {
+    const deps = dependencies({ authService: { authenticate: vi.fn(async () => tenantOwner) } });
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/platform/tenants",
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ error: { code: "DEVELOPER_REQUIRED" } });
+    expect(deps.platformService.listTenants).not.toHaveBeenCalled();
   });
 
   it("creates a draft tenant", async () => {

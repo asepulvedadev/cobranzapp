@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from "pg";
 import type {
   PlatformOverview,
   PlatformService,
+  TenantDirectory,
   TenantStatus,
   TenantStatusUpdateResult,
 } from "./types.js";
@@ -9,6 +10,34 @@ import type {
 async function setPlatformContext(client: Pick<PoolClient, "query">, actorUserId: string) {
   await client.query("SELECT set_config('app.user_id', $1, true)", [actorUserId]);
   await client.query("SELECT set_config('app.platform_role', 'developer', true)");
+}
+
+type TenantRow = {
+  id: string;
+  slug: string;
+  display_name: string;
+  status: PlatformOverview["tenants"][number]["status"];
+  members: string;
+  active_owner: boolean;
+  active_branch: boolean;
+  contact_email: boolean;
+  created_at: Date;
+};
+
+function mapTenant(tenant: TenantRow): PlatformOverview["tenants"][number] {
+  return {
+    id: tenant.id,
+    slug: tenant.slug,
+    displayName: tenant.display_name,
+    status: tenant.status,
+    members: Number(tenant.members),
+    readiness: {
+      activeOwner: tenant.active_owner,
+      activeBranch: tenant.active_branch,
+      contactEmail: tenant.contact_email,
+    },
+    createdAt: tenant.created_at.toISOString(),
+  };
 }
 
 export function createPostgresPlatformService(pool: Pool): PlatformService {
@@ -43,17 +72,7 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
               (SELECT count(*) FROM users WHERE status = 'active') AS users,
               (SELECT count(*) FROM tenant_memberships WHERE status = 'active') AS active_memberships`,
         );
-        const tenantsResult = await client.query<{
-          id: string;
-          slug: string;
-          display_name: string;
-          status: PlatformOverview["tenants"][number]["status"];
-          members: string;
-          active_owner: boolean;
-          active_branch: boolean;
-          contact_email: boolean;
-          created_at: Date;
-        }>(
+        const tenantsResult = await client.query<TenantRow>(
           `SELECT tenant.id, tenant.slug, tenant.display_name, tenant.status,
                     count(membership.user_id) FILTER (WHERE membership.status = 'active') AS members,
                     EXISTS (
@@ -107,19 +126,7 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             users: Number(metrics?.users ?? 0),
             activeMemberships: Number(metrics?.active_memberships ?? 0),
           },
-          tenants: tenantsResult.rows.map((tenant) => ({
-            id: tenant.id,
-            slug: tenant.slug,
-            displayName: tenant.display_name,
-            status: tenant.status,
-            members: Number(tenant.members),
-            readiness: {
-              activeOwner: tenant.active_owner,
-              activeBranch: tenant.active_branch,
-              contactEmail: tenant.contact_email,
-            },
-            createdAt: tenant.created_at.toISOString(),
-          })),
+          tenants: tenantsResult.rows.map(mapTenant),
           activity: activityResult.rows.map((event) => ({
             id: event.id,
             action: event.action,
@@ -130,6 +137,68 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             happenedAt: event.happened_at.toISOString(),
           })),
         };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async listTenants(actorUserId, query) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setPlatformContext(client, actorUserId);
+        const filter = `($1::text IS NULL OR tenant.display_name ILIKE '%' || $1 || '%'
+                         OR tenant.slug::text ILIKE '%' || $1 || '%')
+                        AND ($2::text IS NULL OR tenant.status = $2)`;
+        const countResult = await client.query<{ total: string }>(
+          `SELECT count(*) AS total
+               FROM tenants tenant
+              WHERE ${filter}`,
+          [query.search, query.status],
+        );
+        const total = Number(countResult.rows[0]?.total ?? 0);
+        const totalPages = Math.max(1, Math.ceil(total / query.pageSize));
+        const page = Math.min(query.page, totalPages);
+        const offset = (page - 1) * query.pageSize;
+        const tenantsResult = await client.query<TenantRow>(
+          `SELECT tenant.id, tenant.slug, tenant.display_name, tenant.status,
+                    count(membership.user_id) FILTER (WHERE membership.status = 'active') AS members,
+                    EXISTS (
+                      SELECT 1 FROM tenant_memberships owner_membership
+                       WHERE owner_membership.tenant_id = tenant.id
+                         AND owner_membership.role = 'owner'
+                         AND owner_membership.status = 'active'
+                    ) AS active_owner,
+                    EXISTS (
+                      SELECT 1 FROM branches branch
+                       WHERE branch.tenant_id = tenant.id AND branch.status = 'active'
+                    ) AS active_branch,
+                    EXISTS (
+                      SELECT 1 FROM tenant_settings settings
+                       WHERE settings.tenant_id = tenant.id AND settings.contact_email IS NOT NULL
+                    ) AS contact_email,
+                    tenant.created_at
+               FROM tenants tenant
+               LEFT JOIN tenant_memberships membership ON membership.tenant_id = tenant.id
+              WHERE ${filter}
+              GROUP BY tenant.id
+              ORDER BY tenant.created_at DESC, tenant.id DESC
+              LIMIT $3 OFFSET $4`,
+          [query.search, query.status, query.pageSize, offset],
+        );
+        await client.query("COMMIT");
+        return {
+          tenants: tenantsResult.rows.map(mapTenant),
+          pagination: {
+            page,
+            pageSize: query.pageSize,
+            total,
+            totalPages,
+          },
+        } satisfies TenantDirectory;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

@@ -142,6 +142,17 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       requestId: `test-secondary-${suffix}`,
     });
     expect(tenant.status).toBe("draft");
+    await expect(
+      platform.listTenants(developerId, {
+        search: secondSlug,
+        status: "draft",
+        page: 99,
+        pageSize: 1,
+      }),
+    ).resolves.toMatchObject({
+      tenants: [{ id: secondTenant.id, slug: secondSlug, status: "draft" }],
+      pagination: { page: 1, pageSize: 1, total: 1, totalPages: 1 },
+    });
     const platformOverview = await platform.overview(developerId);
     expect(platformOverview.activity).toContainEqual(
       expect.objectContaining({

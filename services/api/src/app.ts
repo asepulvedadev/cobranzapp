@@ -43,6 +43,12 @@ const tenantTeamMemberParamsSchema = z.object({
 });
 const sessionIdParamsSchema = z.object({ sessionId: z.uuid() });
 const tenantStatusSchema = z.object({ status: z.enum(["active", "suspended", "archived"]) });
+const tenantDirectoryQuerySchema = z.object({
+  q: z.string().trim().max(80).optional(),
+  status: z.enum(["draft", "active", "suspended", "archived"]).optional(),
+  page: z.coerce.number().int().min(1).max(100_000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+});
 const invitationTokenParamsSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{40,60}$/) });
 const invitationSchema = z.object({
   email: z.email().transform((value) => value.toLowerCase()),
@@ -449,6 +455,27 @@ export function buildApp(dependencies: AppDependencies) {
       database: { status: "operational", schemaVersion: database.schemaVersion },
       checkedAt: database.checkedAt,
     };
+  });
+
+  app.get("/v1/platform/tenants", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const parsed = tenantDirectoryQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_TENANT_FILTERS",
+        "Revisa los filtros del directorio de empresas.",
+        request.id,
+      );
+    }
+    return dependencies.platformService.listTenants(session.user.id, {
+      search: parsed.data.q || null,
+      status: parsed.data.status ?? null,
+      page: parsed.data.page,
+      pageSize: parsed.data.pageSize,
+    });
   });
 
   app.post("/v1/platform/tenants", async (request, reply) => {
