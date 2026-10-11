@@ -425,6 +425,16 @@ html:has(.panel-shell) {
   grid-column: 2;
 }
 
+.system-status-grid article.status-attention {
+  border-color: color-mix(in srgb, var(--panel-danger) 36%, var(--panel-line));
+  background: color-mix(in srgb, var(--panel-danger) 5%, var(--panel-surface));
+}
+
+.system-status-grid article.status-attention svg,
+.system-status-grid article.status-attention strong {
+  color: var(--panel-danger);
+}
+
 .dashboard-columns {
   display: grid;
   gap: 14px;
@@ -2305,7 +2315,7 @@ html:has(.panel-shell) {
 
 @media (min-width: 700px) {
   .system-status-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .support-session-banner {
@@ -2689,6 +2699,10 @@ html:has(.panel-shell) {
 }
 
 @media (min-width: 1050px) {
+  .system-status-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   .metric-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }

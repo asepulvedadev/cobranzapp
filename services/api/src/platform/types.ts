@@ -50,6 +50,15 @@ export type TenantDirectory = {
 
 export type PlatformDatabaseStatus = {
   schemaVersion: string | null;
+  jobs: {
+    status: "operational" | "attention";
+    due: number;
+    scheduled: number;
+    processing: number;
+    dead: number;
+    expiredLeases: number;
+    oldestDueAt: string | null;
+  };
   checkedAt: string;
 };
 
@@ -68,7 +77,7 @@ export type TenantStatusUpdateResult =
 export interface PlatformService {
   overview(actorUserId: string): Promise<PlatformOverview>;
   listTenants(actorUserId: string, query: TenantDirectoryQuery): Promise<TenantDirectory>;
-  systemStatus(): Promise<PlatformDatabaseStatus>;
+  systemStatus(actorUserId: string): Promise<PlatformDatabaseStatus>;
   createTenant(
     actorUserId: string,
     input: { displayName: string; slug: string; requestId: string },

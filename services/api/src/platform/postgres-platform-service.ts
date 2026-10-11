@@ -42,17 +42,76 @@ function mapTenant(tenant: TenantRow): PlatformOverview["tenants"][number] {
 
 export function createPostgresPlatformService(pool: Pool): PlatformService {
   return {
-    async systemStatus() {
-      const result = await pool.query<{ schema_version: string | null; checked_at: Date }>(
-        `SELECT max(name) AS schema_version, now() AS checked_at
-           FROM schema_migrations`,
-      );
-      const status = result.rows[0];
-      if (!status) throw new Error("Database status query did not return a record");
-      return {
-        schemaVersion: status.schema_version,
-        checkedAt: status.checked_at.toISOString(),
-      };
+    async systemStatus(actorUserId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setPlatformContext(client, actorUserId);
+        const result = await client.query<{
+          schema_version: string | null;
+          checked_at: Date;
+          due: string;
+          scheduled: string;
+          processing: string;
+          dead: string;
+          expired_leases: string;
+          oldest_due_at: Date | null;
+          oldest_due_seconds: string | null;
+        }>(
+          `SELECT
+              (SELECT max(name) FROM schema_migrations) AS schema_version,
+              now() AS checked_at,
+              count(*) FILTER (
+                WHERE status = 'pending' AND available_at <= now()
+              ) AS due,
+              count(*) FILTER (
+                WHERE status = 'pending' AND available_at > now()
+              ) AS scheduled,
+              count(*) FILTER (WHERE status = 'processing') AS processing,
+              count(*) FILTER (WHERE status = 'dead') AS dead,
+              count(*) FILTER (
+                WHERE status = 'processing' AND lease_expires_at <= now()
+              ) AS expired_leases,
+              min(available_at) FILTER (
+                WHERE status = 'pending' AND available_at <= now()
+              ) AS oldest_due_at,
+              extract(
+                epoch FROM now() - (
+                  min(available_at) FILTER (
+                    WHERE status = 'pending' AND available_at <= now()
+                  )
+                )
+              ) AS oldest_due_seconds
+             FROM outbox_events`,
+        );
+        await client.query("COMMIT");
+        const status = result.rows[0];
+        if (!status) throw new Error("Database status query did not return a record");
+        const dead = Number(status.dead);
+        const expiredLeases = Number(status.expired_leases);
+        const oldestDueSeconds = Number(status.oldest_due_seconds ?? 0);
+        return {
+          schemaVersion: status.schema_version,
+          jobs: {
+            status:
+              dead > 0 || expiredLeases > 0 || oldestDueSeconds >= 300
+                ? "attention"
+                : "operational",
+            due: Number(status.due),
+            scheduled: Number(status.scheduled),
+            processing: Number(status.processing),
+            dead,
+            expiredLeases,
+            oldestDueAt: status.oldest_due_at?.toISOString() ?? null,
+          },
+          checkedAt: status.checked_at.toISOString(),
+        };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
     },
 
     async overview(actorUserId) {

@@ -60,6 +60,12 @@ El procesador registra `outbox_processed`, `outbox_failed` y un latido periódic
 contenido del evento. Los eventos fallidos usan intentos limitados y pasan a estado `dead`; no se
 reintentan indefinidamente.
 
+La consola del desarrollador muestra únicamente agregados de la cola: trabajos vencidos,
+programados, en proceso, con arrendamiento vencido y en estado `dead`. Marca **Requieren atención**
+cuando existe un trabajo `dead`, un arrendamiento vencido o el trabajo vencido más antiguo lleva
+cinco minutos sin procesarse. Un estado **Operativos** con la cola vacía no demuestra por sí solo
+que el proceso esté vivo; confirme también el latido en los registros del contenedor `worker`.
+
 ## Copias de seguridad
 
 Cada día a las 04:40 UTC se genera un volcado PostgreSQL en formato personalizado y se conservan 14 días en `/var/backups/cobranzapp`. Para ejecutarlo y validarlo manualmente:

@@ -449,10 +449,11 @@ export function buildApp(dependencies: AppDependencies) {
   app.get("/v1/platform/system-status", async (request, reply) => {
     const session = await requireUser(request, reply);
     if (!session || !requireDeveloper(session.user, request, reply)) return;
-    const database = await dependencies.platformService.systemStatus();
+    const database = await dependencies.platformService.systemStatus(session.user.id);
     return {
       api: { status: "operational", version: dependencies.version },
       database: { status: "operational", schemaVersion: database.schemaVersion },
+      jobs: database.jobs,
       checkedAt: database.checkedAt,
     };
   });

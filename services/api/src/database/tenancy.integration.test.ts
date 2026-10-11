@@ -127,8 +127,16 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
 
     const platform = createPostgresPlatformService(runtimePool);
     const supportAccess = createPostgresSupportAccessService(runtimePool);
-    await expect(platform.systemStatus()).resolves.toMatchObject({
+    await expect(platform.systemStatus(developerId)).resolves.toMatchObject({
       schemaVersion: "0009_support_access_expiry_outbox.sql",
+      jobs: {
+        status: expect.stringMatching(/^(operational|attention)$/),
+        due: expect.any(Number),
+        scheduled: expect.any(Number),
+        processing: expect.any(Number),
+        dead: expect.any(Number),
+        expiredLeases: expect.any(Number),
+      },
       checkedAt: expect.any(String),
     });
     const tenant = await platform.createTenant(developerId, {
@@ -142,6 +150,16 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       requestId: `test-secondary-${suffix}`,
     });
     expect(tenant.status).toBe("draft");
+    await ownerPool.query(
+      `INSERT INTO outbox_events (
+         tenant_id, event_type, aggregate_type, aggregate_id,
+         idempotency_key, status, max_attempts
+       ) VALUES ($1, 'test.dead', 'tenant', $1, $2, 'dead', 1)`,
+      [tenant.id, `platform-status-${suffix}`],
+    );
+    const alertedSystemStatus = await platform.systemStatus(developerId);
+    expect(alertedSystemStatus.jobs.status).toBe("attention");
+    expect(alertedSystemStatus.jobs.dead).toBeGreaterThan(0);
     await expect(
       platform.listTenants(developerId, {
         search: secondSlug,

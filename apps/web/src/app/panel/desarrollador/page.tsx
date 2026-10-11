@@ -1,4 +1,4 @@
-import { CloudCheck, Database, GitCommit } from "@phosphor-icons/react/dist/ssr";
+import { CloudCheck, Database, GitCommit, Queue } from "@phosphor-icons/react/dist/ssr";
 import { redirect } from "next/navigation";
 import type {
   PlatformOverview,
@@ -34,6 +34,22 @@ function directoryHref(page: number, search: string, status: string | null) {
   if (page > 1) params.set("pagina", String(page));
   const query = params.toString();
   return `/panel/desarrollador${query ? `?${query}` : ""}#empresas`;
+}
+
+function jobStatusDetail(jobs: PlatformSystemStatus["jobs"]) {
+  if (jobs.dead > 0) {
+    return jobs.dead === 1 ? "1 trabajo en cola de errores" : `${jobs.dead} trabajos con error`;
+  }
+  if (jobs.expiredLeases > 0) {
+    return jobs.expiredLeases === 1
+      ? "1 trabajo sin renovar"
+      : `${jobs.expiredLeases} trabajos sin renovar`;
+  }
+  if (jobs.due > 0) {
+    const pending = jobs.due === 1 ? "1 pendiente" : `${jobs.due} pendientes`;
+    return jobs.processing > 0 ? `${pending} · ${jobs.processing} en proceso` : pending;
+  }
+  return jobs.scheduled === 1 ? "1 trabajo programado" : `${jobs.scheduled} programados`;
 }
 
 export default async function DeveloperDashboard({
@@ -147,6 +163,16 @@ export default async function DeveloperDashboard({
               timeZone: "America/Bogota",
             }).format(new Date(system.checkedAt))}
           </small>
+        </article>
+        <article className={system.jobs.status === "attention" ? "status-attention" : undefined}>
+          <Queue aria-hidden="true" size={22} weight="fill" />
+          <div>
+            <span>Trabajos automáticos</span>
+            <strong>
+              {system.jobs.status === "attention" ? "Requieren atención" : "Operativos"}
+            </strong>
+          </div>
+          <small>{jobStatusDetail(system.jobs)}</small>
         </article>
       </section>
 

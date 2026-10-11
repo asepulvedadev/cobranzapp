@@ -85,6 +85,15 @@ export type TenantDirectory = {
 export type PlatformSystemStatus = {
   api: { status: "operational"; version: string };
   database: { status: "operational"; schemaVersion: string | null };
+  jobs: {
+    status: "operational" | "attention";
+    due: number;
+    scheduled: number;
+    processing: number;
+    dead: number;
+    expiredLeases: number;
+    oldestDueAt: string | null;
+  };
   checkedAt: string;
 };
 
