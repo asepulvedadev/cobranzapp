@@ -62,6 +62,24 @@ Consulte la [configuración de desarrollo](docs/development-setup.md) para conoc
 - Dirección técnica de respaldo: `https://cobranzapp.2.24.115.58.sslip.io`
 - Correo institucional aprobado: `info@cobranzaap.tech`
 
+## Despliegue seguro de identidad
+
+Antes de levantar una versión, el servidor ejecuta las migraciones con la cuenta propietaria de
+PostgreSQL. La API y el procesador se conectan después con `APP_DATABASE_USER`, una cuenta sin
+privilegios de superusuario ni capacidad para omitir RLS.
+
+El desarrollador se crea únicamente con el comando de aprovisionamiento y variables de entorno
+temporales; su contraseña no debe guardarse en el repositorio ni en `.env`:
+
+```bash
+DATABASE_URL="postgresql://..." \
+DEVELOPER_USERNAME="usuario" \
+DEVELOPER_EMAIL="correo@ejemplo.com" \
+DEVELOPER_DISPLAY_NAME="Nombre" \
+DEVELOPER_PASSWORD="contraseña-temporal" \
+pnpm db:bootstrap-developer
+```
+
 ## Próximo descubrimiento
 
 Determinar para qué usan principalmente los fondos los clientes; después, definir la clasificación del producto y someter a revisión legal la política de precios y cobranza. La base de ingeniería está autorizada, pero los flujos verticales de negocio siguen bloqueados por las condiciones pendientes de la hoja de ruta.
