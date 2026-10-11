@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
 import type {
+  SupportAccessMutationResult,
   SupportAccessRecord,
   SupportAccessRequestResult,
   SupportAccessService,
@@ -64,6 +65,13 @@ FROM tenant_support_access_requests access
 JOIN tenants tenant ON tenant.id = access.tenant_id
 JOIN users requester ON requester.id = access.requested_by
 LEFT JOIN users reviewer ON reviewer.id = access.reviewed_by`;
+
+async function loadAccess(client: PoolClient, accessId: string) {
+  const result = await client.query<SupportAccessRow>(`${selectAccess} WHERE access.id = $1`, [
+    accessId,
+  ]);
+  return result.rows[0] ? toRecord(result.rows[0]) : null;
+}
 
 export function createPostgresSupportAccessService(pool: Pool): SupportAccessService {
   return {
@@ -165,6 +173,139 @@ export function createPostgresSupportAccessService(pool: Pool): SupportAccessSer
         );
         await client.query("COMMIT");
         return result.rows.map(toRecord);
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async reviewAccess(actor, tenantId, accessId, action, requestId) {
+      if (actor.tenantRole !== "owner") return { status: "not_found" };
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setTenantContext(client, actor, tenantId);
+        const current = await client.query<SupportAccessRow>(
+          `${selectAccess}
+           WHERE access.id = $1 AND access.tenant_id = $2
+           FOR UPDATE OF access`,
+          [accessId, tenantId],
+        );
+        const row = current.rows[0];
+        if (!row) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies SupportAccessMutationResult;
+        }
+        const mayReviewPending = row.status === "pending" && action !== "revoke";
+        const mayRevokeActive =
+          row.status === "approved" &&
+          row.approved_until !== null &&
+          row.approved_until > new Date() &&
+          action === "revoke";
+        if (!mayReviewPending && !mayRevokeActive) {
+          await client.query("ROLLBACK");
+          return { status: "invalid_transition" } satisfies SupportAccessMutationResult;
+        }
+        const nextStatus =
+          action === "approve" ? "approved" : action === "deny" ? "denied" : "revoked";
+        await client.query(
+          `UPDATE tenant_support_access_requests
+              SET status = $3,
+                  reviewed_by = $4,
+                  reviewed_at = now(),
+                  approved_until = CASE
+                    WHEN $3 = 'approved'
+                    THEN now() + make_interval(mins => requested_duration_minutes)
+                    ELSE approved_until
+                  END,
+                  updated_at = now()
+            WHERE id = $1 AND tenant_id = $2`,
+          [accessId, tenantId, nextStatus, actor.userId],
+        );
+        const updated = await loadAccess(client, accessId);
+        if (!updated) throw new Error("Updated support access is unavailable");
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, $3, 'support_access', $4, $5, '{}'::jsonb)`,
+          [
+            tenantId,
+            actor.userId,
+            `support_access.${action === "approve" ? "approved" : action === "deny" ? "denied" : "revoked"}`,
+            accessId,
+            requestId,
+          ],
+        );
+        await client.query("COMMIT");
+        return { status: "updated", access: updated } satisfies SupportAccessMutationResult;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async cancelAccess(actorUserId, accessId, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setPlatformContext(client, actorUserId);
+        const current = await client.query<SupportAccessRow>(
+          `${selectAccess}
+           WHERE access.id = $1 AND access.requested_by = $2
+           FOR UPDATE OF access`,
+          [accessId, actorUserId],
+        );
+        const row = current.rows[0];
+        if (!row) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies SupportAccessMutationResult;
+        }
+        if (row.status !== "pending" && statusFromRow(row) !== "active") {
+          await client.query("ROLLBACK");
+          return { status: "invalid_transition" } satisfies SupportAccessMutationResult;
+        }
+        await client.query(
+          `UPDATE tenant_support_access_requests
+              SET status = 'revoked', reviewed_by = $2, reviewed_at = now(), updated_at = now()
+            WHERE id = $1`,
+          [accessId, actorUserId],
+        );
+        const updated = await loadAccess(client, accessId);
+        if (!updated) throw new Error("Cancelled support access is unavailable");
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'support_access.cancelled', 'support_access', $3, $4, '{}'::jsonb)`,
+          [row.tenant_id, actorUserId, accessId, requestId],
+        );
+        await client.query("COMMIT");
+        return { status: "updated", access: updated } satisfies SupportAccessMutationResult;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async findActiveAccess(actorUserId, tenantId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setPlatformContext(client, actorUserId);
+        const result = await client.query<SupportAccessRow>(
+          `${selectAccess}
+           WHERE access.tenant_id = $1 AND access.requested_by = $2
+             AND access.status = 'approved' AND access.approved_until > now()
+           ORDER BY access.approved_until DESC LIMIT 1`,
+          [tenantId, actorUserId],
+        );
+        await client.query("COMMIT");
+        return result.rows[0] ? toRecord(result.rows[0]) : null;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

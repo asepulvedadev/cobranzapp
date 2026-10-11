@@ -245,6 +245,93 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
         requestedByDisplayName: "Integration Developer",
       }),
     );
+    await expect(
+      supportAccess.reviewAccess(
+        ownerActor,
+        tenant.id,
+        supportRequest.access.id,
+        "approve",
+        `support-approve-${suffix}`,
+      ),
+    ).resolves.toMatchObject({
+      status: "updated",
+      access: { status: "active", expiresAt: expect.any(String) },
+    });
+    await expect(supportAccess.findActiveAccess(developerId, tenant.id)).resolves.toMatchObject({
+      id: supportRequest.access.id,
+      status: "active",
+    });
+    await expect(
+      supportAccess.reviewAccess(
+        ownerActor,
+        tenant.id,
+        supportRequest.access.id,
+        "approve",
+        `support-reapprove-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "invalid_transition" });
+    await ownerPool.query(
+      "UPDATE tenant_support_access_requests SET approved_until = now() - interval '1 second' WHERE id = $1",
+      [supportRequest.access.id],
+    );
+    await expect(supportAccess.findActiveAccess(developerId, tenant.id)).resolves.toBeNull();
+    expect(await supportAccess.listForDeveloper(developerId)).toContainEqual(
+      expect.objectContaining({ id: supportRequest.access.id, status: "expired" }),
+    );
+    const secondSupportRequest = await supportAccess.requestAccess(developerId, tenant.id, {
+      purpose: "Validar nuevamente el proceso de configuración",
+      durationMinutes: 30,
+      requestId: `support-request-second-${suffix}`,
+    });
+    expect(secondSupportRequest).toMatchObject({ status: "created" });
+    if (secondSupportRequest.status !== "created") throw new Error("Expected support request");
+    await expect(
+      supportAccess.cancelAccess(
+        developerId,
+        secondSupportRequest.access.id,
+        `support-cancel-${suffix}`,
+      ),
+    ).resolves.toMatchObject({ status: "updated", access: { status: "revoked" } });
+    const thirdSupportRequest = await supportAccess.requestAccess(developerId, tenant.id, {
+      purpose: "Revisar un incidente reportado por la empresa",
+      durationMinutes: 45,
+      requestId: `support-request-third-${suffix}`,
+    });
+    expect(thirdSupportRequest).toMatchObject({ status: "created" });
+    if (thirdSupportRequest.status !== "created") throw new Error("Expected support request");
+    await supportAccess.reviewAccess(
+      ownerActor,
+      tenant.id,
+      thirdSupportRequest.access.id,
+      "approve",
+      `support-approve-third-${suffix}`,
+    );
+    await expect(
+      supportAccess.reviewAccess(
+        ownerActor,
+        tenant.id,
+        thirdSupportRequest.access.id,
+        "revoke",
+        `support-revoke-${suffix}`,
+      ),
+    ).resolves.toMatchObject({ status: "updated", access: { status: "revoked" } });
+    await expect(supportAccess.findActiveAccess(developerId, tenant.id)).resolves.toBeNull();
+    const fourthSupportRequest = await supportAccess.requestAccess(developerId, tenant.id, {
+      purpose: "Comprobar el flujo de rechazo de soporte",
+      durationMinutes: 30,
+      requestId: `support-request-fourth-${suffix}`,
+    });
+    expect(fourthSupportRequest).toMatchObject({ status: "created" });
+    if (fourthSupportRequest.status !== "created") throw new Error("Expected support request");
+    await expect(
+      supportAccess.reviewAccess(
+        ownerActor,
+        tenant.id,
+        fourthSupportRequest.access.id,
+        "deny",
+        `support-deny-${suffix}`,
+      ),
+    ).resolves.toMatchObject({ status: "updated", access: { status: "denied" } });
     const pendingInvitation = await tenancy.createInvitation(ownerActor, tenant.id, {
       email: `supervisor-${suffix}@example.com`,
       role: "supervisor",
