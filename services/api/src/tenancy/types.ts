@@ -40,6 +40,14 @@ export type TenantOverview = {
     address: string | null;
     version: number;
   };
+  settingsHistory: Array<{
+    version: number;
+    primaryColor: string;
+    accentColor: string;
+    contactEmail: string | null;
+    changedByDisplayName: string;
+    changedAt: string;
+  }>;
   members: Array<{
     userId: string;
     displayName: string;

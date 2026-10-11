@@ -383,6 +383,29 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
             WHERE tenant_id = $1`,
           [tenantId],
         );
+        const maySeeSettingsHistory =
+          actor.tenantRole === "owner" || actor.tenantRole === "supervisor";
+        const settingsHistory = maySeeSettingsHistory
+          ? await client.query<{
+              version: number;
+              primary_color: string;
+              accent_color: string;
+              contact_email: string | null;
+              changed_by_display_name: string;
+              changed_at: Date;
+            }>(
+              `SELECT history.version, history.primary_color, history.accent_color,
+                      history.contact_email,
+                      changed_by.display_name AS changed_by_display_name,
+                      history.changed_at
+                 FROM tenant_setting_versions history
+                 JOIN users changed_by ON changed_by.id = history.changed_by
+                WHERE history.tenant_id = $1
+                ORDER BY history.version DESC
+                LIMIT 12`,
+              [tenantId],
+            )
+          : { rows: [] };
         const branches = await client.query<{
           id: string;
           code: string;
@@ -500,6 +523,14 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
             address: tenantSettings.address,
             version: tenantSettings.version,
           },
+          settingsHistory: settingsHistory.rows.map((version) => ({
+            version: version.version,
+            primaryColor: version.primary_color,
+            accentColor: version.accent_color,
+            contactEmail: version.contact_email,
+            changedByDisplayName: version.changed_by_display_name,
+            changedAt: version.changed_at.toISOString(),
+          })),
           members: members.rows.map((member) => ({
             userId: member.user_id,
             displayName: member.display_name,
@@ -588,6 +619,17 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           await client.query("ROLLBACK");
           return exists.rows[0]?.exists ? { status: "stale" } : { status: "not_found" };
         }
+        await client.query(
+          `INSERT INTO tenant_setting_versions (
+             tenant_id, version, primary_color, accent_color, contact_email,
+             contact_phone, address, changed_by, changed_at
+           )
+           SELECT tenant_id, version, primary_color, accent_color, contact_email,
+                  contact_phone, address, updated_by, updated_at
+             FROM tenant_settings
+            WHERE tenant_id = $1`,
+          [tenantId],
+        );
         await client.query(
           `INSERT INTO audit_events
              (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)

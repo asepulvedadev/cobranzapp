@@ -194,6 +194,12 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     expect(ownerOverview?.tenant.slug).toBe(slug);
     expect(ownerOverview?.metrics.members).toBe(1);
     expect(ownerOverview?.settings.version).toBe(1);
+    expect(ownerOverview?.settingsHistory).toContainEqual(
+      expect.objectContaining({
+        version: 1,
+        changedByDisplayName: "Integration Developer",
+      }),
+    );
 
     await expect(
       platform.updateTenantStatus(developerId, tenant.id, "active", `activate-unready-${suffix}`),
@@ -314,6 +320,17 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     const configuredOverview = await tenancy.overview(ownerActor, tenant.id);
     expect(configuredOverview?.metrics).toMatchObject({ branches: 1, teams: 1 });
     expect(configuredOverview?.settings.contactEmail).toBe(`operations-${suffix}@example.com`);
+    expect(configuredOverview?.settingsHistory).toEqual([
+      expect.objectContaining({
+        version: 2,
+        contactEmail: `operations-${suffix}@example.com`,
+        changedByDisplayName: "Invited Owner",
+      }),
+      expect.objectContaining({
+        version: 1,
+        changedByDisplayName: "Integration Developer",
+      }),
+    ]);
     expect(configuredOverview?.teams[0]?.memberIds).toContain(memberId);
     expect(configuredOverview?.activity).toContainEqual(
       expect.objectContaining({

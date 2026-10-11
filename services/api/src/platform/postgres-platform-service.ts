@@ -128,6 +128,17 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           [tenant.id, actorUserId],
         );
         await client.query(
+          `INSERT INTO tenant_setting_versions (
+             tenant_id, version, primary_color, accent_color, contact_email,
+             contact_phone, address, changed_by, changed_at
+           )
+           SELECT tenant_id, version, primary_color, accent_color, contact_email,
+                  contact_phone, address, updated_by, updated_at
+             FROM tenant_settings
+            WHERE tenant_id = $1`,
+          [tenant.id],
+        );
+        await client.query(
           `INSERT INTO audit_events (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
            VALUES ($1, $2, 'tenant.created', 'tenant', $1, $3, jsonb_build_object('slug', $4::text))`,
           [tenant.id, actorUserId, input.requestId, tenant.slug],

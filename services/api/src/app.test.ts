@@ -119,6 +119,7 @@ function dependencies(overrides?: { authService?: Partial<AuthService> }) {
         address: null,
         version: 1,
       },
+      settingsHistory: [],
       members: [],
       branches: [],
       teams: [],
