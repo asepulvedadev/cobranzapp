@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef } from "react";
+import { heroMotionFrame, heroScrollProgress } from "../lib/hero-motion";
 
 const scenes = [
   {
@@ -34,55 +35,43 @@ const scenes = [
   },
 ];
 
-const cameraPoints = [
-  { x: 0, y: 0, scale: 1 },
-  { x: 13, y: 8, scale: 1.34 },
-  { x: -3, y: -1, scale: 1.48 },
-  { x: -18, y: -8, scale: 1.36 },
-];
-
-function interpolate(start: number, end: number, amount: number) {
-  return start + (end - start) * amount;
-}
-
 export function ScrollWorldExperience() {
   const sectionRef = useRef<HTMLElement>(null);
+  const stickyRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const section = sectionRef.current;
+    const sticky = stickyRef.current;
     const image = imageRef.current;
     const progress = progressRef.current;
-    if (!section || !image || !progress) return;
+    if (!section || !sticky || !image || !progress) return;
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const shortViewport = window.matchMedia("(max-width: 860px) and (max-height: 600px)");
     let frame = 0;
     let activeScene = -1;
+    let previousRatio = -1;
 
     const render = () => {
       frame = 0;
-      const mobile = window.innerWidth <= 860;
-      if (mobile || reduceMotion.matches) {
+      if (reduceMotion.matches || shortViewport.matches) {
+        section.dataset.motion = "static";
         image.style.transform = "none";
         progress.style.transform = "scaleX(1)";
         section.dataset.scene = "0";
+        activeScene = -1;
+        previousRatio = -1;
         return;
       }
 
+      section.dataset.motion = "animated";
       const bounds = section.getBoundingClientRect();
-      const scrollable = Math.max(section.offsetHeight - window.innerHeight, 1);
-      const ratio = Math.min(Math.max(-bounds.top / scrollable, 0), 1);
-      const position = ratio * (cameraPoints.length - 1);
-      const segment = Math.min(Math.floor(position), cameraPoints.length - 2);
-      const localProgress = position - segment;
-      const eased = localProgress * localProgress * (3 - 2 * localProgress);
-      const from = cameraPoints[segment];
-      const to = cameraPoints[segment + 1];
-      const x = interpolate(from.x, to.x, eased);
-      const y = interpolate(from.y, to.y, eased);
-      const scale = interpolate(from.scale, to.scale, eased);
-      const nextScene = Math.min(Math.round(position), scenes.length - 1);
+      const ratio = heroScrollProgress(bounds.top, section.offsetHeight, sticky.offsetHeight);
+      if (ratio === previousRatio) return;
+      previousRatio = ratio;
+      const { x, y, scale, scene: nextScene } = heroMotionFrame(ratio);
 
       image.style.transform = `translate3d(${x}%, ${y}%, 0) scale(${scale})`;
       progress.style.transform = `scaleX(${ratio})`;
@@ -100,24 +89,33 @@ export function ScrollWorldExperience() {
     window.addEventListener("scroll", requestRender, { passive: true });
     window.addEventListener("resize", requestRender);
     reduceMotion.addEventListener("change", requestRender);
+    shortViewport.addEventListener("change", requestRender);
 
     return () => {
       window.removeEventListener("scroll", requestRender);
       window.removeEventListener("resize", requestRender);
       reduceMotion.removeEventListener("change", requestRender);
+      shortViewport.removeEventListener("change", requestRender);
       if (frame) window.cancelAnimationFrame(frame);
     };
   }, []);
 
   return (
-    <section className="scroll-world" id="como-funciona" ref={sectionRef} data-scene="0">
-      <div className="scroll-world-sticky">
+    <section
+      className="scroll-world"
+      id="como-funciona"
+      ref={sectionRef}
+      data-scene="0"
+      data-motion="animated"
+    >
+      <div className="scroll-world-sticky" ref={stickyRef}>
         <div className="scroll-world-camera" ref={imageRef}>
           <Image
             src="/images/cobranzaap-world.webp"
             alt="Recorrido ilustrado por la oficina, la ruta, la supervisión y el cierre de cobranza"
             fill
             priority
+            unoptimized
             sizes="100vw"
           />
         </div>

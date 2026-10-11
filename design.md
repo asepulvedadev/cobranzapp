@@ -209,6 +209,14 @@ Every major screen/component needs loading, empty, error, denied, offline, stale
 
 Toda interfaz y comunicación visible para el público usa español colombiano neutral (`es-CO`). Los identificadores técnicos internos pueden permanecer en inglés. Esta decisión de idioma no cambia el sistema visual.
 
+### Public landing hero: shared desktop and phone scroll experience
+
+The user requested the desktop hero effect on mobile as well. This is a marketing-only exception to the operational-screen motion limits above: native vertical scrolling drives the existing illustration's pan/zoom, four story beats and route progress on both desktop and portrait phones. It is not a new video, WebGL scene or generated asset, and does not animate financial totals.
+
+On phones, shorten the scroll distance and adapt typography, overlays and progress spacing to the viewport. Keep ordinary touch scrolling and direct navigation to plans; never intercept wheel/touch input or force the visitor to finish the sequence. Animate transforms/opacity through one coalesced animation-frame callback, not React state per scroll event. Measure progress against the actual sticky frame to avoid using a changing mobile browser chrome height. Serve the existing compressed WebP at its native resolution: viewport-width image variants undersample a tall portrait cover, while upscaled variants would increase decoder memory without adding source detail.
+
+Reduced-motion preference and short phone/landscape viewports use a static, readable four-card layout. Switching that preference or rotating the device must correctly restore the animated scene index. Desktop behavior and the Colombia hero/Cúcuta footer wording remain unchanged. Browser emulation verifies layout and state transitions; smoothness on physical Android/iOS hardware remains a release-review item.
+
 ## 10. Tenant branding presentation
 
 ### Application identity: cobranzapp
