@@ -29,7 +29,16 @@ export type TenantOverview = {
   metrics: {
     members: number;
     branches: number;
+    teams: number;
     pendingInvitations: number;
+  };
+  settings: {
+    primaryColor: string;
+    accentColor: string;
+    contactEmail: string | null;
+    contactPhone: string | null;
+    address: string | null;
+    version: number;
   };
   members: Array<{
     userId: string;
@@ -42,6 +51,13 @@ export type TenantOverview = {
   branches: Array<{
     id: string;
     code: string;
+    displayName: string;
+    status: "active" | "inactive";
+  }>;
+  teams: Array<{
+    id: string;
+    branchId: string | null;
+    branchName: string | null;
     displayName: string;
     status: "active" | "inactive";
   }>;
@@ -84,4 +100,23 @@ export interface TenancyService {
     requestId: string,
   ): Promise<InvitationAcceptanceResult>;
   overview(actor: TenantActor, tenantId: string): Promise<TenantOverview | null>;
+  updateSettings(
+    actor: TenantActor,
+    tenantId: string,
+    input: TenantOverview["settings"] & { requestId: string },
+  ): Promise<
+    | { status: "updated"; settings: TenantOverview["settings"] }
+    | { status: "stale" }
+    | { status: "not_found" }
+  >;
+  createBranch(
+    actor: TenantActor,
+    tenantId: string,
+    input: { code: string; displayName: string; requestId: string },
+  ): Promise<TenantOverview["branches"][number] | null>;
+  createTeam(
+    actor: TenantActor,
+    tenantId: string,
+    input: { branchId: string | null; displayName: string; requestId: string },
+  ): Promise<TenantOverview["teams"][number] | null>;
 }

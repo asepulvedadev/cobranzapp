@@ -14,6 +14,24 @@ const developer: AuthenticatedUser = {
   memberships: [],
 };
 
+const tenantOwner: AuthenticatedUser = {
+  ...developer,
+  id: "88e9c535-a13b-4f99-a99c-b1bc4f3b9f45",
+  username: "propietario",
+  email: "owner@example.com",
+  displayName: "Propietario",
+  platformRole: null,
+  mustChangePassword: false,
+  memberships: [
+    {
+      tenantId: "5c58269f-ce16-4250-82e2-c0c16621b0fb",
+      tenantName: "Empresa Uno",
+      tenantSlug: "empresa-uno",
+      role: "owner",
+    },
+  ],
+};
+
 function dependencies(overrides?: { authService?: Partial<AuthService> }) {
   const authService: AuthService = {
     login: vi.fn(async () => ({ token: "session-token", user: developer })),
@@ -34,6 +52,17 @@ function dependencies(overrides?: { authService?: Partial<AuthService> }) {
       status: "draft",
       members: 0,
       createdAt: "2026-10-11T00:00:00.000Z",
+    })),
+    updateTenantStatus: vi.fn(async (_actor, tenantId, status) => ({
+      status: "updated",
+      tenant: {
+        id: tenantId,
+        displayName: "Empresa Uno",
+        slug: "empresa-uno",
+        status,
+        members: 1,
+        createdAt: "2026-10-11T00:00:00.000Z",
+      },
     })),
   };
   const tenancyService: TenancyService = {
@@ -65,10 +94,43 @@ function dependencies(overrides?: { authService?: Partial<AuthService> }) {
         currency: "COP",
       },
       actorRole: "owner",
-      metrics: { members: 1, branches: 0, pendingInvitations: 0 },
+      metrics: { members: 1, branches: 0, teams: 0, pendingInvitations: 0 },
+      settings: {
+        primaryColor: "#171717",
+        accentColor: "#FBBF24",
+        contactEmail: null,
+        contactPhone: null,
+        address: null,
+        version: 1,
+      },
       members: [],
       branches: [],
+      teams: [],
       pendingInvitations: [],
+    })),
+    updateSettings: vi.fn(async (_actor, _tenantId, input) => ({
+      status: "updated",
+      settings: {
+        primaryColor: input.primaryColor,
+        accentColor: input.accentColor,
+        contactEmail: input.contactEmail,
+        contactPhone: input.contactPhone,
+        address: input.address,
+        version: input.version + 1,
+      },
+    })),
+    createBranch: vi.fn(async (_actor, _tenantId, input) => ({
+      id: "9ec06ada-07c8-42ba-b1f8-af0fc43c75e4",
+      code: input.code,
+      displayName: input.displayName,
+      status: "active",
+    })),
+    createTeam: vi.fn(async (_actor, _tenantId, input) => ({
+      id: "4ffec9ec-1e7a-4a25-93f7-6b57776ce8af",
+      branchId: input.branchId,
+      branchName: input.branchId ? "Sede Centro" : null,
+      displayName: input.displayName,
+      status: "active",
     })),
   };
   return {
@@ -203,6 +265,29 @@ describe("developer platform", () => {
     expect(response.statusCode).toBe(201);
     expect(response.json()).toMatchObject({ invitation: { role: "owner" } });
   });
+
+  it("changes a tenant operational status", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/v1/platform/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/status",
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { status: "active" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ tenant: { status: "active" } });
+    expect(deps.platformService.updateTenantStatus).toHaveBeenCalledWith(
+      developer.id,
+      "5c58269f-ce16-4250-82e2-c0c16621b0fb",
+      "active",
+      expect.any(String),
+    );
+  });
 });
 
 describe("tenant onboarding", () => {
@@ -226,5 +311,53 @@ describe("tenant onboarding", () => {
     });
     expect(acceptance.statusCode).toBe(200);
     expect(acceptance.json()).toEqual({ tenantSlug: "empresa-uno" });
+  });
+
+  it("lets an owner configure the workspace, branches and teams", async () => {
+    const deps = dependencies({ authService: { authenticate: vi.fn(async () => tenantOwner) } });
+    const app = buildApp(deps);
+    apps.push(app);
+    const headers = {
+      cookie: "cobranzapp_session=session-token",
+      origin: "https://cobranzaap.tech",
+    };
+    const tenantId = tenantOwner.memberships[0]?.tenantId;
+
+    const settings = await app.inject({
+      method: "PATCH",
+      url: `/v1/tenants/${tenantId}/settings`,
+      headers,
+      payload: {
+        primaryColor: "#171717",
+        accentColor: "#FBBF24",
+        contactEmail: "operaciones@example.com",
+        contactPhone: "+57 300 123 4567",
+        address: "Carrera 10 # 20-30, Bogotá",
+        version: 1,
+      },
+    });
+    expect(settings.statusCode).toBe(200);
+    expect(settings.json()).toMatchObject({ settings: { version: 2 } });
+
+    const branch = await app.inject({
+      method: "POST",
+      url: `/v1/tenants/${tenantId}/branches`,
+      headers,
+      payload: { code: "centro", displayName: "Sede Centro" },
+    });
+    expect(branch.statusCode).toBe(201);
+    expect(branch.json()).toMatchObject({ branch: { code: "centro" } });
+
+    const team = await app.inject({
+      method: "POST",
+      url: `/v1/tenants/${tenantId}/teams`,
+      headers,
+      payload: {
+        branchId: "9ec06ada-07c8-42ba-b1f8-af0fc43c75e4",
+        displayName: "Ruta Centro",
+      },
+    });
+    expect(team.statusCode).toBe(201);
+    expect(team.json()).toMatchObject({ team: { displayName: "Ruta Centro" } });
   });
 });

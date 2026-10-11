@@ -117,6 +117,67 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     );
     expect(ownerOverview?.tenant.slug).toBe(slug);
     expect(ownerOverview?.metrics.members).toBe(1);
+    expect(ownerOverview?.settings.version).toBe(1);
+
+    await expect(
+      platform.updateTenantStatus(developerId, tenant.id, "active", `activate-unready-${suffix}`),
+    ).resolves.toMatchObject({
+      status: "not_ready",
+      missing: expect.arrayContaining(["active_branch", "contact_email"]),
+    });
+
+    const ownerActor = {
+      userId: ownerLogin?.user.id ?? "",
+      platformRole: null,
+      tenantRole: "owner" as const,
+    };
+    const settings = await tenancy.updateSettings(ownerActor, tenant.id, {
+      primaryColor: "#171717",
+      accentColor: "#FBBF24",
+      contactEmail: `operations-${suffix}@example.com`,
+      contactPhone: "+57 300 123 4567",
+      address: "Carrera 10 # 20-30, Bogotá",
+      version: 1,
+      requestId: `settings-${suffix}`,
+    });
+    expect(settings).toMatchObject({ status: "updated", settings: { version: 2 } });
+    await expect(
+      tenancy.updateSettings(ownerActor, tenant.id, {
+        primaryColor: "#171717",
+        accentColor: "#FBBF24",
+        contactEmail: `stale-${suffix}@example.com`,
+        contactPhone: null,
+        address: null,
+        version: 1,
+        requestId: `settings-stale-${suffix}`,
+      }),
+    ).resolves.toEqual({ status: "stale" });
+
+    const branch = await tenancy.createBranch(ownerActor, tenant.id, {
+      code: "centro",
+      displayName: "Sede Centro",
+      requestId: `branch-${suffix}`,
+    });
+    expect(branch).toMatchObject({ code: "centro", status: "active" });
+    const team = await tenancy.createTeam(ownerActor, tenant.id, {
+      branchId: branch?.id ?? null,
+      displayName: "Ruta Centro",
+      requestId: `team-${suffix}`,
+    });
+    expect(team).toMatchObject({ displayName: "Ruta Centro", branchName: "Sede Centro" });
+
+    const configuredOverview = await tenancy.overview(ownerActor, tenant.id);
+    expect(configuredOverview?.metrics).toMatchObject({ branches: 1, teams: 1 });
+    expect(configuredOverview?.settings.contactEmail).toBe(`operations-${suffix}@example.com`);
+    await expect(
+      platform.updateTenantStatus(developerId, tenant.id, "active", `activate-${suffix}`),
+    ).resolves.toMatchObject({ status: "updated", tenant: { status: "active" } });
+    await expect(
+      platform.updateTenantStatus(developerId, tenant.id, "suspended", `suspend-${suffix}`),
+    ).resolves.toMatchObject({ status: "updated", tenant: { status: "suspended" } });
+    await expect(
+      platform.updateTenantStatus(developerId, tenant.id, "active", `restore-${suffix}`),
+    ).resolves.toMatchObject({ status: "updated", tenant: { status: "active" } });
 
     const existingInvitation = await tenancy.createInvitation(
       { userId: developerId, platformRole: "developer", tenantRole: null },
@@ -141,6 +202,23 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
         `accept-existing-${suffix}`,
       ),
     ).resolves.toEqual({ status: "accepted", tenantSlug: secondSlug });
+
+    const otherBranch = await tenancy.createBranch(
+      { userId: developerId, platformRole: "developer", tenantRole: null },
+      secondTenant.id,
+      {
+        code: "norte",
+        displayName: "Sede Norte",
+        requestId: `branch-other-${suffix}`,
+      },
+    );
+    await expect(
+      tenancy.createTeam(ownerActor, tenant.id, {
+        branchId: otherBranch?.id ?? null,
+        displayName: "Equipo cruzado",
+        requestId: `team-cross-tenant-${suffix}`,
+      }),
+    ).resolves.toBeNull();
 
     await ownerPool.query(
       `INSERT INTO tenant_memberships (tenant_id, user_id, role, created_by)

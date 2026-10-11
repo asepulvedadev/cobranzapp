@@ -310,13 +310,28 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
         const metrics = await client.query<{
           members: string;
           branches: string;
+          teams: string;
           pending_invitations: string;
         }>(
           `SELECT
              (SELECT count(*) FROM tenant_memberships WHERE tenant_id = $1 AND status = 'active') AS members,
              (SELECT count(*) FROM branches WHERE tenant_id = $1 AND status = 'active') AS branches,
+             (SELECT count(*) FROM teams WHERE tenant_id = $1 AND status = 'active') AS teams,
              (SELECT count(*) FROM tenant_invitations WHERE tenant_id = $1 AND accepted_at IS NULL
                AND revoked_at IS NULL AND expires_at > now()) AS pending_invitations`,
+          [tenantId],
+        );
+        const settings = await client.query<{
+          primary_color: string;
+          accent_color: string;
+          contact_email: string | null;
+          contact_phone: string | null;
+          address: string | null;
+          version: number;
+        }>(
+          `SELECT primary_color, accent_color, contact_email, contact_phone, address, version
+             FROM tenant_settings
+            WHERE tenant_id = $1`,
           [tenantId],
         );
         const branches = await client.query<{
@@ -326,6 +341,22 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           status: "active" | "inactive";
         }>(
           "SELECT id, code, display_name, status FROM branches WHERE tenant_id = $1 ORDER BY display_name",
+          [tenantId],
+        );
+        const teams = await client.query<{
+          id: string;
+          branch_id: string | null;
+          branch_name: string | null;
+          display_name: string;
+          status: "active" | "inactive";
+        }>(
+          `SELECT team.id, team.branch_id, branch.display_name AS branch_name,
+                  team.display_name, team.status
+             FROM teams team
+             LEFT JOIN branches branch
+               ON branch.tenant_id = team.tenant_id AND branch.id = team.branch_id
+            WHERE team.tenant_id = $1
+            ORDER BY team.display_name`,
           [tenantId],
         );
         const mayManagePeople = actor.tenantRole === "owner" || actor.tenantRole === "supervisor";
@@ -362,8 +393,10 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
                 [tenantId],
               )
             : { rows: [] };
-        await client.query("COMMIT");
         const counts = metrics.rows[0];
+        const tenantSettings = settings.rows[0];
+        if (!tenantSettings) throw new Error("Tenant settings are unavailable");
+        await client.query("COMMIT");
         return {
           tenant: {
             id: tenantRow.id,
@@ -378,7 +411,16 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           metrics: {
             members: Number(counts?.members ?? 0),
             branches: Number(counts?.branches ?? 0),
+            teams: Number(counts?.teams ?? 0),
             pendingInvitations: Number(counts?.pending_invitations ?? 0),
+          },
+          settings: {
+            primaryColor: tenantSettings.primary_color,
+            accentColor: tenantSettings.accent_color,
+            contactEmail: tenantSettings.contact_email,
+            contactPhone: tenantSettings.contact_phone,
+            address: tenantSettings.address,
+            version: tenantSettings.version,
           },
           members: members.rows.map((member) => ({
             userId: member.user_id,
@@ -394,6 +436,13 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
             displayName: branch.display_name,
             status: branch.status,
           })),
+          teams: teams.rows.map((team) => ({
+            id: team.id,
+            branchId: team.branch_id,
+            branchName: team.branch_name,
+            displayName: team.display_name,
+            status: team.status,
+          })),
           pendingInvitations: invitations.rows.map((invitation) => ({
             id: invitation.id,
             email: invitation.email,
@@ -401,6 +450,189 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
             expiresAt: invitation.expires_at.toISOString(),
           })),
         } satisfies TenantOverview;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async updateSettings(actor, tenantId, input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setActorContext(client, actor, tenantId);
+        const updated = await client.query<{
+          primary_color: string;
+          accent_color: string;
+          contact_email: string | null;
+          contact_phone: string | null;
+          address: string | null;
+          version: number;
+        }>(
+          `UPDATE tenant_settings
+              SET primary_color = $3,
+                  accent_color = $4,
+                  contact_email = $5,
+                  contact_phone = $6,
+                  address = $7,
+                  version = version + 1,
+                  updated_by = $8,
+                  updated_at = now()
+            WHERE tenant_id = $1 AND version = $2
+          RETURNING primary_color, accent_color, contact_email, contact_phone, address, version`,
+          [
+            tenantId,
+            input.version,
+            input.primaryColor,
+            input.accentColor,
+            input.contactEmail,
+            input.contactPhone,
+            input.address,
+            actor.userId,
+          ],
+        );
+        const row = updated.rows[0];
+        if (!row) {
+          const exists = await client.query<{ exists: boolean }>(
+            "SELECT EXISTS (SELECT 1 FROM tenant_settings WHERE tenant_id = $1) AS exists",
+            [tenantId],
+          );
+          await client.query("ROLLBACK");
+          return exists.rows[0]?.exists ? { status: "stale" } : { status: "not_found" };
+        }
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'tenant.settings_updated', 'tenant', $1, $3,
+                   jsonb_build_object('version', $4::integer))`,
+          [tenantId, actor.userId, input.requestId, row.version],
+        );
+        await client.query("COMMIT");
+        return {
+          status: "updated",
+          settings: {
+            primaryColor: row.primary_color,
+            accentColor: row.accent_color,
+            contactEmail: row.contact_email,
+            contactPhone: row.contact_phone,
+            address: row.address,
+            version: row.version,
+          },
+        } as const;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async createBranch(actor, tenantId, input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setActorContext(client, actor, tenantId);
+        const tenant = await client.query<{ id: string }>("SELECT id FROM tenants WHERE id = $1", [
+          tenantId,
+        ]);
+        if (!tenant.rows[0]) {
+          await client.query("ROLLBACK");
+          return null;
+        }
+        const created = await client.query<{
+          id: string;
+          code: string;
+          display_name: string;
+          status: "active" | "inactive";
+        }>(
+          `INSERT INTO branches (tenant_id, code, display_name, created_by)
+           VALUES ($1, $2, $3, $4)
+           RETURNING id, code, display_name, status`,
+          [tenantId, input.code, input.displayName, actor.userId],
+        );
+        const branch = created.rows[0];
+        if (!branch) throw new Error("Branch insert did not return a record");
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'branch.created', 'branch', $3, $4,
+                   jsonb_build_object('code', $5::text, 'displayName', $6::text))`,
+          [tenantId, actor.userId, branch.id, input.requestId, branch.code, branch.display_name],
+        );
+        await client.query("COMMIT");
+        return {
+          id: branch.id,
+          code: branch.code,
+          displayName: branch.display_name,
+          status: branch.status,
+        };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async createTeam(actor, tenantId, input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setActorContext(client, actor, tenantId);
+        const tenant = await client.query<{ id: string }>("SELECT id FROM tenants WHERE id = $1", [
+          tenantId,
+        ]);
+        if (!tenant.rows[0]) {
+          await client.query("ROLLBACK");
+          return null;
+        }
+        if (input.branchId) {
+          const branch = await client.query<{ id: string }>(
+            `SELECT id FROM branches
+              WHERE tenant_id = $1 AND id = $2 AND status = 'active'`,
+            [tenantId, input.branchId],
+          );
+          if (!branch.rows[0]) {
+            await client.query("ROLLBACK");
+            return null;
+          }
+        }
+        const created = await client.query<{
+          id: string;
+          branch_id: string | null;
+          display_name: string;
+          status: "active" | "inactive";
+        }>(
+          `INSERT INTO teams (tenant_id, branch_id, display_name, created_by)
+           VALUES ($1, $2, $3, $4)
+           RETURNING id, branch_id, display_name, status`,
+          [tenantId, input.branchId, input.displayName, actor.userId],
+        );
+        const team = created.rows[0];
+        if (!team) throw new Error("Team insert did not return a record");
+        const branch = team.branch_id
+          ? await client.query<{ display_name: string }>(
+              "SELECT display_name FROM branches WHERE tenant_id = $1 AND id = $2",
+              [tenantId, team.branch_id],
+            )
+          : { rows: [] };
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'team.created', 'team', $3, $4,
+                   jsonb_build_object('displayName', $5::text, 'branchId', $6::text))`,
+          [tenantId, actor.userId, team.id, input.requestId, team.display_name, team.branch_id],
+        );
+        await client.query("COMMIT");
+        return {
+          id: team.id,
+          branchId: team.branch_id,
+          branchName: branch.rows[0]?.display_name ?? null,
+          displayName: team.display_name,
+          status: team.status,
+        };
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

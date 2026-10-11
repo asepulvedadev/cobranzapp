@@ -30,6 +30,7 @@ const tenantSchema = z.object({
     .max(63),
 });
 const tenantIdParamsSchema = z.object({ tenantId: z.uuid() });
+const tenantStatusSchema = z.object({ status: z.enum(["active", "suspended", "archived"]) });
 const invitationTokenParamsSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{40,60}$/) });
 const invitationSchema = z.object({
   email: z.email().transform((value) => value.toLowerCase()),
@@ -43,6 +44,33 @@ const invitationAcceptanceSchema = z.object({
     .regex(/^[a-z0-9._-]{3,40}$/),
   displayName: z.string().trim().min(2).max(100),
   password: z.string().min(12).max(256),
+});
+const nullableText = (maxLength: number) =>
+  z.union([z.string().trim().min(1).max(maxLength), z.literal("").transform(() => null), z.null()]);
+const tenantSettingsSchema = z.object({
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  contactEmail: z.union([
+    z.email().transform((value) => value.toLowerCase()),
+    z.literal("").transform(() => null),
+    z.null(),
+  ]),
+  contactPhone: nullableText(30),
+  address: nullableText(240),
+  version: z.number().int().positive(),
+});
+const branchSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    .max(40),
+  displayName: z.string().trim().min(2).max(100),
+});
+const teamSchema = z.object({
+  branchId: z.uuid().nullable(),
+  displayName: z.string().trim().min(2).max(100),
 });
 
 export interface AppDependencies {
@@ -300,6 +328,57 @@ export function buildApp(dependencies: AppDependencies) {
     return reply.code(201).send({ tenant });
   });
 
+  app.patch("/v1/platform/tenants/:tenantId/status", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = tenantStatusSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_TENANT_STATUS",
+        "El estado solicitado no es válido.",
+        request.id,
+      );
+    }
+    const result = await dependencies.platformService.updateTenantStatus(
+      session.user.id,
+      params.data.tenantId,
+      body.data.status,
+      request.id,
+    );
+    switch (result.status) {
+      case "updated":
+        return reply.send({ tenant: result.tenant });
+      case "not_ready": {
+        const labels = {
+          active_owner: "un propietario activo",
+          active_branch: "una sede activa",
+          contact_email: "un correo de contacto",
+        };
+        return sendError(
+          reply,
+          409,
+          "TENANT_NOT_READY",
+          `Antes de activar la empresa configura ${result.missing.map((item) => labels[item]).join(", ")}.`,
+          request.id,
+        );
+      }
+      case "invalid_transition":
+        return sendError(
+          reply,
+          409,
+          "INVALID_TENANT_TRANSITION",
+          "Ese cambio de estado no está permitido.",
+          request.id,
+        );
+      default:
+        return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
+    }
+  });
+
   app.post("/v1/platform/tenants/:tenantId/invitations", async (request, reply) => {
     if (!requireAllowedOrigin(request, reply)) return;
     const session = await requireUser(request, reply);
@@ -487,6 +566,157 @@ export function buildApp(dependencies: AppDependencies) {
     if (!invitation)
       return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
     return reply.code(201).send({ invitation });
+  });
+
+  app.patch("/v1/tenants/:tenantId/settings", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = tenantSettingsSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_TENANT_SETTINGS",
+        "Revisa los datos de contacto y los colores.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (membership?.role !== "owner") {
+      return sendError(
+        reply,
+        403,
+        "OWNER_REQUIRED",
+        "Solo el propietario puede modificar la configuración.",
+        request.id,
+      );
+    }
+    const result = await dependencies.tenancyService.updateSettings(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      { ...body.data, requestId: request.id },
+    );
+    if (result.status === "stale") {
+      return sendError(
+        reply,
+        409,
+        "STALE_VERSION",
+        "La configuración cambió en otra sesión. Actualiza la página.",
+        request.id,
+      );
+    }
+    if (result.status === "not_found") {
+      return sendError(
+        reply,
+        404,
+        "TENANT_NOT_FOUND",
+        "La empresa no está disponible.",
+        request.id,
+      );
+    }
+    return reply.send({ settings: result.settings });
+  });
+
+  app.post("/v1/tenants/:tenantId/branches", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = branchSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_BRANCH",
+        "Revisa el nombre y el código de la sede.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (membership?.role !== "owner" && membership?.role !== "supervisor") {
+      return sendError(
+        reply,
+        403,
+        "MANAGER_REQUIRED",
+        "Solo propietarios y supervisores pueden crear sedes.",
+        request.id,
+      );
+    }
+    const branch = await dependencies.tenancyService.createBranch(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      { ...body.data, requestId: request.id },
+    );
+    if (!branch)
+      return sendError(
+        reply,
+        404,
+        "TENANT_NOT_FOUND",
+        "La empresa no está disponible.",
+        request.id,
+      );
+    return reply.code(201).send({ branch });
+  });
+
+  app.post("/v1/tenants/:tenantId/teams", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = teamSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_TEAM",
+        "Revisa el nombre y la sede del equipo.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (membership?.role !== "owner" && membership?.role !== "supervisor") {
+      return sendError(
+        reply,
+        403,
+        "MANAGER_REQUIRED",
+        "Solo propietarios y supervisores pueden crear equipos.",
+        request.id,
+      );
+    }
+    const team = await dependencies.tenancyService.createTeam(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      { ...body.data, requestId: request.id },
+    );
+    if (!team)
+      return sendError(
+        reply,
+        404,
+        "TENANT_OR_BRANCH_NOT_FOUND",
+        "La empresa o la sede no está disponible.",
+        request.id,
+      );
+    return reply.code(201).send({ team });
   });
 
   app.setErrorHandler((cause, request, reply) => {
