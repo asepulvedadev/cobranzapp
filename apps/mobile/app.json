@@ -13,7 +13,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cobranzapp.mobile"
+      "bundleIdentifier": "com.cobranzapp.mobile",
+      "infoPlist": {
+        "CFBundleDevelopmentRegion": "es_CO"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,6 +24,9 @@
         "foregroundImage": "./assets/icon.png"
       },
       "package": "com.cobranzapp.mobile"
+    },
+    "extra": {
+      "defaultLocale": "es-CO"
     }
   }
 }

@@ -1,10 +1,10 @@
 import Image from "next/image";
 
 const modules = [
-  "Tenant isolation",
-  "Borrower operations",
-  "Financial integrity",
-  "Field collections",
+  "Aislamiento entre empresas",
+  "Gestión de clientes",
+  "Integridad financiera",
+  "Cobranza en campo",
 ];
 
 export default function Home() {
@@ -15,22 +15,22 @@ export default function Home() {
           <Image src="/brand.svg" alt="" width="48" height="48" priority />
           <span>cobranzapp</span>
         </div>
-        <div className="status">Development foundation online</div>
-        <h1>Operational lending, built on auditable foundations.</h1>
+        <div className="status">Base de desarrollo activa</div>
+        <h1>Operación de crédito sobre bases auditables.</h1>
         <p>
-          The private repository, automated delivery pipeline, API, worker, PostgreSQL, and
-          production VPS runtime are ready for product development.
+          El repositorio privado, el despliegue automático, la API, el procesador de tareas,
+          PostgreSQL y el entorno del VPS están preparados para iniciar el desarrollo del producto.
         </p>
         <a className="button" href="/api/v1/status">
-          Check API status
+          Consultar estado de la API
         </a>
       </section>
-      <section className="grid" aria-label="Foundation modules">
+      <section className="grid" aria-label="Módulos base">
         {modules.map((module, index) => (
           <article className={index === 0 ? "card card-dark" : "card"} key={module}>
             <span>0{index + 1}</span>
             <h2>{module}</h2>
-            <p>Planned, gated, and ready to implement as a complete vertical slice.</p>
+            <p>Planificado y preparado para implementarse como un flujo vertical completo.</p>
           </article>
         ))}
       </section>

@@ -7,10 +7,10 @@ export default function App() {
       <StatusBar style="light" />
       <View style={styles.card}>
         <Image source={require("./assets/icon.png")} style={styles.logo} />
-        <Text style={styles.eyebrow}>DEVELOPMENT FOUNDATION</Text>
+        <Text style={styles.eyebrow}>BASE DE DESARROLLO</Text>
         <Text style={styles.title}>cobranzapp</Text>
         <Text style={styles.copy}>
-          The mobile workspace is ready for the first approved vertical slice.
+          El entorno móvil está preparado para construir el primer flujo vertical aprobado.
         </Text>
       </View>
     </SafeAreaView>

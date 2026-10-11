@@ -206,7 +206,7 @@ Every major screen/component needs loading, empty, error, denied, offline, stale
 - Micro-interactions: approximately 150–250 ms, opacity/color and subtle transition only; no animated amount counters during collection entry.
 - Respect reduced motion; no parallax, autoplay background scenes, continuous glow or moving financial totals.
 
-UI wording examples are neutral English planning labels, not finalized localization. Colombian Spanish localization can be approved separately without changing this visual system.
+Toda interfaz y comunicación visible para el público usa español colombiano neutral (`es-CO`). Los identificadores técnicos internos pueden permanecer en inglés. Esta decisión de idioma no cambia el sistema visual.
 
 ## 10. Tenant branding presentation
 

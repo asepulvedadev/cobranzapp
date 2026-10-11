@@ -1,12 +1,12 @@
-# Development Setup
+# Configuración de desarrollo
 
-## Requirements
+## Requisitos
 
-- Node.js 22.22 or newer
-- pnpm 10.33.2 through Corepack
-- Docker with Compose
+- Node.js 22.22 o superior
+- pnpm 10.33.2 mediante Corepack
+- Docker con Compose
 
-## Start locally
+## Inicio local
 
 ```bash
 cp .env.example .env
@@ -16,24 +16,24 @@ pnpm compose:up
 pnpm dev
 ```
 
-The web application runs on `http://localhost:3000`, the API on `http://localhost:3001`, and PostgreSQL is bound to local loopback on port `5432`.
+La aplicación web se ejecuta en `http://localhost:3000`, la API en `http://localhost:3001` y PostgreSQL escucha únicamente en la interfaz local, puerto `5432`.
 
-Start the Expo workspace separately:
+Inicie por separado el entorno de Expo:
 
 ```bash
 pnpm dev:mobile
 ```
 
-## Quality gate
+## Control de calidad
 
 ```bash
 pnpm check
 ```
 
-## Production delivery
+## Entrega a producción
 
-Every push to `main` runs the quality gate, builds immutable API, worker, and web images, publishes them to GHCR, and deploys the exact commit SHA to the restricted VPS deployment entrypoint. Pull requests run the same quality workflow without deploying. Production PostgreSQL is private to the Docker network; nginx reaches only loopback-bound web and API ports.
+Cada envío a `main` ejecuta el control de calidad, construye imágenes inmutables para la API, el procesador y la aplicación web, las publica en GHCR y despliega el SHA exacto de la confirmación mediante el punto de entrada restringido del VPS. Las solicitudes de integración ejecutan el mismo flujo de calidad sin desplegar. PostgreSQL permanece privado en la red de Docker; nginx solo accede a los puertos locales de la web y la API.
 
-The temporary development URL is `https://cobranzapp.2.24.115.58.sslip.io`. Replace it with the approved production domain before a live pilot.
+La dirección temporal de desarrollo es `https://cobranzapp.2.24.115.58.sslip.io`. Debe reemplazarse por el dominio de producción aprobado antes de un piloto real.
 
-Operational commands and recovery boundaries are documented in [the runbook](operations-runbook.md).
+Los comandos operativos y los límites de recuperación están documentados en el [manual de operaciones](operations-runbook.md).

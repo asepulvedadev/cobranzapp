@@ -34,7 +34,7 @@ This is a lending operations product, not an investment marketplace. The initial
 | No artificial intelligence | Required — latest instruction | No Hermes, LLMs, agents, machine learning, or model-based OCR |
 | First market | Confirmed by user | Colombia; other jurisdictions are outside the initial scope |
 | Currency | Confirmed example | Colombian pesos (COP) |
-| Locale and timezone | Proposed defaults | Spanish (`es-CO`), `America/Bogota` |
+| Locale and timezone | Confirmed by user | Colombian Spanish (`es-CO`), `America/Bogota` |
 | Lending capital | Assumed | Lender's own capital; platform does not supply or hold it |
 | Connectivity | Assumed | Intermittent connectivity for field collectors |
 | Initial scale | Assumed | Pilot envelope: 10 tenants, 100 staff, 10,000 active loans |

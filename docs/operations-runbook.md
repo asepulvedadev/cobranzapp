@@ -1,36 +1,36 @@
-# Operations Runbook
+# Manual de operaciones
 
-> **Status:** Active development infrastructure, 2026-10-11.
+> **Estado:** Infraestructura activa de desarrollo, 2026-10-11.
 
-## Service map
+## Mapa de servicios
 
-| Component | Location |
+| Componente | Ubicación |
 |---|---|
-| Private source repository | `github.com/asepulvedadev/cobranzapp` |
-| GitHub Actions | `.github/workflows/ci.yml` and `.github/workflows/deploy.yml` |
-| VPS | AutoKing shared host `2.24.115.58` |
-| Runtime directory | `/srv/cobranzapp` |
-| Temporary HTTPS URL | `https://cobranzapp.2.24.115.58.sslip.io` |
-| Web/API loopback ports | `127.0.0.1:13200` / `127.0.0.1:18200` |
-| nginx site | `/etc/nginx/sites-available/cobranzapp.conf` |
-| Deployment entrypoint | `/usr/local/sbin/cobranzapp-deploy-entry` |
-| Backup script | `/usr/local/sbin/cobranzapp-backup` |
+| Repositorio privado | `github.com/asepulvedadev/cobranzapp` |
+| GitHub Actions | `.github/workflows/ci.yml` y `.github/workflows/deploy.yml` |
+| VPS | Servidor compartido AutoKing `2.24.115.58` |
+| Directorio de ejecución | `/srv/cobranzapp` |
+| Dirección HTTPS temporal | `https://cobranzapp.2.24.115.58.sslip.io` |
+| Puertos locales web/API | `127.0.0.1:13200` / `127.0.0.1:18200` |
+| Sitio nginx | `/etc/nginx/sites-available/cobranzapp.conf` |
+| Punto de entrada de despliegue | `/usr/local/sbin/cobranzapp-deploy-entry` |
+| Script de copia de seguridad | `/usr/local/sbin/cobranzapp-backup` |
 
-The GitHub Actions SSH key is forced to the deployment entrypoint. It cannot request a shell, forward ports, or execute arbitrary commands. The entrypoint validates the commit SHA and authorized actor before invoking the root-owned deployment script.
+La clave SSH de GitHub Actions está limitada al punto de entrada de despliegue. No puede solicitar una consola, reenviar puertos ni ejecutar órdenes arbitrarias. El punto de entrada valida el SHA y el actor autorizado antes de invocar el script de despliegue, propiedad de `root`.
 
-## Normal release
+## Lanzamiento normal
 
-Push an approved commit to `main`. GitHub Actions:
+Envíe una confirmación aprobada a `main`. GitHub Actions:
 
-1. Runs formatting, type checking, unit tests, and builds.
-2. Builds API, worker, and web images and pushes commit-SHA tags to private GHCR packages.
-3. Connects with the restricted deployment key.
-4. Pulls the exact SHA, waits for healthy containers, and runs smoke tests.
-5. Records the release in `/srv/cobranzapp/.deployed-release`.
+1. Ejecuta formato, comprobación de tipos, pruebas unitarias y compilaciones.
+2. Construye las imágenes de la API, el procesador y la web, y publica etiquetas con el SHA en paquetes privados de GHCR.
+3. Se conecta mediante la clave restringida de despliegue.
+4. Descarga el SHA exacto, espera contenedores saludables y ejecuta pruebas de humo.
+5. Registra la versión en `/srv/cobranzapp/.deployed-release`.
 
-The deployment script restores the previous image tag when a later release fails and a previous release exists. Database migrations are intentionally absent until a reviewed migration strategy and first physical schema are approved.
+El script restaura la etiqueta anterior cuando falla una versión posterior y existe una versión previa. Las migraciones de base de datos no se incluyen hasta aprobar su estrategia y el primer esquema físico.
 
-## Verification
+## Verificación
 
 ```bash
 curl --fail https://cobranzapp.2.24.115.58.sslip.io/health
@@ -38,7 +38,7 @@ curl --fail https://cobranzapp.2.24.115.58.sslip.io/api/ready
 curl --fail https://cobranzapp.2.24.115.58.sslip.io/api/v1/status
 ```
 
-On the VPS:
+En el VPS:
 
 ```bash
 cd /srv/cobranzapp
@@ -47,29 +47,29 @@ docker compose --env-file .env --env-file .release.env -f compose.yaml ps
 docker compose --env-file .env --env-file .release.env -f compose.yaml logs --tail=100
 ```
 
-## Backups
+## Copias de seguridad
 
-A daily PostgreSQL custom-format dump runs at 04:40 UTC and retains 14 days in `/var/backups/cobranzapp`. Run and inspect it manually with:
+Cada día a las 04:40 UTC se genera un volcado PostgreSQL en formato personalizado y se conservan 14 días en `/var/backups/cobranzapp`. Para ejecutarlo y validarlo manualmente:
 
 ```bash
 sudo /usr/local/sbin/cobranzapp-backup
 sha256sum -c /var/backups/cobranzapp/postgres-*.dump.sha256
 ```
 
-This local backup is sufficient only for the development foundation. **Do not introduce real borrower or financial data** until encrypted offsite copies, continuous WAL archiving/PITR, key recovery, and an isolated restore drill meet the approved RPO/RTO.
+Esta copia local solo es suficiente para la base de desarrollo. **No se deben introducir datos reales de clientes ni información financiera** hasta contar con copias externas cifradas, archivado continuo de WAL con recuperación a un punto en el tiempo, recuperación de llaves y una prueba aislada de restauración que cumpla los RPO/RTO aprobados.
 
-## Security boundaries
+## Límites de seguridad
 
-- Only nginx exposes public ports; web and API bind to loopback, PostgreSQL stays inside the private Docker network.
-- Runtime secrets live in `/srv/cobranzapp/.env` with mode `0600`; they are absent from Git, images, logs, and GitHub Actions.
-- GHCR credentials are job-scoped and use a temporary Docker configuration removed after deployment.
-- Application images run as UID/GID `10001`; pinned base-image digests and resource limits are configured.
-- The current public URL is a temporary development endpoint, not authorization for a live lending pilot.
+- Solo nginx expone puertos públicos; la web y la API escuchan en la interfaz local, y PostgreSQL permanece en la red privada de Docker.
+- Los secretos de ejecución viven en `/srv/cobranzapp/.env`, con modo `0600`, y no aparecen en Git, imágenes, registros ni GitHub Actions.
+- Las credenciales de GHCR existen únicamente durante el trabajo y usan una configuración temporal de Docker que se elimina al finalizar.
+- Las imágenes de aplicación se ejecutan con UID/GID `10001`; las imágenes base están fijadas por resumen y los recursos tienen límites.
+- La dirección pública actual es un entorno temporal de desarrollo, no una autorización para operar un piloto real de crédito.
 
-## Incident first actions
+## Primeras acciones ante incidentes
 
-1. Confirm the deployed SHA and container state.
-2. Capture relevant redacted logs and timestamps before restarting anything.
-3. If a new release caused the incident, rerun the previous SHA through the deployment entrypoint or restore `.release.env` and start the previous compatible images.
-4. Never roll back an incompatible database schema by image alone. Use an approved forward fix or database restoration/reconciliation procedure.
-5. Verify J4 and AutoKing health after any shared-host networking or nginx change.
+1. Confirme el SHA desplegado y el estado de los contenedores.
+2. Capture los registros pertinentes, sin secretos, y las horas exactas antes de reiniciar servicios.
+3. Si la versión nueva causó el incidente, vuelva a ejecutar el SHA anterior mediante el punto de entrada o restaure `.release.env` e inicie las imágenes compatibles anteriores.
+4. Nunca revierta un esquema incompatible únicamente cambiando la imagen. Use una corrección progresiva aprobada o el procedimiento de restauración y conciliación de la base de datos.
+5. Verifique la salud de J4 y AutoKing después de cualquier cambio de red o nginx en el servidor compartido.
