@@ -45,5 +45,6 @@ jobs:
           node-version: 22.22.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm security:check
       - run: pnpm db:migrate
       - run: pnpm check

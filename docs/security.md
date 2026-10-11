@@ -46,6 +46,24 @@ This is an interim first-party identity baseline, not completion of the identity
 PKCE for mobile, MFA for privileged roles, approved support access, and an independent security
 review remain required before the corresponding launch gate can pass.
 
+### Dependency-security posture
+
+Production dependency auditing is enforced in CI at the `high` severity threshold. The current
+Expo toolchain needs three transitive dependencies that require explicit treatment:
+
+- `uuid` is forced to `11.1.1`, the first patched CommonJS-compatible release, because `xcode`
+  only uses its `v4()` API.
+- `node-forge` `1.4.0` carries a repository patch that rejects extra nested
+  `DigestAlgorithm` elements during RSA PKCS#1 v1.5 verification. The patch mirrors the pending
+  upstream fix and remains until an official patched release is available.
+- `braces` `3.0.3` is accepted temporarily as a monitored risk: no patched release exists, and it
+  is only reachable through Metro's trusted build-time glob processing, not from application input
+  or any deployed server runtime.
+
+The audit command ignores only the two documented CVEs for the locally patched or build-only
+packages. Any other high or critical production advisory fails CI. Reassess and remove each
+exception when the Expo dependency graph or upstream releases change.
+
 ## Branding asset security
 
 Sanitize uploaded logo/receipt assets and prohibit arbitrary HTML, CSS, JavaScript or untrusted template execution. Custom domains require verified ownership and tenant-aware routing; a domain is not proof of membership. Branding presentation belongs in [visual design](../design.md).
