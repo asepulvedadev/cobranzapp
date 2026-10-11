@@ -11,6 +11,8 @@
 | VPS | Servidor compartido AutoKing `2.24.115.58` |
 | Directorio de ejecución | `/srv/cobranzapp` |
 | Dirección HTTPS temporal | `https://cobranzapp.2.24.115.58.sslip.io` |
+| Dominio aprobado | `https://cobranzaap.tech` |
+| Correo institucional | `info@cobranzaap.tech` |
 | Puertos locales web/API | `127.0.0.1:13200` / `127.0.0.1:18200` |
 | Sitio nginx | `/etc/nginx/sites-available/cobranzapp.conf` |
 | Punto de entrada de despliegue | `/usr/local/sbin/cobranzapp-deploy-entry` |

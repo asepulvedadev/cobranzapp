@@ -25,6 +25,7 @@ Plataforma móvil y multiempresa para gestionar créditos y cobranzas de prestam
 | [Despliegue en VPS](docs/deployment.md) | Alojamiento, lanzamientos, migraciones, monitoreo, copias de seguridad y recuperación |
 | [Plan de desarrollo](docs/development-plan.md) | Fases, unidades de trabajo, controles de calidad, lanzamiento en VPS y finalización del piloto |
 | [Manual de operaciones](docs/operations-runbook.md) | Repositorio, CI/CD, VPS, verificaciones de salud, copias de seguridad e incidentes |
+| [Dominio y correo](docs/domain-email-setup.md) | Registros DNS, Hostinger Email y activación TLS |
 | [Hoja de ruta](docs/roadmap.md) | Decisiones pendientes, evidencia, riesgos y autorización de construcción |
 | [Referencias](docs/references.md) | Registro de fuentes primarias y procedencia |
 
@@ -58,6 +59,8 @@ Consulte la [configuración de desarrollo](docs/development-setup.md) para conoc
 
 - Repositorio privado: `https://github.com/asepulvedadev/cobranzapp`
 - Entorno de desarrollo: `https://cobranzapp.2.24.115.58.sslip.io`
+- Dominio aprobado: `https://cobranzaap.tech` (activación de DNS y TLS en curso)
+- Correo institucional aprobado: `info@cobranzaap.tech`
 
 ## Próximo descubrimiento
 
