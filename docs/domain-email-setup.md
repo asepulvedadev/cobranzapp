@@ -8,9 +8,9 @@
 | Tipo | Nombre | Valor | TTL |
 |---|---|---|---:|
 | A | `@` | `2.24.115.58` | `300` |
-| A | `www` | `2.24.115.58` | `300` |
+| CNAME | `www` | `cobranzaap.tech` | `300` |
 
-Antes de agregarlos, elimine únicamente los registros A, AAAA o CNAME existentes para `@` y `www` que entren en conflicto. No elimine registros de correo.
+Edite el registro A existente para `@`, que inicialmente apunta al estacionamiento `2.57.91.91`. Mantenga el CNAME existente de `www` hacia `cobranzaap.tech`. No elimine registros de correo.
 
 ## Registros para Hostinger Email
 
