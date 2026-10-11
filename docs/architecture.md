@@ -1,6 +1,6 @@
 # Application Architecture and API Contracts
 
-> **Status:** Planning draft v0.4 — not implementation authorization.
+> **Status:** Planning draft v0.5 — not implementation authorization.
 > **Updated:** 2026-10-11.
 
 Owns module boundaries, dependency direction, runtime processes, repository proposal and integration contracts.
@@ -8,6 +8,12 @@ Owns module boundaries, dependency direction, runtime processes, repository prop
 ## Architecture and module boundaries
 
 Use a **modular monolith** for transactional business logic, with separate API, worker, identity provider processes. These process boundaries do not imply a microservice per business module.
+
+The public marketing surface and the private tenant system are separate application concerns. The
+public site contains product education, original resources and lead contact. The private system
+requires authentication and exposes only the four product roles: tenant owner, supervisor,
+collector, and customer. Internal platform operations are service administration, not a fifth
+tenant-facing role.
 
 ```text
 Android / iOS                 Responsive web console

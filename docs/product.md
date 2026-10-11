@@ -1,6 +1,6 @@
 # Product, Offer and Scope
 
-> **Status:** Planning draft v0.5 — not implementation authorization.
+> **Status:** Planning draft v0.6 — not implementation authorization.
 > **Updated:** 2026-10-11.
 
 Owns the business problem, customer, product boundaries, confirmed requirements and assumptions.
@@ -58,9 +58,16 @@ This is discovery evidence, not confirmation that the rate, charge, calendar or 
 | Risk records consist of informal blacklists | Incorrect restrictions and privacy exposure | Tenant-local risk registry with evidence and review |
 | Decisions rely on total collections alone | Principal recovery mistaken for profit | Defined portfolio, cash, delinquency, and profitability metrics |
 
-**Primary customer:** The independent lender or lending business owner.
-**Operational users:** Collectors, supervisors, administrators, and finance staff.
-**Borrower:** Data subject and recipient of receipts; a borrower-facing app is not part of the first release.
+**Only paying customer:** The tenant owner. Supervisors, collectors, and end customers use
+the workspace created by that owner; they are not separate subscribers.
+**Supported product roles:** Tenant owner, supervisor, collector, and customer.
+**Customer:** The person responsible for an obligation and recipient of receipts. A bounded
+customer view for personal obligations and receipts is part of the target experience; it never
+exposes the tenant's internal operation.
+
+The public marketing site remains separate from the authenticated operational system. Public
+content lives at the canonical domain, while sign-in is a distinct entry point that will hand off
+to the private application once authentication is enabled.
 
 ### Offer hypothesis
 
@@ -77,7 +84,7 @@ A business subscription for operational control, not a percentage of borrower pa
 
 | Release | Included | Explicitly deferred |
 |---|---|---|
-| First operational pilot | Tenant onboarding, roles, branding/settings, borrower dossier, manual document capture, one approved loan model, schedules, collections/receipts, route lists, cash reconciliation, internal risk registry, core dashboards, audit trail | Automated credit approval, external credit bureau reporting, public/shared blacklist, native desktop apps |
+| First operational pilot | Tenant onboarding, the four approved roles, branding/settings, customer dossier, manual document capture, one approved loan model, schedules, collections/receipts, route lists, cash reconciliation, internal risk registry, core dashboards, customer receipt view, audit trail | Automated credit approval, external credit bureau reporting, public/shared blacklist, native desktop apps |
 | Field reliability and automation | Offline capture/reconciliation if validated as essential, manual document review, optional validated non-model barcode parsing, map provider integration, controlled notifications, imports, richer supervisor workflows | Guaranteed background sync, continuous employee tracking, fully autonomous collection |
 | Deep analytics and systematization | Cohorts, trend reports, explicit exception thresholds, deterministic scenarios, scheduled reports and task workflows | AI, machine learning, automatic loan denial, unrestricted rule execution |
 | Expansion after evidence | Payment integrations, borrower portal, advanced routing, multiple approved loan products, dedicated tenant infrastructure | Banking/custody or capital marketplace without separate approval |

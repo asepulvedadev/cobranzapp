@@ -126,9 +126,10 @@ Phone layout is the baseline—not a breakpoint added after desktop. Design arou
 
 | Role | Primary phone tabs | Home focus |
 |---|---|---|
-| Collector | Today, Routes, Borrowers, More | Next assigned task, cash status, pending synchronization |
+| Collector | Today, Routes, Customers, More | Next assigned task, cash status, pending synchronization |
 | Supervisor | Overview, Team, Routes, Exceptions, More | Scoped exceptions, route progress, cash discrepancies |
-| Owner/admin | Overview, Portfolio, Borrowers, Operations, More | Portfolio summary, cash position and required reviews |
+| Tenant owner | Overview, Portfolio, Customers, Operations, More | Portfolio summary, cash position and required reviews |
+| Customer | My obligations, Receipts, Profile | Own balances, upcoming obligations and payment evidence only |
 
 Loan details, document review, receipts, risk cases, reports and settings are contextual destinations. Active tabs use a bounded yellow treatment with label and icon; inactive labels remain readable on the dark bar.
 
@@ -152,7 +153,7 @@ Today           Routes          Borrowers      More
 
 This is a textual composition guide, not an implemented mockup. Dashboard values must reflect real permitted metrics later; no decorative fake money or unrelated personal-spending categories.
 
-Supervisor uses the same shell but prioritizes exception cards; owner uses the same visual grammar with portfolio/report cards. Do not give each role a different design identity.
+Supervisor uses the same shell but prioritizes exception cards; owner uses the same visual grammar with portfolio/report cards. The customer receives a reduced self-service view, never an internal dashboard. Do not give each role a different design identity.
 
 ## 7. Core component specification
 

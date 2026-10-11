@@ -50,7 +50,7 @@ Systematization means explicit, testable business workflows: `Event or schedule 
 ### Rule engine boundaries
 
 - Start with coded, typed business rules and fixed configuration fields. Do not build an arbitrary user scripting platform.
-- Tenant administrators can configure approved thresholds, recipients, templates, working calendar and schedules within platform/legal limits.
+- Tenant owners can configure approved thresholds, recipients, templates, working calendar and schedules within platform/legal limits.
 - Every rule has an immutable version, effective date, tenant/resource scope, author/approver, enabled state and execution history.
 - Rules execute through existing authorized use cases, not direct financial table updates. Revalidate permissions/state when each job runs.
 - Idempotency is per rule version and source event/occurrence. Handle timezone changes, daylight-saving transitions where applicable, repeated delivery and delayed jobs explicitly.
