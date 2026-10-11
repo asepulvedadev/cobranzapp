@@ -72,6 +72,12 @@ export type PlatformOverview = {
   >;
 };
 
+export type PlatformSystemStatus = {
+  api: { status: "operational"; version: string };
+  database: { status: "operational"; schemaVersion: string | null };
+  checkedAt: string;
+};
+
 export type InvitationPreview = {
   email: string;
   role: "owner" | "supervisor" | "collector" | "customer";

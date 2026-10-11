@@ -1,5 +1,10 @@
+import { CloudCheck, Database, GitCommit } from "@phosphor-icons/react/dist/ssr";
 import { redirect } from "next/navigation";
-import type { PlatformOverview, SupportAccessRecord } from "../../../lib/platform";
+import type {
+  PlatformOverview,
+  PlatformSystemStatus,
+  SupportAccessRecord,
+} from "../../../lib/platform";
 import { serverApi } from "../../../lib/server-api";
 import { ActivityFeed } from "../ActivityFeed";
 import { InviteUserForm } from "../InviteUserForm";
@@ -21,16 +26,22 @@ export default async function DeveloperDashboard({
   searchParams: Promise<{ soporte?: string }>;
 }) {
   const query = await searchParams;
-  const [response, supportResponse] = await Promise.all([
+  const [response, supportResponse, systemResponse] = await Promise.all([
     serverApi("/v1/platform/overview"),
     serverApi("/v1/platform/support-access"),
+    serverApi("/v1/platform/system-status"),
   ]);
   if (response.status === 401) redirect("/ingresar");
   if (response.status === 403) redirect("/ingresar?error=sin-acceso");
   if (!response.ok) throw new Error("No fue posible cargar la consola de plataforma");
   if (!supportResponse.ok) throw new Error("No fue posible cargar los accesos de soporte");
+  if (!systemResponse.ok) throw new Error("No fue posible validar el estado de la plataforma");
   const overview = (await response.json()) as PlatformOverview;
   const { access } = (await supportResponse.json()) as { access: SupportAccessRecord[] };
+  const system = (await systemResponse.json()) as PlatformSystemStatus;
+  const version =
+    system.api.version === "development" ? "Desarrollo" : system.api.version.slice(0, 8);
+  const schemaVersion = system.database.schemaVersion?.split("_")[0] ?? "Sin migraciones";
 
   return (
     <div className="dashboard-page">
@@ -72,6 +83,38 @@ export default async function DeveloperDashboard({
           <span>Aislamiento</span>
           <strong>RLS</strong>
           <small>Protección activa en PostgreSQL</small>
+        </article>
+      </section>
+
+      <section aria-label="Estado de la plataforma" className="system-status-grid">
+        <article>
+          <CloudCheck aria-hidden="true" size={22} weight="fill" />
+          <div>
+            <span>API</span>
+            <strong>Operativa</strong>
+          </div>
+          <small>Comprobada ahora</small>
+        </article>
+        <article>
+          <Database aria-hidden="true" size={22} weight="fill" />
+          <div>
+            <span>Base de datos</span>
+            <strong>Esquema {schemaVersion}</strong>
+          </div>
+          <small>PostgreSQL disponible</small>
+        </article>
+        <article>
+          <GitCommit aria-hidden="true" size={22} weight="fill" />
+          <div>
+            <span>Versión desplegada</span>
+            <strong>{version}</strong>
+          </div>
+          <small>
+            {new Intl.DateTimeFormat("es-CO", {
+              timeStyle: "short",
+              timeZone: "America/Bogota",
+            }).format(new Date(system.checkedAt))}
+          </small>
         </article>
       </section>
 

@@ -13,6 +13,11 @@ const actionLabels: Record<string, string> = {
   "team.member_removed": "Retiró un integrante de un equipo",
   "membership.updated": "Actualizó el acceso de un integrante",
   "auth.reauthenticated": "Confirmó su identidad",
+  "support_access.requested": "Solicitó acceso temporal de soporte",
+  "support_access.approved": "Autorizó acceso temporal de soporte",
+  "support_access.denied": "Rechazó acceso temporal de soporte",
+  "support_access.revoked": "Revocó acceso temporal de soporte",
+  "support_access.cancelled": "Canceló una solicitud de soporte",
 };
 
 type ActivityItem = AuditActivity & { tenantName?: string | null };

@@ -381,6 +381,50 @@ html:has(.panel-shell) {
   color: var(--panel-green);
 }
 
+.system-status-grid {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.system-status-grid article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 3px 11px;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  background: var(--panel-surface);
+}
+
+.system-status-grid svg {
+  grid-row: 1 / span 2;
+  color: var(--panel-green);
+}
+
+.system-status-grid div {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.system-status-grid span,
+.system-status-grid small {
+  color: var(--panel-muted);
+  font-size: 10px;
+}
+
+.system-status-grid strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.system-status-grid small {
+  grid-column: 2;
+}
+
 .dashboard-columns {
   display: grid;
   gap: 14px;
@@ -2168,6 +2212,10 @@ html:has(.panel-shell) {
 }
 
 @media (min-width: 700px) {
+  .system-status-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .support-session-banner {
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
