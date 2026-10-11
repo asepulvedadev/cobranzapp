@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { ScrollEffects } from "../components/ScrollEffects";
@@ -147,54 +146,7 @@ export default function Home() {
       </a>
       <SiteHeader />
       <main id="contenido">
-        <section className="hero-section">
-          <div className="hero-copy" data-reveal>
-            <span className="eyebrow">Control de cartera hecho en Cúcuta</span>
-            <h1>Tu operación de crédito, clara desde la ruta hasta el cierre.</h1>
-            <p>
-              cobranzapp reúne clientes, obligaciones, recaudo y seguimiento de equipo en una sola
-              operación trazable para negocios colombianos.
-            </p>
-            <div className="hero-actions">
-              <a
-                className="button"
-                href="mailto:info@cobranzaap.tech?subject=Quiero%20conocer%20cobranzapp"
-              >
-                Solicitar una demostración
-              </a>
-              <a className="text-link" href="#como-funciona">
-                Ver el recorrido <span aria-hidden="true">→</span>
-              </a>
-            </div>
-            <div className="proof-line">
-              <span>Plataforma en desarrollo</span>
-              <span>Espacios separados por empresa</span>
-              <span>Operación en español colombiano</span>
-            </div>
-            <p className="disclaimer">
-              cobranzapp no otorga créditos ni recibe dinero de los clientes. Es software de gestión
-              para operaciones administradas por terceros.
-            </p>
-          </div>
-          <div className="hero-world" data-reveal>
-            <Image
-              src="/images/cobranzaap-world.webp"
-              alt="Mundo ilustrado con oficina de cartera, ruta de cobro, supervisión y entrega de comprobante"
-              fill
-              priority
-              sizes="(max-width: 900px) 100vw, 58vw"
-            />
-            <div className="world-label world-label-one">
-              <span /> Operación central
-            </div>
-            <div className="world-label world-label-two">
-              <span /> Ruta conectada
-            </div>
-            <div className="world-label world-label-three">
-              <span /> Comprobante listo
-            </div>
-          </div>
-        </section>
+        <ScrollWorldExperience />
 
         <section className="trust-strip" aria-label="Enfoque del producto" data-reveal>
           <p>Una sola línea operativa</p>
@@ -252,8 +204,6 @@ export default function Home() {
             revisar y explicar.
           </WordReveal>
         </section>
-
-        <ScrollWorldExperience />
 
         <section className="features-section section-shell" id="funciones">
           <div className="section-heading narrow" data-reveal>

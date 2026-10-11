@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Brand } from "./Brand";
 
 const links = [
-  { href: "/#funciones", label: "Funciones" },
+  { href: "/producto", label: "Producto" },
   { href: "/#como-funciona", label: "Cómo funciona" },
   { href: "/#roles", label: "Perfiles" },
   { href: "/blog", label: "Recursos" },

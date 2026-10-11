@@ -11,7 +11,7 @@ export function SiteFooter() {
         </div>
         <div>
           <strong>Producto</strong>
-          <Link href="/#funciones">Funciones</Link>
+          <Link href="/producto">Funciones</Link>
           <Link href="/#roles">Perfiles</Link>
           <Link href="/ingresar">Ingresar</Link>
         </div>

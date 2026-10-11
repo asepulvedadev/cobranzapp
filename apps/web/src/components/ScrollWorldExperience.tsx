@@ -117,20 +117,21 @@ export function ScrollWorldExperience() {
             src="/images/cobranzaap-world.webp"
             alt="Recorrido ilustrado por la oficina, la ruta, la supervisión y el cierre de cobranza"
             fill
+            priority
             sizes="100vw"
           />
         </div>
         <div className="scroll-world-shade" aria-hidden="true" />
         <div className="scroll-world-heading">
-          <span className="eyebrow">Recorrido de la operación</span>
-          <p>Desplázate para seguir un día de cobranza</p>
+          <span className="eyebrow">Control de cartera hecho en Cúcuta</span>
+          <p>Desplázate para seguir un día de operación</p>
         </div>
         <div className="scroll-world-captions">
           {scenes.map((scene, index) => (
             <article key={scene.time} data-scene-card={index}>
               <span className="scroll-world-time">{scene.time}</span>
               <span className="card-kicker">{scene.eyebrow}</span>
-              <h2>{scene.title}</h2>
+              {index === 0 ? <h1>{scene.title}</h1> : <h2>{scene.title}</h2>}
               <p>{scene.text}</p>
               <strong>{scene.detail}</strong>
             </article>
