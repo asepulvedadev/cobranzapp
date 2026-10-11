@@ -5,6 +5,7 @@ const actionLabels: Record<string, string> = {
   "tenant.status_changed": "Cambió el estado de la empresa",
   "invitation.created": "Creó una invitación",
   "invitation.accepted": "Aceptó una invitación",
+  "invitation.revoked": "Revocó una invitación",
   "tenant.settings_updated": "Actualizó la configuración",
   "branch.created": "Creó una sede",
   "team.created": "Creó un equipo",

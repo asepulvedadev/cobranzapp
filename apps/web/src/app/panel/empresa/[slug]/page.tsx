@@ -5,6 +5,7 @@ import { serverApi } from "../../../../lib/server-api";
 import { ActivityFeed } from "../../ActivityFeed";
 import { InviteUserForm } from "../../InviteUserForm";
 import { MemberAccessControl } from "./MemberAccessControl";
+import { PendingInvitationList } from "./PendingInvitationList";
 import { TeamAssignmentManager } from "./TeamAssignmentManager";
 import { CreateBranchForm, CreateTeamForm, WorkspaceSettingsForm } from "./WorkspaceOperations";
 
@@ -163,6 +164,10 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
             <p>Asigna solo el rol necesario. El acceso se activa desde un enlace individual.</p>
             <InviteUserForm
               allowedRoles={["supervisor", "collector", "customer"]}
+              tenantId={overview.tenant.id}
+            />
+            <PendingInvitationList
+              invitations={overview.pendingInvitations}
               tenantId={overview.tenant.id}
             />
           </aside>

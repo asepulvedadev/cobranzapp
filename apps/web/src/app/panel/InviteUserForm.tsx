@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { useSensitiveFetch } from "./ReauthenticationProvider";
 
@@ -23,6 +24,7 @@ export function InviteUserForm({
   tenantId?: string;
   tenants?: Array<{ id: string; displayName: string }>;
 }) {
+  const router = useRouter();
   const sensitiveFetch = useSensitiveFetch();
   const [message, setMessage] = useState("");
   const [acceptanceUrl, setAcceptanceUrl] = useState("");
@@ -53,6 +55,7 @@ export function InviteUserForm({
     setAcceptanceUrl(body.invitation.acceptanceUrl);
     setMessage("Invitación creada. Comparte el enlace por un canal seguro.");
     setIsSubmitting(false);
+    router.refresh();
   }
 
   return (
