@@ -205,6 +205,8 @@ html:has(.panel-shell) {
 .workspace-switcher-mobile select:focus,
 .workspace-switcher-desktop select:focus,
 .table-action button:focus-visible,
+.member-access-control select:focus,
+.member-access-control button:focus-visible,
 .tenant-form input:focus,
 .tenant-form select:focus,
 .tenant-form button:focus-visible,
@@ -519,6 +521,88 @@ html:has(.panel-shell) {
 .table-muted {
   color: var(--panel-muted);
   font-size: 12px;
+}
+
+.member-access-control {
+  display: grid;
+  width: 100%;
+  gap: 8px;
+  text-align: left;
+}
+
+.member-access-control label {
+  display: grid;
+  gap: 4px;
+}
+
+.member-access-control label > span {
+  color: var(--panel-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.member-access-control select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid #c9d0ca;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--panel-dark);
+  font-size: 16px;
+}
+
+.member-access-control > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.member-access-control button {
+  min-height: 44px;
+  flex: 1 1 108px;
+  padding: 0 11px;
+  border: 1px solid var(--panel-dark);
+  border-radius: 8px;
+  background: var(--panel-dark);
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.member-access-control .secondary-action {
+  background: #fff;
+  color: var(--panel-dark);
+}
+
+.member-access-control .danger-action {
+  border-color: #fecaca;
+  background: #fff;
+  color: var(--panel-danger);
+}
+
+.member-access-control button:disabled,
+.member-access-control select:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.member-access-control > small {
+  padding: 7px 8px;
+  border-radius: 6px;
+  background: #edfbf4;
+  color: #065f46;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.member-access-control > .form-message-error {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .status {
@@ -965,6 +1049,10 @@ html:has(.panel-shell) {
 
   .table-action small {
     text-align: left;
+  }
+
+  .member-access-control {
+    min-width: 280px;
   }
 
   .workspace-configuration,

@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import type { CurrentUser, TenantOverview } from "../../../../lib/platform";
 import { serverApi } from "../../../../lib/server-api";
 import { InviteUserForm } from "../../InviteUserForm";
+import { MemberAccessControl } from "./MemberAccessControl";
 import { CreateBranchForm, CreateTeamForm, WorkspaceSettingsForm } from "./WorkspaceOperations";
 
 export const metadata: Metadata = { title: "Espacio empresarial" };
@@ -19,6 +20,20 @@ const statusLabels = {
   active: "Activa",
   suspended: "Suspendida",
   archived: "Archivada",
+};
+
+const memberStatusLabels = {
+  invited: "Invitado",
+  active: "Activo",
+  suspended: "Suspendido",
+  revoked: "Revocado",
+};
+
+const memberStatusClasses = {
+  invited: "draft",
+  active: "active",
+  suspended: "suspended",
+  revoked: "archived",
 };
 
 export default async function TenantDashboard({ params }: { params: Promise<{ slug: string }> }) {
@@ -75,8 +90,8 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
         </article>
       </section>
 
-      <div className="dashboard-columns" id="equipo">
-        <section className="dashboard-card tenant-card">
+      <div className="dashboard-columns">
+        <section className="dashboard-card tenant-card" id="equipo">
           <div className="card-heading">
             <div>
               <span className="panel-eyebrow">Accesos</span>
@@ -92,6 +107,7 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
                     <th>Persona</th>
                     <th>Rol</th>
                     <th>Estado</th>
+                    {overview.actorRole === "owner" ? <th>Administrar</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -103,12 +119,19 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
                       </td>
                       <td data-label="Rol">{roleLabels[member.role]}</td>
                       <td data-label="Estado">
-                        <span
-                          className={`status status-${member.status === "active" ? "active" : "draft"}`}
-                        >
-                          {member.status === "active" ? "Activo" : "Restringido"}
+                        <span className={`status status-${memberStatusClasses[member.status]}`}>
+                          {memberStatusLabels[member.status]}
                         </span>
                       </td>
+                      {overview.actorRole === "owner" ? (
+                        <td data-label="Administrar">
+                          {member.userId === user.id ? (
+                            <span className="table-muted">Tu acceso</span>
+                          ) : (
+                            <MemberAccessControl member={member} tenantId={overview.tenant.id} />
+                          )}
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>
