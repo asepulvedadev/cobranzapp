@@ -35,6 +35,7 @@ export interface AppDependencies {
   checkDatabase: () => Promise<void>;
   isProduction?: boolean;
   platformService: PlatformService;
+  sessionTtlHours?: number;
   version: string;
 }
 
@@ -61,8 +62,8 @@ function parseCookies(value?: string) {
   return cookies;
 }
 
-function sessionCookie(token: string, secure: boolean) {
-  return `${sessionCookieName}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800${secure ? "; Secure" : ""}`;
+function sessionCookie(token: string, secure: boolean, maxAgeSeconds: number) {
+  return `${sessionCookieName}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAgeSeconds}${secure ? "; Secure" : ""}`;
 }
 
 function expiredSessionCookie(secure: boolean) {
@@ -78,6 +79,7 @@ export function buildApp(dependencies: AppDependencies) {
   const allowedOrigins = new Set(dependencies.allowedWebOrigins ?? ["http://localhost:3000"]);
   const loginRateLimiter = new LoginRateLimiter();
   const secureCookies = dependencies.isProduction ?? false;
+  const sessionMaxAgeSeconds = (dependencies.sessionTtlHours ?? 8) * 60 * 60;
 
   function requireAllowedOrigin(request: FastifyRequest, reply: FastifyReply) {
     const origin = request.headers.origin;
@@ -201,7 +203,7 @@ export function buildApp(dependencies: AppDependencies) {
       );
     }
     loginRateLimiter.clear(limiterKey);
-    reply.header("set-cookie", sessionCookie(result.token, secureCookies));
+    reply.header("set-cookie", sessionCookie(result.token, secureCookies, sessionMaxAgeSeconds));
     return reply.send({ user: result.user });
   });
 

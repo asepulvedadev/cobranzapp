@@ -19,6 +19,7 @@ const app = buildApp({
   },
   isProduction: config.NODE_ENV === "production",
   platformService: createPostgresPlatformService(pool),
+  sessionTtlHours: config.SESSION_TTL_HOURS,
   version: process.env.APP_VERSION ?? "development",
 });
 

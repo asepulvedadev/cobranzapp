@@ -1,55 +1,53 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Brand } from "../../components/Brand";
-import { SiteFooter } from "../../components/SiteFooter";
+import { LoginForm } from "./LoginForm";
+import "./login.css";
 
 export const metadata: Metadata = {
-  title: "Ingreso al sistema",
-  description:
-    "Acceso privado de cobranzapp para propietarios, supervisores, cobradores y clientes.",
+  title: "Ingresar",
+  description: "Acceso seguro a la plataforma cobranzapp.",
   robots: { index: false, follow: false },
 };
 
 export default function LoginPage() {
   return (
-    <>
-      <main className="page-main section-shell" id="contenido">
-        <div className="breadcrumb page-hero">
-          <Link href="/">Inicio</Link>
-          <span>/</span>
-          <span>Ingresar</span>
-        </div>
-        <section className="login-panel">
-          <div className="login-copy">
-            <Brand light />
-            <span className="eyebrow">Sistema privado</span>
-            <h1>La operación vive aquí. La landing permanece aparte.</h1>
+    <main className="login-page" id="contenido">
+      <section className="login-stage" aria-labelledby="login-title">
+        <div className="login-context">
+          <Brand light />
+          <div>
+            <span className="login-kicker">Plataforma privada</span>
+            <h1 id="login-title">Control operativo, sin perder el contexto.</h1>
             <p>
-              El acceso todavía no está habilitado. Estamos preparando la autenticación y los
-              permisos antes de abrir datos operativos.
+              Ingresa a tu espacio de trabajo con el usuario o correo asignado. Cada empresa
+              conserva sus datos y permisos por separado.
             </p>
-            <a
-              className="button"
-              href="mailto:info@cobranzaap.tech?subject=Acceso%20anticipado%20a%20cobranzapp"
-            >
-              Solicitar acceso anticipado
-            </a>
           </div>
-          <div className="login-preview">
-            <div className="access-card">
-              <span>Acceso por perfil</span>
-              <h2>Un espacio distinto para cada responsabilidad.</h2>
-              <ul>
-                <li>Propietario</li>
-                <li>Supervisor</li>
-                <li>Cobrador</li>
-                <li>Cliente</li>
-              </ul>
-            </div>
+          <div className="login-assurance">
+            <span aria-hidden="true">✓</span>
+            <p>
+              Sesión protegida y trazabilidad de acceso.
+              <small>Nunca compartas tu contraseña.</small>
+            </p>
           </div>
-        </section>
-      </main>
-      <SiteFooter />
-    </>
+        </div>
+        <div className="login-form-shell">
+          <div className="login-heading">
+            <span>Acceso</span>
+            <h2>Ingresa a cobranzapp</h2>
+            <p>Usa tu nombre de usuario o correo electrónico.</p>
+          </div>
+          <LoginForm />
+          <div className="login-support">
+            <p>¿Tienes problemas para ingresar?</p>
+            <a href="mailto:info@cobranzaap.tech">info@cobranzaap.tech</a>
+          </div>
+          <Link className="login-back" href="/">
+            ← Volver al sitio público
+          </Link>
+        </div>
+      </section>
+    </main>
   );
 }
