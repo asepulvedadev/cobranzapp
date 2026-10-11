@@ -132,6 +132,17 @@ function dependencies(overrides?: { authService?: Partial<AuthService> }) {
       displayName: input.displayName,
       status: "active",
     })),
+    updateMember: vi.fn(async (_actor, _tenantId, userId, input) => ({
+      status: "updated",
+      member: {
+        userId,
+        displayName: "Cobrador Uno",
+        email: "cobrador@example.com",
+        username: "cobrador",
+        role: input.role,
+        status: input.status,
+      },
+    })),
   };
   return {
     allowedWebOrigins: ["https://cobranzaap.tech"],
@@ -359,5 +370,32 @@ describe("tenant onboarding", () => {
     });
     expect(team.statusCode).toBe(201);
     expect(team.json()).toMatchObject({ team: { displayName: "Ruta Centro" } });
+  });
+
+  it("lets an owner change a non-owner membership", async () => {
+    const deps = dependencies({ authService: { authenticate: vi.fn(async () => tenantOwner) } });
+    const app = buildApp(deps);
+    apps.push(app);
+    const tenantId = tenantOwner.memberships[0]?.tenantId;
+    const userId = "7727df33-e22e-4b17-9b4a-0e27f84b3da1";
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/v1/tenants/${tenantId}/members/${userId}`,
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { role: "collector", status: "suspended" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      member: { userId, role: "collector", status: "suspended" },
+    });
+    expect(deps.tenancyService.updateMember).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantRole: "owner" }),
+      tenantId,
+      userId,
+      expect.objectContaining({ role: "collector", status: "suspended" }),
+    );
   });
 });

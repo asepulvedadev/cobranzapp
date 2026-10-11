@@ -131,6 +131,45 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       platformRole: null,
       tenantRole: "owner" as const,
     };
+    await ownerPool.query(
+      `INSERT INTO tenant_memberships (tenant_id, user_id, role, created_by)
+       VALUES ($1, $2, 'collector', $3)`,
+      [tenant.id, memberId, developerId],
+    );
+    const memberLogin = await auth.login(`member-${suffix}`, password, {});
+    expect(memberLogin?.user.memberships).toContainEqual(
+      expect.objectContaining({ tenantId: tenant.id, role: "collector" }),
+    );
+    await expect(
+      tenancy.updateMember(ownerActor, tenant.id, memberId, {
+        role: "collector",
+        status: "suspended",
+        requestId: `member-suspend-${suffix}`,
+      }),
+    ).resolves.toMatchObject({ status: "updated", member: { status: "suspended" } });
+    expect((await auth.authenticate(memberLogin?.token ?? ""))?.memberships).not.toContainEqual(
+      expect.objectContaining({ tenantId: tenant.id }),
+    );
+    await expect(
+      tenancy.updateMember(ownerActor, tenant.id, memberId, {
+        role: "supervisor",
+        status: "active",
+        requestId: `member-restore-${suffix}`,
+      }),
+    ).resolves.toMatchObject({
+      status: "updated",
+      member: { role: "supervisor", status: "active" },
+    });
+    expect((await auth.authenticate(memberLogin?.token ?? ""))?.memberships).toContainEqual(
+      expect.objectContaining({ tenantId: tenant.id, role: "supervisor" }),
+    );
+    await expect(
+      tenancy.updateMember(ownerActor, tenant.id, ownerActor.userId, {
+        role: "supervisor",
+        status: "suspended",
+        requestId: `member-self-${suffix}`,
+      }),
+    ).resolves.toEqual({ status: "protected" });
     const settings = await tenancy.updateSettings(ownerActor, tenant.id, {
       primaryColor: "#171717",
       accentColor: "#FBBF24",
@@ -220,12 +259,6 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       }),
     ).resolves.toBeNull();
 
-    await ownerPool.query(
-      `INSERT INTO tenant_memberships (tenant_id, user_id, role, created_by)
-       VALUES ($1, $2, 'owner', $3)`,
-      [tenant.id, memberId, developerId],
-    );
-
     const anonymous = await runtimePool.query<{ count: string }>(
       "SELECT count(*) FROM tenants WHERE slug = ANY($1::citext[])",
       [[slug, secondSlug]],
@@ -245,5 +278,23 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     } finally {
       client.release();
     }
+
+    await expect(
+      tenancy.updateMember(ownerActor, tenant.id, memberId, {
+        role: "supervisor",
+        status: "revoked",
+        requestId: `member-revoke-${suffix}`,
+      }),
+    ).resolves.toMatchObject({ status: "updated", member: { status: "revoked" } });
+    expect((await auth.authenticate(memberLogin?.token ?? ""))?.memberships).not.toContainEqual(
+      expect.objectContaining({ tenantId: tenant.id }),
+    );
+    await expect(
+      tenancy.updateMember(ownerActor, tenant.id, memberId, {
+        role: "collector",
+        status: "active",
+        requestId: `member-reinstate-${suffix}`,
+      }),
+    ).resolves.toEqual({ status: "invalid_transition" });
   });
 });

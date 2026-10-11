@@ -69,6 +69,14 @@ export type TenantOverview = {
   }>;
 };
 
+export type ManagedMember = TenantOverview["members"][number];
+
+export type MemberUpdateResult =
+  | { status: "updated"; member: ManagedMember }
+  | { status: "not_found" }
+  | { status: "protected" }
+  | { status: "invalid_transition" };
+
 export type InvitationAcceptanceInput =
   | { existingUserId: string }
   | { username: string; displayName: string; password: string };
@@ -119,4 +127,14 @@ export interface TenancyService {
     tenantId: string,
     input: { branchId: string | null; displayName: string; requestId: string },
   ): Promise<TenantOverview["teams"][number] | null>;
+  updateMember(
+    actor: TenantActor,
+    tenantId: string,
+    userId: string,
+    input: {
+      role: Exclude<TenantRole, "owner">;
+      status: "active" | "suspended" | "revoked";
+      requestId: string;
+    },
+  ): Promise<MemberUpdateResult>;
 }

@@ -30,6 +30,7 @@ const tenantSchema = z.object({
     .max(63),
 });
 const tenantIdParamsSchema = z.object({ tenantId: z.uuid() });
+const tenantMemberParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
 const tenantStatusSchema = z.object({ status: z.enum(["active", "suspended", "archived"]) });
 const invitationTokenParamsSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{40,60}$/) });
 const invitationSchema = z.object({
@@ -71,6 +72,10 @@ const branchSchema = z.object({
 const teamSchema = z.object({
   branchId: z.uuid().nullable(),
   displayName: z.string().trim().min(2).max(100),
+});
+const memberUpdateSchema = z.object({
+  role: z.enum(["supervisor", "collector", "customer"]),
+  status: z.enum(["active", "suspended", "revoked"]),
 });
 
 export interface AppDependencies {
@@ -566,6 +571,67 @@ export function buildApp(dependencies: AppDependencies) {
     if (!invitation)
       return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
     return reply.code(201).send({ invitation });
+  });
+
+  app.patch("/v1/tenants/:tenantId/members/:userId", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantMemberParamsSchema.safeParse(request.params);
+    const body = memberUpdateSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_MEMBER_UPDATE",
+        "Revisa el rol y el estado del acceso.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (membership?.role !== "owner") {
+      return sendError(
+        reply,
+        403,
+        "OWNER_REQUIRED",
+        "Solo el propietario puede administrar accesos.",
+        request.id,
+      );
+    }
+    const result = await dependencies.tenancyService.updateMember(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.userId,
+      { ...body.data, requestId: request.id },
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "MEMBER_NOT_FOUND", "El integrante no existe.", request.id);
+    }
+    if (result.status === "protected") {
+      return sendError(
+        reply,
+        409,
+        "PROTECTED_MEMBERSHIP",
+        "Este acceso protegido no se puede modificar desde aquí.",
+        request.id,
+      );
+    }
+    if (result.status === "invalid_transition") {
+      return sendError(
+        reply,
+        409,
+        "MEMBERSHIP_REVOKED",
+        "Un acceso revocado no se puede reactivar. Envía una nueva invitación.",
+        request.id,
+      );
+    }
+    return reply.send({ member: result.member });
   });
 
   app.patch("/v1/tenants/:tenantId/settings", async (request, reply) => {

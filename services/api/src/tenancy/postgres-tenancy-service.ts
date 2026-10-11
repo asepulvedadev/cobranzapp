@@ -640,5 +640,93 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
         client.release();
       }
     },
+
+    async updateMember(actor, tenantId, userId, input) {
+      if (actor.userId === userId) return { status: "protected" };
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setActorContext(client, actor, tenantId);
+        const current = await client.query<{
+          display_name: string;
+          email: string;
+          username: string;
+          role: TenantRole;
+          status: "invited" | "active" | "suspended" | "revoked";
+        }>(
+          `SELECT users.display_name, users.email, users.username,
+                  membership.role, membership.status
+             FROM tenant_memberships membership
+             JOIN users ON users.id = membership.user_id
+            WHERE membership.tenant_id = $1 AND membership.user_id = $2
+            FOR UPDATE OF membership`,
+          [tenantId, userId],
+        );
+        const previous = current.rows[0];
+        if (!previous) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" };
+        }
+        if (previous.role === "owner") {
+          await client.query("ROLLBACK");
+          return { status: "protected" };
+        }
+        if (previous.status === "revoked") {
+          await client.query("ROLLBACK");
+          return { status: "invalid_transition" };
+        }
+        const updated = await client.query<{
+          role: TenantRole;
+          status: "active" | "suspended" | "revoked";
+        }>(
+          `UPDATE tenant_memberships
+              SET role = $3, status = $4, updated_at = now()
+            WHERE tenant_id = $1 AND user_id = $2
+          RETURNING role, status`,
+          [tenantId, userId, input.role, input.status],
+        );
+        const member = updated.rows[0];
+        if (!member) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" };
+        }
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'membership.updated', 'tenant_membership', $3, $4,
+                   jsonb_build_object(
+                     'previousRole', $5::text, 'role', $6::text,
+                     'previousStatus', $7::text, 'status', $8::text
+                   ))`,
+          [
+            tenantId,
+            actor.userId,
+            userId,
+            input.requestId,
+            previous.role,
+            member.role,
+            previous.status,
+            member.status,
+          ],
+        );
+        await client.query("COMMIT");
+        return {
+          status: "updated",
+          member: {
+            userId,
+            displayName: previous.display_name,
+            email: previous.email,
+            username: previous.username,
+            role: member.role,
+            status: member.status,
+          },
+        };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
   };
 }
