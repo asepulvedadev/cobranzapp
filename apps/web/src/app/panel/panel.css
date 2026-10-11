@@ -207,6 +207,8 @@ html:has(.panel-shell) {
 .table-action button:focus-visible,
 .member-access-control select:focus,
 .member-access-control button:focus-visible,
+.team-assignment-manager select:focus,
+.team-assignment-manager button:focus-visible,
 .session-manager button:focus-visible,
 .tenant-form input:focus,
 .tenant-form select:focus,
@@ -890,6 +892,126 @@ html:has(.panel-shell) {
 .structure-item small {
   color: var(--panel-muted);
   font-size: 11px;
+}
+
+.team-assignment-manager {
+  display: grid;
+  gap: 14px;
+}
+
+.structure-item.team-item {
+  display: grid;
+  align-items: stretch;
+}
+
+.team-item-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.team-item-heading > span:first-child,
+.team-member-list li > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.team-member-list {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--panel-line);
+  list-style: none;
+}
+
+.team-member-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.team-member-list button {
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  background: #fff;
+  color: var(--panel-danger);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.team-member-list button:disabled,
+.team-assignment-form button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.team-empty {
+  padding-top: 10px;
+  border-top: 1px solid var(--panel-line);
+}
+
+.team-assignment-form {
+  display: grid;
+  gap: 8px;
+  padding: 13px;
+  border: 1px solid var(--panel-line);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.team-assignment-form > strong {
+  margin-bottom: 2px;
+  font-size: 13px;
+}
+
+.team-assignment-form label {
+  color: var(--panel-muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.team-assignment-form select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 11px;
+  border: 1px solid #c9d0ca;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--panel-dark);
+  font: inherit;
+  font-size: 13px;
+}
+
+.team-assignment-form > button {
+  min-height: 44px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--panel-dark);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.team-assignment-form > small {
+  color: var(--panel-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.team-assignment-form .tenant-form-message {
+  margin: 2px 0 0;
 }
 
 .operations-grid {

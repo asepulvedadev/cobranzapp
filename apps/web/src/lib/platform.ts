@@ -88,6 +88,7 @@ export type TenantOverview = {
     branchName: string | null;
     displayName: string;
     status: "active" | "inactive";
+    memberIds: string[];
   }>;
   pendingInvitations: Array<{
     id: string;

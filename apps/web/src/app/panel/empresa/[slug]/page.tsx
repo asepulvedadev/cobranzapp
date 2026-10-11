@@ -4,6 +4,7 @@ import type { CurrentUser, TenantOverview } from "../../../../lib/platform";
 import { serverApi } from "../../../../lib/server-api";
 import { InviteUserForm } from "../../InviteUserForm";
 import { MemberAccessControl } from "./MemberAccessControl";
+import { TeamAssignmentManager } from "./TeamAssignmentManager";
 import { CreateBranchForm, CreateTeamForm, WorkspaceSettingsForm } from "./WorkspaceOperations";
 
 export const metadata: Metadata = { title: "Espacio empresarial" };
@@ -238,7 +239,13 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
             </section>
             <section>
               <h3>Equipos</h3>
-              {overview.teams.length ? (
+              {canSeeTeam ? (
+                <TeamAssignmentManager
+                  members={overview.members}
+                  teams={overview.teams}
+                  tenantId={overview.tenant.id}
+                />
+              ) : overview.teams.length ? (
                 <div className="structure-list">
                   {overview.teams.map((team) => (
                     <article className="structure-item" key={team.id}>
