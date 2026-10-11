@@ -10,8 +10,8 @@
 | GitHub Actions | `.github/workflows/ci.yml` y `.github/workflows/deploy.yml` |
 | VPS | Servidor compartido AutoKing `2.24.115.58` |
 | Directorio de ejecución | `/srv/cobranzapp` |
-| Dirección HTTPS temporal | `https://cobranzapp.2.24.115.58.sslip.io` |
-| Dominio aprobado | `https://cobranzaap.tech` |
+| Dirección HTTPS principal | `https://cobranzaap.tech` |
+| Dirección técnica de respaldo | `https://cobranzapp.2.24.115.58.sslip.io` |
 | Correo institucional | `info@cobranzaap.tech` |
 | Puertos locales web/API | `127.0.0.1:13200` / `127.0.0.1:18200` |
 | Sitio nginx | `/etc/nginx/sites-available/cobranzapp.conf` |
@@ -35,9 +35,9 @@ El script restaura la etiqueta anterior cuando falla una versión posterior y ex
 ## Verificación
 
 ```bash
-curl --fail https://cobranzapp.2.24.115.58.sslip.io/health
-curl --fail https://cobranzapp.2.24.115.58.sslip.io/api/ready
-curl --fail https://cobranzapp.2.24.115.58.sslip.io/api/v1/status
+curl --fail https://cobranzaap.tech/health
+curl --fail https://cobranzaap.tech/api/ready
+curl --fail https://cobranzaap.tech/api/v1/status
 ```
 
 En el VPS:
@@ -70,7 +70,7 @@ Esta copia local solo es suficiente para la base de desarrollo. **No se deben in
 - Los secretos de ejecución viven en `/srv/cobranzapp/.env`, con modo `0600`, y no aparecen en Git, imágenes, registros ni GitHub Actions.
 - Las credenciales de GHCR existen únicamente durante el trabajo y usan una configuración temporal de Docker que se elimina al finalizar.
 - Las imágenes de aplicación se ejecutan con UID/GID `10001`; las imágenes base están fijadas por resumen y los recursos tienen límites.
-- La dirección pública actual es un entorno temporal de desarrollo, no una autorización para operar un piloto real de crédito.
+- El dominio público corresponde todavía a un entorno de desarrollo, no a una autorización para operar un piloto real de crédito.
 
 ## Primeras acciones ante incidentes
 

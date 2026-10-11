@@ -58,8 +58,8 @@ pnpm dev
 Consulte la [configuración de desarrollo](docs/development-setup.md) para conocer los servicios locales, las validaciones y la entrega automática.
 
 - Repositorio privado: `https://github.com/asepulvedadev/cobranzapp`
-- Entorno de desarrollo: `https://cobranzapp.2.24.115.58.sslip.io`
-- Dominio aprobado: `https://cobranzaap.tech` (activación de DNS y TLS en curso)
+- Aplicación: `https://cobranzaap.tech`
+- Dirección técnica de respaldo: `https://cobranzapp.2.24.115.58.sslip.io`
 - Correo institucional aprobado: `info@cobranzaap.tech`
 
 ## Próximo descubrimiento

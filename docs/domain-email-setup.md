@@ -33,4 +33,4 @@ Después de crear el buzón `info@cobranzaap.tech`, agregue inicialmente este re
 
 ## Activación de TLS
 
-El VPS ya acepta tráfico HTTP para `cobranzaap.tech` y `www.cobranzaap.tech`. Cuando los registros A resuelvan públicamente a `2.24.115.58`, se debe emitir el certificado de Let's Encrypt, activar la redirección HTTPS y ejecutar las pruebas de salud.
+El certificado de Let's Encrypt está activo para `cobranzaap.tech` y `www.cobranzaap.tech`, con renovación automática. HTTP y `www` redirigen a `https://cobranzaap.tech`.
