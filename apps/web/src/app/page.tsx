@@ -1,39 +1,447 @@
+import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
+import type { CSSProperties } from "react";
+import { ScrollEffects } from "../components/ScrollEffects";
+import { SiteFooter } from "../components/SiteFooter";
+import { SiteHeader } from "../components/SiteHeader";
+import { blogPosts } from "../data/blog";
 
-const modules = [
-  "Aislamiento entre empresas",
-  "Gestión de clientes",
-  "Integridad financiera",
-  "Cobranza en campo",
+export const metadata: Metadata = {
+  title: "Control de cartera y cobranza en Colombia | cobranzapp",
+  description:
+    "Organiza cartera, rutas, recaudo y cierres diarios con trazabilidad para propietarios y equipos de cobranza en Colombia.",
+};
+
+const features = [
+  {
+    number: "01",
+    title: "Cartera que sí puedes explicar",
+    text: "Consulta obligaciones, cuotas, abonos y novedades desde un historial común, sin reconstruir cada caso desde conversaciones sueltas.",
+    tone: "dark",
+  },
+  {
+    number: "02",
+    title: "Rutas con responsables claros",
+    text: "Asigna jornadas por cobrador, organiza puntos de gestión y deja visibles los casos que necesitan apoyo del supervisor.",
+    tone: "cream",
+  },
+  {
+    number: "03",
+    title: "Recaudo con trazabilidad",
+    text: "Registra el cobro, conserva su estado y genera un comprobante digital sin perder quién hizo cada movimiento.",
+    tone: "mint",
+  },
+  {
+    number: "04",
+    title: "Cierres sin adivinar",
+    text: "Compara pagos, efectivo, transferencias y novedades antes de dar por terminada la operación del día.",
+    tone: "yellow",
+  },
+  {
+    number: "05",
+    title: "Permisos según el trabajo",
+    text: "Cada perfil ve lo que necesita. El propietario conserva el control y el equipo opera dentro de su alcance asignado.",
+    tone: "cream",
+  },
+  {
+    number: "06",
+    title: "Reportes con contexto",
+    text: "Lee cartera, recaudo, mora y diferencias con fecha de corte, responsables y filtros útiles para decidir.",
+    tone: "dark",
+  },
 ];
 
-export default function Home() {
+const roles = [
+  {
+    name: "Propietario",
+    label: "Cliente de cobranzapp",
+    text: "Administra su empresa, configura el equipo y revisa cartera, caja y decisiones sensibles.",
+  },
+  {
+    name: "Supervisor",
+    label: "Control operativo",
+    text: "Acompaña rutas, revisa excepciones y valida cierres dentro de los equipos asignados.",
+  },
+  {
+    name: "Cobrador",
+    label: "Trabajo en campo",
+    text: "Consulta su jornada, registra gestiones y entrega comprobantes de los cobros realizados.",
+  },
+  {
+    name: "Cliente",
+    label: "Consulta personal",
+    text: "Revisa sus obligaciones, comprobantes y canales autorizados sin acceder a la operación interna.",
+  },
+];
+
+const faqs = [
+  {
+    question: "¿cobranzapp presta dinero?",
+    answer:
+      "No. cobranzapp es una plataforma tecnológica para administrar cartera y cobranza de créditos otorgados por terceros.",
+  },
+  {
+    question: "¿Para quién está pensada la plataforma?",
+    answer:
+      "Para propietarios de operaciones de crédito y sus equipos de supervisión y cobro. Cada empresa trabaja en un espacio independiente.",
+  },
+  {
+    question: "¿Quién contrata el servicio?",
+    answer:
+      "El propietario de cada empresa es el cliente de cobranzapp. Supervisores, cobradores y clientes finales acceden como perfiles operativos vinculados a esa empresa.",
+  },
+  {
+    question: "¿Ya está disponible?",
+    answer:
+      "La plataforma está en desarrollo. Estamos recibiendo solicitudes de demostración para validar los flujos con operaciones reales en Colombia.",
+  },
+  {
+    question: "¿Pueden trabajar varias personas en la misma empresa?",
+    answer:
+      "Sí. El producto está diseñado para que propietario, supervisores y cobradores colaboren dentro del mismo espacio con permisos y alcances diferentes.",
+  },
+  {
+    question: "¿Cómo manejan la información entre empresas?",
+    answer:
+      "La arquitectura está diseñada para separar los datos por empresa y aplicar permisos por perfil, equipo, ruta y operación.",
+  },
+];
+
+function WordReveal({ children }: { children: string }) {
+  const occurrences = new Map<string, number>();
+  const words = children.split(" ").map((word, position) => {
+    const occurrence = (occurrences.get(word) ?? 0) + 1;
+    occurrences.set(word, occurrence);
+    return { id: `${word}-${occurrence}`, position, word };
+  });
+
   return (
-    <main className="shell">
-      <section className="hero">
-        <div className="brand-row">
-          <Image src="/brand.svg" alt="" width="48" height="48" priority />
-          <span>cobranzapp</span>
-        </div>
-        <div className="status">Base de desarrollo activa</div>
-        <h1>Operación de crédito sobre bases auditables.</h1>
-        <p>
-          El repositorio privado, el despliegue automático, la API, el procesador de tareas,
-          PostgreSQL y el entorno del VPS están preparados para iniciar el desarrollo del producto.
-        </p>
-        <a className="button" href="/api/v1/status">
-          Consultar estado de la API
-        </a>
-      </section>
-      <section className="grid" aria-label="Módulos base">
-        {modules.map((module, index) => (
-          <article className={index === 0 ? "card card-dark" : "card"} key={module}>
-            <span>0{index + 1}</span>
-            <h2>{module}</h2>
-            <p>Planificado y preparado para implementarse como un flujo vertical completo.</p>
-          </article>
-        ))}
-      </section>
-    </main>
+    <p className="tagline" data-word-reveal>
+      {words.map(({ id, position, word }) => (
+        <span key={id} style={{ "--word-index": position } as CSSProperties}>
+          {word}{" "}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+export default function Home() {
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: { "@type": "Answer", text: item.answer },
+    })),
+  };
+
+  return (
+    <>
+      <ScrollEffects />
+      <a className="skip-link" href="#contenido">
+        Saltar al contenido
+      </a>
+      <SiteHeader />
+      <main id="contenido">
+        <section className="hero-section">
+          <div className="hero-copy" data-reveal>
+            <span className="eyebrow">Control de cartera hecho en Cúcuta</span>
+            <h1>Tu operación de crédito, clara desde la ruta hasta el cierre.</h1>
+            <p>
+              cobranzapp reúne clientes, obligaciones, recaudo y seguimiento de equipo en una sola
+              operación trazable para negocios colombianos.
+            </p>
+            <div className="hero-actions">
+              <a
+                className="button"
+                href="mailto:info@cobranzaap.tech?subject=Quiero%20conocer%20cobranzapp"
+              >
+                Solicitar una demostración
+              </a>
+              <a className="text-link" href="#como-funciona">
+                Ver el recorrido <span aria-hidden="true">→</span>
+              </a>
+            </div>
+            <div className="proof-line">
+              <span>Plataforma en desarrollo</span>
+              <span>Espacios separados por empresa</span>
+              <span>Operación en español colombiano</span>
+            </div>
+            <p className="disclaimer">
+              cobranzapp no otorga créditos ni recibe dinero de los clientes. Es software de gestión
+              para operaciones administradas por terceros.
+            </p>
+          </div>
+          <div className="hero-world" data-reveal>
+            <Image
+              src="/images/cobranzaap-world.webp"
+              alt="Mundo ilustrado con oficina de cartera, ruta de cobro, supervisión y entrega de comprobante"
+              fill
+              priority
+              sizes="(max-width: 900px) 100vw, 58vw"
+            />
+            <div className="world-label world-label-one">
+              <span /> Operación central
+            </div>
+            <div className="world-label world-label-two">
+              <span /> Ruta conectada
+            </div>
+            <div className="world-label world-label-three">
+              <span /> Comprobante listo
+            </div>
+          </div>
+        </section>
+
+        <section className="trust-strip" aria-label="Enfoque del producto" data-reveal>
+          <p>Una sola línea operativa</p>
+          <div>
+            <span>01</span> Cartera
+          </div>
+          <div>
+            <span>02</span> Rutas
+          </div>
+          <div>
+            <span>03</span> Recaudo
+          </div>
+          <div>
+            <span>04</span> Conciliación
+          </div>
+        </section>
+
+        <section className="problem-section section-shell" id="problema">
+          <div className="section-heading" data-reveal>
+            <span className="eyebrow">Cuando la información se dispersa</span>
+            <h2>El problema no es cobrar. Es poder explicar lo que pasó después.</h2>
+          </div>
+          <div className="problem-grid">
+            <article className="paper-card" data-reveal>
+              <span className="card-kicker">Antes</span>
+              <h3>Cuadernos, hojas y mensajes que no cuentan la misma historia.</h3>
+              <ul>
+                <li>Un saldo distinto en cada archivo</li>
+                <li>Novedades sin responsable</li>
+                <li>Cierres reconstruidos al final del día</li>
+              </ul>
+            </article>
+            <article className="control-card" data-reveal>
+              <span className="card-kicker">Con cobranzapp</span>
+              <h3>Una operación donde cada movimiento conserva su contexto.</h3>
+              <div className="control-row">
+                <span>Abono registrado</span>
+                <strong>08:42</strong>
+              </div>
+              <div className="control-row">
+                <span>Comprobante generado</span>
+                <strong>08:43</strong>
+              </div>
+              <div className="control-row">
+                <span>Cierre por revisar</span>
+                <strong>Hoy</strong>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section className="tagline-section section-shell">
+          <WordReveal>
+            Cada cobro deja de ser un dato suelto y se convierte en una operación que puedes seguir,
+            revisar y explicar.
+          </WordReveal>
+        </section>
+
+        <section className="journey-section" id="como-funciona">
+          <div className="journey-intro section-shell" data-reveal>
+            <span className="eyebrow">Un día de operación</span>
+            <h2>Del primer pendiente al cierre, sin cambiar de historia.</h2>
+            <p>Un recorrido pensado para que cada perfil continúe el trabajo del anterior.</p>
+          </div>
+          <div className="journey-stage section-shell">
+            <div className="journey-rail" aria-hidden="true">
+              <span />
+            </div>
+            <article className="journey-card" data-reveal>
+              <span className="journey-time">06:45</span>
+              <div>
+                <span className="card-kicker">Preparar</span>
+                <h3>La cartera define la jornada</h3>
+                <p>
+                  El propietario y el supervisor identifican vencimientos, asignan responsables y
+                  separan las excepciones.
+                </p>
+              </div>
+              <div className="mini-ui">
+                <strong>Ruta Norte</strong>
+                <span>12 gestiones asignadas</span>
+                <i>Lista para iniciar</i>
+              </div>
+            </article>
+            <article className="journey-card" data-reveal>
+              <span className="journey-time">09:20</span>
+              <div>
+                <span className="card-kicker">Gestionar</span>
+                <h3>El cobrador registra lo que ocurrió</h3>
+                <p>
+                  La visita, el contacto o el pago quedan asociados al cliente, la obligación y la
+                  ruta correcta.
+                </p>
+              </div>
+              <div className="mini-ui mint">
+                <strong>Pago recibido</strong>
+                <span>Referencia CA 0184</span>
+                <i>Comprobante disponible</i>
+              </div>
+            </article>
+            <article className="journey-card" data-reveal>
+              <span className="journey-time">14:10</span>
+              <div>
+                <span className="card-kicker">Supervisar</span>
+                <h3>Las novedades llegan con contexto</h3>
+                <p>
+                  El supervisor ve diferencias, compromisos y casos detenidos sin llamar a cada
+                  persona del equipo.
+                </p>
+              </div>
+              <div className="mini-ui yellow">
+                <strong>2 casos por revisar</strong>
+                <span>Uno necesita evidencia</span>
+                <i>Asignados al supervisor</i>
+              </div>
+            </article>
+            <article className="journey-card" data-reveal>
+              <span className="journey-time">18:05</span>
+              <div>
+                <span className="card-kicker">Conciliar</span>
+                <h3>El cierre muestra dónde quedó el recaudo</h3>
+                <p>
+                  Pagos, efectivo, transferencias y diferencias se comparan antes de cerrar la
+                  jornada.
+                </p>
+              </div>
+              <div className="mini-ui dark">
+                <strong>Jornada conciliada</strong>
+                <span>Ruta Norte</span>
+                <i>Sin diferencias abiertas</i>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section className="features-section section-shell" id="funciones">
+          <div className="section-heading narrow" data-reveal>
+            <span className="eyebrow">Lo que estamos construyendo</span>
+            <h2>Herramientas para operar, no solo para mirar cifras.</h2>
+            <p>
+              El alcance se está validando con propietarios de operaciones de crédito en Colombia.
+            </p>
+          </div>
+          <div className="features-grid">
+            {features.map((feature) => (
+              <article className={`feature-card ${feature.tone}`} key={feature.number} data-reveal>
+                <span>{feature.number}</span>
+                <h3>{feature.title}</h3>
+                <p>{feature.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="roles-section" id="roles">
+          <div className="section-shell roles-layout">
+            <div className="roles-copy" data-reveal>
+              <span className="eyebrow">Cuatro perfiles, una empresa</span>
+              <h2>El propietario contrata. Cada persona entra a su espacio de trabajo.</h2>
+              <p>
+                La plataforma pública y el sistema privado permanecen separados. Dentro del sistema,
+                los permisos dependen del perfil y del alcance asignado.
+              </p>
+              <Link className="text-link light" href="/ingresar">
+                Conocer el acceso privado <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+            <div className="roles-list">
+              {roles.map((role, index) => (
+                <article key={role.name} data-reveal>
+                  <span>0{index + 1}</span>
+                  <div>
+                    <small>{role.label}</small>
+                    <h3>{role.name}</h3>
+                    <p>{role.text}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="blog-preview section-shell" id="recursos">
+          <div className="section-heading row" data-reveal>
+            <div>
+              <span className="eyebrow">Recursos para operar mejor</span>
+              <h2>Decisiones prácticas para la cartera diaria.</h2>
+            </div>
+            <Link className="text-link" href="/blog">
+              Ver todos los artículos <span aria-hidden="true">→</span>
+            </Link>
+          </div>
+          <div className="article-grid">
+            {blogPosts.map((post, index) => (
+              <article key={post.slug} data-reveal>
+                <div className={`article-visual visual-${index + 1}`} aria-hidden="true">
+                  <span>0{index + 1}</span>
+                </div>
+                <div className="article-body">
+                  <span className="card-kicker">
+                    {post.category} · {post.readingTime}
+                  </span>
+                  <h3>
+                    <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+                  </h3>
+                  <p>{post.summary}</p>
+                  <time dateTime={post.publishedAt}>{post.dateLabel}</time>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="faq-section section-shell">
+          <div className="section-heading narrow" data-reveal>
+            <span className="eyebrow">Preguntas frecuentes</span>
+            <h2>Lo esencial antes de conversar.</h2>
+          </div>
+          <div className="faq-list">
+            {faqs.map((item) => (
+              <details key={item.question} data-reveal>
+                <summary>
+                  {item.question}
+                  <span aria-hidden="true">+</span>
+                </summary>
+                <p>{item.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
+        <section className="final-cta section-shell" data-reveal>
+          <span className="eyebrow">Construyamos la operación correcta</span>
+          <h2>Cuéntanos cómo cobras hoy y qué necesitas controlar mañana.</h2>
+          <p>Estamos validando cobranzapp con propietarios y equipos de cobranza en Colombia.</p>
+          <a
+            className="button button-light"
+            href="mailto:info@cobranzaap.tech?subject=Quiero%20participar%20en%20la%20validación%20de%20cobranzapp"
+          >
+            Hablar con el equipo
+          </a>
+          <a className="email-link" href="mailto:info@cobranzaap.tech">
+            info@cobranzaap.tech
+          </a>
+        </section>
+      </main>
+      <SiteFooter />
+      <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>
+    </>
   );
 }
