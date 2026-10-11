@@ -128,7 +128,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     const platform = createPostgresPlatformService(runtimePool);
     const supportAccess = createPostgresSupportAccessService(runtimePool);
     await expect(platform.systemStatus()).resolves.toMatchObject({
-      schemaVersion: "0008_runtime_schema_visibility.sql",
+      schemaVersion: "0009_support_access_expiry_outbox.sql",
       checkedAt: expect.any(String),
     });
     const tenant = await platform.createTenant(developerId, {
@@ -271,6 +271,23 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     ).resolves.toMatchObject({
       status: "updated",
       access: { status: "active", expiresAt: expect.any(String) },
+    });
+    expect(
+      (
+        await ownerPool.query(
+          `SELECT tenant_id, event_type, aggregate_type, aggregate_id, status, available_at
+             FROM outbox_events
+            WHERE aggregate_id = $1`,
+          [supportRequest.access.id],
+        )
+      ).rows[0],
+    ).toMatchObject({
+      tenant_id: tenant.id,
+      event_type: "support_access.expire",
+      aggregate_type: "support_access",
+      aggregate_id: supportRequest.access.id,
+      status: "pending",
+      available_at: expect.any(Date),
     });
     await expect(supportAccess.findActiveAccess(developerId, tenant.id)).resolves.toMatchObject({
       id: supportRequest.access.id,

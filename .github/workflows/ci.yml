@@ -33,7 +33,10 @@ jobs:
       MIGRATION_DATABASE_URL: postgresql://cobranzapp_owner:owner-test-password@localhost:5432/cobranzapp_test
       APP_DATABASE_USER: cobranzapp_app
       APP_DATABASE_PASSWORD: integration-app-password-123456
+      WORKER_DATABASE_USER: cobranzapp_worker
+      WORKER_DATABASE_PASSWORD: integration-worker-password-123456
       TEST_DATABASE_URL: postgresql://cobranzapp_app:integration-app-password-123456@localhost:5432/cobranzapp_test
+      TEST_WORKER_DATABASE_URL: postgresql://cobranzapp_worker:integration-worker-password-123456@localhost:5432/cobranzapp_test
       TEST_MIGRATION_DATABASE_URL: postgresql://cobranzapp_owner:owner-test-password@localhost:5432/cobranzapp_test
     steps:
       - uses: actions/checkout@v7

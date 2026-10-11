@@ -4,12 +4,18 @@ import process from "node:process";
 import pg from "pg";
 import { z } from "zod";
 
-const migrationConfigSchema = z.object({
-  MIGRATION_DATABASE_URL: z.string().min(1),
-  APP_DATABASE_USER: z.string().regex(/^[a-z_][a-z0-9_]{0,62}$/),
-  APP_DATABASE_PASSWORD: z.string().min(24),
-  MIGRATIONS_DIR: z.string().optional(),
-});
+const migrationConfigSchema = z
+  .object({
+    MIGRATION_DATABASE_URL: z.string().min(1),
+    APP_DATABASE_USER: z.string().regex(/^[a-z_][a-z0-9_]{0,62}$/),
+    APP_DATABASE_PASSWORD: z.string().min(24),
+    WORKER_DATABASE_USER: z.string().regex(/^[a-z_][a-z0-9_]{0,62}$/),
+    WORKER_DATABASE_PASSWORD: z.string().min(24),
+    MIGRATIONS_DIR: z.string().optional(),
+  })
+  .refine((value) => value.APP_DATABASE_USER !== value.WORKER_DATABASE_USER, {
+    message: "Application and worker database roles must be different",
+  });
 
 function quoteIdentifier(identifier: string) {
   return `"${identifier.replaceAll('"', '""')}"`;
@@ -42,28 +48,45 @@ async function main() {
   const pool = new pg.Pool({ connectionString: config.MIGRATION_DATABASE_URL, max: 1 });
   const client = await pool.connect();
   const appRole = quoteIdentifier(config.APP_DATABASE_USER);
+  const workerRole = quoteIdentifier(config.WORKER_DATABASE_USER);
   try {
     await client.query("SELECT pg_advisory_lock(hashtext('cobranzapp:migrations'))");
-    const roleResult = await client.query<{ exists: boolean }>(
-      "SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1) AS exists",
-      [config.APP_DATABASE_USER],
-    );
-    if (roleResult.rows[0]?.exists) {
-      await client.query(
-        `ALTER ROLE ${appRole} WITH LOGIN PASSWORD ${quoteLiteral(config.APP_DATABASE_PASSWORD)} NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS`,
+    const runtimeRoles = [
+      {
+        name: config.APP_DATABASE_USER,
+        password: config.APP_DATABASE_PASSWORD,
+        identifier: appRole,
+      },
+      {
+        name: config.WORKER_DATABASE_USER,
+        password: config.WORKER_DATABASE_PASSWORD,
+        identifier: workerRole,
+      },
+    ];
+    for (const role of runtimeRoles) {
+      const roleResult = await client.query<{ exists: boolean }>(
+        "SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1) AS exists",
+        [role.name],
       );
-    } else {
-      await client.query(
-        `CREATE ROLE ${appRole} WITH LOGIN PASSWORD ${quoteLiteral(config.APP_DATABASE_PASSWORD)} NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS`,
-      );
+      if (roleResult.rows[0]?.exists) {
+        await client.query(
+          `ALTER ROLE ${role.identifier} WITH LOGIN PASSWORD ${quoteLiteral(role.password)} NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS`,
+        );
+      } else {
+        await client.query(
+          `CREATE ROLE ${role.identifier} WITH LOGIN PASSWORD ${quoteLiteral(role.password)} NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS`,
+        );
+      }
     }
     const databaseResult = await client.query<{ name: string }>(
       "SELECT current_database() AS name",
     );
     const databaseName = databaseResult.rows[0]?.name;
     if (!databaseName) throw new Error("Could not resolve the current database name");
-    await client.query(`GRANT CONNECT ON DATABASE ${quoteIdentifier(databaseName)} TO ${appRole}`);
-    await client.query(`GRANT USAGE ON SCHEMA public TO ${appRole}`);
+    for (const role of [appRole, workerRole]) {
+      await client.query(`GRANT CONNECT ON DATABASE ${quoteIdentifier(databaseName)} TO ${role}`);
+      await client.query(`GRANT USAGE ON SCHEMA public TO ${role}`);
+    }
     await client.query(
       `CREATE TABLE IF NOT EXISTS schema_migrations (
         name text PRIMARY KEY,
@@ -94,7 +117,11 @@ async function main() {
 
       await client.query("BEGIN");
       try {
-        await client.query(source.replaceAll("{{APP_DATABASE_ROLE}}", appRole));
+        await client.query(
+          source
+            .replaceAll("{{APP_DATABASE_ROLE}}", appRole)
+            .replaceAll("{{WORKER_DATABASE_ROLE}}", workerRole),
+        );
         await client.query("INSERT INTO schema_migrations (name, checksum) VALUES ($1, $2)", [
           file,
           checksum,

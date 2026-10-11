@@ -15,7 +15,7 @@ type SupportAccessRow = {
   requested_by_display_name: string;
   purpose: string;
   requested_duration_minutes: number;
-  status: "pending" | "approved" | "denied" | "revoked";
+  status: "pending" | "approved" | "denied" | "revoked" | "expired";
   created_at: Date;
   reviewed_by_display_name: string | null;
   reviewed_at: Date | null;
@@ -226,6 +226,23 @@ export function createPostgresSupportAccessService(pool: Pool): SupportAccessSer
         );
         const updated = await loadAccess(client, accessId);
         if (!updated) throw new Error("Updated support access is unavailable");
+        if (action === "approve" && updated.expiresAt) {
+          await client.query(
+            `INSERT INTO outbox_events (
+               tenant_id, event_type, aggregate_type, aggregate_id,
+               idempotency_key, payload, available_at
+             ) VALUES (
+               $1, 'support_access.expire', 'support_access', $2,
+               $3, jsonb_build_object('version', 1), $4::timestamptz
+             )`,
+            [
+              tenantId,
+              accessId,
+              `support-access-expire:${accessId}:${updated.expiresAt}`,
+              updated.expiresAt,
+            ],
+          );
+        }
         await client.query(
           `INSERT INTO audit_events
              (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
