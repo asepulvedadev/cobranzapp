@@ -13,6 +13,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
   const developerId = crypto.randomUUID();
   const memberId = crypto.randomUUID();
   const slug = `tenant-${suffix}`;
+  const secondSlug = `tenant-secondary-${suffix}`;
   const password = "integration-password-123";
   const invitedUsername = `owner-${suffix}`;
   let runtimePool: pg.Pool;
@@ -41,14 +42,16 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
   afterAll(async () => {
     if (ownerPool) {
       await ownerPool.query(
-        "DELETE FROM audit_events WHERE tenant_id IN (SELECT id FROM tenants WHERE slug = $1)",
-        [slug],
+        "DELETE FROM audit_events WHERE tenant_id IN (SELECT id FROM tenants WHERE slug = ANY($1::citext[]))",
+        [[slug, secondSlug]],
       );
       await ownerPool.query(
-        "DELETE FROM tenant_memberships WHERE tenant_id IN (SELECT id FROM tenants WHERE slug = $1)",
-        [slug],
+        "DELETE FROM tenant_memberships WHERE tenant_id IN (SELECT id FROM tenants WHERE slug = ANY($1::citext[]))",
+        [[slug, secondSlug]],
       );
-      await ownerPool.query("DELETE FROM tenants WHERE slug = $1", [slug]);
+      await ownerPool.query("DELETE FROM tenants WHERE slug = ANY($1::citext[])", [
+        [slug, secondSlug],
+      ]);
       await ownerPool.query("DELETE FROM auth_sessions WHERE user_id = ANY($1::uuid[])", [
         [developerId, memberId],
       ]);
@@ -75,6 +78,11 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       displayName: "Tenant Integration",
       slug,
       requestId: `test-${suffix}`,
+    });
+    const secondTenant = await platform.createTenant(developerId, {
+      displayName: "Tenant Secondary",
+      slug: secondSlug,
+      requestId: `test-secondary-${suffix}`,
     });
     expect(tenant.status).toBe("draft");
 
@@ -110,6 +118,30 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     expect(ownerOverview?.tenant.slug).toBe(slug);
     expect(ownerOverview?.metrics.members).toBe(1);
 
+    const existingInvitation = await tenancy.createInvitation(
+      { userId: developerId, platformRole: "developer", tenantRole: null },
+      secondTenant.id,
+      {
+        email: `owner-${suffix}@example.com`,
+        role: "owner",
+        requestId: `invite-existing-${suffix}`,
+      },
+    );
+    const existingToken = new URL(existingInvitation?.acceptanceUrl ?? "").searchParams.get(
+      "token",
+    );
+    await expect(tenancy.previewInvitation(existingToken ?? "")).resolves.toMatchObject({
+      accountExists: true,
+      tenantSlug: secondSlug,
+    });
+    await expect(
+      tenancy.acceptInvitation(
+        existingToken ?? "",
+        { existingUserId: ownerLogin?.user.id ?? "" },
+        `accept-existing-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "accepted", tenantSlug: secondSlug });
+
     await ownerPool.query(
       `INSERT INTO tenant_memberships (tenant_id, user_id, role, created_by)
        VALUES ($1, $2, 'owner', $3)`,
@@ -117,8 +149,8 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     );
 
     const anonymous = await runtimePool.query<{ count: string }>(
-      "SELECT count(*) FROM tenants WHERE slug = $1",
-      [slug],
+      "SELECT count(*) FROM tenants WHERE slug = ANY($1::citext[])",
+      [[slug, secondSlug]],
     );
     expect(Number(anonymous.rows[0]?.count)).toBe(0);
 
@@ -127,8 +159,8 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       await client.query("BEGIN");
       await client.query("SELECT set_config('app.user_id', $1, true)", [memberId]);
       const visible = await client.query<{ count: string }>(
-        "SELECT count(*) FROM tenants WHERE slug = $1",
-        [slug],
+        "SELECT count(*) FROM tenants WHERE slug = ANY($1::citext[])",
+        [[slug, secondSlug]],
       );
       expect(Number(visible.rows[0]?.count)).toBe(1);
       await client.query("ROLLBACK");

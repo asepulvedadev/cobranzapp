@@ -29,7 +29,10 @@ export function LoginForm() {
         setMessage(body.error?.message ?? "No pudimos iniciar la sesión. Intenta nuevamente.");
         return;
       }
-      router.push("/panel");
+      const nextPath = new URLSearchParams(window.location.search).get("siguiente");
+      const safeNextPath =
+        nextPath?.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/panel";
+      router.push(safeNextPath);
       router.refresh();
     } catch {
       setMessage("No hay conexión con la plataforma. Intenta nuevamente.");

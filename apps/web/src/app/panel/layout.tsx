@@ -18,22 +18,48 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   if (response.status === 401) redirect("/ingresar");
   if (!response.ok) throw new Error("No fue posible validar la sesión");
   const { user } = (await response.json()) as { user: CurrentUser };
-  if (user.platformRole !== "developer") redirect("/ingresar?error=perfil-no-habilitado");
+  const primaryMembership = user.memberships[0];
+  if (user.platformRole !== "developer" && !primaryMembership) {
+    redirect("/ingresar?error=perfil-no-habilitado");
+  }
+  const dashboardHref =
+    user.platformRole === "developer"
+      ? "/panel/desarrollador"
+      : `/panel/empresa/${primaryMembership?.tenantSlug}`;
 
   return (
     <div className="panel-shell">
       <aside className="panel-sidebar">
         <Brand light />
+        <div className="panel-context">
+          <span>{user.platformRole === "developer" ? "Plataforma" : "Empresa"}</span>
+          <strong>
+            {user.platformRole === "developer" ? "Administración" : primaryMembership?.tenantName}
+          </strong>
+        </div>
         <nav aria-label="Navegación del panel" className="panel-nav">
-          <Link href="/panel/desarrollador">
+          <Link href={dashboardHref}>
             <span aria-hidden="true">▦</span> Vista general
           </Link>
-          <Link href="/panel/desarrollador#empresas">
-            <span aria-hidden="true">◇</span> Empresas
-          </Link>
-          <Link href="/panel/desarrollador#actividad">
-            <span aria-hidden="true">↗</span> Actividad
-          </Link>
+          {user.platformRole === "developer" ? (
+            <>
+              <Link href="/panel/desarrollador#empresas">
+                <span aria-hidden="true">◇</span> Empresas
+              </Link>
+              <Link href="/panel/desarrollador#actividad">
+                <span aria-hidden="true">↗</span> Actividad
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href={`${dashboardHref}#equipo`}>
+                <span aria-hidden="true">◇</span> Equipo
+              </Link>
+              <Link href={`${dashboardHref}#configuracion`}>
+                <span aria-hidden="true">↗</span> Configuración
+              </Link>
+            </>
+          )}
           <Link href="/panel/seguridad">
             <span aria-hidden="true">●</span> Seguridad
           </Link>

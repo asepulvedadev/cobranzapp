@@ -29,3 +29,46 @@ export type PlatformOverview = {
     createdAt: string;
   }>;
 };
+
+export type InvitationPreview = {
+  email: string;
+  role: "owner" | "supervisor" | "collector" | "customer";
+  tenantName: string;
+  tenantSlug: string;
+  expiresAt: string;
+  accountExists: boolean;
+};
+
+export type TenantOverview = {
+  tenant: {
+    id: string;
+    slug: string;
+    displayName: string;
+    status: "draft" | "active" | "suspended" | "archived";
+    locale: string;
+    timezone: string;
+    currency: string;
+  };
+  actorRole: "owner" | "supervisor" | "collector" | "customer";
+  metrics: { members: number; branches: number; pendingInvitations: number };
+  members: Array<{
+    userId: string;
+    displayName: string;
+    email: string;
+    username: string;
+    role: "owner" | "supervisor" | "collector" | "customer";
+    status: "invited" | "active" | "suspended" | "revoked";
+  }>;
+  branches: Array<{
+    id: string;
+    code: string;
+    displayName: string;
+    status: "active" | "inactive";
+  }>;
+  pendingInvitations: Array<{
+    id: string;
+    email: string;
+    role: "owner" | "supervisor" | "collector" | "customer";
+    expiresAt: string;
+  }>;
+};

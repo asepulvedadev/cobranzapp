@@ -466,6 +466,15 @@ export function buildApp(dependencies: AppDependencies) {
         request.id,
       );
     }
+    if (body.data.role === "owner") {
+      return sendError(
+        reply,
+        403,
+        "PLATFORM_APPROVAL_REQUIRED",
+        "La incorporación de otro propietario requiere aprobación de plataforma.",
+        request.id,
+      );
+    }
     const invitation = await dependencies.tenancyService.createInvitation(
       {
         userId: session.user.id,

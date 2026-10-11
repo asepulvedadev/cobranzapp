@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { PlatformOverview } from "../../../lib/platform";
 import { serverApi } from "../../../lib/server-api";
+import { InviteUserForm } from "../InviteUserForm";
 import { CreateTenantForm } from "./CreateTenantForm";
 
 const statusLabels = {
@@ -105,16 +106,35 @@ export default async function DeveloperDashboard() {
           )}
         </section>
 
-        <aside className="dashboard-card create-card">
-          <div className="card-heading">
-            <div>
-              <span className="panel-eyebrow">Alta controlada</span>
-              <h2>Nueva empresa</h2>
+        <div className="dashboard-side-stack">
+          <aside className="dashboard-card create-card">
+            <div className="card-heading">
+              <div>
+                <span className="panel-eyebrow">Alta controlada</span>
+                <h2>Nueva empresa</h2>
+              </div>
             </div>
-          </div>
-          <p>Crea únicamente el espacio aislado. Los usuarios y reglas se configuran después.</p>
-          <CreateTenantForm />
-        </aside>
+            <p>Crea únicamente el espacio aislado. Los usuarios y reglas se configuran después.</p>
+            <CreateTenantForm />
+          </aside>
+          <aside className="dashboard-card create-card">
+            <div className="card-heading">
+              <div>
+                <span className="panel-eyebrow">Acceso inicial</span>
+                <h2>Invitar propietario</h2>
+              </div>
+            </div>
+            <p>Genera un enlace de activación individual con vigencia de 72 horas.</p>
+            <InviteUserForm
+              allowedRoles={["owner"]}
+              platform
+              tenants={overview.tenants.map((tenant) => ({
+                id: tenant.id,
+                displayName: tenant.displayName,
+              }))}
+            />
+          </aside>
+        </div>
       </div>
 
       <section className="dashboard-card activity-card" id="actividad">
