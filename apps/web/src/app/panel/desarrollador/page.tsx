@@ -77,17 +77,17 @@ export default async function DeveloperDashboard() {
                 <tbody>
                   {overview.tenants.map((tenant) => (
                     <tr key={tenant.id}>
-                      <td>
+                      <td data-label="Empresa">
                         <strong>{tenant.displayName}</strong>
                         <small>{tenant.slug}</small>
                       </td>
-                      <td>
+                      <td data-label="Estado">
                         <span className={`status status-${tenant.status}`}>
                           {statusLabels[tenant.status]}
                         </span>
                       </td>
-                      <td>{tenant.members}</td>
-                      <td>
+                      <td data-label="Miembros">{tenant.members}</td>
+                      <td data-label="Creada">
                         {new Intl.DateTimeFormat("es-CO", { dateStyle: "medium" }).format(
                           new Date(tenant.createdAt),
                         )}

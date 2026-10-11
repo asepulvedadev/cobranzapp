@@ -1,5 +1,6 @@
 "use client";
 
+import { SignOut } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -15,8 +16,15 @@ export function LogoutButton() {
   }
 
   return (
-    <button className="panel-logout" disabled={isPending} onClick={logout} type="button">
-      {isPending ? "Cerrando…" : "Cerrar sesión"}
+    <button
+      aria-label={isPending ? "Cerrando sesión" : "Cerrar sesión"}
+      className="panel-logout"
+      disabled={isPending}
+      onClick={logout}
+      type="button"
+    >
+      <SignOut aria-hidden="true" size={20} />
+      <span>{isPending ? "Cerrando…" : "Cerrar sesión"}</span>
     </button>
   );
 }

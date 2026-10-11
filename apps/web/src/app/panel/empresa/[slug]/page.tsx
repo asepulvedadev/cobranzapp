@@ -96,12 +96,12 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
                 <tbody>
                   {overview.members.map((member) => (
                     <tr key={member.userId}>
-                      <td>
+                      <td data-label="Persona">
                         <strong>{member.displayName}</strong>
                         <small>{member.email}</small>
                       </td>
-                      <td>{roleLabels[member.role]}</td>
-                      <td>
+                      <td data-label="Rol">{roleLabels[member.role]}</td>
+                      <td data-label="Estado">
                         <span
                           className={`status status-${member.status === "active" ? "active" : "draft"}`}
                         >

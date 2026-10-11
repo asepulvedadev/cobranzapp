@@ -6,6 +6,7 @@ import { Brand } from "../../components/Brand";
 import type { CurrentUser } from "../../lib/platform";
 import { serverApi } from "../../lib/server-api";
 import { LogoutButton } from "./LogoutButton";
+import { PanelNavigation } from "./PanelNavigation";
 import "./panel.css";
 
 export const metadata: Metadata = {
@@ -30,40 +31,17 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   return (
     <div className="panel-shell">
       <aside className="panel-sidebar">
-        <Brand light />
+        <Brand href={dashboardHref} light />
         <div className="panel-context">
           <span>{user.platformRole === "developer" ? "Plataforma" : "Empresa"}</span>
           <strong>
             {user.platformRole === "developer" ? "Administración" : primaryMembership?.tenantName}
           </strong>
         </div>
-        <nav aria-label="Navegación del panel" className="panel-nav">
-          <Link href={dashboardHref}>
-            <span aria-hidden="true">▦</span> Vista general
-          </Link>
-          {user.platformRole === "developer" ? (
-            <>
-              <Link href="/panel/desarrollador#empresas">
-                <span aria-hidden="true">◇</span> Empresas
-              </Link>
-              <Link href="/panel/desarrollador#actividad">
-                <span aria-hidden="true">↗</span> Actividad
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href={`${dashboardHref}#equipo`}>
-                <span aria-hidden="true">◇</span> Equipo
-              </Link>
-              <Link href={`${dashboardHref}#configuracion`}>
-                <span aria-hidden="true">↗</span> Configuración
-              </Link>
-            </>
-          )}
-          <Link href="/panel/seguridad">
-            <span aria-hidden="true">●</span> Seguridad
-          </Link>
-        </nav>
+        <PanelNavigation
+          dashboardHref={dashboardHref}
+          isDeveloper={user.platformRole === "developer"}
+        />
         <div className="panel-sidebar-footer">
           <div className="panel-profile">
             <span>{user.displayName.slice(0, 1).toUpperCase()}</span>
