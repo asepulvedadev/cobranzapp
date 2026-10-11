@@ -4,6 +4,7 @@ import { z } from "zod";
 import { LoginRateLimiter } from "./auth/login-rate-limiter.js";
 import type { AuthenticatedUser, AuthService } from "./auth/types.js";
 import type { PlatformService } from "./platform/types.js";
+import type { SupportAccessService } from "./support-access/types.js";
 import type { TenancyService } from "./tenancy/types.js";
 
 const sessionCookieName = "cobranzapp_session";
@@ -33,6 +34,8 @@ const tenantSchema = z.object({
 const tenantIdParamsSchema = z.object({ tenantId: z.uuid() });
 const tenantInvitationParamsSchema = z.object({ tenantId: z.uuid(), invitationId: z.uuid() });
 const tenantMemberParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
+const supportAccessParamsSchema = z.object({ accessId: z.uuid() });
+const tenantSupportAccessParamsSchema = z.object({ tenantId: z.uuid(), accessId: z.uuid() });
 const tenantTeamMemberParamsSchema = z.object({
   tenantId: z.uuid(),
   teamId: z.uuid(),
@@ -85,6 +88,11 @@ const memberUpdateSchema = z.object({
   role: z.enum(["supervisor", "collector", "customer"]),
   status: z.enum(["active", "suspended", "revoked"]),
 });
+const supportAccessRequestSchema = z.object({
+  purpose: z.string().trim().min(12).max(240),
+  durationMinutes: z.number().int().min(15).max(480),
+});
+const supportAccessReviewSchema = z.object({ action: z.enum(["approve", "deny", "revoke"]) });
 
 export interface AppDependencies {
   allowedWebOrigins?: string[];
@@ -93,6 +101,7 @@ export interface AppDependencies {
   isProduction?: boolean;
   platformService: PlatformService;
   sessionTtlHours?: number;
+  supportAccessService: SupportAccessService;
   tenancyService: TenancyService;
   version: string;
 }
@@ -557,6 +566,118 @@ export function buildApp(dependencies: AppDependencies) {
     return reply.code(204).send();
   });
 
+  app.get("/v1/platform/support-access", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    return { access: await dependencies.supportAccessService.listForDeveloper(session.user.id) };
+  });
+
+  app.post("/v1/platform/tenants/:tenantId/support-access", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = supportAccessRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_SUPPORT_ACCESS",
+        "Revisa el motivo y la duración solicitada.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const result = await dependencies.supportAccessService.requestAccess(
+      session.user.id,
+      params.data.tenantId,
+      { ...body.data, requestId: request.id },
+    );
+    if (result.status === "tenant_not_found") {
+      return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
+    }
+    if (result.status === "exists") {
+      return sendError(
+        reply,
+        409,
+        "SUPPORT_ACCESS_EXISTS",
+        "Ya existe una solicitud pendiente o un acceso vigente.",
+        request.id,
+      );
+    }
+    return reply.code(201).send({ access: result.access });
+  });
+
+  app.delete("/v1/platform/support-access/:accessId", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const params = supportAccessParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "SUPPORT_ACCESS_NOT_FOUND", "El acceso no existe.", request.id);
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const result = await dependencies.supportAccessService.cancelAccess(
+      session.user.id,
+      params.data.accessId,
+      request.id,
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "SUPPORT_ACCESS_NOT_FOUND", "El acceso no existe.", request.id);
+    }
+    if (result.status === "invalid_transition") {
+      return sendError(
+        reply,
+        409,
+        "INVALID_SUPPORT_ACCESS_TRANSITION",
+        "Ese acceso ya no puede cancelarse.",
+        request.id,
+      );
+    }
+    return reply.code(204).send();
+  });
+
+  app.get("/v1/platform/tenants/:tenantId/support-overview", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
+    }
+    const access = await dependencies.supportAccessService.findActiveAccess(
+      session.user.id,
+      params.data.tenantId,
+    );
+    if (!access) {
+      return sendError(
+        reply,
+        403,
+        "SUPPORT_ACCESS_REQUIRED",
+        "Necesitas una autorización de soporte vigente.",
+        request.id,
+      );
+    }
+    const overview = await dependencies.tenancyService.overview(
+      {
+        userId: session.user.id,
+        platformRole: "developer",
+        tenantRole: null,
+        supportAccessId: access.id,
+      },
+      params.data.tenantId,
+    );
+    if (!overview) {
+      return sendError(
+        reply,
+        403,
+        "SUPPORT_ACCESS_REQUIRED",
+        "La autorización de soporte venció o fue revocada.",
+        request.id,
+      );
+    }
+    return { access, overview };
+  });
+
   app.get("/v1/invitations/:token", async (request, reply) => {
     const params = invitationTokenParamsSchema.safeParse(request.params);
     if (!params.success)
@@ -669,6 +790,91 @@ export function buildApp(dependencies: AppDependencies) {
         request.id,
       );
     return overview;
+  });
+
+  app.get("/v1/tenants/:tenantId/support-access", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (membership?.role !== "owner") {
+      return sendError(
+        reply,
+        403,
+        "OWNER_REQUIRED",
+        "Solo el propietario puede revisar accesos de soporte.",
+        request.id,
+      );
+    }
+    return {
+      access: await dependencies.supportAccessService.listForTenant(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+      ),
+    };
+  });
+
+  app.patch("/v1/tenants/:tenantId/support-access/:accessId", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantSupportAccessParamsSchema.safeParse(request.params);
+    const body = supportAccessReviewSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_SUPPORT_ACCESS",
+        "La decisión solicitada no es válida.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (membership?.role !== "owner") {
+      return sendError(
+        reply,
+        403,
+        "OWNER_REQUIRED",
+        "Solo el propietario puede administrar accesos de soporte.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const result = await dependencies.supportAccessService.reviewAccess(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.accessId,
+      body.data.action,
+      request.id,
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "SUPPORT_ACCESS_NOT_FOUND", "El acceso no existe.", request.id);
+    }
+    if (result.status === "invalid_transition") {
+      return sendError(
+        reply,
+        409,
+        "INVALID_SUPPORT_ACCESS_TRANSITION",
+        "Ese acceso ya no admite la acción solicitada.",
+        request.id,
+      );
+    }
+    return { access: result.access };
   });
 
   app.post("/v1/tenants/:tenantId/invitations", async (request, reply) => {

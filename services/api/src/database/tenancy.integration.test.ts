@@ -262,6 +262,23 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       status: "active",
     });
     await expect(
+      tenancy.overview(
+        {
+          userId: developerId,
+          platformRole: "developer",
+          tenantRole: null,
+          supportAccessId: supportRequest.access.id,
+        },
+        tenant.id,
+      ),
+    ).resolves.toMatchObject({ actorRole: "support", tenant: { id: tenant.id } });
+    await expect(
+      tenancy.overview(
+        { userId: developerId, platformRole: "developer", tenantRole: null },
+        tenant.id,
+      ),
+    ).resolves.toBeNull();
+    await expect(
       supportAccess.reviewAccess(
         ownerActor,
         tenant.id,

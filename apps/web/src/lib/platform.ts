@@ -77,7 +77,7 @@ export type TenantOverview = {
     timezone: string;
     currency: string;
   };
-  actorRole: "owner" | "supervisor" | "collector" | "customer";
+  actorRole: "owner" | "supervisor" | "collector" | "customer" | "support";
   metrics: { members: number; branches: number; teams: number; pendingInvitations: number };
   settings: {
     primaryColor: string;

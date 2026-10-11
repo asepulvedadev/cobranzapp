@@ -4,6 +4,7 @@ export type TenantActor = {
   userId: string;
   platformRole: PlatformRole;
   tenantRole: TenantRole | null;
+  supportAccessId?: string;
 };
 
 export type InvitationPreview = {
@@ -25,7 +26,7 @@ export type TenantOverview = {
     timezone: string;
     currency: string;
   };
-  actorRole: TenantRole;
+  actorRole: TenantRole | "support";
   metrics: {
     members: number;
     branches: number;

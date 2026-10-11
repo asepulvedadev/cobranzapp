@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "./app.js";
 import type { AuthenticatedUser, AuthService } from "./auth/types.js";
 import type { PlatformService } from "./platform/types.js";
+import type { SupportAccessRecord, SupportAccessService } from "./support-access/types.js";
 import type { TenancyService } from "./tenancy/types.js";
 
 const developer: AuthenticatedUser = {
@@ -32,7 +33,24 @@ const tenantOwner: AuthenticatedUser = {
   ],
 };
 
-function dependencies(overrides?: { authService?: Partial<AuthService> }) {
+const supportAccessRecord: SupportAccessRecord = {
+  id: "5b511ded-bb78-4994-b170-7f47cc440111",
+  tenantId: "5c58269f-ce16-4250-82e2-c0c16621b0fb",
+  tenantName: "Empresa Uno",
+  requestedByDisplayName: "Desarrollador",
+  purpose: "Revisar la configuración de la empresa",
+  requestedDurationMinutes: 60,
+  status: "pending",
+  requestedAt: "2026-10-11T00:00:00.000Z",
+  reviewedByDisplayName: null,
+  reviewedAt: null,
+  expiresAt: null,
+};
+
+function dependencies(overrides?: {
+  authService?: Partial<AuthService>;
+  supportAccessService?: Partial<SupportAccessService>;
+}) {
   const authService: AuthService = {
     login: vi.fn(async () => ({ token: "session-token", user: developer })),
     authenticate: vi.fn(async () => developer),
@@ -167,12 +185,32 @@ function dependencies(overrides?: { authService?: Partial<AuthService> }) {
       },
     })),
   };
+  const supportAccessService: SupportAccessService = {
+    requestAccess: vi.fn(async () => ({ status: "created", access: supportAccessRecord })),
+    listForDeveloper: vi.fn(async () => [supportAccessRecord]),
+    listForTenant: vi.fn(async () => [supportAccessRecord]),
+    reviewAccess: vi.fn(async () => ({
+      status: "updated",
+      access: { ...supportAccessRecord, status: "active", expiresAt: "2026-10-11T01:00:00.000Z" },
+    })),
+    cancelAccess: vi.fn(async () => ({
+      status: "updated",
+      access: { ...supportAccessRecord, status: "revoked" },
+    })),
+    findActiveAccess: vi.fn(async () => ({
+      ...supportAccessRecord,
+      status: "active",
+      expiresAt: "2026-10-11T01:00:00.000Z",
+    })),
+    ...overrides?.supportAccessService,
+  };
   return {
     allowedWebOrigins: ["https://cobranzaap.tech"],
     authService,
     checkDatabase: async () => undefined,
     isProduction: true,
     platformService,
+    supportAccessService,
     tenancyService,
     version: "test",
   };
@@ -415,6 +453,99 @@ describe("developer platform", () => {
       error: { code: "REAUTHENTICATION_REQUIRED" },
     });
     expect(deps.platformService.updateTenantStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe("temporary support access", () => {
+  const tenantId = "5c58269f-ce16-4250-82e2-c0c16621b0fb";
+
+  it("lets a developer request time-limited access", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/platform/tenants/${tenantId}/support-access`,
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: {
+        purpose: "Revisar la configuración de la empresa",
+        durationMinutes: 60,
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({ access: { status: "pending" } });
+    expect(deps.supportAccessService.requestAccess).toHaveBeenCalledWith(
+      developer.id,
+      tenantId,
+      expect.objectContaining({ durationMinutes: 60 }),
+    );
+  });
+
+  it("denies the support overview without an active approval", async () => {
+    const deps = dependencies({
+      supportAccessService: { findActiveAccess: vi.fn(async () => null) },
+    });
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/platform/tenants/${tenantId}/support-overview`,
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ error: { code: "SUPPORT_ACCESS_REQUIRED" } });
+    expect(deps.tenancyService.overview).not.toHaveBeenCalled();
+  });
+
+  it("opens a read-only overview with a current approval", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/platform/tenants/${tenantId}/support-overview`,
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      access: { status: "active" },
+      overview: { actorRole: "owner" },
+    });
+    expect(deps.tenancyService.overview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platformRole: "developer",
+        tenantRole: null,
+        supportAccessId: supportAccessRecord.id,
+      }),
+      tenantId,
+    );
+  });
+
+  it("lets the tenant owner approve a pending request", async () => {
+    const deps = dependencies({ authService: { authenticate: vi.fn(async () => tenantOwner) } });
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/v1/tenants/${tenantId}/support-access/${supportAccessRecord.id}`,
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { action: "approve" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ access: { status: "active" } });
+    expect(deps.supportAccessService.reviewAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantRole: "owner" }),
+      tenantId,
+      supportAccessRecord.id,
+      "approve",
+      expect.any(String),
+    );
   });
 });
 

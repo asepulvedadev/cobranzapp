@@ -3,6 +3,7 @@ import { buildApp } from "./app.js";
 import { createPostgresAuthService } from "./auth/postgres-auth-service.js";
 import { loadConfig, parseAllowedOrigins } from "./config.js";
 import { createPostgresPlatformService } from "./platform/postgres-platform-service.js";
+import { createPostgresSupportAccessService } from "./support-access/postgres-support-access-service.js";
 import { createPostgresTenancyService } from "./tenancy/postgres-tenancy-service.js";
 
 const config = loadConfig();
@@ -21,6 +22,7 @@ const app = buildApp({
   isProduction: config.NODE_ENV === "production",
   platformService: createPostgresPlatformService(pool),
   sessionTtlHours: config.SESSION_TTL_HOURS,
+  supportAccessService: createPostgresSupportAccessService(pool),
   tenancyService: createPostgresTenancyService(pool, config.PUBLIC_WEB_URL),
   version: process.env.APP_VERSION ?? "development",
 });

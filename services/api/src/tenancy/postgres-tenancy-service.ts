@@ -352,7 +352,21 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           [tenantId],
         );
         const tenantRow = tenant.rows[0];
-        if (!tenantRow || !actor.tenantRole) {
+        const supportAccess = actor.supportAccessId
+          ? await client.query<{ allowed: boolean }>(
+              `SELECT EXISTS (
+                 SELECT 1 FROM tenant_support_access_requests
+                  WHERE id = $1 AND tenant_id = $2 AND requested_by = $3
+                    AND status = 'approved' AND approved_until > now()
+               ) AS allowed`,
+              [actor.supportAccessId, tenantId, actor.userId],
+            )
+          : { rows: [] };
+        const isSupport =
+          actor.platformRole === "developer" &&
+          actor.tenantRole === null &&
+          supportAccess.rows[0]?.allowed === true;
+        if (!tenantRow || (!actor.tenantRole && !isSupport)) {
           await client.query("ROLLBACK");
           return null;
         }
@@ -384,7 +398,7 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           [tenantId],
         );
         const maySeeSettingsHistory =
-          actor.tenantRole === "owner" || actor.tenantRole === "supervisor";
+          isSupport || actor.tenantRole === "owner" || actor.tenantRole === "supervisor";
         const settingsHistory = maySeeSettingsHistory
           ? await client.query<{
               version: number;
@@ -440,7 +454,8 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
             ORDER BY team.display_name`,
           [tenantId],
         );
-        const mayManagePeople = actor.tenantRole === "owner" || actor.tenantRole === "supervisor";
+        const mayManagePeople =
+          isSupport || actor.tenantRole === "owner" || actor.tenantRole === "supervisor";
         const activity = mayManagePeople
           ? await client.query<{
               id: string;
@@ -508,7 +523,7 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
             timezone: tenantRow.timezone,
             currency: tenantRow.currency,
           },
-          actorRole: actor.tenantRole,
+          actorRole: actor.tenantRole ?? "support",
           metrics: {
             members: Number(counts?.members ?? 0),
             branches: Number(counts?.branches ?? 0),
