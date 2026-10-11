@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import type { CSSProperties } from "react";
 import type { CurrentUser, TenantOverview } from "../../../../lib/platform";
 import { serverApi } from "../../../../lib/server-api";
 import { ActivityFeed } from "../../ActivityFeed";
 import { InviteUserForm } from "../../InviteUserForm";
 import { MemberAccessControl } from "./MemberAccessControl";
 import { PendingInvitationList } from "./PendingInvitationList";
+import { SettingsVersionHistory } from "./SettingsVersionHistory";
 import { TeamAssignmentManager } from "./TeamAssignmentManager";
 import { CreateBranchForm, CreateTeamForm, WorkspaceSettingsForm } from "./WorkspaceOperations";
 
@@ -53,9 +55,14 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
   if (!response.ok) throw new Error("No fue posible cargar la empresa");
   const overview = (await response.json()) as TenantOverview;
   const canSeeTeam = overview.actorRole === "owner" || overview.actorRole === "supervisor";
+  const brandStyle = {
+    "--tenant-brand-primary": overview.settings.primaryColor,
+    "--tenant-brand-accent": overview.settings.accentColor,
+  } as CSSProperties;
 
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-page tenant-dashboard" style={brandStyle}>
+      <div className="tenant-brand-band" aria-hidden="true" />
       <header className="dashboard-header">
         <div>
           <span className="panel-eyebrow">Espacio empresarial</span>
@@ -213,6 +220,7 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
               </dl>
             </div>
           )}
+          {canSeeTeam ? <SettingsVersionHistory versions={overview.settingsHistory} /> : null}
         </div>
 
         <div className="dashboard-card structure-card">
