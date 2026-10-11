@@ -777,6 +777,68 @@ html:has(.panel-shell) {
   margin-top: 14px;
 }
 
+.audit-feed {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.audit-feed li {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 4px 11px;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--panel-line);
+}
+
+.audit-feed li:last-child {
+  border-bottom: 0;
+}
+
+.audit-avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  grid-row: 1 / span 2;
+  place-items: center;
+  border-radius: 9px;
+  background: #fff2bb;
+  color: #6d5100;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.audit-feed div,
+.audit-feed p,
+.audit-feed small,
+.audit-feed time {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.audit-feed p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.audit-feed small,
+.audit-feed time {
+  color: var(--panel-muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.audit-feed time {
+  grid-column: 2;
+}
+
+.compact-empty-state {
+  min-height: 180px;
+}
+
 .workspace-configuration {
   display: grid;
   gap: 14px;
@@ -1287,6 +1349,15 @@ html:has(.panel-shell) {
 
   .session-item > button {
     width: auto;
+  }
+
+  .audit-feed li {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+  }
+
+  .audit-feed time {
+    grid-column: auto;
+    text-align: right;
   }
 }
 

@@ -22,6 +22,14 @@ export type AccountSession = {
   current: boolean;
 };
 
+export type AuditActivity = {
+  id: string;
+  action: string;
+  actorDisplayName: string | null;
+  actorUsername: string | null;
+  happenedAt: string;
+};
+
 export type PlatformOverview = {
   metrics: {
     tenants: number;
@@ -37,6 +45,12 @@ export type PlatformOverview = {
     members: number;
     createdAt: string;
   }>;
+  activity: Array<
+    AuditActivity & {
+      tenantId: string | null;
+      tenantName: string | null;
+    }
+  >;
 };
 
 export type InvitationPreview = {
@@ -96,4 +110,5 @@ export type TenantOverview = {
     role: "owner" | "supervisor" | "collector" | "customer";
     expiresAt: string;
   }>;
+  activity: AuditActivity[];
 };

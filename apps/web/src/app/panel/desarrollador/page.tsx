@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { PlatformOverview } from "../../../lib/platform";
 import { serverApi } from "../../../lib/server-api";
+import { ActivityFeed } from "../ActivityFeed";
 import { InviteUserForm } from "../InviteUserForm";
 import { CreateTenantForm } from "./CreateTenantForm";
 import { TenantStatusButton } from "./TenantStatusButton";
@@ -146,6 +147,16 @@ export default async function DeveloperDashboard() {
       </div>
 
       <section className="dashboard-card activity-card" id="actividad">
+        <div className="card-heading">
+          <div>
+            <span className="panel-eyebrow">Trazabilidad</span>
+            <h2>Actividad reciente</h2>
+          </div>
+        </div>
+        <ActivityFeed activity={overview.activity} />
+      </section>
+
+      <section className="dashboard-card activity-card">
         <div className="card-heading">
           <div>
             <span className="panel-eyebrow">Estado técnico</span>

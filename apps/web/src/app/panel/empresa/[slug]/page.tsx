@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import type { CurrentUser, TenantOverview } from "../../../../lib/platform";
 import { serverApi } from "../../../../lib/server-api";
+import { ActivityFeed } from "../../ActivityFeed";
 import { InviteUserForm } from "../../InviteUserForm";
 import { MemberAccessControl } from "./MemberAccessControl";
 import { TeamAssignmentManager } from "./TeamAssignmentManager";
@@ -278,6 +279,18 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
           ) : null}
         </div>
       </section>
+
+      {canSeeTeam ? (
+        <section className="dashboard-card activity-card">
+          <div className="card-heading">
+            <div>
+              <span className="panel-eyebrow">Trazabilidad</span>
+              <h2>Actividad reciente</h2>
+            </div>
+          </div>
+          <ActivityFeed activity={overview.activity} />
+        </section>
+      ) : null}
 
       <section className="dashboard-card activity-card">
         <div className="card-heading">
