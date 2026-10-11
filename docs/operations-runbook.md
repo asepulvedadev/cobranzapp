@@ -54,7 +54,11 @@ Cada día a las 04:40 UTC se genera un volcado PostgreSQL en formato personaliza
 ```bash
 sudo /usr/local/sbin/cobranzapp-backup
 sha256sum -c /var/backups/cobranzapp/postgres-*.dump.sha256
+latest=$(ls -1t /var/backups/cobranzapp/postgres-*.dump | head -n1)
+docker exec -i cobranzapp-postgres-1 pg_restore --list < "$latest"
 ```
+
+La inspección del catálogo se ejecuta dentro del contenedor para usar la misma versión principal de PostgreSQL que creó el volcado. El `pg_restore` instalado en el anfitrión puede ser anterior y rechazar un archivo válido.
 
 Esta copia local solo es suficiente para la base de desarrollo. **No se deben introducir datos reales de clientes ni información financiera** hasta contar con copias externas cifradas, archivado continuo de WAL con recuperación a un punto en el tiempo, recuperación de llaves y una prueba aislada de restauración que cumpla los RPO/RTO aprobados.
 
