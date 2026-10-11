@@ -483,6 +483,98 @@ html:has(.panel-shell) {
   line-height: 1.45;
 }
 
+.tenant-directory-filters {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--panel-line);
+  background: #f8faf8;
+}
+
+.tenant-directory-filters label {
+  display: grid;
+  gap: 6px;
+}
+
+.tenant-directory-filters label > span {
+  color: var(--panel-muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.tenant-directory-filters input,
+.tenant-directory-filters select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid #cfd5d0;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--panel-dark);
+  font: inherit;
+}
+
+.tenant-directory-filters input:focus-visible,
+.tenant-directory-filters select:focus-visible {
+  border-color: var(--panel-green);
+  outline: 3px solid color-mix(in srgb, var(--panel-green) 18%, transparent);
+  outline-offset: 1px;
+}
+
+.tenant-directory-filter-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tenant-directory-filter-actions button,
+.tenant-directory-filter-actions a,
+.tenant-directory-pagination a,
+.tenant-directory-pagination span {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid #cfd5d0;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--panel-dark);
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.tenant-directory-filter-actions button {
+  border-color: var(--panel-dark);
+  background: var(--panel-dark);
+  color: #fff;
+  cursor: pointer;
+}
+
+.tenant-directory-pagination {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--panel-line);
+}
+
+.tenant-directory-pagination strong {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  color: var(--panel-muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.tenant-directory-pagination span {
+  color: #9aa09b;
+  cursor: not-allowed;
+}
+
 .tenant-table-wrap {
   overflow-x: hidden;
 }
@@ -2540,6 +2632,32 @@ html:has(.panel-shell) {
 
   .card-heading h2 {
     font-size: 22px;
+  }
+
+  .tenant-directory-filters {
+    grid-template-columns: minmax(0, 1fr) minmax(130px, 0.55fr);
+    align-items: end;
+    padding: 18px 22px;
+  }
+
+  .tenant-directory-filter-actions {
+    grid-column: 1 / -1;
+  }
+
+  .tenant-directory-filter-actions button,
+  .tenant-directory-filter-actions a {
+    min-width: 0;
+  }
+
+  .tenant-directory-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-inline: 22px;
+  }
+
+  .tenant-directory-pagination strong {
+    order: 0;
   }
 
   .create-card > p {

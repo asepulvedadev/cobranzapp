@@ -4,6 +4,7 @@ import type {
   PlatformOverview,
   PlatformSystemStatus,
   SupportAccessRecord,
+  TenantDirectory,
 } from "../../../lib/platform";
 import { serverApi } from "../../../lib/server-api";
 import { ActivityFeed } from "../ActivityFeed";
@@ -20,23 +21,54 @@ const statusLabels = {
   archived: "Archivada",
 };
 
+const tenantStatuses = new Set(["draft", "active", "suspended", "archived"]);
+
+function firstQueryValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function directoryHref(page: number, search: string, status: string | null) {
+  const params = new URLSearchParams();
+  if (search) params.set("q", search);
+  if (status) params.set("estado", status);
+  if (page > 1) params.set("pagina", String(page));
+  const query = params.toString();
+  return `/panel/desarrollador${query ? `?${query}` : ""}#empresas`;
+}
+
 export default async function DeveloperDashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ soporte?: string }>;
+  searchParams: Promise<{
+    soporte?: string | string[];
+    q?: string | string[];
+    estado?: string | string[];
+    pagina?: string | string[];
+  }>;
 }) {
   const query = await searchParams;
-  const [response, supportResponse, systemResponse] = await Promise.all([
+  const search = (firstQueryValue(query.q) ?? "").trim().slice(0, 80);
+  const requestedStatus = firstQueryValue(query.estado) ?? null;
+  const status = requestedStatus && tenantStatuses.has(requestedStatus) ? requestedStatus : null;
+  const requestedPage = Number(firstQueryValue(query.pagina));
+  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const directoryQuery = new URLSearchParams({ page: String(page), pageSize: "20" });
+  if (search) directoryQuery.set("q", search);
+  if (status) directoryQuery.set("status", status);
+  const [response, directoryResponse, supportResponse, systemResponse] = await Promise.all([
     serverApi("/v1/platform/overview"),
+    serverApi(`/v1/platform/tenants?${directoryQuery}`),
     serverApi("/v1/platform/support-access"),
     serverApi("/v1/platform/system-status"),
   ]);
   if (response.status === 401) redirect("/ingresar");
   if (response.status === 403) redirect("/ingresar?error=sin-acceso");
   if (!response.ok) throw new Error("No fue posible cargar la consola de plataforma");
+  if (!directoryResponse.ok) throw new Error("No fue posible cargar el directorio de empresas");
   if (!supportResponse.ok) throw new Error("No fue posible cargar los accesos de soporte");
   if (!systemResponse.ok) throw new Error("No fue posible validar el estado de la plataforma");
   const overview = (await response.json()) as PlatformOverview;
+  const directory = (await directoryResponse.json()) as TenantDirectory;
   const { access } = (await supportResponse.json()) as { access: SupportAccessRecord[] };
   const system = (await systemResponse.json()) as PlatformSystemStatus;
   const version =
@@ -56,7 +88,7 @@ export default async function DeveloperDashboard({
         </span>
       </header>
 
-      {query.soporte === "sin-autorizacion" ? (
+      {firstQueryValue(query.soporte) === "sin-autorizacion" ? (
         <div className="support-expired-notice" role="status">
           <strong>El acceso de soporte ya no está disponible.</strong>
           <span>Solicita una nueva autorización si necesitas volver a consultar la empresa.</span>
@@ -125,12 +157,41 @@ export default async function DeveloperDashboard({
               <span className="panel-eyebrow">Directorio</span>
               <h2>Empresas</h2>
             </div>
-            <span>{overview.tenants.length} registros</span>
+            <span>
+              {directory.pagination.total}{" "}
+              {directory.pagination.total === 1 ? "registro" : "registros"}
+            </span>
           </div>
           <p className="operational-note">
             Activar habilita el espacio de trabajo. No aprueba créditos ni movimientos de dinero.
           </p>
-          {overview.tenants.length ? (
+          <form className="tenant-directory-filters" action="/panel/desarrollador#empresas">
+            <label>
+              <span>Buscar empresa</span>
+              <input
+                defaultValue={search}
+                maxLength={80}
+                name="q"
+                placeholder="Nombre o identificador"
+                type="search"
+              />
+            </label>
+            <label>
+              <span>Estado</span>
+              <select defaultValue={status ?? ""} name="estado">
+                <option value="">Todos</option>
+                <option value="draft">Borrador</option>
+                <option value="active">Activa</option>
+                <option value="suspended">Suspendida</option>
+                <option value="archived">Archivada</option>
+              </select>
+            </label>
+            <div className="tenant-directory-filter-actions">
+              <button type="submit">Filtrar</button>
+              {search || status ? <a href="/panel/desarrollador#empresas">Limpiar</a> : null}
+            </div>
+          </form>
+          {directory.tenants.length ? (
             <div className="tenant-table-wrap">
               <table className="tenant-table">
                 <thead>
@@ -145,7 +206,7 @@ export default async function DeveloperDashboard({
                   </tr>
                 </thead>
                 <tbody>
-                  {overview.tenants.map((tenant) => (
+                  {directory.tenants.map((tenant) => (
                     <tr key={tenant.id}>
                       <td data-label="Empresa">
                         <strong>{tenant.displayName}</strong>
@@ -186,10 +247,31 @@ export default async function DeveloperDashboard({
           ) : (
             <div className="empty-state">
               <span aria-hidden="true">◇</span>
-              <h3>Aún no hay empresas</h3>
-              <p>Crea el primer espacio. Quedará en borrador hasta completar su configuración.</p>
+              <h3>{search || status ? "No encontramos empresas" : "Aún no hay empresas"}</h3>
+              <p>
+                {search || status
+                  ? "Prueba con otro nombre o cambia el estado seleccionado."
+                  : "Crea el primer espacio. Quedará en borrador hasta completar su configuración."}
+              </p>
             </div>
           )}
+          {directory.pagination.totalPages > 1 ? (
+            <nav className="tenant-directory-pagination" aria-label="Páginas del directorio">
+              {directory.pagination.page > 1 ? (
+                <a href={directoryHref(directory.pagination.page - 1, search, status)}>Anterior</a>
+              ) : (
+                <span aria-disabled="true">Anterior</span>
+              )}
+              <strong>
+                Página {directory.pagination.page} de {directory.pagination.totalPages}
+              </strong>
+              {directory.pagination.page < directory.pagination.totalPages ? (
+                <a href={directoryHref(directory.pagination.page + 1, search, status)}>Siguiente</a>
+              ) : (
+                <span aria-disabled="true">Siguiente</span>
+              )}
+            </nav>
+          ) : null}
         </section>
 
         <div className="dashboard-side-stack">

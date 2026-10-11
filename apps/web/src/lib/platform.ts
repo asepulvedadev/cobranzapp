@@ -72,6 +72,16 @@ export type PlatformOverview = {
   >;
 };
 
+export type TenantDirectory = {
+  tenants: PlatformOverview["tenants"];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
 export type PlatformSystemStatus = {
   api: { status: "operational"; version: string };
   database: { status: "operational"; schemaVersion: string | null };
