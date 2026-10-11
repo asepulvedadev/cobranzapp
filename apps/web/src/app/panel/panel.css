@@ -207,6 +207,7 @@ html:has(.panel-shell) {
 .table-action button:focus-visible,
 .member-access-control select:focus,
 .member-access-control button:focus-visible,
+.session-manager button:focus-visible,
 .tenant-form input:focus,
 .tenant-form select:focus,
 .tenant-form button:focus-visible,
@@ -958,6 +959,102 @@ html:has(.panel-shell) {
   max-width: 620px;
 }
 
+.security-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.security-card-copy {
+  margin: 0;
+  padding: 16px 16px 0;
+  color: var(--panel-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.session-manager {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.session-list {
+  display: grid;
+  gap: 9px;
+}
+
+.session-item {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid var(--panel-line);
+  border-radius: 9px;
+  background: #fafbfa;
+}
+
+.session-item > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.session-item strong,
+.session-item span,
+.session-item small {
+  overflow-wrap: anywhere;
+}
+
+.session-item strong {
+  font-size: 14px;
+}
+
+.session-item > div span,
+.session-item small {
+  color: var(--panel-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.session-item > button,
+.revoke-others {
+  min-height: 44px;
+  padding: 0 13px;
+  border: 1px solid #c9d0ca;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--panel-dark);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.session-item > button {
+  width: 100%;
+}
+
+.revoke-others {
+  width: 100%;
+  border-color: #fecaca;
+  color: var(--panel-danger);
+}
+
+.session-item > button:disabled,
+.revoke-others:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.session-message {
+  margin: 0;
+  padding: 10px;
+  border-radius: 7px;
+  background: #edfbf4;
+  color: #065f46;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .password-form {
   padding-top: 18px;
 }
@@ -1059,6 +1156,15 @@ html:has(.panel-shell) {
   .structure-grid,
   .operations-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .session-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .session-item > button {
+    width: auto;
   }
 }
 
@@ -1291,6 +1397,10 @@ html:has(.panel-shell) {
   .structure-grid,
   .operations-grid {
     padding: 20px 22px;
+  }
+
+  .security-stack {
+    gap: 20px;
   }
 }
 

@@ -13,6 +13,15 @@ export type CurrentUser = {
   }>;
 };
 
+export type AccountSession = {
+  id: string;
+  userAgent: string | null;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  current: boolean;
+};
+
 export type PlatformOverview = {
   metrics: {
     tenants: number;
