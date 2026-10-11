@@ -1799,6 +1799,9 @@ select {
     top: 96px;
     right: 24px;
     left: 24px;
+    border-radius: 6px;
+    background: var(--dark);
+    box-shadow: 0 0 0 12px var(--dark);
   }
   .scroll-world-heading .eyebrow {
     font-size: 11px;
