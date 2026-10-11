@@ -1,0 +1,22 @@
+name: cobranzapp-dev
+
+services:
+  postgres:
+    image: postgres:17.7-alpine3.23@sha256:bb377b7239d2774ac8cc76f481596ce96c5a6b5e9d141f6d0a0ee371a6e7c0f2
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cobranzapp}
+      POSTGRES_USER: ${POSTGRES_USER:-cobranzapp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cobranzapp_dev}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:

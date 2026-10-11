@@ -1,0 +1,90 @@
+name: cobranzapp
+
+services:
+  postgres:
+    image: postgres:17.7-alpine3.23@sha256:bb377b7239d2774ac8cc76f481596ce96c5a6b5e9d141f6d0a0ee371a6e7c0f2
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    cpus: 1.5
+    mem_limit: 2g
+
+  api:
+    image: ghcr.io/asepulvedadev/cobranzapp-api:${IMAGE_TAG}
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      API_HOST: 0.0.0.0
+      API_PORT: 3001
+      APP_VERSION: ${IMAGE_TAG}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:18200:3001"
+    networks: [frontend, backend]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    cpus: 1.0
+    mem_limit: 1g
+
+  worker:
+    image: ghcr.io/asepulvedadev/cobranzapp-worker:${IMAGE_TAG}
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      APP_VERSION: ${IMAGE_TAG}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+    restart: unless-stopped
+    cpus: 0.5
+    mem_limit: 512m
+
+  web:
+    image: ghcr.io/asepulvedadev/cobranzapp-web:${IMAGE_TAG}
+    environment:
+      NODE_ENV: production
+      APP_VERSION: ${IMAGE_TAG}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:13200:3000"
+    networks: [frontend]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    cpus: 0.75
+    mem_limit: 768m
+
+networks:
+  frontend:
+  backend:
+    internal: true
+
+volumes:
+  postgres_data:

@@ -1,0 +1,404 @@
+{
+  "brand": "cobranzapp",
+  "version": "2.0",
+  "background": "transparent",
+  "palette": {
+    "charcoal": "#171717",
+    "cream": "#FFEDD5",
+    "yellow": "#FBBF24"
+  },
+  "assets": [
+    {
+      "file": "png/cobranzapp-isotype-primary-24.png",
+      "width": 24,
+      "height": 24,
+      "variant": "primary",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-primary-32.png",
+      "width": 32,
+      "height": 32,
+      "variant": "primary",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-primary-48.png",
+      "width": 48,
+      "height": 48,
+      "variant": "primary",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-primary-64.png",
+      "width": 64,
+      "height": 64,
+      "variant": "primary",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-primary-128.png",
+      "width": 128,
+      "height": 128,
+      "variant": "primary",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-primary-256.png",
+      "width": 256,
+      "height": 256,
+      "variant": "primary",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-primary-512.png",
+      "width": 512,
+      "height": 512,
+      "variant": "primary",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-primary-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "variant": "primary",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-wordmark-primary-512.png",
+      "width": 512,
+      "height": 104,
+      "variant": "primary",
+      "kind": "wordmark"
+    },
+    {
+      "file": "png/cobranzapp-wordmark-primary-1024.png",
+      "width": 1024,
+      "height": 207,
+      "variant": "primary",
+      "kind": "wordmark"
+    },
+    {
+      "file": "png/cobranzapp-wordmark-primary-2048.png",
+      "width": 2048,
+      "height": 415,
+      "variant": "primary",
+      "kind": "wordmark"
+    },
+    {
+      "file": "png/cobranzapp-lockup-primary-512.png",
+      "width": 512,
+      "height": 95,
+      "variant": "primary",
+      "kind": "lockup"
+    },
+    {
+      "file": "png/cobranzapp-lockup-primary-1024.png",
+      "width": 1024,
+      "height": 190,
+      "variant": "primary",
+      "kind": "lockup"
+    },
+    {
+      "file": "png/cobranzapp-lockup-primary-2048.png",
+      "width": 2048,
+      "height": 380,
+      "variant": "primary",
+      "kind": "lockup"
+    },
+    {
+      "file": "png/cobranzapp-isotype-reversed-24.png",
+      "width": 24,
+      "height": 24,
+      "variant": "reversed",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-reversed-32.png",
+      "width": 32,
+      "height": 32,
+      "variant": "reversed",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-reversed-48.png",
+      "width": 48,
+      "height": 48,
+      "variant": "reversed",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-reversed-64.png",
+      "width": 64,
+      "height": 64,
+      "variant": "reversed",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-reversed-128.png",
+      "width": 128,
+      "height": 128,
+      "variant": "reversed",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-reversed-256.png",
+      "width": 256,
+      "height": 256,
+      "variant": "reversed",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-reversed-512.png",
+      "width": 512,
+      "height": 512,
+      "variant": "reversed",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-reversed-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "variant": "reversed",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-wordmark-reversed-512.png",
+      "width": 512,
+      "height": 104,
+      "variant": "reversed",
+      "kind": "wordmark"
+    },
+    {
+      "file": "png/cobranzapp-wordmark-reversed-1024.png",
+      "width": 1024,
+      "height": 207,
+      "variant": "reversed",
+      "kind": "wordmark"
+    },
+    {
+      "file": "png/cobranzapp-wordmark-reversed-2048.png",
+      "width": 2048,
+      "height": 415,
+      "variant": "reversed",
+      "kind": "wordmark"
+    },
+    {
+      "file": "png/cobranzapp-lockup-reversed-512.png",
+      "width": 512,
+      "height": 95,
+      "variant": "reversed",
+      "kind": "lockup"
+    },
+    {
+      "file": "png/cobranzapp-lockup-reversed-1024.png",
+      "width": 1024,
+      "height": 190,
+      "variant": "reversed",
+      "kind": "lockup"
+    },
+    {
+      "file": "png/cobranzapp-lockup-reversed-2048.png",
+      "width": 2048,
+      "height": 380,
+      "variant": "reversed",
+      "kind": "lockup"
+    },
+    {
+      "file": "png/cobranzapp-isotype-charcoal-24.png",
+      "width": 24,
+      "height": 24,
+      "variant": "charcoal",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-charcoal-32.png",
+      "width": 32,
+      "height": 32,
+      "variant": "charcoal",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-charcoal-48.png",
+      "width": 48,
+      "height": 48,
+      "variant": "charcoal",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-charcoal-64.png",
+      "width": 64,
+      "height": 64,
+      "variant": "charcoal",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-charcoal-128.png",
+      "width": 128,
+      "height": 128,
+      "variant": "charcoal",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-charcoal-256.png",
+      "width": 256,
+      "height": 256,
+      "variant": "charcoal",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-charcoal-512.png",
+      "width": 512,
+      "height": 512,
+      "variant": "charcoal",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-charcoal-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "variant": "charcoal",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-wordmark-charcoal-512.png",
+      "width": 512,
+      "height": 104,
+      "variant": "charcoal",
+      "kind": "wordmark"
+    },
+    {
+      "file": "png/cobranzapp-wordmark-charcoal-1024.png",
+      "width": 1024,
+      "height": 207,
+      "variant": "charcoal",
+      "kind": "wordmark"
+    },
+    {
+      "file": "png/cobranzapp-wordmark-charcoal-2048.png",
+      "width": 2048,
+      "height": 415,
+      "variant": "charcoal",
+      "kind": "wordmark"
+    },
+    {
+      "file": "png/cobranzapp-lockup-charcoal-512.png",
+      "width": 512,
+      "height": 95,
+      "variant": "charcoal",
+      "kind": "lockup"
+    },
+    {
+      "file": "png/cobranzapp-lockup-charcoal-1024.png",
+      "width": 1024,
+      "height": 190,
+      "variant": "charcoal",
+      "kind": "lockup"
+    },
+    {
+      "file": "png/cobranzapp-lockup-charcoal-2048.png",
+      "width": 2048,
+      "height": 380,
+      "variant": "charcoal",
+      "kind": "lockup"
+    },
+    {
+      "file": "png/cobranzapp-isotype-white-24.png",
+      "width": 24,
+      "height": 24,
+      "variant": "white",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-white-32.png",
+      "width": 32,
+      "height": 32,
+      "variant": "white",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-white-48.png",
+      "width": 48,
+      "height": 48,
+      "variant": "white",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-white-64.png",
+      "width": 64,
+      "height": 64,
+      "variant": "white",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-white-128.png",
+      "width": 128,
+      "height": 128,
+      "variant": "white",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-white-256.png",
+      "width": 256,
+      "height": 256,
+      "variant": "white",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-white-512.png",
+      "width": 512,
+      "height": 512,
+      "variant": "white",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-isotype-white-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "variant": "white",
+      "kind": "isotype"
+    },
+    {
+      "file": "png/cobranzapp-wordmark-white-512.png",
+      "width": 512,
+      "height": 104,
+      "variant": "white",
+      "kind": "wordmark"
+    },
+    {
+      "file": "png/cobranzapp-wordmark-white-1024.png",
+      "width": 1024,
+      "height": 207,
+      "variant": "white",
+      "kind": "wordmark"
+    },
+    {
+      "file": "png/cobranzapp-wordmark-white-2048.png",
+      "width": 2048,
+      "height": 415,
+      "variant": "white",
+      "kind": "wordmark"
+    },
+    {
+      "file": "png/cobranzapp-lockup-white-512.png",
+      "width": 512,
+      "height": 95,
+      "variant": "white",
+      "kind": "lockup"
+    },
+    {
+      "file": "png/cobranzapp-lockup-white-1024.png",
+      "width": 1024,
+      "height": 190,
+      "variant": "white",
+      "kind": "lockup"
+    },
+    {
+      "file": "png/cobranzapp-lockup-white-2048.png",
+      "width": 2048,
+      "height": 380,
+      "variant": "white",
+      "kind": "lockup"
+    }
+  ]
+}

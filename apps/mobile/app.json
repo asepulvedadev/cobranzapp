@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "cobranzapp",
+    "slug": "cobranzapp",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#171717"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cobranzapp.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#171717",
+        "foregroundImage": "./assets/icon.png"
+      },
+      "package": "com.cobranzapp.mobile"
+    }
+  }
+}

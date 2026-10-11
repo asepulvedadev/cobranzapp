@@ -1,0 +1,29 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds
+.next/
+dist/
+coverage/
+.expo/
+*.tsbuildinfo
+
+# environment and secrets
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+
+# logs
+*.log
+pnpm-debug.log*
+
+# deployment
+.release.env
+backups/

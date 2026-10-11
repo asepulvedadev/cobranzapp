@@ -1,0 +1,114 @@
+{
+  "brand": "cobranzapp",
+  "approved_artwork": "brand-v2",
+  "background": "transparent",
+  "colors": {
+    "charcoal": "#171717",
+    "cream": "#FFEDD5",
+    "yellow": "#FBBF24"
+  },
+  "files": [
+    {
+      "file": "cobranzapp-isotype.svg",
+      "kind": "isotype",
+      "variant": "primary",
+      "bytes": 396,
+      "sha256": "040d030cd0d6e896a9349db378087d91fe758c726abcc8a9c88490b6e2031442"
+    },
+    {
+      "file": "cobranzapp-isotype.png",
+      "kind": "isotype",
+      "variant": "primary",
+      "bytes": 7467,
+      "sha256": "d3b7f627dae3731375f762fe3236ba5ef43efe46ab663aaa0a8ba876446c839f",
+      "width": 512,
+      "height": 512,
+      "transparent": true
+    },
+    {
+      "file": "cobranzapp-wordmark.svg",
+      "kind": "wordmark",
+      "variant": "primary",
+      "bytes": 1135,
+      "sha256": "3451c04a5a0cff64fe7452a69fae72b003d01cf101fc9f96b2aefc3e653aa141"
+    },
+    {
+      "file": "cobranzapp-wordmark.png",
+      "kind": "wordmark",
+      "variant": "primary",
+      "bytes": 14132,
+      "sha256": "45f16f2cbcbb33af9879f9a3bdec2d4d05cec0416eda3ed955a93148eb6d924f",
+      "width": 1024,
+      "height": 207,
+      "transparent": true
+    },
+    {
+      "file": "cobranzapp-lockup.svg",
+      "kind": "lockup",
+      "variant": "primary",
+      "bytes": 1403,
+      "sha256": "906d2592605fc31d75dfe4c0fb8e4003d8c45a2cc1eaf8e62cd537d9f3868dba"
+    },
+    {
+      "file": "cobranzapp-lockup.png",
+      "kind": "lockup",
+      "variant": "primary",
+      "bytes": 12942,
+      "sha256": "62579a306acf1a46afd7a1680c9cf659a06f6f224221bce25c7d4884e58e8a17",
+      "width": 1024,
+      "height": 190,
+      "transparent": true
+    },
+    {
+      "file": "cobranzapp-isotype-dark.svg",
+      "kind": "isotype",
+      "variant": "reversed",
+      "bytes": 397,
+      "sha256": "949fd40a859218d30259746de8dd3171e69315d5348328249530d9bc968358db"
+    },
+    {
+      "file": "cobranzapp-isotype-dark.png",
+      "kind": "isotype",
+      "variant": "reversed",
+      "bytes": 7793,
+      "sha256": "4b7d146fb2558279c2462d6ef9be884f944f597245f15bbabb00099763b0bd40",
+      "width": 512,
+      "height": 512,
+      "transparent": true
+    },
+    {
+      "file": "cobranzapp-wordmark-dark.svg",
+      "kind": "wordmark",
+      "variant": "reversed",
+      "bytes": 1136,
+      "sha256": "07a66050fe5c32d6cfd4ba3480b926c73dd795424d73cb7cdebb86f486b0080e"
+    },
+    {
+      "file": "cobranzapp-wordmark-dark.png",
+      "kind": "wordmark",
+      "variant": "reversed",
+      "bytes": 14804,
+      "sha256": "e829993cfa4514d5bd866eedb416cbf9a9d8e5f8a0af8dea95c7fb14ac884555",
+      "width": 1024,
+      "height": 207,
+      "transparent": true
+    },
+    {
+      "file": "cobranzapp-lockup-dark.svg",
+      "kind": "lockup",
+      "variant": "reversed",
+      "bytes": 1404,
+      "sha256": "5e96da5c75301c78297ec2db20ae8e18948e5f2a7157da05720a20a6458c022b"
+    },
+    {
+      "file": "cobranzapp-lockup-dark.png",
+      "kind": "lockup",
+      "variant": "reversed",
+      "bytes": 13558,
+      "sha256": "6bf85c4f778cf0552b96887b98c472a81cf3cdd09d0646aa5adb7501cf0820dc",
+      "width": 1024,
+      "height": 190,
+      "transparent": true
+    }
+  ]
+}

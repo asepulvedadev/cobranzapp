@@ -1,0 +1,15 @@
+.git
+.github
+node_modules
+**/node_modules
+.next
+**/.next
+dist
+**/dist
+.expo
+coverage
+.env
+.env.*
+!.env.example
+backups
+*.log
