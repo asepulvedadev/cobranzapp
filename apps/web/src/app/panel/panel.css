@@ -904,6 +904,200 @@ html:has(.panel-shell) {
   font-weight: 750;
 }
 
+.support-workspace {
+  padding-top: 2px;
+}
+
+.support-back-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 7px;
+  color: var(--panel-dark);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+.support-workspace-header {
+  padding-top: 10px;
+}
+
+.support-readonly-badge {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 11px;
+  border: 1px solid #a7d8bd;
+  border-radius: 8px;
+  background: #edfbf4;
+  color: #16643f;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.support-session-banner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px 10px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid #e5c664;
+  border-radius: 10px;
+  background: #fff8dd;
+  color: #654f12;
+}
+
+.support-session-banner > svg:first-child {
+  grid-row: 1 / span 2;
+}
+
+.support-session-banner > svg:last-child {
+  display: none;
+}
+
+.support-session-banner div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.support-session-banner strong {
+  font-size: 12px;
+}
+
+.support-session-banner span {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.support-overview-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.support-detail-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0 16px;
+}
+
+.support-detail-list > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--panel-line);
+}
+
+.support-detail-list > div:last-child {
+  border-bottom: 0;
+}
+
+.support-detail-list dt,
+.support-detail-list dd {
+  overflow-wrap: anywhere;
+}
+
+.support-detail-list dt {
+  color: var(--panel-muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.support-detail-list dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.support-structure-list,
+.support-member-list {
+  display: grid;
+  padding: 4px 16px;
+}
+
+.support-structure-list article,
+.support-member-list article {
+  min-width: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--panel-line);
+}
+
+.support-structure-list article:last-child,
+.support-member-list article:last-child {
+  border-bottom: 0;
+}
+
+.support-structure-list article {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.support-structure-list article > div,
+.support-member-list article > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.support-structure-list strong,
+.support-member-list strong,
+.support-structure-list small,
+.support-member-list small {
+  overflow-wrap: anywhere;
+}
+
+.support-structure-list strong,
+.support-member-list strong {
+  font-size: 12px;
+}
+
+.support-structure-list small,
+.support-member-list small,
+.support-structure-list > p {
+  color: var(--panel-muted);
+  font-size: 11px;
+}
+
+.support-structure-list > p {
+  margin: 12px 0;
+}
+
+.support-member-list article {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.support-member-list article > span {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  grid-row: 1 / span 2;
+  place-items: center;
+  border-radius: 9px;
+  background: #eef1ee;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.support-member-list article > div:last-child {
+  grid-column: 2;
+  grid-row: 2;
+}
+
 .table-muted {
   color: var(--panel-muted);
   font-size: 12px;
@@ -1944,6 +2138,30 @@ html:has(.panel-shell) {
 }
 
 @media (min-width: 700px) {
+  .support-session-banner {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    padding: 16px 18px;
+  }
+
+  .support-session-banner > svg:last-child {
+    display: block;
+  }
+
+  .support-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .support-member-list article {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+  }
+
+  .support-member-list article > div:last-child {
+    grid-column: auto;
+    grid-row: auto;
+    justify-items: end;
+  }
+
   .settings-history-heading {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
