@@ -4,6 +4,7 @@ import { serverApi } from "../../../lib/server-api";
 import { ActivityFeed } from "../ActivityFeed";
 import { InviteUserForm } from "../InviteUserForm";
 import { CreateTenantForm } from "./CreateTenantForm";
+import { TenantReadiness } from "./TenantReadiness";
 import { TenantStatusButton } from "./TenantStatusButton";
 
 const statusLabels = {
@@ -76,6 +77,7 @@ export default async function DeveloperDashboard() {
                     <th>Empresa</th>
                     <th>Estado</th>
                     <th>Miembros</th>
+                    <th>Preparación</th>
                     <th>Creada</th>
                     <th>Acción</th>
                   </tr>
@@ -93,13 +95,20 @@ export default async function DeveloperDashboard() {
                         </span>
                       </td>
                       <td data-label="Miembros">{tenant.members}</td>
+                      <td data-label="Preparación">
+                        <TenantReadiness readiness={tenant.readiness} />
+                      </td>
                       <td data-label="Creada">
                         {new Intl.DateTimeFormat("es-CO", { dateStyle: "medium" }).format(
                           new Date(tenant.createdAt),
                         )}
                       </td>
                       <td data-label="Acción">
-                        <TenantStatusButton status={tenant.status} tenantId={tenant.id} />
+                        <TenantStatusButton
+                          isReady={Object.values(tenant.readiness).every(Boolean)}
+                          status={tenant.status}
+                          tenantId={tenant.id}
+                        />
                       </td>
                     </tr>
                   ))}

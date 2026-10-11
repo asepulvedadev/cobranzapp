@@ -11,6 +11,11 @@ export type PlatformOverview = {
     displayName: string;
     status: "draft" | "active" | "suspended" | "archived";
     members: number;
+    readiness: {
+      activeOwner: boolean;
+      activeBranch: boolean;
+      contactEmail: boolean;
+    };
     createdAt: string;
   }>;
   activity: Array<{

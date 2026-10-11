@@ -66,6 +66,7 @@ function dependencies(overrides?: { authService?: Partial<AuthService> }) {
       slug: input.slug,
       status: "draft",
       members: 0,
+      readiness: { activeOwner: false, activeBranch: false, contactEmail: false },
       createdAt: "2026-10-11T00:00:00.000Z",
     })),
     updateTenantStatus: vi.fn(async (_actor, tenantId, status) => ({
@@ -76,6 +77,7 @@ function dependencies(overrides?: { authService?: Partial<AuthService> }) {
         slug: "empresa-uno",
         status,
         members: 1,
+        readiness: { activeOwner: true, activeBranch: true, contactEmail: true },
         createdAt: "2026-10-11T00:00:00.000Z",
       },
     })),

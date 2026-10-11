@@ -36,10 +36,27 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           display_name: string;
           status: PlatformOverview["tenants"][number]["status"];
           members: string;
+          active_owner: boolean;
+          active_branch: boolean;
+          contact_email: boolean;
           created_at: Date;
         }>(
           `SELECT tenant.id, tenant.slug, tenant.display_name, tenant.status,
                     count(membership.user_id) FILTER (WHERE membership.status = 'active') AS members,
+                    EXISTS (
+                      SELECT 1 FROM tenant_memberships owner_membership
+                       WHERE owner_membership.tenant_id = tenant.id
+                         AND owner_membership.role = 'owner'
+                         AND owner_membership.status = 'active'
+                    ) AS active_owner,
+                    EXISTS (
+                      SELECT 1 FROM branches branch
+                       WHERE branch.tenant_id = tenant.id AND branch.status = 'active'
+                    ) AS active_branch,
+                    EXISTS (
+                      SELECT 1 FROM tenant_settings settings
+                       WHERE settings.tenant_id = tenant.id AND settings.contact_email IS NOT NULL
+                    ) AS contact_email,
                     tenant.created_at
                FROM tenants tenant
                LEFT JOIN tenant_memberships membership ON membership.tenant_id = tenant.id
@@ -83,6 +100,11 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             displayName: tenant.display_name,
             status: tenant.status,
             members: Number(tenant.members),
+            readiness: {
+              activeOwner: tenant.active_owner,
+              activeBranch: tenant.active_branch,
+              contactEmail: tenant.contact_email,
+            },
             createdAt: tenant.created_at.toISOString(),
           })),
           activity: activityResult.rows.map((event) => ({
@@ -150,6 +172,7 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           displayName: tenant.display_name,
           status: tenant.status,
           members: 0,
+          readiness: { activeOwner: false, activeBranch: false, contactEmail: false },
           createdAt: tenant.created_at.toISOString(),
         };
       } catch (error) {
@@ -239,6 +262,26 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             WHERE tenant_id = $1 AND status = 'active'`,
           [tenantId],
         );
+        const readiness = await client.query<{
+          active_owner: boolean;
+          active_branch: boolean;
+          contact_email: boolean;
+        }>(
+          `SELECT
+             EXISTS (
+               SELECT 1 FROM tenant_memberships
+                WHERE tenant_id = $1 AND role = 'owner' AND status = 'active'
+             ) AS active_owner,
+             EXISTS (
+               SELECT 1 FROM branches
+                WHERE tenant_id = $1 AND status = 'active'
+             ) AS active_branch,
+             EXISTS (
+               SELECT 1 FROM tenant_settings
+                WHERE tenant_id = $1 AND contact_email IS NOT NULL
+             ) AS contact_email`,
+          [tenantId],
+        );
         await client.query(
           `INSERT INTO audit_events
              (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
@@ -255,6 +298,11 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             displayName: tenant.display_name,
             status: tenant.status,
             members: Number(memberCount.rows[0]?.count ?? 0),
+            readiness: {
+              activeOwner: readiness.rows[0]?.active_owner ?? false,
+              activeBranch: readiness.rows[0]?.active_branch ?? false,
+              contactEmail: readiness.rows[0]?.contact_email ?? false,
+            },
             createdAt: tenant.created_at.toISOString(),
           },
         } satisfies TenantStatusUpdateResult;

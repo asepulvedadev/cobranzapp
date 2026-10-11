@@ -13,9 +13,11 @@ const actions: Partial<Record<TenantStatus, { label: string; target: TenantStatu
 };
 
 export function TenantStatusButton({
+  isReady,
   tenantId,
   status,
 }: {
+  isReady: boolean;
   tenantId: string;
   status: TenantStatus;
 }) {
@@ -24,6 +26,7 @@ export function TenantStatusButton({
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const action = actions[status];
+  const activationBlocked = action?.target === "active" && !isReady;
 
   if (!action) return <span className="table-muted">Sin acciones</span>;
 
@@ -51,9 +54,12 @@ export function TenantStatusButton({
 
   return (
     <div className="table-action">
-      <button disabled={isSubmitting} onClick={updateStatus} type="button">
-        {isSubmitting ? "Procesando…" : action.label}
+      <button disabled={isSubmitting || activationBlocked} onClick={updateStatus} type="button">
+        {isSubmitting ? "Procesando…" : activationBlocked ? "Preparación pendiente" : action.label}
       </button>
+      {activationBlocked ? (
+        <small className="table-action-note">Completa los tres requisitos para activar.</small>
+      ) : null}
       {message ? <small role="status">{message}</small> : null}
     </div>
   );
