@@ -32,6 +32,8 @@ pnpm check
 
 ## Production delivery
 
-Every push to `main` runs the quality gate, builds immutable API, worker, and web images, publishes them to GHCR, and deploys the exact commit SHA to the restricted VPS deployment entrypoint. Production PostgreSQL is private to the Docker network; nginx reaches only loopback-bound web and API ports.
+Every push to `main` runs the quality gate, builds immutable API, worker, and web images, publishes them to GHCR, and deploys the exact commit SHA to the restricted VPS deployment entrypoint. Pull requests run the same quality workflow without deploying. Production PostgreSQL is private to the Docker network; nginx reaches only loopback-bound web and API ports.
 
 The temporary development URL is `https://cobranzapp.2.24.115.58.sslip.io`. Replace it with the approved production domain before a live pilot.
+
+Operational commands and recovery boundaries are documented in [the runbook](operations-runbook.md).

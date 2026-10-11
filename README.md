@@ -24,6 +24,7 @@ Mobile-first, multi-tenant loan/collection operations for independent lenders in
 | [Analytics and automation](docs/analytics-automation.md) | Deterministic metrics, reports, scenarios, scheduled rules and execution audit |
 | [VPS deployment](docs/deployment.md) | Hosting, release/migration planning, monitoring, backups and recovery |
 | [Development plan](docs/development-plan.md) | Ordered implementation phases, work units, quality gates, VPS launch and pilot completion |
+| [Operations runbook](docs/operations-runbook.md) | Repository, CI/CD, VPS runtime, health checks, backup and incident commands |
 | [Roadmap](docs/roadmap.md) | Open decisions, verification evidence, risk register and construction authorization |
 | [References](docs/references.md) | Primary source register and provenance |
 
@@ -54,6 +55,9 @@ pnpm dev
 ```
 
 See [the development setup](docs/development-setup.md) for local services, validation, and automated delivery details.
+
+- Private repository: `https://github.com/asepulvedadev/cobranzapp`
+- Development deployment: `https://cobranzapp.2.24.115.58.sslip.io`
 
 ## Next discovery
 
