@@ -41,6 +41,9 @@ SameSite cookies. A password confirmation is required again when the latest cred
 older than ten minutes before platform lifecycle changes, invitations, membership changes, or team
 scope assignments. Successful confirmations are bound to the current session, rate-limited, and
 recorded as account-scoped audit events; no password or session token is included in audit data.
+Invitation links expire after 72 hours and are single-use. Tenant owners can revoke pending
+non-owner invitations, while owner invitations remain protected behind platform administration;
+revocation requires recent password confirmation and creates a tenant-scoped audit event.
 
 This is an interim first-party identity baseline, not completion of the identity roadmap. OIDC with
 PKCE for mobile, MFA for privileged roles, approved support access, and an independent security

@@ -31,6 +31,7 @@ const tenantSchema = z.object({
     .max(63),
 });
 const tenantIdParamsSchema = z.object({ tenantId: z.uuid() });
+const tenantInvitationParamsSchema = z.object({ tenantId: z.uuid(), invitationId: z.uuid() });
 const tenantMemberParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
 const tenantTeamMemberParamsSchema = z.object({
   tenantId: z.uuid(),
@@ -529,6 +530,33 @@ export function buildApp(dependencies: AppDependencies) {
     return reply.code(201).send({ invitation });
   });
 
+  app.delete("/v1/platform/tenants/:tenantId/invitations/:invitationId", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const params = tenantInvitationParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "INVITATION_NOT_FOUND", "La invitación no existe.", request.id);
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const result = await dependencies.tenancyService.revokeInvitation(
+      { userId: session.user.id, platformRole: "developer", tenantRole: null },
+      params.data.tenantId,
+      params.data.invitationId,
+      request.id,
+    );
+    if (result.status === "not_found") {
+      return sendError(
+        reply,
+        404,
+        "INVITATION_NOT_FOUND",
+        "La invitación no existe o ya no está pendiente.",
+        request.id,
+      );
+    }
+    return reply.code(204).send();
+  });
+
   app.get("/v1/invitations/:token", async (request, reply) => {
     const params = invitationTokenParamsSchema.safeParse(request.params);
     if (!params.success)
@@ -692,6 +720,58 @@ export function buildApp(dependencies: AppDependencies) {
     if (!invitation)
       return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
     return reply.code(201).send({ invitation });
+  });
+
+  app.delete("/v1/tenants/:tenantId/invitations/:invitationId", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantInvitationParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "INVITATION_NOT_FOUND", "La invitación no existe.", request.id);
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (membership?.role !== "owner") {
+      return sendError(
+        reply,
+        403,
+        "OWNER_REQUIRED",
+        "Solo el propietario puede revocar invitaciones.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const result = await dependencies.tenancyService.revokeInvitation(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.invitationId,
+      request.id,
+    );
+    if (result.status === "protected") {
+      return sendError(
+        reply,
+        409,
+        "PLATFORM_APPROVAL_REQUIRED",
+        "La invitación de un propietario debe administrarse desde la plataforma.",
+        request.id,
+      );
+    }
+    if (result.status === "not_found") {
+      return sendError(
+        reply,
+        404,
+        "INVITATION_NOT_FOUND",
+        "La invitación no existe o ya no está pendiente.",
+        request.id,
+      );
+    }
+    return reply.code(204).send();
   });
 
   app.patch("/v1/tenants/:tenantId/members/:userId", async (request, reply) => {

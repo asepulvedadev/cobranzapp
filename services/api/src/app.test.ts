@@ -98,6 +98,7 @@ function dependencies(overrides?: { authService?: Partial<AuthService> }) {
       accountExists: false,
     })),
     acceptInvitation: vi.fn(async () => ({ status: "accepted", tenantSlug: "empresa-uno" })),
+    revokeInvitation: vi.fn(async () => ({ status: "revoked" })),
     overview: vi.fn(async () => ({
       tenant: {
         id: "5c58269f-ce16-4250-82e2-c0c16621b0fb",
@@ -540,5 +541,48 @@ describe("tenant onboarding", () => {
       userId,
       expect.objectContaining({ role: "collector", status: "suspended" }),
     );
+  });
+
+  it("lets an owner revoke a pending non-owner invitation", async () => {
+    const deps = dependencies({ authService: { authenticate: vi.fn(async () => tenantOwner) } });
+    const app = buildApp(deps);
+    apps.push(app);
+    const tenantId = tenantOwner.memberships[0]?.tenantId;
+    const invitationId = "ac08c04c-1026-4700-975c-38844928f89c";
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/v1/tenants/${tenantId}/invitations/${invitationId}`,
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+    });
+    expect(response.statusCode).toBe(204);
+    expect(deps.tenancyService.revokeInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantRole: "owner" }),
+      tenantId,
+      invitationId,
+      expect.any(String),
+    );
+  });
+
+  it("keeps owner invitations protected behind platform administration", async () => {
+    const deps = dependencies({ authService: { authenticate: vi.fn(async () => tenantOwner) } });
+    vi.mocked(deps.tenancyService.revokeInvitation).mockResolvedValue({ status: "protected" });
+    const app = buildApp(deps);
+    apps.push(app);
+    const tenantId = tenantOwner.memberships[0]?.tenantId;
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/v1/tenants/${tenantId}/invitations/ac08c04c-1026-4700-975c-38844928f89c`,
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      error: { code: "PLATFORM_APPROVAL_REQUIRED" },
+    });
   });
 });

@@ -284,6 +284,55 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
       }
     },
 
+    async revokeInvitation(actor, tenantId, invitationId, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setActorContext(client, actor, tenantId);
+        const current = await client.query<{
+          id: string;
+          email: string;
+          role: TenantRole;
+        }>(
+          `SELECT id, email, role
+             FROM tenant_invitations
+            WHERE tenant_id = $1 AND id = $2
+              AND accepted_at IS NULL AND revoked_at IS NULL
+            FOR UPDATE`,
+          [tenantId, invitationId],
+        );
+        const invitation = current.rows[0];
+        if (!invitation) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" };
+        }
+        if (invitation.role === "owner" && actor.platformRole !== "developer") {
+          await client.query("ROLLBACK");
+          return { status: "protected" };
+        }
+        await client.query(
+          `UPDATE tenant_invitations
+              SET revoked_at = now()
+            WHERE tenant_id = $1 AND id = $2`,
+          [tenantId, invitationId],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'invitation.revoked', 'tenant_invitation', $3, $4,
+                   jsonb_build_object('email', $5::text, 'role', $6::text))`,
+          [tenantId, actor.userId, invitation.id, requestId, invitation.email, invitation.role],
+        );
+        await client.query("COMMIT");
+        return { status: "revoked" };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
     async overview(actor, tenantId) {
       const client = await pool.connect();
       try {

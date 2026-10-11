@@ -103,6 +103,11 @@ export type InvitationAcceptanceResult =
   | { status: "email_mismatch" }
   | { status: "username_unavailable" };
 
+export type InvitationRevocationResult =
+  | { status: "revoked" }
+  | { status: "not_found" }
+  | { status: "protected" };
+
 export interface TenancyService {
   createInvitation(
     actor: TenantActor,
@@ -121,6 +126,12 @@ export interface TenancyService {
     input: InvitationAcceptanceInput,
     requestId: string,
   ): Promise<InvitationAcceptanceResult>;
+  revokeInvitation(
+    actor: TenantActor,
+    tenantId: string,
+    invitationId: string,
+    requestId: string,
+  ): Promise<InvitationRevocationResult>;
   overview(actor: TenantActor, tenantId: string): Promise<TenantOverview | null>;
   updateSettings(
     actor: TenantActor,

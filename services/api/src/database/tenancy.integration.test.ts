@@ -207,6 +207,27 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       platformRole: null,
       tenantRole: "owner" as const,
     };
+    const pendingInvitation = await tenancy.createInvitation(ownerActor, tenant.id, {
+      email: `supervisor-${suffix}@example.com`,
+      role: "supervisor",
+      requestId: `invite-supervisor-${suffix}`,
+    });
+    const pendingToken = new URL(pendingInvitation?.acceptanceUrl ?? "").searchParams.get("token");
+    expect((await tenancy.overview(ownerActor, tenant.id))?.pendingInvitations).toContainEqual(
+      expect.objectContaining({ id: pendingInvitation?.id, role: "supervisor" }),
+    );
+    await expect(
+      tenancy.revokeInvitation(
+        ownerActor,
+        tenant.id,
+        pendingInvitation?.id ?? "",
+        `revoke-supervisor-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "revoked" });
+    await expect(tenancy.previewInvitation(pendingToken ?? "")).resolves.toBeNull();
+    expect((await tenancy.overview(ownerActor, tenant.id))?.activity).toContainEqual(
+      expect.objectContaining({ action: "invitation.revoked", actorUsername: invitedUsername }),
+    );
     await ownerPool.query(
       `INSERT INTO tenant_memberships (tenant_id, user_id, role, created_by)
        VALUES ($1, $2, 'collector', $3)`,
