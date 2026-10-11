@@ -500,6 +500,23 @@ html:has(.panel-shell) {
   display: none;
 }
 
+.tenant-table td[data-label="Preparación"],
+.tenant-table td[data-label="Soporte"],
+.tenant-table td[data-label="Acción"] {
+  display: grid;
+  justify-content: stretch;
+  gap: 7px;
+  padding-block: 8px;
+  text-align: left;
+}
+
+.tenant-table td[data-label="Preparación"] > *,
+.tenant-table td[data-label="Soporte"] > *,
+.tenant-table td[data-label="Acción"] > * {
+  width: 100%;
+  max-width: none;
+}
+
 .tenant-table td small {
   color: var(--panel-muted);
 }
@@ -2557,6 +2574,13 @@ html:has(.panel-shell) {
     padding: 14px 20px;
     border-bottom: 1px solid #edf0ed;
     text-align: left;
+  }
+
+  .tenant-table td[data-label="Preparación"],
+  .tenant-table td[data-label="Soporte"],
+  .tenant-table td[data-label="Acción"] {
+    display: table-cell;
+    padding: 14px 20px;
   }
 
   .tenant-table th {
