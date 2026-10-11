@@ -128,6 +128,123 @@ export const blogPosts: BlogPost[] = [
       },
     ],
   },
+  {
+    slug: "permisos-para-equipos-de-cobranza",
+    category: "Equipo",
+    title: "Permisos para equipos de cobranza: quién debe ver y hacer qué",
+    summary:
+      "Una forma práctica de separar las responsabilidades del propietario, supervisor y cobrador sin frenar la operación.",
+    publishedAt: "2026-09-20",
+    dateLabel: "20 de septiembre de 2026",
+    readingTime: "6 min",
+    intro:
+      "Un cargo no debería abrir toda la información de una empresa. Los permisos útiles combinan el perfil de la persona con el equipo, la ruta y la operación concreta que tiene asignada.",
+    sections: [
+      {
+        title: "Empieza por la responsabilidad, no por la pantalla",
+        paragraphs: [
+          "Define qué decisión toma cada persona y qué evidencia necesita para hacerlo. El propietario administra la empresa; el supervisor resuelve excepciones; el cobrador ejecuta su jornada.",
+          "Dar acceso por comodidad suele terminar en exportaciones innecesarias, cambios sin responsable y datos personales visibles para quien no los necesita.",
+        ],
+      },
+      {
+        title: "Combina el rol con el alcance",
+        paragraphs: [
+          "Dos supervisores pueden tener el mismo rol y equipos distintos. De la misma manera, un cobrador debería consultar únicamente los clientes y gestiones de sus asignaciones vigentes.",
+        ],
+        bullets: [
+          "Empresa y sucursal a la que pertenece.",
+          "Equipo o ruta bajo su responsabilidad.",
+          "Estado de la operación que intenta modificar.",
+          "Acciones sensibles que requieren revisión adicional.",
+        ],
+      },
+      {
+        title: "Conserva quién hizo cada cambio",
+        paragraphs: [
+          "Un permiso evita acciones indebidas; la auditoría explica las acciones permitidas. Ambos controles son necesarios cuando se registran pagos, diferencias o cambios de condiciones.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "migrar-cartera-desde-excel",
+    category: "Cartera",
+    title: "Antes de migrar una cartera desde Excel, limpia estas cinco cosas",
+    summary:
+      "Cómo preparar clientes, obligaciones y saldos para evitar que los errores del archivo entren al nuevo sistema.",
+    publishedAt: "2026-09-13",
+    dateLabel: "13 de septiembre de 2026",
+    readingTime: "7 min",
+    intro:
+      "Migrar no es copiar columnas. Es decidir cuál dato representa la realidad cuando hay nombres repetidos, pagos sin referencia y saldos que no coinciden entre archivos.",
+    sections: [
+      {
+        title: "Identifica duplicados antes de sumar",
+        paragraphs: [
+          "Un mismo cliente puede aparecer con abreviaciones, teléfonos distintos o documentos incompletos. Define un identificador confiable y separa los casos dudosos para revisión manual.",
+        ],
+      },
+      {
+        title: "Separa clientes, obligaciones y pagos",
+        paragraphs: [
+          "Una fila que mezcla datos personales, condiciones del crédito y el último abono es fácil de leer, pero difícil de auditar. Cada concepto necesita su propio registro y relación.",
+        ],
+        bullets: [
+          "Datos vigentes de contacto del cliente.",
+          "Condiciones originales de cada obligación.",
+          "Calendario o cuotas esperadas.",
+          "Pagos con fecha, valor y referencia.",
+          "Saldo de control para validar el resultado.",
+        ],
+      },
+      {
+        title: "Haz una conciliación de entrada",
+        paragraphs: [
+          "Compara el total de capital, pagos y saldos antes y después de la migración. Si existe una diferencia, no la ocultes con un ajuste global: conserva el caso y su explicación.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "comprobante-de-pago-en-cobranza",
+    category: "Recaudo",
+    title: "Qué debe permitir verificar un comprobante de pago",
+    summary:
+      "Los datos mínimos para que empresa, cobrador y cliente puedan relacionar un abono con la obligación correcta.",
+    publishedAt: "2026-09-06",
+    dateLabel: "6 de septiembre de 2026",
+    readingTime: "5 min",
+    intro:
+      "Un comprobante no es solo un mensaje de confirmación. Debe ayudar a reconocer la operación sin revelar información innecesaria ni reemplazar la conciliación interna.",
+    sections: [
+      {
+        title: "Relaciona el pago sin exponer de más",
+        paragraphs: [
+          "Incluye una referencia verificable, la fecha, el valor, el medio registrado y una identificación suficiente de la obligación. Evita mostrar notas internas o datos que el receptor no necesita.",
+        ],
+      },
+      {
+        title: "Distingue registro y confirmación",
+        paragraphs: [
+          "Si el pago todavía requiere revisión, el comprobante debe reflejar ese estado. Presentar como definitivo un movimiento pendiente crea una expectativa difícil de corregir.",
+        ],
+        bullets: [
+          "Referencia única del movimiento.",
+          "Fecha y hora del registro.",
+          "Valor y medio de pago informado.",
+          "Obligación a la que fue asociado.",
+          "Estado actual del movimiento.",
+        ],
+      },
+      {
+        title: "Permite consultar la misma versión",
+        paragraphs: [
+          "La empresa y el cliente deberían poder llegar al mismo registro. Si una corrección es necesaria, conserva el historial en lugar de reemplazar silenciosamente el comprobante anterior.",
+        ],
+      },
+    ],
+  },
 ];
 
 export function getBlogPost(slug: string) {

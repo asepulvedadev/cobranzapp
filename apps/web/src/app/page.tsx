@@ -75,6 +75,42 @@ const roles = [
   },
 ];
 
+const useCases = [
+  {
+    number: "01",
+    title: "Propietario con cartera propia",
+    text: "Centraliza clientes, obligaciones y recaudo para dejar de reconstruir saldos desde varios archivos.",
+    signal: "Control directo",
+  },
+  {
+    number: "02",
+    title: "Comercio que vende a crédito",
+    text: "Relaciona cada plan de pago con el cliente, sus abonos y los comprobantes que respaldan la operación.",
+    signal: "Ventas en cuotas",
+  },
+  {
+    number: "03",
+    title: "Empresa con equipo en campo",
+    text: "Organiza rutas, delimita permisos y revisa lo que hizo cada cobrador sin depender de reportes por chat.",
+    signal: "Supervisión",
+  },
+  {
+    number: "04",
+    title: "Operación con varias zonas",
+    text: "Separa equipos y alcances por sucursal, zona o ruta mientras el propietario conserva una lectura común.",
+    signal: "Crecimiento ordenado",
+  },
+];
+
+const comparisonRows = [
+  ["Historial común por cliente", "Previsto", "Manual", "Depende del archivo"],
+  ["Responsable visible por gestión", "Previsto", "No", "Configuración adicional"],
+  ["Permisos según el perfil", "Previsto", "No", "Limitado"],
+  ["Comprobante relacionado con el pago", "Previsto", "Manual", "Manual"],
+  ["Cierre y diferencias de la jornada", "Previsto", "Suma manual", "Fórmulas"],
+  ["Consulta personal del cliente", "Previsto", "No", "No"],
+];
+
 const faqs = [
   {
     question: "¿cobranzapp presta dinero?",
@@ -224,6 +260,73 @@ export default function Home() {
           </div>
         </section>
 
+        <section className="use-cases-section section-shell" id="casos">
+          <div className="section-heading row" data-reveal>
+            <div>
+              <span className="eyebrow">Casos de uso</span>
+              <h2>La misma trazabilidad, aplicada a operaciones diferentes.</h2>
+            </div>
+            <Link className="text-link" href="/producto">
+              Explorar el producto <span aria-hidden="true">→</span>
+            </Link>
+          </div>
+          <div className="use-cases-grid">
+            {useCases.map((item) => (
+              <article key={item.number} data-reveal>
+                <div>
+                  <span>{item.number}</span>
+                  <small>{item.signal}</small>
+                </div>
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </article>
+            ))}
+          </div>
+          <p className="scope-note" data-reveal>
+            cobranzapp es una herramienta operativa. Cada propietario sigue siendo responsable de
+            sus productos de crédito, contratos, autorizaciones y prácticas de cobranza.
+          </p>
+        </section>
+
+        <section className="comparison-section">
+          <div className="section-shell">
+            <div className="section-heading row" data-reveal>
+              <div>
+                <span className="eyebrow">Comparación operativa</span>
+                <h2>El cuaderno es simple. La hoja calcula. Ninguno coordina todo el trabajo.</h2>
+              </div>
+              <p>
+                Esta comparación describe el alcance previsto de cobranzapp; no anuncia funciones
+                como disponibles antes de terminar su validación.
+              </p>
+            </div>
+            <div className="comparison-table-wrap" data-reveal>
+              <table className="comparison-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Necesidad diaria</th>
+                    <th scope="col">cobranzapp</th>
+                    <th scope="col">Cuaderno</th>
+                    <th scope="col">Hoja de cálculo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisonRows.map(([need, product, notebook, sheet]) => (
+                    <tr key={need}>
+                      <th scope="row">{need}</th>
+                      <td>
+                        <span>{product}</span>
+                      </td>
+                      <td>{notebook}</td>
+                      <td>{sheet}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
         <section className="roles-section" id="roles">
           <div className="section-shell roles-layout">
             <div className="roles-copy" data-reveal>
@@ -263,7 +366,7 @@ export default function Home() {
             </Link>
           </div>
           <div className="article-grid">
-            {blogPosts.map((post, index) => (
+            {blogPosts.slice(0, 3).map((post, index) => (
               <article key={post.slug} data-reveal>
                 <div className={`article-visual visual-${index + 1}`} aria-hidden="true">
                   <span>0{index + 1}</span>

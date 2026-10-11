@@ -12,13 +12,15 @@ export function SiteFooter() {
         <div>
           <strong>Producto</strong>
           <Link href="/producto">Funciones</Link>
+          <Link href="/#casos">Casos de uso</Link>
           <Link href="/#roles">Perfiles</Link>
           <Link href="/ingresar">Ingresar</Link>
         </div>
         <div>
           <strong>Recursos</strong>
           <Link href="/blog">Blog</Link>
-          <a href="mailto:info@cobranzaap.tech">Contacto</a>
+          <Link href="/nosotros">Nosotros</Link>
+          <Link href="/contacto">Contacto</Link>
         </div>
         <div>
           <strong>Legal</strong>
