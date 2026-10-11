@@ -3,6 +3,7 @@ import { Brand } from "./Brand";
 
 const links = [
   { href: "/producto", label: "Producto" },
+  { href: "/#planes", label: "Planes" },
   { href: "/#como-funciona", label: "Cómo funciona" },
   { href: "/#casos", label: "Casos de uso" },
   { href: "/#roles", label: "Perfiles" },
@@ -21,6 +22,9 @@ export function SiteHeader() {
             </Link>
           ))}
         </div>
+        <Link className="nav-plans-shortcut" href="/#planes">
+          Planes
+        </Link>
         <div className="nav-actions">
           <Link className="nav-login" href="/ingresar">
             Ingresar

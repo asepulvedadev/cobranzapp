@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { PricingSection } from "../components/PricingSection";
 import { ScrollEffects } from "../components/ScrollEffects";
 import { ScrollWorldExperience } from "../components/ScrollWorldExperience";
 import { SiteFooter } from "../components/SiteFooter";
 import { SiteHeader } from "../components/SiteHeader";
 import { blogPosts } from "../data/blog";
+import {
+  calculateMembershipMonthlyPrice,
+  formatCop,
+  membershipExtraEmployeePriceCop,
+  membershipSetupFeeCop,
+  memberships,
+} from "../data/memberships";
 
 export const metadata: Metadata = {
   title: "Control de cartera y cobranza en Colombia | cobranzapp",
@@ -113,6 +121,14 @@ const comparisonRows = [
 
 const faqs = [
   {
+    question: "¿Cuánto cuestan los planes y el onboarding?",
+    answer: `Pro cuesta ${formatCop(memberships[0].monthlyPriceCop)} COP al mes e incluye ${memberships[0].includedEmployeeSeats} empleados más el dueño y hasta ${memberships[0].clientLimit} clientes. Ultra cuesta ${formatCop(memberships[1].monthlyPriceCop)} COP al mes e incluye ${memberships[1].includedEmployeeSeats} empleados más el dueño, hasta ${memberships[1].clientLimit} clientes y soporte prioritario. Ambos incluyen préstamos ilimitados. Cada empleado adicional cuesta ${formatCop(membershipExtraEmployeePriceCop)} COP al mes. La creación de empresa y el onboarding cuestan ${formatCop(membershipSetupFeeCop)} COP, como pago único aparte de la mensualidad.`,
+  },
+  {
+    question: "¿Puedo agregar más empleados sin cambiar de plan?",
+    answer: `Sí. Tanto Pro como Ultra permiten empleados adicionales por ${formatCop(membershipExtraEmployeePriceCop)} COP por persona al mes. Por ejemplo, Pro con 6 empleados más el dueño cuesta ${formatCop(calculateMembershipMonthlyPrice("pro", 6))} COP al mes, y Ultra con 51 empleados más el dueño cuesta ${formatCop(calculateMembershipMonthlyPrice("ultra", 51))} COP al mes. El dueño no genera un cargo adicional. Agregar empleados no amplía el límite de clientes ni cambia el pago único de onboarding.`,
+  },
+  {
     question: "¿cobranzapp presta dinero?",
     answer:
       "No. cobranzapp es una plataforma tecnológica para administrar cartera y cobranza de créditos otorgados por terceros.",
@@ -183,6 +199,18 @@ export default function Home() {
       <SiteHeader />
       <main id="contenido">
         <ScrollWorldExperience />
+
+        <div className="plans-entry section-shell">
+          <span>
+            Pro y Ultra · desde{" "}
+            <strong>{formatCop(memberships[0].monthlyPriceCop)} COP / mes</strong>
+          </span>
+          <a className="text-link" href="#planes">
+            Ver planes y qué incluyen <span aria-hidden="true">→</span>
+          </a>
+        </div>
+
+        <PricingSection />
 
         <section className="trust-strip" aria-label="Enfoque del producto" data-reveal>
           <p>Una sola línea operativa</p>
