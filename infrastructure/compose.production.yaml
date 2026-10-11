@@ -28,7 +28,9 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: 3001
       APP_VERSION: ${IMAGE_TAG}
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${APP_DATABASE_USER}:${APP_DATABASE_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      ALLOWED_WEB_ORIGINS: ${ALLOWED_WEB_ORIGINS}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-8}
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,7 +53,7 @@ services:
     environment:
       NODE_ENV: production
       APP_VERSION: ${IMAGE_TAG}
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${APP_DATABASE_USER}:${APP_DATABASE_PASSWORD}@postgres:5432/${POSTGRES_DB}
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,6 +67,7 @@ services:
     environment:
       NODE_ENV: production
       APP_VERSION: ${IMAGE_TAG}
+      INTERNAL_API_URL: http://api:3001
     depends_on:
       api:
         condition: service_healthy

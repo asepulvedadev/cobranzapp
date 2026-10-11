@@ -1,6 +1,8 @@
 import pg from "pg";
 import { buildApp } from "./app.js";
-import { loadConfig } from "./config.js";
+import { createPostgresAuthService } from "./auth/postgres-auth-service.js";
+import { loadConfig, parseAllowedOrigins } from "./config.js";
+import { createPostgresPlatformService } from "./platform/postgres-platform-service.js";
 
 const config = loadConfig();
 const pool = new pg.Pool({
@@ -10,9 +12,13 @@ const pool = new pg.Pool({
 });
 
 const app = buildApp({
+  allowedWebOrigins: parseAllowedOrigins(config.ALLOWED_WEB_ORIGINS),
+  authService: createPostgresAuthService(pool, config.SESSION_TTL_HOURS),
   checkDatabase: async () => {
     await pool.query("SELECT 1");
   },
+  isProduction: config.NODE_ENV === "production",
+  platformService: createPostgresPlatformService(pool),
   version: process.env.APP_VERSION ?? "development",
 });
 

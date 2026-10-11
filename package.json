@@ -11,6 +11,8 @@
     "check": "pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
     "dev": "pnpm --parallel --filter @cobranzapp/api --filter @cobranzapp/web --filter @cobranzapp/worker dev",
     "dev:mobile": "pnpm --filter @cobranzapp/mobile start",
+    "db:bootstrap-developer": "pnpm --filter @cobranzapp/api db:bootstrap-developer",
+    "db:migrate": "pnpm --filter @cobranzapp/api db:migrate",
     "format": "biome check --write .",
     "format:check": "biome check .",
     "typecheck": "pnpm -r --if-present typecheck",

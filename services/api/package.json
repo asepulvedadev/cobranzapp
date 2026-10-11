@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "db:bootstrap-developer": "tsx src/database/bootstrap-developer.ts",
+    "db:migrate": "tsx src/database/migrate.ts",
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "test": "vitest run src",
