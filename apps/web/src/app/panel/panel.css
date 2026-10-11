@@ -774,6 +774,19 @@ html:has(.panel-shell) {
   color: #285942;
 }
 
+.support-expired-notice {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid #e7c467;
+  border-radius: 9px;
+  background: #fff8dd;
+  color: #654f12;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .support-access-empty {
   display: grid;
   gap: 5px;

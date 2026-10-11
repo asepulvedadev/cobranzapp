@@ -15,7 +15,12 @@ const statusLabels = {
   archived: "Archivada",
 };
 
-export default async function DeveloperDashboard() {
+export default async function DeveloperDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ soporte?: string }>;
+}) {
+  const query = await searchParams;
   const [response, supportResponse] = await Promise.all([
     serverApi("/v1/platform/overview"),
     serverApi("/v1/platform/support-access"),
@@ -39,6 +44,13 @@ export default async function DeveloperDashboard() {
           <i /> Producción
         </span>
       </header>
+
+      {query.soporte === "sin-autorizacion" ? (
+        <div className="support-expired-notice" role="status">
+          <strong>El acceso de soporte ya no está disponible.</strong>
+          <span>Solicita una nueva autorización si necesitas volver a consultar la empresa.</span>
+        </div>
+      ) : null}
 
       <section aria-label="Indicadores principales" className="metric-grid">
         <article>
