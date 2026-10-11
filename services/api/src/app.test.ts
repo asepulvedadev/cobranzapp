@@ -37,6 +37,8 @@ function dependencies(overrides?: { authService?: Partial<AuthService> }) {
     login: vi.fn(async () => ({ token: "session-token", user: developer })),
     authenticate: vi.fn(async () => developer),
     logout: vi.fn(async () => undefined),
+    reauthenticate: vi.fn(async () => true),
+    isRecentlyReauthenticated: vi.fn(async () => true),
     changePassword: vi.fn(async () => true),
     listSessions: vi.fn(async () => [
       {
@@ -248,6 +250,48 @@ describe("authentication", () => {
     expect(response.json()).toMatchObject({ error: { code: "INVALID_CREDENTIALS" } });
   });
 
+  it("reauthenticates the current session without issuing another token", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/auth/reauthenticate",
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { password: "correct-password" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ reauthenticated: true, validForMinutes: 10 });
+    expect(deps.authService.reauthenticate).toHaveBeenCalledWith(
+      developer.id,
+      "session-token",
+      "correct-password",
+      expect.any(String),
+    );
+    expect(response.headers["set-cookie"]).toBeUndefined();
+  });
+
+  it("rejects an incorrect password during reauthentication", async () => {
+    const app = buildApp(
+      dependencies({ authService: { reauthenticate: vi.fn(async () => false) } }),
+    );
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/auth/reauthenticate",
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { password: "incorrect-password" },
+    });
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({ error: { code: "REAUTHENTICATION_FAILED" } });
+  });
+
   it("lists and revokes only sessions owned by the authenticated user", async () => {
     const deps = dependencies();
     const app = buildApp(deps);
@@ -345,6 +389,28 @@ describe("developer platform", () => {
       "active",
       expect.any(String),
     );
+  });
+
+  it("requires recent password confirmation for a sensitive platform action", async () => {
+    const deps = dependencies({
+      authService: { isRecentlyReauthenticated: vi.fn(async () => false) },
+    });
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/v1/platform/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/status",
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { status: "active" },
+    });
+    expect(response.statusCode).toBe(428);
+    expect(response.json()).toMatchObject({
+      error: { code: "REAUTHENTICATION_REQUIRED" },
+    });
+    expect(deps.platformService.updateTenantStatus).not.toHaveBeenCalled();
   });
 });
 

@@ -20,6 +20,7 @@ const passwordSchema = z
     message: "La nueva contraseña debe ser diferente.",
     path: ["newPassword"],
   });
+const reauthenticationSchema = z.object({ password: z.string().min(12).max(256) });
 const tenantSchema = z.object({
   displayName: z.string().trim().min(2).max(120),
   slug: z
@@ -134,8 +135,10 @@ export function buildApp(dependencies: AppDependencies) {
   });
   const allowedOrigins = new Set(dependencies.allowedWebOrigins ?? ["http://localhost:3000"]);
   const loginRateLimiter = new LoginRateLimiter();
+  const reauthenticationRateLimiter = new LoginRateLimiter();
   const secureCookies = dependencies.isProduction ?? false;
   const sessionMaxAgeSeconds = (dependencies.sessionTtlHours ?? 8) * 60 * 60;
+  const reauthenticationWindowMinutes = 10;
 
   function requireAllowedOrigin(request: FastifyRequest, reply: FastifyReply) {
     const origin = request.headers.origin;
@@ -179,6 +182,29 @@ export function buildApp(dependencies: AppDependencies) {
         403,
         "DEVELOPER_REQUIRED",
         "No tienes acceso a la consola de plataforma.",
+        request.id,
+      );
+      return false;
+    }
+    return true;
+  }
+
+  async function requireRecentReauthentication(
+    session: { token: string; user: AuthenticatedUser },
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ) {
+    const recent = await dependencies.authService.isRecentlyReauthenticated(
+      session.user.id,
+      session.token,
+      reauthenticationWindowMinutes,
+    );
+    if (!recent) {
+      sendError(
+        reply,
+        428,
+        "REAUTHENTICATION_REQUIRED",
+        "Confirma tu contraseña para realizar esta acción.",
         request.id,
       );
       return false;
@@ -321,6 +347,44 @@ export function buildApp(dependencies: AppDependencies) {
     return reply.send({ revoked });
   });
 
+  app.post("/v1/auth/reauthenticate", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const parsed = reauthenticationSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return sendError(reply, 400, "INVALID_PASSWORD", "Escribe tu contraseña actual.", request.id);
+    }
+    const limiterKey = `${request.ip}:${session.user.id}`;
+    if (reauthenticationRateLimiter.isBlocked(limiterKey)) {
+      return sendError(
+        reply,
+        429,
+        "TOO_MANY_ATTEMPTS",
+        "Espera unos minutos antes de volver a intentarlo.",
+        request.id,
+      );
+    }
+    const authenticated = await dependencies.authService.reauthenticate(
+      session.user.id,
+      session.token,
+      parsed.data.password,
+      request.id,
+    );
+    if (!authenticated) {
+      reauthenticationRateLimiter.registerFailure(limiterKey);
+      return sendError(
+        reply,
+        401,
+        "REAUTHENTICATION_FAILED",
+        "La contraseña no es válida.",
+        request.id,
+      );
+    }
+    reauthenticationRateLimiter.clear(limiterKey);
+    return reply.send({ reauthenticated: true, validForMinutes: reauthenticationWindowMinutes });
+  });
+
   app.post("/v1/auth/logout", async (request, reply) => {
     if (!requireAllowedOrigin(request, reply)) return;
     const token = parseCookies(request.headers.cookie).get(sessionCookieName);
@@ -379,6 +443,7 @@ export function buildApp(dependencies: AppDependencies) {
         "Revisa el nombre y el identificador de la empresa.",
         request.id,
       );
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
     const tenant = await dependencies.platformService.createTenant(session.user.id, {
       ...parsed.data,
       requestId: request.id,
@@ -401,6 +466,7 @@ export function buildApp(dependencies: AppDependencies) {
         request.id,
       );
     }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
     const result = await dependencies.platformService.updateTenantStatus(
       session.user.id,
       params.data.tenantId,
@@ -452,6 +518,7 @@ export function buildApp(dependencies: AppDependencies) {
         request.id,
       );
     }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
     const invitation = await dependencies.tenancyService.createInvitation(
       { userId: session.user.id, platformRole: "developer", tenantRole: null },
       params.data.tenantId,
@@ -612,6 +679,7 @@ export function buildApp(dependencies: AppDependencies) {
         request.id,
       );
     }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
     const invitation = await dependencies.tenancyService.createInvitation(
       {
         userId: session.user.id,
@@ -653,6 +721,7 @@ export function buildApp(dependencies: AppDependencies) {
         request.id,
       );
     }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
     const result = await dependencies.tenancyService.updateMember(
       {
         userId: session.user.id,
@@ -868,6 +937,7 @@ export function buildApp(dependencies: AppDependencies) {
         request.id,
       );
     }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
     const actor = {
       userId: session.user.id,
       platformRole: session.user.platformRole,

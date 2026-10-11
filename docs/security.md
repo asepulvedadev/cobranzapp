@@ -34,6 +34,18 @@ PostgreSQL documents that owners normally bypass RLS and superusers/`BYPASSRLS` 
 - Quarantine uploads, inspect actual content type, size-limit, scan, and use private short-lived links; never public identity-document URLs.
 - Notifications contain minimal sensitive information. Uploaded files, form values and imported data are untrusted input; validate them and never execute embedded content.
 
+### Implemented session-security baseline
+
+As of 2026-10-11, the web application uses server-managed opaque sessions in secure HttpOnly,
+SameSite cookies. A password confirmation is required again when the latest credential proof is
+older than ten minutes before platform lifecycle changes, invitations, membership changes, or team
+scope assignments. Successful confirmations are bound to the current session, rate-limited, and
+recorded as account-scoped audit events; no password or session token is included in audit data.
+
+This is an interim first-party identity baseline, not completion of the identity roadmap. OIDC with
+PKCE for mobile, MFA for privileged roles, approved support access, and an independent security
+review remain required before the corresponding launch gate can pass.
+
 ## Branding asset security
 
 Sanitize uploaded logo/receipt assets and prohibit arbitrary HTML, CSS, JavaScript or untrusted template execution. Custom domains require verified ownership and tenant-aware routing; a domain is not proof of membership. Branding presentation belongs in [visual design](../design.md).

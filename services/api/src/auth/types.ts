@@ -38,6 +38,13 @@ export interface AuthService {
   ): Promise<{ token: string; user: AuthenticatedUser } | null>;
   authenticate(token: string): Promise<AuthenticatedUser | null>;
   logout(token: string): Promise<void>;
+  reauthenticate(
+    userId: string,
+    token: string,
+    password: string,
+    requestId: string,
+  ): Promise<boolean>;
+  isRecentlyReauthenticated(userId: string, token: string, withinMinutes: number): Promise<boolean>;
   changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean>;
   listSessions(userId: string, currentToken: string): Promise<AccountSession[]>;
   revokeSession(

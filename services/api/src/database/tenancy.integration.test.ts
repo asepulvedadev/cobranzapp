@@ -42,8 +42,13 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
   afterAll(async () => {
     if (ownerPool) {
       await ownerPool.query(
-        "DELETE FROM audit_events WHERE tenant_id IN (SELECT id FROM tenants WHERE slug = ANY($1::citext[]))",
-        [[slug, secondSlug]],
+        `DELETE FROM audit_events
+          WHERE tenant_id IN (SELECT id FROM tenants WHERE slug = ANY($1::citext[]))
+             OR actor_user_id = ANY($2::uuid[])`,
+        [
+          [slug, secondSlug],
+          [developerId, memberId],
+        ],
       );
       await ownerPool.query(
         "DELETE FROM tenant_memberships WHERE tenant_id IN (SELECT id FROM tenants WHERE slug = ANY($1::citext[]))",
@@ -58,6 +63,10 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       await ownerPool.query("DELETE FROM users WHERE id = ANY($1::uuid[])", [
         [developerId, memberId],
       ]);
+      await ownerPool.query(
+        "DELETE FROM audit_events WHERE actor_user_id IN (SELECT id FROM users WHERE username = $1)",
+        [invitedUsername],
+      );
       await ownerPool.query("DELETE FROM users WHERE username = $1", [invitedUsername]);
       await ownerPool.end();
     }
@@ -72,6 +81,27 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
 
     const byEmail = await auth.login(`developer-${suffix}@example.com`, password, {});
     expect(byEmail?.user.id).toBe(developerId);
+    await expect(
+      auth.isRecentlyReauthenticated(developerId, byEmail?.token ?? "", 10),
+    ).resolves.toBe(true);
+    await ownerPool.query(
+      `UPDATE auth_sessions
+          SET reauthenticated_at = now() - interval '30 minutes'
+        WHERE user_id = $1 AND revoked_at IS NULL`,
+      [developerId],
+    );
+    await expect(
+      auth.isRecentlyReauthenticated(developerId, byEmail?.token ?? "", 10),
+    ).resolves.toBe(false);
+    await expect(
+      auth.reauthenticate(developerId, byEmail?.token ?? "", "incorrect-password", `bad-${suffix}`),
+    ).resolves.toBe(false);
+    await expect(
+      auth.reauthenticate(developerId, byEmail?.token ?? "", password, `reauth-${suffix}`),
+    ).resolves.toBe(true);
+    await expect(
+      auth.isRecentlyReauthenticated(developerId, byEmail?.token ?? "", 10),
+    ).resolves.toBe(true);
     const otherSession = await auth.login(`developer-${suffix}`, password, {
       userAgent: "Integration Browser",
     });
@@ -140,6 +170,23 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     expect(ownerLogin?.user.memberships).toContainEqual(
       expect.objectContaining({ tenantId: tenant.id, role: "owner" }),
     );
+    await expect(
+      auth.reauthenticate(
+        ownerLogin?.user.id ?? "",
+        ownerLogin?.token ?? "",
+        password,
+        `owner-reauth-${suffix}`,
+      ),
+    ).resolves.toBe(true);
+    const ownerReauthenticationAudit = await ownerPool.query<{ count: string }>(
+      `SELECT count(*)
+         FROM audit_events
+        WHERE actor_user_id = $1
+          AND action = 'auth.reauthenticated'
+          AND request_id = $2`,
+      [ownerLogin?.user.id, `owner-reauth-${suffix}`],
+    );
+    expect(Number(ownerReauthenticationAudit.rows[0]?.count)).toBe(1);
     const ownerOverview = await tenancy.overview(
       { userId: ownerLogin?.user.id ?? "", platformRole: null, tenantRole: "owner" },
       tenant.id,
