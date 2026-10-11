@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { hashPassword } from "../auth/password.js";
 import { createPostgresAuthService } from "../auth/postgres-auth-service.js";
 import { createPostgresPlatformService } from "../platform/postgres-platform-service.js";
+import { createPostgresSupportAccessService } from "../support-access/postgres-support-access-service.js";
 import { createPostgresTenancyService } from "../tenancy/postgres-tenancy-service.js";
 
 const runtimeUrl = process.env.TEST_DATABASE_URL;
@@ -125,6 +126,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     });
 
     const platform = createPostgresPlatformService(runtimePool);
+    const supportAccess = createPostgresSupportAccessService(runtimePool);
     const tenant = await platform.createTenant(developerId, {
       displayName: "Tenant Integration",
       slug,
@@ -149,6 +151,25 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       activeBranch: false,
       contactEmail: false,
     });
+    const supportRequest = await supportAccess.requestAccess(developerId, tenant.id, {
+      purpose: "Revisar la configuración inicial de la empresa",
+      durationMinutes: 60,
+      requestId: `support-request-${suffix}`,
+    });
+    expect(supportRequest).toMatchObject({
+      status: "created",
+      access: { status: "pending", tenantId: tenant.id },
+    });
+    await expect(
+      supportAccess.requestAccess(developerId, tenant.id, {
+        purpose: "Solicitud duplicada para la misma empresa",
+        durationMinutes: 30,
+        requestId: `support-duplicate-${suffix}`,
+      }),
+    ).resolves.toMatchObject({ status: "exists", access: { id: supportRequest.access.id } });
+    expect(await supportAccess.listForDeveloper(developerId)).toContainEqual(
+      expect.objectContaining({ id: supportRequest.access.id, status: "pending" }),
+    );
 
     const tenancy = createPostgresTenancyService(runtimePool, "https://cobranzaap.tech");
     const invitation = await tenancy.createInvitation(
@@ -218,6 +239,12 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       platformRole: null,
       tenantRole: "owner" as const,
     };
+    expect(await supportAccess.listForTenant(ownerActor, tenant.id)).toContainEqual(
+      expect.objectContaining({
+        id: supportRequest.access.id,
+        requestedByDisplayName: "Integration Developer",
+      }),
+    );
     const pendingInvitation = await tenancy.createInvitation(ownerActor, tenant.id, {
       email: `supervisor-${suffix}@example.com`,
       role: "supervisor",
