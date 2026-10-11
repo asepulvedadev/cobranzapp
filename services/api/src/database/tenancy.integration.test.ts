@@ -72,6 +72,27 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
 
     const byEmail = await auth.login(`developer-${suffix}@example.com`, password, {});
     expect(byEmail?.user.id).toBe(developerId);
+    const otherSession = await auth.login(`developer-${suffix}`, password, {
+      userAgent: "Integration Browser",
+    });
+    const sessions = await auth.listSessions(developerId, byEmail?.token ?? "");
+    expect(sessions).toHaveLength(2);
+    expect(sessions.find((session) => session.current)?.userAgent).toBeNull();
+    const currentSessionId = sessions.find((session) => session.current)?.id ?? "";
+    const otherSessionId = sessions.find((session) => !session.current)?.id ?? "";
+    await expect(
+      auth.revokeSession(developerId, currentSessionId, byEmail?.token ?? ""),
+    ).resolves.toBe("current");
+    await expect(
+      auth.revokeSession(developerId, otherSessionId, byEmail?.token ?? ""),
+    ).resolves.toBe("revoked");
+    await expect(auth.authenticate(otherSession?.token ?? "")).resolves.toBeNull();
+    const additionalSession = await auth.login(`developer-${suffix}`, password, {});
+    await expect(auth.revokeOtherSessions(developerId, byEmail?.token ?? "")).resolves.toBe(1);
+    await expect(auth.authenticate(additionalSession?.token ?? "")).resolves.toBeNull();
+    await expect(auth.authenticate(byEmail?.token ?? "")).resolves.toMatchObject({
+      id: developerId,
+    });
 
     const platform = createPostgresPlatformService(runtimePool);
     const tenant = await platform.createTenant(developerId, {

@@ -21,6 +21,15 @@ export type SessionMetadata = {
   ipAddress?: string;
 };
 
+export type AccountSession = {
+  id: string;
+  userAgent: string | null;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  current: boolean;
+};
+
 export interface AuthService {
   login(
     identifier: string,
@@ -30,4 +39,11 @@ export interface AuthService {
   authenticate(token: string): Promise<AuthenticatedUser | null>;
   logout(token: string): Promise<void>;
   changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean>;
+  listSessions(userId: string, currentToken: string): Promise<AccountSession[]>;
+  revokeSession(
+    userId: string,
+    sessionId: string,
+    currentToken: string,
+  ): Promise<"revoked" | "current" | "not_found">;
+  revokeOtherSessions(userId: string, currentToken: string): Promise<number>;
 }

@@ -38,6 +38,18 @@ function dependencies(overrides?: { authService?: Partial<AuthService> }) {
     authenticate: vi.fn(async () => developer),
     logout: vi.fn(async () => undefined),
     changePassword: vi.fn(async () => true),
+    listSessions: vi.fn(async () => [
+      {
+        id: "0ecb798b-b0f6-4536-8a48-8ba09ca37cf0",
+        userAgent: "Test Browser",
+        createdAt: "2026-10-11T00:00:00.000Z",
+        lastSeenAt: "2026-10-11T01:00:00.000Z",
+        expiresAt: "2026-10-11T08:00:00.000Z",
+        current: true,
+      },
+    ]),
+    revokeSession: vi.fn(async () => "revoked"),
+    revokeOtherSessions: vi.fn(async () => 2),
     ...overrides?.authService,
   };
   const platformService: PlatformService = {
@@ -229,6 +241,36 @@ describe("authentication", () => {
     });
     expect(response.statusCode).toBe(401);
     expect(response.json()).toMatchObject({ error: { code: "INVALID_CREDENTIALS" } });
+  });
+
+  it("lists and revokes only sessions owned by the authenticated user", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const headers = { cookie: "cobranzapp_session=session-token" };
+    const sessions = await app.inject({ method: "GET", url: "/v1/auth/sessions", headers });
+    expect(sessions.statusCode).toBe(200);
+    expect(sessions.json()).toMatchObject({ sessions: [{ current: true }] });
+
+    const revoked = await app.inject({
+      method: "DELETE",
+      url: "/v1/auth/sessions/0ecb798b-b0f6-4536-8a48-8ba09ca37cf0",
+      headers: { ...headers, origin: "https://cobranzaap.tech" },
+    });
+    expect(revoked.statusCode).toBe(204);
+    expect(deps.authService.revokeSession).toHaveBeenCalledWith(
+      developer.id,
+      "0ecb798b-b0f6-4536-8a48-8ba09ca37cf0",
+      "session-token",
+    );
+
+    const others = await app.inject({
+      method: "POST",
+      url: "/v1/auth/sessions/revoke-others",
+      headers: { ...headers, origin: "https://cobranzaap.tech" },
+    });
+    expect(others.statusCode).toBe(200);
+    expect(others.json()).toEqual({ revoked: 2 });
   });
 });
 

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { hashPassword, verifyPassword } from "./password.js";
-import type { AuthenticatedUser, AuthService, TenantRole } from "./types.js";
+import type { AccountSession, AuthenticatedUser, AuthService, TenantRole } from "./types.js";
 
 type UserRow = {
   id: string;
@@ -179,6 +179,65 @@ export function createPostgresAuthService(pool: Pool, sessionTtlHours: number): 
       } finally {
         client.release();
       }
+    },
+
+    async listSessions(userId, currentToken) {
+      const result = await pool.query<{
+        id: string;
+        user_agent: string | null;
+        created_at: Date;
+        last_seen_at: Date;
+        expires_at: Date;
+        current: boolean;
+      }>(
+        `SELECT id, user_agent, created_at, last_seen_at, expires_at,
+                token_hash = $2 AS current
+           FROM auth_sessions
+          WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()
+          ORDER BY current DESC, last_seen_at DESC`,
+        [userId, hashToken(currentToken)],
+      );
+      return result.rows.map(
+        (session): AccountSession => ({
+          id: session.id,
+          userAgent: session.user_agent,
+          createdAt: session.created_at.toISOString(),
+          lastSeenAt: session.last_seen_at.toISOString(),
+          expiresAt: session.expires_at.toISOString(),
+          current: session.current,
+        }),
+      );
+    },
+
+    async revokeSession(userId, sessionId, currentToken) {
+      const currentHash = hashToken(currentToken);
+      const revoked = await pool.query(
+        `UPDATE auth_sessions
+            SET revoked_at = now()
+          WHERE id = $1 AND user_id = $2 AND token_hash <> $3
+            AND revoked_at IS NULL AND expires_at > now()
+        RETURNING id`,
+        [sessionId, userId, currentHash],
+      );
+      if (revoked.rowCount) return "revoked";
+      const current = await pool.query<{ current: boolean }>(
+        `SELECT token_hash = $3 AS current
+           FROM auth_sessions
+          WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL AND expires_at > now()`,
+        [sessionId, userId, currentHash],
+      );
+      return current.rows[0]?.current ? "current" : "not_found";
+    },
+
+    async revokeOtherSessions(userId, currentToken) {
+      const result = await pool.query(
+        `UPDATE auth_sessions
+            SET revoked_at = now()
+          WHERE user_id = $1 AND token_hash <> $2
+            AND revoked_at IS NULL AND expires_at > now()`,
+        [userId, hashToken(currentToken)],
+      );
+      return result.rowCount ?? 0;
     },
   };
 }

@@ -31,6 +31,7 @@ const tenantSchema = z.object({
 });
 const tenantIdParamsSchema = z.object({ tenantId: z.uuid() });
 const tenantMemberParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
+const sessionIdParamsSchema = z.object({ sessionId: z.uuid() });
 const tenantStatusSchema = z.object({ status: z.enum(["active", "suspended", "archived"]) });
 const invitationTokenParamsSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{40,60}$/) });
 const invitationSchema = z.object({
@@ -266,6 +267,53 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session) return;
     return { user: session.user };
+  });
+
+  app.get("/v1/auth/sessions", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    return {
+      sessions: await dependencies.authService.listSessions(session.user.id, session.token),
+    };
+  });
+
+  app.delete("/v1/auth/sessions/:sessionId", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = sessionIdParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "SESSION_NOT_FOUND", "La sesión no existe.", request.id);
+    }
+    const result = await dependencies.authService.revokeSession(
+      session.user.id,
+      params.data.sessionId,
+      session.token,
+    );
+    if (result === "current") {
+      return sendError(
+        reply,
+        409,
+        "CURRENT_SESSION",
+        "Usa Cerrar sesión para terminar esta sesión.",
+        request.id,
+      );
+    }
+    if (result === "not_found") {
+      return sendError(reply, 404, "SESSION_NOT_FOUND", "La sesión no existe.", request.id);
+    }
+    return reply.code(204).send();
+  });
+
+  app.post("/v1/auth/sessions/revoke-others", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const revoked = await dependencies.authService.revokeOtherSessions(
+      session.user.id,
+      session.token,
+    );
+    return reply.send({ revoked });
   });
 
   app.post("/v1/auth/logout", async (request, reply) => {
