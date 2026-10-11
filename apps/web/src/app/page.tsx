@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { ScrollEffects } from "../components/ScrollEffects";
+import { ScrollWorldExperience } from "../components/ScrollWorldExperience";
 import { SiteFooter } from "../components/SiteFooter";
 import { SiteHeader } from "../components/SiteHeader";
 import { blogPosts } from "../data/blog";
@@ -252,82 +253,7 @@ export default function Home() {
           </WordReveal>
         </section>
 
-        <section className="journey-section" id="como-funciona">
-          <div className="journey-intro section-shell" data-reveal>
-            <span className="eyebrow">Un día de operación</span>
-            <h2>Del primer pendiente al cierre, sin cambiar de historia.</h2>
-            <p>Un recorrido pensado para que cada perfil continúe el trabajo del anterior.</p>
-          </div>
-          <div className="journey-stage section-shell">
-            <div className="journey-rail" aria-hidden="true">
-              <span />
-            </div>
-            <article className="journey-card" data-reveal>
-              <span className="journey-time">06:45</span>
-              <div>
-                <span className="card-kicker">Preparar</span>
-                <h3>La cartera define la jornada</h3>
-                <p>
-                  El propietario y el supervisor identifican vencimientos, asignan responsables y
-                  separan las excepciones.
-                </p>
-              </div>
-              <div className="mini-ui">
-                <strong>Ruta Norte</strong>
-                <span>12 gestiones asignadas</span>
-                <i>Lista para iniciar</i>
-              </div>
-            </article>
-            <article className="journey-card" data-reveal>
-              <span className="journey-time">09:20</span>
-              <div>
-                <span className="card-kicker">Gestionar</span>
-                <h3>El cobrador registra lo que ocurrió</h3>
-                <p>
-                  La visita, el contacto o el pago quedan asociados al cliente, la obligación y la
-                  ruta correcta.
-                </p>
-              </div>
-              <div className="mini-ui mint">
-                <strong>Pago recibido</strong>
-                <span>Referencia CA 0184</span>
-                <i>Comprobante disponible</i>
-              </div>
-            </article>
-            <article className="journey-card" data-reveal>
-              <span className="journey-time">14:10</span>
-              <div>
-                <span className="card-kicker">Supervisar</span>
-                <h3>Las novedades llegan con contexto</h3>
-                <p>
-                  El supervisor ve diferencias, compromisos y casos detenidos sin llamar a cada
-                  persona del equipo.
-                </p>
-              </div>
-              <div className="mini-ui yellow">
-                <strong>2 casos por revisar</strong>
-                <span>Uno necesita evidencia</span>
-                <i>Asignados al supervisor</i>
-              </div>
-            </article>
-            <article className="journey-card" data-reveal>
-              <span className="journey-time">18:05</span>
-              <div>
-                <span className="card-kicker">Conciliar</span>
-                <h3>El cierre muestra dónde quedó el recaudo</h3>
-                <p>
-                  Pagos, efectivo, transferencias y diferencias se comparan antes de cerrar la
-                  jornada.
-                </p>
-              </div>
-              <div className="mini-ui dark">
-                <strong>Jornada conciliada</strong>
-                <span>Ruta Norte</span>
-                <i>Sin diferencias abiertas</i>
-              </div>
-            </article>
-          </div>
-        </section>
+        <ScrollWorldExperience />
 
         <section className="features-section section-shell" id="funciones">
           <div className="section-heading narrow" data-reveal>
