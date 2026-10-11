@@ -69,9 +69,9 @@ The public marketing site remains separate from the authenticated operational sy
 content lives at the canonical domain, while sign-in is a distinct entry point that will hand off
 to the private application once authentication is enabled.
 
-### Offer hypothesis
+### Approved membership offer
 
-A business subscription for operational control, not a percentage of borrower payments. Possible pricing unit: base workspace plus active staff or active loan tier. Final pricing, quotas, trial duration, and support model remain open; interview lenders before choosing them. Automated workflows use explicit business rules and scheduled jobs; no AI subscription or inference cost is included.
+A business subscription for operational control, not a percentage of borrower payments. The owner confirmed two memberships, Pro and Ultra, a recurring charge for each employee above included capacity in either plan, and a separate one-time company creation/onboarding charge. Prices, included/purchased seats, customer limits, shared features, priority-support scope and owner-only percentage/loan-approval requirements are authoritative in [approved memberships](memberships.md). Billing policy, advisor mapping, quota-counting semantics and customer-link lifetimes remain open. Automated workflows use explicit rules; no AI subscription or inference cost is included. The landing presents this commercial scope; it does not implement backend entitlements or financial features.
 
 ### Validation evidence to collect
 

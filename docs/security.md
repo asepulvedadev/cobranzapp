@@ -73,6 +73,7 @@ Sanitize uploaded logo/receipt assets and prohibit arbitrary HTML, CSS, JavaScri
 
 ## Related documents
 
+- [Membership permissions and bounded customer links](memberships.md)
 - [Domain roles](domain.md)
 - [Compliance](compliance.md)
 - [Database](database.md)

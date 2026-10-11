@@ -13,6 +13,7 @@ Plataforma móvil y multiempresa para gestionar créditos y cobranzas de prestam
 | [Recursos de marca para la aplicación](assets/brand-app/README.md) | Símbolo, nombre y archivos combinados para fondos claros y oscuros |
 | [Producto](docs/product.md) | Problema, cliente, oferta, alcance y requisitos o supuestos confirmados |
 | [Dominio](docs/domain.md) | Vocabulario, actores, funciones, relaciones de negocio y ciclo de vida |
+| [Membresías aprobadas](docs/memberships.md) | Planes Pro y Ultra, límites, cobro de onboarding, permisos y alcance del enlace de cliente |
 | [Reglas financieras](docs/financial-rules.md) | Valores nominales y netos, ejemplo de cargos e intereses, calendarios, asignaciones e invariantes contables |
 | [Arquitectura](docs/architecture.md) | Módulos, dirección de dependencias, límites de ejecución y contratos de API |
 | [Tecnologías](docs/stack.md) | Bibliotecas y entornos propuestos, alternativas y restricciones de compatibilidad |

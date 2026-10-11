@@ -65,6 +65,7 @@ Use configurable, jurisdiction-approved products rather than hardcoding 10% or 3
 
 ## Related documents
 
+- [Approved membership and owner-only percentage permissions](memberships.md)
 - [Compliance gate](compliance.md)
 - [Database representation](database.md)
 - [Analytics definitions](analytics-automation.md)
