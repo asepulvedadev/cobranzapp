@@ -123,7 +123,7 @@ export function ScrollWorldExperience() {
         </div>
         <div className="scroll-world-shade" aria-hidden="true" />
         <div className="scroll-world-heading">
-          <span className="eyebrow">Control de cartera hecho en Cúcuta</span>
+          <span className="eyebrow">Control de cartera hecho en Colombia</span>
           <p>Desplázate para seguir un día de operación</p>
         </div>
         <div className="scroll-world-captions">
