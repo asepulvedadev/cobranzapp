@@ -752,6 +752,158 @@ html:has(.panel-shell) {
   resize: vertical;
 }
 
+.support-access-note {
+  background: #eef7f2;
+  color: #285942;
+}
+
+.support-access-empty {
+  display: grid;
+  gap: 5px;
+  padding: 20px 16px;
+}
+
+.support-access-empty strong {
+  font-size: 14px;
+}
+
+.support-access-empty p {
+  margin: 0;
+  color: var(--panel-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.support-access-review {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.support-access-review ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.support-access-review li {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--panel-line);
+  border-radius: 9px;
+  background: #fafbfa;
+}
+
+.support-access-review li > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.support-access-review li > header > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.support-access-review li > header strong,
+.support-access-review li > header small,
+.support-access-review li > p {
+  overflow-wrap: anywhere;
+}
+
+.support-access-review li > header strong {
+  font-size: 13px;
+}
+
+.support-access-review li > header small,
+.support-access-review dt {
+  color: var(--panel-muted);
+  font-size: 10px;
+}
+
+.support-access-review li > p {
+  margin: 12px 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.support-access-review dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 0;
+}
+
+.support-access-review dl > div {
+  display: grid;
+  gap: 2px;
+}
+
+.support-access-review dt {
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.support-access-review dd {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.support-review-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 13px;
+}
+
+.support-review-actions button,
+.support-revoke-action {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--panel-dark);
+  border-radius: 8px;
+  background: var(--panel-dark);
+  color: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.support-review-actions .secondary-action,
+.support-revoke-action {
+  background: #fff;
+  color: var(--panel-dark);
+}
+
+.support-revoke-action {
+  width: 100%;
+  margin-top: 13px;
+  border-color: #fecaca;
+  color: var(--panel-danger);
+}
+
+.support-review-actions button:disabled,
+.support-revoke-action:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.support-access-review > p {
+  margin: 0;
+  padding: 9px 10px;
+  border-radius: 7px;
+  background: #edfbf4;
+  color: #065f46;
+  font-size: 11px;
+  font-weight: 750;
+}
+
 .table-muted {
   color: var(--panel-muted);
   font-size: 12px;
