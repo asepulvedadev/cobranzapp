@@ -14,6 +14,7 @@
 | Dirección técnica de respaldo | `https://cobranzapp.2.24.115.58.sslip.io` |
 | Correo institucional | `info@cobranzaap.tech` |
 | Puertos locales web/API | `127.0.0.1:13200` / `127.0.0.1:18200` |
+| Roles PostgreSQL de ejecución | `cobranzapp_app` para API y `cobranzapp_worker` para trabajos |
 | Sitio nginx | `/etc/nginx/sites-available/cobranzapp.conf` |
 | Punto de entrada de despliegue | `/usr/local/sbin/cobranzapp-deploy-entry` |
 | Script de copia de seguridad | `/usr/local/sbin/cobranzapp-backup` |
@@ -27,10 +28,15 @@ Envíe una confirmación aprobada a `main`. GitHub Actions:
 1. Ejecuta formato, comprobación de tipos, pruebas unitarias y compilaciones.
 2. Construye las imágenes de la API, el procesador y la web, y publica etiquetas con el SHA en paquetes privados de GHCR.
 3. Se conecta mediante la clave restringida de despliegue.
-4. Descarga el SHA exacto, espera contenedores saludables y ejecuta pruebas de humo.
-5. Registra la versión en `/srv/cobranzapp/.deployed-release`.
+4. Descarga las imágenes del SHA exacto.
+5. Aplica migraciones con el propietario de migración; la API y el procesador conservan roles separados.
+6. Espera contenedores saludables y ejecuta pruebas de humo.
+7. Registra la versión en `/srv/cobranzapp/.deployed-release`.
 
-El script restaura la etiqueta anterior cuando falla una versión posterior y existe una versión previa. Las migraciones de base de datos no se incluyen hasta aprobar su estrategia y el primer esquema físico.
+El script restaura la etiqueta anterior cuando falla una versión posterior y existe una versión
+previa. Las migraciones progresivas autorizadas se ejecutan antes de reemplazar los servicios. Una
+migración irreversible exige copia verificada, revisión específica y estrategia de corrección o
+restauración.
 
 ## Verificación
 
@@ -47,7 +53,12 @@ cd /srv/cobranzapp
 docker compose --env-file .env --env-file .release.env -f compose.yaml ps
 ./smoke-test.sh http://127.0.0.1:13200 http://127.0.0.1:18200
 docker compose --env-file .env --env-file .release.env -f compose.yaml logs --tail=100
+docker compose --env-file .env --env-file .release.env -f compose.yaml logs --tail=100 worker
 ```
+
+El procesador registra `outbox_processed`, `outbox_failed` y un latido periódico sin incluir el
+contenido del evento. Los eventos fallidos usan intentos limitados y pasan a estado `dead`; no se
+reintentan indefinidamente.
 
 ## Copias de seguridad
 
@@ -68,6 +79,7 @@ Esta copia local solo es suficiente para la base de desarrollo. **No se deben in
 
 - Solo nginx expone puertos públicos; la web y la API escuchan en la interfaz local, y PostgreSQL permanece en la red privada de Docker.
 - Los secretos de ejecución viven en `/srv/cobranzapp/.env`, con modo `0600`, y no aparecen en Git, imágenes, registros ni GitHub Actions.
+- La API y el procesador usan credenciales PostgreSQL diferentes. El procesador no puede leer usuarios globales ni tablas ajenas a sus manejadores autorizados.
 - Las credenciales de GHCR existen únicamente durante el trabajo y usan una configuración temporal de Docker que se elimina al finalizar.
 - Las imágenes de aplicación se ejecutan con UID/GID `10001`; las imágenes base están fijadas por resumen y los recursos tienen límites.
 - El dominio público corresponde todavía a un entorno de desarrollo, no a una autorización para operar un piloto real de crédito.

@@ -49,6 +49,19 @@ This is an interim first-party identity baseline, not completion of the identity
 PKCE for mobile, MFA for privileged roles, approved support access, and an independent security
 review remain required before the corresponding launch gate can pass.
 
+### Implemented worker-security baseline
+
+The API and background worker use different PostgreSQL login roles. The API role can insert
+tenant-scoped outbox events but cannot lease, complete, retry, or dead-letter them. The worker role
+can lease and update outbox records, expire approved support access, and write only the associated
+audit event; it cannot read global users or arbitrary tenant tables. Every handler reloads the
+authoritative tenant and aggregate identifiers from the leased database row instead of trusting
+tenant values inside the payload. Leases, bounded attempts, exponential retry, dead-letter state,
+and `FOR UPDATE SKIP LOCKED` provide the current durable-job baseline.
+
+Only support-access expiry is registered as a handler today. Additional handlers must add their own
+least-privilege grants, RLS policies, idempotency behavior, and cross-tenant integration tests.
+
 ### Dependency-security posture
 
 Production dependency auditing is enforced in CI at the `high` severity threshold. The current

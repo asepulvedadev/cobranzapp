@@ -54,7 +54,8 @@ services:
     environment:
       NODE_ENV: production
       APP_VERSION: ${IMAGE_TAG}
-      DATABASE_URL: postgresql://${APP_DATABASE_USER}:${APP_DATABASE_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${WORKER_DATABASE_USER}:${WORKER_DATABASE_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      WORKER_LEASE_SECONDS: ${WORKER_LEASE_SECONDS:-30}
     depends_on:
       postgres:
         condition: service_healthy

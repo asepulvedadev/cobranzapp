@@ -54,6 +54,8 @@ set +a
 "${compose[@]}" run --rm --no-deps \
   -e "MIGRATION_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}" \
   -e "MIGRATIONS_DIR=/app/database/migrations" \
+  -e "WORKER_DATABASE_USER=${WORKER_DATABASE_USER}" \
+  -e "WORKER_DATABASE_PASSWORD=${WORKER_DATABASE_PASSWORD}" \
   api node dist/database/migrate.js
 "${compose[@]}" up -d --wait --remove-orphans
 ./smoke-test.sh http://127.0.0.1:13200 http://127.0.0.1:18200
