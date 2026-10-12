@@ -2,6 +2,7 @@ import type { Route } from "@cobranzapp/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "./app.js";
 import type { AuthenticatedUser, AuthService } from "./auth/types.js";
+import type { BorrowerService } from "./borrowers/types.js";
 import type { CreditService } from "./credit/types.js";
 import type { PlatformService } from "./platform/types.js";
 import type { RouteService } from "./routes/types.js";
@@ -64,6 +65,7 @@ const proEntitlement = {
 
 function dependencies(overrides?: {
   authService?: Partial<AuthService>;
+  borrowerService?: BorrowerService;
   creditService?: CreditService;
   routeService?: RouteService;
   supportAccessService?: Partial<SupportAccessService>;
@@ -351,6 +353,7 @@ function dependencies(overrides?: {
   return {
     allowedWebOrigins: ["https://cobranzaap.tech"],
     authService,
+    borrowerService: overrides?.borrowerService,
     creditService: overrides?.creditService,
     routeService: overrides?.routeService,
     checkDatabase: async () => undefined,
@@ -477,6 +480,49 @@ describe("collection route status", () => {
         requestId: expect.any(String),
       },
     );
+  });
+});
+
+describe("borrower creation security", () => {
+  it("requires recent reauthentication before creating a dossier", async () => {
+    const create = vi.fn();
+    const app = buildApp(
+      dependencies({
+        authService: {
+          authenticate: vi.fn(async () => tenantOwner),
+          isRecentlyReauthenticated: vi.fn(async () => false),
+        },
+        borrowerService: { create } as unknown as BorrowerService,
+      }),
+    );
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/borrowers",
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+      },
+      payload: {
+        fullName: "Cliente de prueba",
+        country: "CO",
+        documentType: "CC",
+        documentNumber: "1234567890",
+        phone: "3000000000",
+        homeAddress: "Calle 1 # 2-3",
+        workAddress: "Carrera 4 # 5-6",
+        profilePhotoObjectKey: null,
+        consentVersion: "borrower-dossier-v1",
+        consentEvidenceRef: "test-consent",
+        emergencyContacts: [
+          { fullName: "Contacto Uno", relationship: "Familiar", phone: "3110000000" },
+        ],
+        documents: [],
+      },
+    });
+    expect(response.statusCode).toBe(428);
+    expect(response.json()).toMatchObject({ error: { code: "REAUTHENTICATION_REQUIRED" } });
+    expect(create).not.toHaveBeenCalled();
   });
 });
 
