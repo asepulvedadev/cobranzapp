@@ -212,6 +212,60 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
         </section>
       )}
 
+      {borrowerDirectory ? (
+        <section
+          aria-label="Estado de clientes y solicitudes"
+          className="metric-grid tenant-metrics"
+        >
+          <article>
+            <span>Clientes activos</span>
+            <strong>
+              {
+                borrowerDirectory.borrowers.filter((borrower) => borrower.status === "active")
+                  .length
+              }
+            </strong>
+            <small>Registros disponibles para operación</small>
+          </article>
+          <article>
+            <span>Identidades pendientes</span>
+            <strong>
+              {
+                borrowerDirectory.borrowers.filter(
+                  (borrower) => borrower.identity.verificationState === "manual_pending",
+                ).length
+              }
+            </strong>
+            <small>Requieren revisión humana</small>
+          </article>
+          <article>
+            <span>Identidades revisadas</span>
+            <strong>
+              {
+                borrowerDirectory.borrowers.filter(
+                  (borrower) => borrower.identity.verificationState === "reviewed",
+                ).length
+              }
+            </strong>
+            <small>Con evidencia documental completa</small>
+          </article>
+          {loanApplications ? (
+            <article className="metric-accent">
+              <span>Solicitudes en revisión</span>
+              <strong>
+                {
+                  loanApplications.filter(
+                    (application) =>
+                      application.status === "submitted" || application.status === "under_review",
+                  ).length
+                }
+              </strong>
+              <small>{loanApplications.length} solicitudes registradas</small>
+            </article>
+          ) : null}
+        </section>
+      ) : null}
+
       <div className="dashboard-columns">
         <section className="dashboard-card tenant-card" id="equipo">
           <div className="card-heading">
