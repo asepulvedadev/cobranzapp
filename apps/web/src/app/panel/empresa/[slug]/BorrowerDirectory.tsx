@@ -86,10 +86,44 @@ export function BorrowerDirectory({
       setIsSubmitting(false);
       return;
     }
+    const created = (await response.json().catch(() => null)) as {
+      borrower?: { id?: string };
+    } | null;
+    const borrowerId = created?.borrower?.id;
+    const uploads: Array<{
+      field: string;
+      category: "identity" | "profile_photo";
+      side?: "front" | "back";
+    }> = [
+      { field: "identityFront", category: "identity", side: "front" },
+      { field: "identityBack", category: "identity", side: "back" },
+      { field: "profilePhoto", category: "profile_photo" },
+    ];
+    let uploadFailure = !borrowerId;
+    if (borrowerId) {
+      for (const upload of uploads) {
+        const file = form.get(upload.field);
+        if (!(file instanceof File) || file.size === 0) {
+          uploadFailure = true;
+          continue;
+        }
+        const body = new FormData();
+        body.append("file", file);
+        body.append("category", upload.category);
+        if (upload.side) body.append("side", upload.side);
+        const uploadResponse = await sensitiveFetch(
+          `/api/v1/tenants/${tenantId}/borrowers/${borrowerId}/documents`,
+          { method: "POST", body },
+        ).catch(() => null);
+        if (!uploadResponse?.ok) uploadFailure = true;
+      }
+    }
     event.currentTarget.reset();
     setIncludeSecondContact(false);
     setMessage(
-      "Cliente creado. Completa sus documentos privados antes de usarlo en una operación.",
+      uploadFailure
+        ? "Cliente creado, pero una o más imágenes no pudieron guardarse. Revisa la ficha y vuelve a cargarlas."
+        : "Cliente creado con documento frente, reverso y foto de perfil en cuarentena privada; queda pendiente la revisión humana.",
     );
     setIsSubmitting(false);
     router.refresh();
@@ -255,8 +289,8 @@ export function BorrowerDirectory({
           </div>
         </div>
         <p className="operational-note">
-          Esta primera captura no hace OCR ni afirma autenticidad. La carga de documentos privados
-          se completa en el paso documental.
+          Esta captura no hace OCR ni afirma autenticidad. Las imágenes se validan y se guardan en
+          cuarentena privada para la revisión humana.
         </p>
         <form className="tenant-form" onSubmit={submit}>
           <label htmlFor="borrower-full-name">Nombre completo</label>
@@ -281,6 +315,38 @@ export function BorrowerDirectory({
           <input id="borrower-home" name="homeAddress" required maxLength={240} />
           <label htmlFor="borrower-work">Dirección de trabajo</label>
           <input id="borrower-work" name="workAddress" required maxLength={240} />
+          <div className="borrower-form-row borrower-document-fields">
+            <label>
+              Cédula · frente
+              <input
+                accept="image/jpeg,image/png,image/webp,application/pdf"
+                name="identityFront"
+                required
+                type="file"
+              />
+            </label>
+            <label>
+              Cédula · reverso
+              <input
+                accept="image/jpeg,image/png,image/webp,application/pdf"
+                name="identityBack"
+                required
+                type="file"
+              />
+            </label>
+          </div>
+          <label>
+            Foto designada de perfil
+            <input
+              accept="image/jpeg,image/png,image/webp"
+              name="profilePhoto"
+              required
+              type="file"
+            />
+          </label>
+          <small>
+            Máximo 10 MB por archivo. No es una selfie ni se usa para afirmar autenticidad.
+          </small>
           <fieldset className="borrower-contact-fieldset">
             <legend>Contacto de emergencia</legend>
             <input
