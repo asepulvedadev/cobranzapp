@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   borrowerCreateRequestSchema,
+  borrowerDirectorySchema,
   borrowerReviewRequestSchema,
   createBranchRequestSchema,
   createPlatformTenantRequestSchema,
@@ -151,6 +152,21 @@ describe("shared API contracts", () => {
         profilePhotoConfirmed: false,
       }).success,
     ).toBe(true);
+  });
+
+  it("keeps borrower verification totals independent from the visible page", () => {
+    const result = borrowerDirectorySchema.parse({
+      borrowers: [],
+      pagination: { page: 1, pageSize: 20, total: 42, totalPages: 3 },
+      identitySummary: { pending: 12, reviewed: 28, rejected: 2 },
+    });
+    expect(result.identitySummary).toEqual({ pending: 12, reviewed: 28, rejected: 2 });
+    expect(
+      borrowerDirectorySchema.parse({
+        borrowers: [],
+        pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 },
+      }).identitySummary,
+    ).toEqual({ pending: 0, reviewed: 0, rejected: 0 });
   });
 
   it("normalizes platform tenant creation and forbids returning to draft", () => {
