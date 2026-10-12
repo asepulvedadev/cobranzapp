@@ -1629,6 +1629,26 @@ html:has(.panel-shell) {
   max-width: 720px;
 }
 
+.member-profile-forms {
+  display: grid;
+  gap: 16px;
+  max-width: 720px;
+}
+
+.member-profile-photo-form {
+  display: grid;
+  gap: 8px;
+  max-width: 420px;
+  padding-top: 14px;
+  border-top: 1px solid var(--panel-line);
+}
+
+.member-profile-photo-form small {
+  color: var(--panel-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .member-profile-fieldset {
   display: grid;
   gap: 8px;

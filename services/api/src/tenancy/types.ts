@@ -77,6 +77,12 @@ export type MemberProfileResult =
   | { status: "forbidden" }
   | { status: "invalid_photo_key" };
 
+export type MemberProfilePhotoResult =
+  | { status: "updated"; profile: TenantMemberProfile }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "invalid_photo_key" };
+
 export interface TenancyService {
   createInvitation(
     actor: TenantActor,
@@ -166,4 +172,10 @@ export interface TenancyService {
     userId: string,
     input: TenantMemberProfileRequest & { requestId: string },
   ): Promise<MemberProfileResult>;
+  setMemberProfilePhoto?(
+    actor: TenantActor,
+    tenantId: string,
+    userId: string,
+    input: { objectKey: string; requestId: string },
+  ): Promise<MemberProfilePhotoResult>;
 }

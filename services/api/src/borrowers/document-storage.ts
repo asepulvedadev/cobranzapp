@@ -24,8 +24,16 @@ export type QuarantinedDocument = {
   sha256: string;
 };
 
+export type QuarantineMemberProfileInput = {
+  tenantId: string;
+  userId: string;
+  mediaType: string;
+  bytes: Buffer;
+};
+
 export interface BorrowerDocumentStorage {
   quarantine(input: QuarantineDocumentInput): Promise<QuarantinedDocument>;
+  quarantineMemberProfile(input: QuarantineMemberProfileInput): Promise<QuarantinedDocument>;
   remove(objectKey: string): Promise<void>;
 }
 
@@ -54,9 +62,31 @@ function safeObjectPath(root: string, objectKey: string) {
 }
 
 export function createLocalBorrowerDocumentStorage(root: string): BorrowerDocumentStorage {
+  async function validateAndWrite(
+    bytes: Buffer,
+    mediaType: string,
+    objectKey: string,
+    allowPdf = true,
+  ) {
+    if (!allowedMediaTypes.has(mediaType)) throw new Error("UNSUPPORTED_DOCUMENT_TYPE");
+    if (bytes.length < 1 || bytes.length > maxDocumentSize) {
+      throw new Error("DOCUMENT_SIZE_INVALID");
+    }
+    if (!allowPdf && mediaType === "application/pdf") throw new Error("PROFILE_PHOTO_TYPE_INVALID");
+    if (!hasMagic(bytes, mediaType)) throw new Error("DOCUMENT_CONTENT_INVALID");
+    const filePath = safeObjectPath(root, objectKey);
+    await mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
+    await writeFile(filePath, bytes, { flag: "wx", mode: 0o600 });
+    return {
+      objectKey,
+      mediaType,
+      sizeBytes: bytes.length,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+    };
+  }
+
   return {
     async quarantine(input) {
-      if (!allowedMediaTypes.has(input.mediaType)) throw new Error("UNSUPPORTED_DOCUMENT_TYPE");
       if (input.bytes.length < 1 || input.bytes.length > maxDocumentSize) {
         throw new Error("DOCUMENT_SIZE_INVALID");
       }
@@ -69,18 +99,15 @@ export function createLocalBorrowerDocumentStorage(root: string): BorrowerDocume
       if (input.category === "profile_photo" && input.mediaType === "application/pdf") {
         throw new Error("PROFILE_PHOTO_TYPE_INVALID");
       }
-      if (!hasMagic(input.bytes, input.mediaType)) throw new Error("DOCUMENT_CONTENT_INVALID");
+      if (!allowedMediaTypes.has(input.mediaType)) throw new Error("UNSUPPORTED_DOCUMENT_TYPE");
 
       const objectKey = `tenant/${input.tenantId}/borrowers/${input.borrowerId}/quarantine/${randomUUID()}.bin`;
-      const filePath = safeObjectPath(root, objectKey);
-      await mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
-      await writeFile(filePath, input.bytes, { flag: "wx", mode: 0o600 });
-      return {
-        objectKey,
-        mediaType: input.mediaType,
-        sizeBytes: input.bytes.length,
-        sha256: createHash("sha256").update(input.bytes).digest("hex"),
-      };
+      return validateAndWrite(input.bytes, input.mediaType, objectKey);
+    },
+
+    async quarantineMemberProfile(input) {
+      const objectKey = `tenant/${input.tenantId}/members/${input.userId}/profile/${randomUUID()}.bin`;
+      return validateAndWrite(input.bytes, input.mediaType, objectKey, false);
     },
 
     async remove(objectKey) {

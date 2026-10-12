@@ -47,6 +47,7 @@ export function MemberProfileForm({
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   function updateContact(index: number, field: keyof ContactDraft, value: string) {
     setContacts((current) =>
@@ -105,104 +106,156 @@ export function MemberProfileForm({
     router.refresh();
   }
 
+  async function uploadPhoto(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const file = new FormData(event.currentTarget).get("file");
+    if (!(file instanceof File) || file.size === 0) {
+      setMessage("Selecciona una foto de perfil.");
+      setIsError(true);
+      return;
+    }
+    setIsUploadingPhoto(true);
+    setMessage("");
+    setIsError(false);
+    const body = new FormData();
+    body.append("file", file);
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/members/${profile.userId}/profile-photo`,
+      { method: "POST", body },
+    ).catch(() => null);
+    if (!response?.ok) {
+      const error = (await response?.json().catch(() => ({}))) as {
+        error?: { message?: string };
+      };
+      setMessage(error.error?.message ?? "No fue posible guardar la foto de perfil.");
+      setIsError(true);
+      setIsUploadingPhoto(false);
+      return;
+    }
+    setMessage("Foto de perfil guardada en almacenamiento privado.");
+    setIsUploadingPhoto(false);
+    event.currentTarget.reset();
+    router.refresh();
+  }
+
   return (
-    <form className="tenant-form member-profile-form" onSubmit={submit}>
-      <p className="operational-note">
-        Completa solo los datos necesarios para operar. La foto de perfil será privada; no es una
-        selfie ni una prueba de identidad.
-      </p>
-      <label htmlFor="profile-phone">Celular</label>
-      <input
-        defaultValue={profile.phone ?? ""}
-        id="profile-phone"
-        maxLength={30}
-        name="phone"
-        placeholder="+57 300 000 0000"
-        type="tel"
-      />
-      <label htmlFor="profile-home-address">Dirección de casa</label>
-      <input
-        defaultValue={profile.homeAddress ?? ""}
-        id="profile-home-address"
-        maxLength={240}
-        name="homeAddress"
-        placeholder="Dirección, barrio, ciudad"
-      />
-      <label htmlFor="profile-work-address">Dirección de trabajo</label>
-      <input
-        defaultValue={profile.workAddress ?? ""}
-        id="profile-work-address"
-        maxLength={240}
-        name="workAddress"
-        placeholder="Dirección, barrio, ciudad"
-      />
-      <fieldset className="member-profile-fieldset">
-        <legend>Tipo de sangre (opcional)</legend>
-        <select defaultValue={profile.bloodType ?? ""} name="bloodType">
-          <option value="">No registrar</option>
-          {(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] as const).map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
-        </select>
-        <label className="member-profile-consent">
-          <input
-            defaultChecked={Boolean(profile.bloodTypeConsentVersion)}
-            name="bloodTypeConsent"
-            type="checkbox"
-          />
-          <span>Autorizo guardar este dato para atención operativa.</span>
-        </label>
-      </fieldset>
-      <fieldset className="member-profile-fieldset">
-        <legend>Contactos de emergencia</legend>
-        {contacts.map((contact, index) => (
-          <div className="member-profile-contact" key={contact.id}>
-            <strong>Contacto {index + 1}</strong>
-            <input
-              aria-label={`Nombre del contacto ${index + 1}`}
-              maxLength={120}
-              onChange={(event) => updateContact(index, "fullName", event.target.value)}
-              placeholder="Nombre completo"
-              value={contact.fullName}
-            />
-            <input
-              aria-label={`Relación del contacto ${index + 1}`}
-              maxLength={80}
-              onChange={(event) => updateContact(index, "relationship", event.target.value)}
-              placeholder="Relación"
-              value={contact.relationship}
-            />
-            <input
-              aria-label={`Celular del contacto ${index + 1}`}
-              maxLength={30}
-              onChange={(event) => updateContact(index, "phone", event.target.value)}
-              placeholder="Celular"
-              type="tel"
-              value={contact.phone}
-            />
-            {contacts.length > 1 ? (
-              <button className="button-link" onClick={() => removeContact(index)} type="button">
-                Quitar contacto
-              </button>
-            ) : null}
-          </div>
-        ))}
-        {contacts.length < 2 ? (
-          <button className="button-link" onClick={addContact} type="button">
-            + Agregar otro contacto
-          </button>
-        ) : null}
-      </fieldset>
-      {message ? (
-        <p className={`tenant-form-message${isError ? " form-message-error" : ""}`} role="status">
-          {message}
+    <div className="member-profile-forms">
+      <form className="tenant-form member-profile-form" onSubmit={submit}>
+        <p className="operational-note">
+          Completa solo los datos necesarios para operar. La foto de perfil será privada; no es una
+          selfie ni una prueba de identidad.
         </p>
-      ) : null}
-      <button disabled={isSubmitting} type="submit">
-        {isSubmitting ? "Guardando…" : "Guardar ficha"}
-      </button>
-    </form>
+        <label htmlFor="profile-phone">Celular</label>
+        <input
+          defaultValue={profile.phone ?? ""}
+          id="profile-phone"
+          maxLength={30}
+          name="phone"
+          placeholder="+57 300 000 0000"
+          type="tel"
+        />
+        <label htmlFor="profile-home-address">Dirección de casa</label>
+        <input
+          defaultValue={profile.homeAddress ?? ""}
+          id="profile-home-address"
+          maxLength={240}
+          name="homeAddress"
+          placeholder="Dirección, barrio, ciudad"
+        />
+        <label htmlFor="profile-work-address">Dirección de trabajo</label>
+        <input
+          defaultValue={profile.workAddress ?? ""}
+          id="profile-work-address"
+          maxLength={240}
+          name="workAddress"
+          placeholder="Dirección, barrio, ciudad"
+        />
+        <fieldset className="member-profile-fieldset">
+          <legend>Tipo de sangre (opcional)</legend>
+          <select defaultValue={profile.bloodType ?? ""} name="bloodType">
+            <option value="">No registrar</option>
+            {(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] as const).map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+          <label className="member-profile-consent">
+            <input
+              defaultChecked={Boolean(profile.bloodTypeConsentVersion)}
+              name="bloodTypeConsent"
+              type="checkbox"
+            />
+            <span>Autorizo guardar este dato para atención operativa.</span>
+          </label>
+        </fieldset>
+        <fieldset className="member-profile-fieldset">
+          <legend>Contactos de emergencia</legend>
+          {contacts.map((contact, index) => (
+            <div className="member-profile-contact" key={contact.id}>
+              <strong>Contacto {index + 1}</strong>
+              <input
+                aria-label={`Nombre del contacto ${index + 1}`}
+                maxLength={120}
+                onChange={(event) => updateContact(index, "fullName", event.target.value)}
+                placeholder="Nombre completo"
+                value={contact.fullName}
+              />
+              <input
+                aria-label={`Relación del contacto ${index + 1}`}
+                maxLength={80}
+                onChange={(event) => updateContact(index, "relationship", event.target.value)}
+                placeholder="Relación"
+                value={contact.relationship}
+              />
+              <input
+                aria-label={`Celular del contacto ${index + 1}`}
+                maxLength={30}
+                onChange={(event) => updateContact(index, "phone", event.target.value)}
+                placeholder="Celular"
+                type="tel"
+                value={contact.phone}
+              />
+              {contacts.length > 1 ? (
+                <button className="button-link" onClick={() => removeContact(index)} type="button">
+                  Quitar contacto
+                </button>
+              ) : null}
+            </div>
+          ))}
+          {contacts.length < 2 ? (
+            <button className="button-link" onClick={addContact} type="button">
+              + Agregar otro contacto
+            </button>
+          ) : null}
+        </fieldset>
+        {message ? (
+          <p className={`tenant-form-message${isError ? " form-message-error" : ""}`} role="status">
+            {message}
+          </p>
+        ) : null}
+        <button disabled={isSubmitting} type="submit">
+          {isSubmitting ? "Guardando…" : "Guardar ficha"}
+        </button>
+      </form>
+      <form className="tenant-form member-profile-photo-form" onSubmit={uploadPhoto}>
+        <label htmlFor="member-profile-photo">Foto designada de perfil</label>
+        <input
+          accept="image/jpeg,image/png,image/webp"
+          id="member-profile-photo"
+          name="file"
+          required
+          type="file"
+        />
+        <small>
+          {profile.profilePhotoObjectKey
+            ? "Ya existe una foto privada; puedes reemplazarla."
+            : "No es una selfie ni un documento de identidad."}
+        </small>
+        <button disabled={isUploadingPhoto} type="submit">
+          {isUploadingPhoto ? "Cargando…" : "Guardar foto privada"}
+        </button>
+      </form>
+    </div>
   );
 }

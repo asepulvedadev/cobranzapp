@@ -89,8 +89,10 @@ auditado. La revisión no equivale a una certificación de autenticidad.
 La carga de documentos ya pasa por un endpoint multipart con límite de 10 MB, validación de tipo
 declarado contra los bytes iniciales, clave opaca por tenant/cliente y permisos de archivo
 restringidos. El archivo se escribe en cuarentena privada con estado `pending`; no se entrega una
-URL pública ni se permite reutilizar una ruta arbitraria. La integración de antivirus externo y la
-copia off-site/versionada siguen siendo un requisito operativo antes de almacenar datos reales.
+URL pública ni se permite reutilizar una ruta arbitraria. La foto designada de perfil del personal
+usa un prefijo privado separado por tenant/integrante y requiere reautenticación para reemplazarse.
+La integración de antivirus externo y la copia off-site/versionada siguen siendo un requisito
+operativo antes de almacenar datos reales.
 
 ### Shared verification network (replacement for “blacklist”)
 

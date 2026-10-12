@@ -1376,6 +1376,152 @@ export function buildApp(dependencies: AppDependencies) {
     }
   });
 
+  app.post("/v1/tenants/:tenantId/members/:userId/profile-photo", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantMemberProfileParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "MEMBER_PROFILE_NOT_FOUND", "La ficha no existe.", request.id);
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership) {
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a esta empresa.", request.id);
+    }
+    if (
+      params.data.userId !== session.user.id &&
+      !["owner", "supervisor"].includes(membership.role)
+    ) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo puedes cargar tu propia foto de perfil.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const setMemberProfilePhoto = dependencies.tenancyService.setMemberProfilePhoto;
+    if (!setMemberProfilePhoto || !dependencies.documentStorage) {
+      return sendError(
+        reply,
+        503,
+        "MEMBER_PROFILE_PHOTO_UNAVAILABLE",
+        "La carga privada de fotos todavía no está configurada.",
+        request.id,
+      );
+    }
+
+    let mediaType = "";
+    let fileBytes: Buffer | null = null;
+    try {
+      for await (const part of request.parts()) {
+        if (part.type !== "file") continue;
+        if (fileBytes) {
+          return sendError(
+            reply,
+            400,
+            "TOO_MANY_PROFILE_PHOTOS",
+            "Solo puedes cargar una foto por vez.",
+            request.id,
+          );
+        }
+        mediaType = part.mimetype;
+        fileBytes = await part.toBuffer();
+      }
+    } catch (error) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === "FST_REQ_FILE_TOO_LARGE"
+      ) {
+        return sendError(
+          reply,
+          413,
+          "PROFILE_PHOTO_TOO_LARGE",
+          "La foto supera el límite de 10 MB.",
+          request.id,
+        );
+      }
+      throw error;
+    }
+    if (!fileBytes || !mediaType) {
+      return sendError(
+        reply,
+        400,
+        "PROFILE_PHOTO_REQUIRED",
+        "Debes seleccionar una foto.",
+        request.id,
+      );
+    }
+    try {
+      const stored = await dependencies.documentStorage.quarantineMemberProfile({
+        tenantId: params.data.tenantId,
+        userId: params.data.userId,
+        mediaType,
+        bytes: fileBytes,
+      });
+      const result = await setMemberProfilePhoto(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.userId,
+        { objectKey: stored.objectKey, requestId: request.id },
+      );
+      if (result.status !== "updated") {
+        await dependencies.documentStorage.remove(stored.objectKey).catch(() => undefined);
+      }
+      if (result.status === "not_found") {
+        return sendError(reply, 404, "MEMBER_PROFILE_NOT_FOUND", "La ficha no existe.", request.id);
+      }
+      if (result.status === "forbidden") {
+        return sendError(reply, 403, "SCOPE_DENIED", "No puedes actualizar esta foto.", request.id);
+      }
+      if (result.status === "invalid_photo_key") {
+        return sendError(
+          reply,
+          400,
+          "INVALID_PROFILE_PHOTO_KEY",
+          "La ruta privada no es válida.",
+          request.id,
+        );
+      }
+      return reply.send({ profile: result.profile });
+    } catch (error) {
+      if (error instanceof Error) {
+        const messages: Record<string, [number, string, string]> = {
+          UNSUPPORTED_DOCUMENT_TYPE: [
+            400,
+            "UNSUPPORTED_PROFILE_PHOTO_TYPE",
+            "El formato no está permitido.",
+          ],
+          DOCUMENT_SIZE_INVALID: [
+            400,
+            "PROFILE_PHOTO_SIZE_INVALID",
+            "La foto está vacía o supera 10 MB.",
+          ],
+          DOCUMENT_CONTENT_INVALID: [
+            400,
+            "PROFILE_PHOTO_CONTENT_INVALID",
+            "El contenido no coincide con su formato.",
+          ],
+          PROFILE_PHOTO_TYPE_INVALID: [
+            400,
+            "PROFILE_PHOTO_TYPE_INVALID",
+            "La foto debe ser una imagen.",
+          ],
+        };
+        const mapped = messages[error.message];
+        if (mapped) return sendError(reply, mapped[0], mapped[1], mapped[2], request.id);
+      }
+      throw error;
+    }
+  });
+
   function canManageBorrowers(role: AuthenticatedUser["memberships"][number]["role"] | undefined) {
     return role === "owner" || role === "supervisor" || role === "collector";
   }

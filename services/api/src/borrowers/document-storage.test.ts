@@ -47,4 +47,17 @@ describe("private borrower document storage", () => {
     ).rejects.toThrow("DOCUMENT_CONTENT_INVALID");
     await expect(storage.remove("../../outside")).rejects.toThrow("INVALID_DOCUMENT_OBJECT_KEY");
   });
+
+  it("keeps staff profile photos in a separate tenant-scoped prefix", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "cobranzapp-documents-"));
+    roots.push(root);
+    const storage = createLocalBorrowerDocumentStorage(root);
+    const result = await storage.quarantineMemberProfile({
+      tenantId: "tenant-1",
+      userId: "user-1",
+      mediaType: "image/jpeg",
+      bytes: Buffer.from("ffd8ff", "hex"),
+    });
+    expect(result.objectKey).toMatch(/^tenant\/tenant-1\/members\/user-1\/profile\//);
+  });
 });

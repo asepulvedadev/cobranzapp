@@ -7,6 +7,7 @@ import { buildMembershipEntitlement, membershipCatalog } from "../memberships/ca
 import type {
   InvitationAcceptanceResult,
   InvitationPreview,
+  MemberProfilePhotoResult,
   MemberProfileResult,
   TenancyService,
   TenantActor,
@@ -1254,6 +1255,68 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
         }
         await client.query("COMMIT");
         return { status: "updated", profile } satisfies MemberProfileResult;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async setMemberProfilePhoto(actor, tenantId, userId, input) {
+      const expectedPrefix = `tenant/${tenantId}/members/${userId}/profile/`;
+      if (!input.objectKey.startsWith(expectedPrefix)) {
+        return { status: "invalid_photo_key" } satisfies MemberProfileResult;
+      }
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setActorContext(client, actor, tenantId);
+        const member = await client.query<{ role: TenantRole; status: string }>(
+          `SELECT role, status
+             FROM tenant_memberships
+            WHERE tenant_id = $1 AND user_id = $2`,
+          [tenantId, userId],
+        );
+        const membership = member.rows[0];
+        if (!membership || membership.status === "revoked") {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies MemberProfilePhotoResult;
+        }
+        if (actor.userId !== userId && !["owner", "supervisor"].includes(actor.tenantRole ?? "")) {
+          await client.query("ROLLBACK");
+          return { status: "forbidden" } satisfies MemberProfilePhotoResult;
+        }
+        if (
+          actor.userId !== userId &&
+          actor.tenantRole === "supervisor" &&
+          membership.role === "owner"
+        ) {
+          await client.query("ROLLBACK");
+          return { status: "forbidden" } satisfies MemberProfilePhotoResult;
+        }
+        await client.query(
+          `INSERT INTO tenant_member_profiles (tenant_id, user_id, profile_photo_object_key)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (tenant_id, user_id) DO UPDATE SET
+             profile_photo_object_key = EXCLUDED.profile_photo_object_key,
+             updated_at = now()`,
+          [tenantId, userId, input.objectKey],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'member.profile_photo_uploaded', 'tenant_member_profile', $3, $4,
+                   jsonb_build_object('targetUserId', $5::text))`,
+          [tenantId, actor.userId, userId, input.requestId, userId],
+        );
+        const profile = await loadMemberProfile(client, tenantId, userId);
+        if (!profile) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies MemberProfilePhotoResult;
+        }
+        await client.query("COMMIT");
+        return { status: "updated", profile } satisfies MemberProfilePhotoResult;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

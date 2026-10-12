@@ -575,6 +575,55 @@ export function createOpenApiDocument(version: string) {
           },
         },
       },
+      "/v1/tenants/{tenantId}/members/{userId}/profile-photo": {
+        post: {
+          tags: ["Empresas"],
+          operationId: "uploadTenantMemberProfilePhoto",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  required: ["file"],
+                  properties: { file: { type: "string", format: "binary" } },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": response(
+              "Foto de perfil privada actualizada.",
+              schemaReference("TenantMemberProfileResponse"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("El integrante no existe.", schemaReference("ApiError")),
+            "413": response("La foto supera el límite permitido.", schemaReference("ApiError")),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
+            "503": response("La carga privada no está habilitada.", schemaReference("ApiError")),
+          },
+        },
+      },
       "/v1/tenants/{tenantId}/settings": {
         patch: {
           tags: ["Empresas"],
