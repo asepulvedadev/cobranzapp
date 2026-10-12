@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "./app.js";
 import type { AuthenticatedUser, AuthService } from "./auth/types.js";
+import type { CreditService } from "./credit/types.js";
 import type { PlatformService } from "./platform/types.js";
 import type { SupportAccessRecord, SupportAccessService } from "./support-access/types.js";
 import type { TenancyService } from "./tenancy/types.js";
@@ -61,6 +62,7 @@ const proEntitlement = {
 
 function dependencies(overrides?: {
   authService?: Partial<AuthService>;
+  creditService?: CreditService;
   supportAccessService?: Partial<SupportAccessService>;
 }) {
   const authService: AuthService = {
@@ -346,6 +348,7 @@ function dependencies(overrides?: {
   return {
     allowedWebOrigins: ["https://cobranzaap.tech"],
     authService,
+    creditService: overrides?.creditService,
     checkDatabase: async () => undefined,
     isProduction: true,
     platformService,
@@ -354,6 +357,83 @@ function dependencies(overrides?: {
     version: "test",
   };
 }
+
+describe("loan application review queue", () => {
+  it("allows an owner to start review after recent reauthentication", async () => {
+    const application = {
+      id: "f9a9ef72-e2d6-44c6-8d89-30d7e1f9b9c8",
+      borrowerId: "193a2db4-2349-4a48-8833-746a2a334260",
+      borrowerName: "Cliente de prueba",
+      loanProductId: "56d33f0e-b1a8-4a55-9061-2ccf283ce0f5",
+      loanProductName: "Capital de trabajo",
+      requestedPrincipal: "500000.00",
+      requestedTermCount: 4,
+      purpose: "Compra de inventario",
+      status: "under_review" as const,
+      createdAt: "2026-10-11T00:00:00.000Z",
+      updatedAt: "2026-10-11T00:01:00.000Z",
+    };
+    const startApplicationReview = vi.fn(async () => ({
+      status: "review_started" as const,
+      application,
+    }));
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => tenantOwner) },
+        creditService: { startApplicationReview } as unknown as CreditService,
+      }),
+    );
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/loan-applications/f9a9ef72-e2d6-44c6-8d89-30d7e1f9b9c8/review",
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ application });
+    expect(startApplicationReview).toHaveBeenCalledWith(
+      {
+        userId: tenantOwner.id,
+        platformRole: null,
+        tenantRole: "owner",
+      },
+      "5c58269f-ce16-4250-82e2-c0c16621b0fb",
+      "f9a9ef72-e2d6-44c6-8d89-30d7e1f9b9c8",
+      expect.any(String),
+    );
+  });
+
+  it("keeps the review transition restricted to owners and supervisors", async () => {
+    const startApplicationReview = vi.fn();
+    const collector: AuthenticatedUser = {
+      ...tenantOwner,
+      id: "8b8f4a23-3207-497f-a4b6-778cb8f4d1d0",
+      platformRole: null,
+      memberships: [{ ...tenantOwner.memberships[0], role: "collector" }],
+    };
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => collector) },
+        creditService: { startApplicationReview } as unknown as CreditService,
+      }),
+    );
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/loan-applications/f9a9ef72-e2d6-44c6-8d89-30d7e1f9b9c8/review",
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+      },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ error: { code: "SCOPE_DENIED" } });
+    expect(startApplicationReview).not.toHaveBeenCalled();
+  });
+});
 
 const apps: ReturnType<typeof buildApp>[] = [];
 afterEach(async () => {
