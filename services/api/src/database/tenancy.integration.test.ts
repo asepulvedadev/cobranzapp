@@ -74,6 +74,9 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
         [invitedUsername],
       );
       await ownerPool.query("DELETE FROM users WHERE username = $1", [invitedUsername]);
+      await ownerPool.query("DELETE FROM users WHERE email::text LIKE $1", [
+        `%${suffix}@example.com`,
+      ]);
       await ownerPool.end();
     }
     if (runtimePool) await runtimePool.end();
@@ -162,7 +165,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     const platform = createPostgresPlatformService(runtimePool);
     const supportAccess = createPostgresSupportAccessService(runtimePool);
     await expect(platform.systemStatus(developerId)).resolves.toMatchObject({
-      schemaVersion: "0012_inactive_organization_scope.sql",
+      schemaVersion: "0013_membership_entitlements.sql",
       jobs: {
         status: expect.stringMatching(/^(operational|attention)$/),
         due: expect.any(Number),
@@ -186,11 +189,43 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       requestId: `test-secondary-${suffix}`,
     });
     expect(tenant.status).toBe("draft");
-    expect(tenant).toMatchObject({ membershipPlan: "pro", readiness: { membershipPlan: true } });
-    expect(secondTenant).toMatchObject({ membershipPlan: "ultra" });
+    expect(tenant).toMatchObject({
+      membershipPlan: "pro",
+      membershipEntitlement: {
+        version: 1,
+        includedEmployeeSeats: 5,
+        additionalEmployeeSeats: 0,
+        employeeSeatLimit: 5,
+        clientLimit: 100,
+      },
+      readiness: { membershipPlan: true },
+    });
+    expect(secondTenant).toMatchObject({
+      membershipPlan: "ultra",
+      membershipEntitlement: { includedEmployeeSeats: 50, employeeSeatLimit: 50 },
+    });
     await expect(
       platform.updateMembershipPlan(developerId, tenant.id, "ultra", `membership-plan-${suffix}`),
-    ).resolves.toEqual({ status: "updated", membershipPlan: "ultra" });
+    ).resolves.toMatchObject({
+      status: "updated",
+      membershipPlan: "ultra",
+      membershipEntitlement: { version: 2, employeeSeatLimit: 50, clientLimit: 200 },
+    });
+    await expect(
+      platform.updateMembershipEntitlement(
+        developerId,
+        tenant.id,
+        3,
+        `membership-capacity-${suffix}`,
+      ),
+    ).resolves.toMatchObject({
+      status: "updated",
+      membershipEntitlement: {
+        version: 3,
+        additionalEmployeeSeats: 3,
+        employeeSeatLimit: 53,
+      },
+    });
     expect(
       (
         await ownerPool.query<{ membership_plan: string }>(
@@ -232,7 +267,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
         "ultra",
         `restore-plan-${suffix}`,
       ),
-    ).resolves.toEqual({ status: "updated", membershipPlan: "ultra" });
+    ).resolves.toMatchObject({ status: "updated", membershipPlan: "ultra" });
     await ownerPool.query(
       `INSERT INTO outbox_events (
          tenant_id, event_type, aggregate_type, aggregate_id,
@@ -315,6 +350,11 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     expect(ownerLogin?.user.memberships).toContainEqual(
       expect.objectContaining({ tenantId: tenant.id, role: "owner" }),
     );
+    const ownerActor = {
+      userId: ownerLogin?.user.id ?? "",
+      platformRole: null,
+      tenantRole: "owner" as const,
+    };
     await expect(
       auth.reauthenticate(
         ownerLogin?.user.id ?? "",
@@ -340,6 +380,111 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     expect(ownerOverview?.tenant.membershipPlan).toBe("ultra");
     expect(ownerOverview?.metrics.members).toBe(1);
     expect(ownerOverview?.metrics.activeEmployeeSeats).toBe(0);
+    expect(ownerOverview?.membershipEntitlement).toMatchObject({
+      version: 3,
+      includedEmployeeSeats: 50,
+      additionalEmployeeSeats: 3,
+      employeeSeatLimit: 53,
+      availableEmployeeSeats: 53,
+      clientLimit: 200,
+    });
+
+    await expect(
+      platform.updateMembershipEntitlement(
+        developerId,
+        tenant.id,
+        0,
+        `membership-capacity-reset-${suffix}`,
+      ),
+    ).resolves.toMatchObject({
+      status: "updated",
+      membershipEntitlement: { additionalEmployeeSeats: 0, employeeSeatLimit: 50 },
+    });
+    await expect(
+      platform.updateMembershipPlan(developerId, tenant.id, "pro", `membership-pro-${suffix}`),
+    ).resolves.toMatchObject({
+      status: "updated",
+      membershipEntitlement: { employeeSeatLimit: 5 },
+    });
+    const seatInvitations = await Promise.all(
+      Array.from({ length: 6 }, (_, index) =>
+        tenancy.createInvitation(ownerActor, tenant.id, {
+          email: `seat-${index + 1}-${suffix}@example.com`,
+          role: index % 2 === 0 ? "collector" : "supervisor",
+          requestId: `seat-invite-${index + 1}-${suffix}`,
+        }),
+      ),
+    );
+    const seatTokens = seatInvitations.map(
+      (invitation) => new URL(invitation?.acceptanceUrl ?? "").searchParams.get("token") ?? "",
+    );
+    const seatResults = await Promise.all(
+      seatTokens.map((token, index) =>
+        tenancy.acceptInvitation(
+          token,
+          {
+            username: `seat-${index + 1}-${suffix}`,
+            displayName: `Empleado ${index + 1}`,
+            password,
+          },
+          `seat-accept-${index + 1}-${suffix}`,
+        ),
+      ),
+    );
+    expect(seatResults.filter((result) => result.status === "accepted")).toHaveLength(5);
+    expect(seatResults).toContainEqual({ status: "seat_limit_reached", employeeSeatLimit: 5 });
+    expect((await tenancy.overview(ownerActor, tenant.id))?.membershipEntitlement).toMatchObject({
+      employeeSeatLimit: 5,
+      availableEmployeeSeats: 0,
+    });
+    await expect(
+      platform.updateMembershipEntitlement(
+        developerId,
+        tenant.id,
+        1,
+        `membership-capacity-six-${suffix}`,
+      ),
+    ).resolves.toMatchObject({
+      status: "updated",
+      membershipEntitlement: { employeeSeatLimit: 6 },
+    });
+    const rejectedSeatIndex = seatResults.findIndex(
+      (result) => result.status === "seat_limit_reached",
+    );
+    await expect(
+      tenancy.acceptInvitation(
+        seatTokens[rejectedSeatIndex] ?? "",
+        {
+          username: `seat-${rejectedSeatIndex + 1}-${suffix}`,
+          displayName: `Empleado ${rejectedSeatIndex + 1}`,
+          password,
+        },
+        `seat-accept-expanded-${suffix}`,
+      ),
+    ).resolves.toMatchObject({ status: "accepted" });
+    await expect(
+      platform.updateMembershipEntitlement(
+        developerId,
+        tenant.id,
+        0,
+        `membership-capacity-too-small-${suffix}`,
+      ),
+    ).resolves.toEqual({
+      status: "seat_limit_conflict",
+      activeEmployeeSeats: 6,
+      employeeSeatLimit: 5,
+    });
+    await expect(
+      platform.updateMembershipEntitlement(
+        developerId,
+        tenant.id,
+        2,
+        `membership-capacity-seven-${suffix}`,
+      ),
+    ).resolves.toMatchObject({
+      status: "updated",
+      membershipEntitlement: { employeeSeatLimit: 7 },
+    });
     expect(ownerOverview?.settings.version).toBe(1);
     expect(ownerOverview?.settingsHistory).toContainEqual(
       expect.objectContaining({
@@ -355,11 +500,6 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       missing: expect.arrayContaining(["active_branch", "contact_email"]),
     });
 
-    const ownerActor = {
-      userId: ownerLogin?.user.id ?? "",
-      platformRole: null,
-      tenantRole: "owner" as const,
-    };
     expect(await supportAccess.listForTenant(ownerActor, tenant.id)).toContainEqual(
       expect.objectContaining({
         id: supportRequest.access.id,

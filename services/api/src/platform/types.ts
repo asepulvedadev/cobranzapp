@@ -1,3 +1,7 @@
+import type { MembershipEntitlement, MembershipPlan } from "../memberships/catalog.js";
+
+export type { MembershipEntitlement, MembershipPlan } from "../memberships/catalog.js";
+
 export type PlatformOverview = {
   metrics: {
     tenants: number;
@@ -11,6 +15,7 @@ export type PlatformOverview = {
     displayName: string;
     status: "draft" | "active" | "suspended" | "archived";
     membershipPlan: MembershipPlan | null;
+    membershipEntitlement: MembershipEntitlement | null;
     members: number;
     readiness: {
       activeOwner: boolean;
@@ -31,7 +36,6 @@ export type PlatformOverview = {
   }>;
 };
 
-export type MembershipPlan = "pro" | "ultra";
 export type TenantStatus = PlatformOverview["tenants"][number]["status"];
 
 export type TenantDirectoryQuery = {
@@ -78,7 +82,18 @@ export type TenantStatusUpdateResult =
   | { status: "not_found" };
 
 export type MembershipPlanUpdateResult =
-  | { status: "updated"; membershipPlan: MembershipPlan }
+  | {
+      status: "updated";
+      membershipPlan: MembershipPlan;
+      membershipEntitlement: MembershipEntitlement;
+    }
+  | { status: "seat_limit_conflict"; activeEmployeeSeats: number; employeeSeatLimit: number }
+  | { status: "not_found" };
+
+export type MembershipEntitlementUpdateResult =
+  | { status: "updated"; membershipEntitlement: MembershipEntitlement }
+  | { status: "plan_required" }
+  | { status: "seat_limit_conflict"; activeEmployeeSeats: number; employeeSeatLimit: number }
   | { status: "not_found" };
 
 export interface PlatformService {
@@ -100,6 +115,12 @@ export interface PlatformService {
     membershipPlan: MembershipPlan,
     requestId: string,
   ): Promise<MembershipPlanUpdateResult>;
+  updateMembershipEntitlement(
+    actorUserId: string,
+    tenantId: string,
+    additionalEmployeeSeats: number,
+    requestId: string,
+  ): Promise<MembershipEntitlementUpdateResult>;
   updateTenantStatus(
     actorUserId: string,
     tenantId: string,

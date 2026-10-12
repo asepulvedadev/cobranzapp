@@ -47,6 +47,9 @@ const tenantTeamParamsSchema = z.object({ tenantId: z.uuid(), teamId: z.uuid() }
 const sessionIdParamsSchema = z.object({ sessionId: z.uuid() });
 const tenantStatusSchema = z.object({ status: z.enum(["active", "suspended", "archived"]) });
 const tenantMembershipPlanSchema = z.object({ membershipPlan: z.enum(["pro", "ultra"]) });
+const tenantMembershipEntitlementSchema = z.object({
+  additionalEmployeeSeats: z.number().int().min(0).max(1000),
+});
 const tenantDirectoryQuerySchema = z.object({
   q: z.string().trim().max(80).optional(),
   status: z.enum(["draft", "active", "suspended", "archived"]).optional(),
@@ -593,7 +596,65 @@ export function buildApp(dependencies: AppDependencies) {
     if (result.status === "not_found") {
       return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
     }
-    return reply.send({ membershipPlan: result.membershipPlan });
+    if (result.status === "seat_limit_conflict") {
+      return sendError(
+        reply,
+        409,
+        "EMPLOYEE_SEAT_LIMIT_CONFLICT",
+        `La empresa tiene ${result.activeEmployeeSeats} empleados activos y el plan seleccionado permitiría ${result.employeeSeatLimit}.`,
+        request.id,
+      );
+    }
+    return reply.send({
+      membershipPlan: result.membershipPlan,
+      membershipEntitlement: result.membershipEntitlement,
+    });
+  });
+
+  app.patch("/v1/platform/tenants/:tenantId/membership-entitlement", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = tenantMembershipEntitlementSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_MEMBERSHIP_ENTITLEMENT",
+        "La cantidad de cupos adicionales debe estar entre 0 y 1.000.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const result = await dependencies.platformService.updateMembershipEntitlement(
+      session.user.id,
+      params.data.tenantId,
+      body.data.additionalEmployeeSeats,
+      request.id,
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
+    }
+    if (result.status === "plan_required") {
+      return sendError(
+        reply,
+        409,
+        "MEMBERSHIP_PLAN_REQUIRED",
+        "Asigna un plan antes de ampliar la capacidad.",
+        request.id,
+      );
+    }
+    if (result.status === "seat_limit_conflict") {
+      return sendError(
+        reply,
+        409,
+        "EMPLOYEE_SEAT_LIMIT_CONFLICT",
+        `La empresa tiene ${result.activeEmployeeSeats} empleados activos y el nuevo límite sería ${result.employeeSeatLimit}.`,
+        request.id,
+      );
+    }
+    return reply.send({ membershipEntitlement: result.membershipEntitlement });
   });
 
   app.post("/v1/platform/tenants/:tenantId/invitations", async (request, reply) => {
@@ -830,6 +891,14 @@ export function buildApp(dependencies: AppDependencies) {
           409,
           "USERNAME_UNAVAILABLE",
           "Ese nombre de usuario no está disponible.",
+          request.id,
+        );
+      case "seat_limit_reached":
+        return sendError(
+          reply,
+          409,
+          "EMPLOYEE_SEAT_LIMIT_REACHED",
+          `La empresa ya usa sus ${result.employeeSeatLimit} cupos de empleados. El propietario debe solicitar una ampliación.`,
           request.id,
         );
       case "expired":
@@ -1119,6 +1188,15 @@ export function buildApp(dependencies: AppDependencies) {
         409,
         "MEMBERSHIP_REVOKED",
         "Un acceso revocado no se puede reactivar. Envía una nueva invitación.",
+        request.id,
+      );
+    }
+    if (result.status === "seat_limit_reached") {
+      return sendError(
+        reply,
+        409,
+        "EMPLOYEE_SEAT_LIMIT_REACHED",
+        `La empresa ya usa sus ${result.employeeSeatLimit} cupos de empleados. Solicita una ampliación antes de activar este acceso.`,
         request.id,
       );
     }

@@ -35,6 +35,16 @@ export type TenantOverview = {
     pendingInvitations: number;
     activeEmployeeSeats: number;
   };
+  membershipEntitlement: {
+    catalogVersion: number;
+    version: number;
+    includedEmployeeSeats: number;
+    additionalEmployeeSeats: number;
+    employeeSeatLimit: number;
+    availableEmployeeSeats: number;
+    clientLimit: number;
+    prioritySupport: boolean;
+  } | null;
   settings: {
     primaryColor: string;
     accentColor: string;
@@ -94,6 +104,7 @@ export type MemberUpdateResult =
   | { status: "updated"; member: ManagedMember }
   | { status: "not_found" }
   | { status: "protected" }
+  | { status: "seat_limit_reached"; employeeSeatLimit: number }
   | { status: "invalid_transition" };
 
 export type TeamMemberUpdateResult =
@@ -122,7 +133,8 @@ export type InvitationAcceptanceResult =
   | { status: "expired" }
   | { status: "account_exists" }
   | { status: "email_mismatch" }
-  | { status: "username_unavailable" };
+  | { status: "username_unavailable" }
+  | { status: "seat_limit_reached"; employeeSeatLimit: number };
 
 export type InvitationRevocationResult =
   | { status: "revoked" }

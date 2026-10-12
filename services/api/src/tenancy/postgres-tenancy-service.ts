@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { hashPassword } from "../auth/password.js";
 import type { TenantRole } from "../auth/types.js";
+import { buildMembershipEntitlement, membershipCatalog } from "../memberships/catalog.js";
 import type {
   InvitationAcceptanceResult,
   InvitationPreview,
@@ -25,6 +26,10 @@ async function setActorContext(client: PoolClient, actor: TenantActor, tenantId:
   ]);
   await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
   await client.query("SELECT set_config('app.tenant_role', $1, true)", [actor.tenantRole ?? ""]);
+}
+
+async function lockTenantMembershipCapacity(client: PoolClient, tenantId: string) {
+  await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))", [tenantId]);
 }
 
 async function loadInvitation(
@@ -204,6 +209,9 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           await client.query("ROLLBACK");
           return { status: "expired" };
         }
+        await client.query("SELECT set_config('app.invitation_tenant_id', $1, true)", [
+          invitation.tenant_id,
+        ]);
 
         let userId: string;
         if ("existingUserId" in input) {
@@ -246,6 +254,43 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
         }
 
         await client.query("SELECT set_config('app.user_id', $1, true)", [userId]);
+
+        if (invitation.role === "supervisor" || invitation.role === "collector") {
+          await lockTenantMembershipCapacity(client, invitation.tenant_id);
+          const tenant = await client.query<{
+            membership_plan: "pro" | "ultra" | null;
+            additional_employee_seats: number;
+          }>(
+            `SELECT membership_plan, additional_employee_seats
+               FROM tenants WHERE id = $1`,
+            [invitation.tenant_id],
+          );
+          const tenantRow = tenant.rows[0];
+          const employeeSeatLimit = tenantRow?.membership_plan
+            ? membershipCatalog[tenantRow.membership_plan].includedEmployeeSeats +
+              tenantRow.additional_employee_seats
+            : 0;
+          const currentMembership = await client.query<{ consumes_seat: boolean }>(
+            `SELECT EXISTS (
+               SELECT 1 FROM tenant_memberships
+                WHERE tenant_id = $1 AND user_id = $2
+                  AND status = 'active' AND role IN ('supervisor', 'collector')
+             ) AS consumes_seat`,
+            [invitation.tenant_id, userId],
+          );
+          const occupied = await client.query<{ count: number }>(
+            "SELECT tenant_active_employee_seat_count($1) AS count",
+            [invitation.tenant_id],
+          );
+          if (
+            !currentMembership.rows[0]?.consumes_seat &&
+            Number(occupied.rows[0]?.count ?? 0) >= employeeSeatLimit
+          ) {
+            await client.query("ROLLBACK");
+            return { status: "seat_limit_reached", employeeSeatLimit };
+          }
+        }
+
         await client.query("SELECT set_config('app.tenant_id', $1, true)", [invitation.tenant_id]);
         await client.query("SELECT set_config('app.invitation_tenant_id', $1, true)", [
           invitation.tenant_id,
@@ -347,8 +392,11 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           timezone: string;
           currency: string;
           membership_plan: "pro" | "ultra" | null;
+          additional_employee_seats: number;
+          membership_entitlement_version: number;
         }>(
-          `SELECT id, slug, display_name, status, locale, timezone, currency, membership_plan
+          `SELECT id, slug, display_name, status, locale, timezone, currency, membership_plan,
+                  additional_employee_seats, membership_entitlement_version
              FROM tenants WHERE id = $1`,
           [tenantId],
         );
@@ -517,6 +565,16 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
               )
             : { rows: [] };
         const counts = metrics.rows[0];
+        const activeEmployeeSeats = Number(counts?.active_employee_seats ?? 0);
+        const maySeeMembership = actor.tenantRole === "owner" || isSupport;
+        const entitlement =
+          maySeeMembership && tenantRow.membership_plan
+            ? buildMembershipEntitlement(
+                tenantRow.membership_plan,
+                tenantRow.additional_employee_seats,
+                tenantRow.membership_entitlement_version,
+              )
+            : null;
         const tenantSettings = settings.rows[0];
         if (!tenantSettings) throw new Error("Tenant settings are unavailable");
         await client.query("COMMIT");
@@ -529,8 +587,7 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
             locale: tenantRow.locale,
             timezone: tenantRow.timezone,
             currency: tenantRow.currency,
-            membershipPlan:
-              actor.tenantRole === "owner" || isSupport ? tenantRow.membership_plan : null,
+            membershipPlan: maySeeMembership ? tenantRow.membership_plan : null,
           },
           actorRole: actor.tenantRole ?? "support",
           metrics: {
@@ -538,10 +595,17 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
             branches: Number(counts?.branches ?? 0),
             teams: Number(counts?.teams ?? 0),
             pendingInvitations: maySeeOrganization ? Number(counts?.pending_invitations ?? 0) : 0,
-            activeEmployeeSeats: maySeeOrganization
-              ? Number(counts?.active_employee_seats ?? 0)
-              : 0,
+            activeEmployeeSeats: maySeeOrganization ? activeEmployeeSeats : 0,
           },
+          membershipEntitlement: entitlement
+            ? {
+                ...entitlement,
+                availableEmployeeSeats: Math.max(
+                  0,
+                  entitlement.employeeSeatLimit - activeEmployeeSeats,
+                ),
+              }
+            : null,
           settings: {
             primaryColor: tenantSettings.primary_color,
             accentColor: tenantSettings.accent_color,
@@ -1015,6 +1079,20 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
       try {
         await client.query("BEGIN");
         await setActorContext(client, actor, tenantId);
+        await lockTenantMembershipCapacity(client, tenantId);
+        const tenant = await client.query<{
+          membership_plan: "pro" | "ultra" | null;
+          additional_employee_seats: number;
+        }>(
+          `SELECT membership_plan, additional_employee_seats
+             FROM tenants WHERE id = $1`,
+          [tenantId],
+        );
+        const tenantRow = tenant.rows[0];
+        if (!tenantRow) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" };
+        }
         const current = await client.query<{
           display_name: string;
           email: string;
@@ -1042,6 +1120,30 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
         if (previous.status === "revoked") {
           await client.query("ROLLBACK");
           return { status: "invalid_transition" };
+        }
+        const becomesActiveEmployee =
+          input.status === "active" &&
+          (input.role === "supervisor" || input.role === "collector") &&
+          !(
+            previous.status === "active" &&
+            (previous.role === "supervisor" || previous.role === "collector")
+          );
+        if (becomesActiveEmployee) {
+          const employeeSeatLimit = tenantRow.membership_plan
+            ? membershipCatalog[tenantRow.membership_plan].includedEmployeeSeats +
+              tenantRow.additional_employee_seats
+            : 0;
+          const occupied = await client.query<{ count: string }>(
+            `SELECT count(*) AS count
+               FROM tenant_memberships
+              WHERE tenant_id = $1 AND user_id <> $2
+                AND status = 'active' AND role IN ('supervisor', 'collector')`,
+            [tenantId, userId],
+          );
+          if (Number(occupied.rows[0]?.count ?? 0) >= employeeSeatLimit) {
+            await client.query("ROLLBACK");
+            return { status: "seat_limit_reached", employeeSeatLimit };
+          }
         }
         const updated = await client.query<{
           role: TenantRole;

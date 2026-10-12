@@ -1,6 +1,6 @@
 # Approved Memberships — Pro and Ultra
 
-> **Status:** Commercial scope confirmed by the owner on 2026-10-11. Public landing and audited per-tenant plan assignment are implemented; backend quota enforcement, billing, customer links and financial workflows remain unimplemented.
+> **Status:** Commercial scope confirmed by the owner on 2026-10-11. Public landing, audited per-tenant plan assignment, versioned employee-seat entitlements and atomic employee-seat enforcement are implemented; billing, customer limits, customer links and financial workflows remain unimplemented.
 
 This document owns subscription prices, included capacity, the separate setup fee and plan-related business permissions. The subscriber is the company owner, not each employee or borrower. Both memberships apply per tenant and have the same core features.
 
@@ -86,7 +86,7 @@ These are design requirements, not implemented controls in the landing update. S
 ## Open implementation decisions
 
 1. Whether the customer quota counts all records, active borrowers or another explicit population. The landing says "up to 100/200 customers" and does not silently narrow it to active borrowers.
-2. Additional-seat activation, owner approval and quota treatment for pending invitations, suspended users and concurrent invitations. Enforce included plus purchased capacity atomically on the server, not only in the UI; adding an invitation must not silently authorize billing.
+2. Owner approval, effective dates and billing treatment for additional-seat changes. Pending invitations do not reserve capacity or authorize billing; the server enforces capacity atomically when an employee invitation is accepted or a suspended employee is reactivated. Suspended, revoked and customer memberships do not consume employee seats.
 3. Advisor mapping, who can issue/revoke customer links and link validity periods.
 4. Whether the daily document is a payment receipt, a daily account report or a separately reviewed invoicing function. No electronic tax-invoicing integration is promised or implemented.
 5. Billing dates, tax treatment, payment method, failed payments, cancellation, prorating, upgrade/downgrade and over-quota behavior. Do not delete historical customer/loan evidence to satisfy a downgrade.
@@ -95,8 +95,9 @@ These are design requirements, not implemented controls in the landing update. S
 ## Implementation and verification boundaries
 
 - Public catalog: `apps/web/src/data/memberships.ts`; base prices, included seats, the COP 20,000 recurring employee add-on and customer limits are tested and reused in landing cards and pricing FAQ. `calculateMembershipMonthlyPrice` is a commercial estimate, not a billing or entitlement enforcement service.
-- Platform assignment: every newly created tenant records `pro` or `ultra`. The developer can correct that assignment with recent password confirmation, and each change is audited with its previous value, next value and catalog version. A plan is required before activating a new tenant. Tenant owners can see the assigned plan, included staff capacity, customer limit, support level and activation checklist in their workspace.
-- Assignment is commercial metadata only. It does not charge the tenant, buy additional seats, enforce customer limits, determine taxes, prorate a cycle or represent payment status.
+- Platform assignment: every newly created tenant records `pro` or `ultra`. The developer can correct that assignment and record purchased employee-seat capacity with recent password confirmation. Every effective entitlement snapshot is immutable and versioned with the plan, included seats, purchased seats, customer limit, support level, catalog version, actor and request. Reducing capacity or changing plan below current active employee use is rejected.
+- Employee capacity is server-authoritative. Concurrent employee invitation acceptance and employee reactivation serialize per tenant, so at most the current included plus purchased capacity becomes active. Owner and customer memberships do not consume employee seats; pending invitations do not reserve them. Tenant owners can see active, included, additional, total and available capacity in their workspace.
+- Assignment and capacity are commercial authorization metadata only. Recording additional capacity does not charge the tenant, determine taxes, prorate a cycle or represent payment status. Customer-limit enforcement remains pending because the customer-counting policy is still open.
 - Public presentation: `PricingSection`, navigation and footer links, a visible pricing entry point, per-plan enquiry links and a separate setup-fee block.
 - This delivery does not implement database subscription cycles, quota enforcement, billing or live lending authorization. Do not infer that assigning a plan enabled those features.
 - Before backend implementation, map this approved catalog into server-controlled entitlements and versioned subscription terms; verify isolation, over-quota concurrency, approved rate permissions and public-link data minimization.

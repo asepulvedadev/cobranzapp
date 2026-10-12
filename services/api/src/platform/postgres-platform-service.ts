@@ -1,5 +1,11 @@
 import type { Pool, PoolClient } from "pg";
+import {
+  buildMembershipEntitlement,
+  membershipCatalog,
+  membershipCatalogVersion,
+} from "../memberships/catalog.js";
 import type {
+  MembershipEntitlementUpdateResult,
   MembershipPlan,
   MembershipPlanUpdateResult,
   PlatformOverview,
@@ -9,9 +15,51 @@ import type {
   TenantStatusUpdateResult,
 } from "./types.js";
 
+async function insertEntitlementVersion(
+  client: Pick<PoolClient, "query">,
+  input: {
+    actorUserId: string;
+    additionalEmployeeSeats: number;
+    membershipPlan: MembershipPlan;
+    requestId: string;
+    tenantId: string;
+    version: number;
+  },
+) {
+  const entitlement = buildMembershipEntitlement(
+    input.membershipPlan,
+    input.additionalEmployeeSeats,
+    input.version,
+  );
+  await client.query(
+    `INSERT INTO tenant_membership_entitlement_versions (
+       tenant_id, version, membership_plan, included_employee_seats,
+       additional_employee_seats, client_limit, priority_support,
+       catalog_version, changed_by, request_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [
+      input.tenantId,
+      input.version,
+      input.membershipPlan,
+      entitlement.includedEmployeeSeats,
+      input.additionalEmployeeSeats,
+      entitlement.clientLimit,
+      entitlement.prioritySupport,
+      membershipCatalogVersion,
+      input.actorUserId,
+      input.requestId,
+    ],
+  );
+  return entitlement;
+}
+
 async function setPlatformContext(client: Pick<PoolClient, "query">, actorUserId: string) {
   await client.query("SELECT set_config('app.user_id', $1, true)", [actorUserId]);
   await client.query("SELECT set_config('app.platform_role', 'developer', true)");
+}
+
+async function lockTenantMembershipCapacity(client: Pick<PoolClient, "query">, tenantId: string) {
+  await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))", [tenantId]);
 }
 
 type TenantRow = {
@@ -20,6 +68,8 @@ type TenantRow = {
   display_name: string;
   status: PlatformOverview["tenants"][number]["status"];
   membership_plan: MembershipPlan | null;
+  additional_employee_seats: number;
+  membership_entitlement_version: number;
   members: string;
   active_owner: boolean;
   active_branch: boolean;
@@ -34,6 +84,13 @@ function mapTenant(tenant: TenantRow): PlatformOverview["tenants"][number] {
     displayName: tenant.display_name,
     status: tenant.status,
     membershipPlan: tenant.membership_plan,
+    membershipEntitlement: tenant.membership_plan
+      ? buildMembershipEntitlement(
+          tenant.membership_plan,
+          tenant.additional_employee_seats,
+          tenant.membership_entitlement_version,
+        )
+      : null,
     members: Number(tenant.members),
     readiness: {
       activeOwner: tenant.active_owner,
@@ -138,7 +195,8 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
         );
         const tenantsResult = await client.query<TenantRow>(
           `SELECT tenant.id, tenant.slug, tenant.display_name, tenant.status,
-                    tenant.membership_plan,
+                    tenant.membership_plan, tenant.additional_employee_seats,
+                    tenant.membership_entitlement_version,
                     count(membership.user_id) FILTER (WHERE membership.status = 'active') AS members,
                     EXISTS (
                       SELECT 1 FROM tenant_memberships owner_membership
@@ -230,7 +288,8 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
         const offset = (page - 1) * query.pageSize;
         const tenantsResult = await client.query<TenantRow>(
           `SELECT tenant.id, tenant.slug, tenant.display_name, tenant.status,
-                    tenant.membership_plan,
+                    tenant.membership_plan, tenant.additional_employee_seats,
+                    tenant.membership_entitlement_version,
                     count(membership.user_id) FILTER (WHERE membership.status = 'active') AS members,
                     EXISTS (
                       SELECT 1 FROM tenant_memberships owner_membership
@@ -284,11 +343,14 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           display_name: string;
           status: PlatformOverview["tenants"][number]["status"];
           membership_plan: MembershipPlan;
+          additional_employee_seats: number;
+          membership_entitlement_version: number;
           created_at: Date;
         }>(
           `INSERT INTO tenants (slug, display_name, membership_plan, created_by)
            VALUES ($1, $2, $3, $4)
-           RETURNING id, slug, display_name, status, membership_plan, created_at`,
+           RETURNING id, slug, display_name, status, membership_plan,
+                     additional_employee_seats, membership_entitlement_version, created_at`,
           [input.slug, input.displayName, input.membershipPlan, actorUserId],
         );
         const tenant = result.rows[0];
@@ -298,6 +360,14 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
            VALUES ($1, $2)`,
           [tenant.id, actorUserId],
         );
+        const entitlement = await insertEntitlementVersion(client, {
+          actorUserId,
+          additionalEmployeeSeats: tenant.additional_employee_seats,
+          membershipPlan: tenant.membership_plan,
+          requestId: input.requestId,
+          tenantId: tenant.id,
+          version: tenant.membership_entitlement_version,
+        });
         await client.query(
           `INSERT INTO tenant_setting_versions (
              tenant_id, version, primary_color, accent_color, contact_email,
@@ -328,6 +398,7 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           displayName: tenant.display_name,
           status: tenant.status,
           membershipPlan: tenant.membership_plan,
+          membershipEntitlement: entitlement,
           members: 0,
           readiness: {
             activeOwner: false,
@@ -350,8 +421,14 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
       try {
         await client.query("BEGIN");
         await setPlatformContext(client, actorUserId);
-        const current = await client.query<{ membership_plan: MembershipPlan | null }>(
-          "SELECT membership_plan FROM tenants WHERE id = $1 FOR UPDATE",
+        await lockTenantMembershipCapacity(client, tenantId);
+        const current = await client.query<{
+          membership_plan: MembershipPlan | null;
+          additional_employee_seats: number;
+          membership_entitlement_version: number;
+        }>(
+          `SELECT membership_plan, additional_employee_seats, membership_entitlement_version
+             FROM tenants WHERE id = $1 FOR UPDATE`,
           [tenantId],
         );
         const tenant = current.rows[0];
@@ -359,13 +436,48 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           await client.query("ROLLBACK");
           return { status: "not_found" } satisfies MembershipPlanUpdateResult;
         }
+        const nextLimit =
+          membershipCatalog[membershipPlan].includedEmployeeSeats +
+          tenant.additional_employee_seats;
+        const activeEmployees = await client.query<{ count: string }>(
+          `SELECT count(*) AS count
+             FROM tenant_memberships
+            WHERE tenant_id = $1 AND status = 'active'
+              AND role IN ('supervisor', 'collector')`,
+          [tenantId],
+        );
+        const activeEmployeeSeats = Number(activeEmployees.rows[0]?.count ?? 0);
+        if (activeEmployeeSeats > nextLimit) {
+          await client.query("ROLLBACK");
+          return {
+            status: "seat_limit_conflict",
+            activeEmployeeSeats,
+            employeeSeatLimit: nextLimit,
+          } satisfies MembershipPlanUpdateResult;
+        }
+        let entitlement = buildMembershipEntitlement(
+          membershipPlan,
+          tenant.additional_employee_seats,
+          tenant.membership_entitlement_version,
+        );
         if (tenant.membership_plan !== membershipPlan) {
+          const nextVersion = tenant.membership_entitlement_version + 1;
           await client.query(
             `UPDATE tenants
-                SET membership_plan = $2, updated_at = now()
+                SET membership_plan = $2,
+                    membership_entitlement_version = $3,
+                    updated_at = now()
               WHERE id = $1`,
-            [tenantId, membershipPlan],
+            [tenantId, membershipPlan, nextVersion],
           );
+          entitlement = await insertEntitlementVersion(client, {
+            actorUserId,
+            additionalEmployeeSeats: tenant.additional_employee_seats,
+            membershipPlan,
+            requestId,
+            tenantId,
+            version: nextVersion,
+          });
           await client.query(
             `INSERT INTO audit_events
                (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
@@ -381,7 +493,114 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           );
         }
         await client.query("COMMIT");
-        return { status: "updated", membershipPlan } satisfies MembershipPlanUpdateResult;
+        return {
+          status: "updated",
+          membershipPlan,
+          membershipEntitlement: entitlement,
+        } satisfies MembershipPlanUpdateResult;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async updateMembershipEntitlement(actorUserId, tenantId, additionalEmployeeSeats, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setPlatformContext(client, actorUserId);
+        await lockTenantMembershipCapacity(client, tenantId);
+        const current = await client.query<{
+          membership_plan: MembershipPlan | null;
+          additional_employee_seats: number;
+          membership_entitlement_version: number;
+        }>(
+          `SELECT membership_plan, additional_employee_seats, membership_entitlement_version
+             FROM tenants WHERE id = $1 FOR UPDATE`,
+          [tenantId],
+        );
+        const tenant = current.rows[0];
+        if (!tenant) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies MembershipEntitlementUpdateResult;
+        }
+        if (!tenant.membership_plan) {
+          await client.query("ROLLBACK");
+          return { status: "plan_required" } satisfies MembershipEntitlementUpdateResult;
+        }
+        const nextLimit =
+          membershipCatalog[tenant.membership_plan].includedEmployeeSeats + additionalEmployeeSeats;
+        const activeEmployees = await client.query<{ count: string }>(
+          `SELECT count(*) AS count
+             FROM tenant_memberships
+            WHERE tenant_id = $1 AND status = 'active'
+              AND role IN ('supervisor', 'collector')`,
+          [tenantId],
+        );
+        const activeEmployeeSeats = Number(activeEmployees.rows[0]?.count ?? 0);
+        if (activeEmployeeSeats > nextLimit) {
+          await client.query("ROLLBACK");
+          return {
+            status: "seat_limit_conflict",
+            activeEmployeeSeats,
+            employeeSeatLimit: nextLimit,
+          } satisfies MembershipEntitlementUpdateResult;
+        }
+        let entitlement = buildMembershipEntitlement(
+          tenant.membership_plan,
+          tenant.additional_employee_seats,
+          tenant.membership_entitlement_version,
+        );
+        if (tenant.additional_employee_seats !== additionalEmployeeSeats) {
+          const nextVersion = tenant.membership_entitlement_version + 1;
+          await client.query(
+            `UPDATE tenants
+                SET additional_employee_seats = $2,
+                    membership_entitlement_version = $3,
+                    updated_at = now()
+              WHERE id = $1`,
+            [tenantId, additionalEmployeeSeats, nextVersion],
+          );
+          entitlement = await insertEntitlementVersion(client, {
+            actorUserId,
+            additionalEmployeeSeats,
+            membershipPlan: tenant.membership_plan,
+            requestId,
+            tenantId,
+            version: nextVersion,
+          });
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+             VALUES (
+               $1, $2, 'tenant.membership_capacity_changed', 'tenant', $1, $3,
+               jsonb_build_object(
+                 'fromAdditionalEmployeeSeats', $4::integer,
+                 'toAdditionalEmployeeSeats', $5::integer,
+                 'employeeSeatLimit', $6::integer,
+                 'membershipCatalogVersion', $7::integer,
+                 'entitlementVersion', $8::integer
+               )
+             )`,
+            [
+              tenantId,
+              actorUserId,
+              requestId,
+              tenant.additional_employee_seats,
+              additionalEmployeeSeats,
+              entitlement.employeeSeatLimit,
+              membershipCatalogVersion,
+              entitlement.version,
+            ],
+          );
+        }
+        await client.query("COMMIT");
+        return {
+          status: "updated",
+          membershipEntitlement: entitlement,
+        } satisfies MembershipEntitlementUpdateResult;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -462,12 +681,15 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           display_name: string;
           status: TenantStatus;
           membership_plan: MembershipPlan | null;
+          additional_employee_seats: number;
+          membership_entitlement_version: number;
           created_at: Date;
         }>(
           `UPDATE tenants
               SET status = $2, updated_at = now()
             WHERE id = $1
-          RETURNING id, slug, display_name, status, membership_plan, created_at`,
+          RETURNING id, slug, display_name, status, membership_plan,
+                    additional_employee_seats, membership_entitlement_version, created_at`,
           [tenantId, targetStatus],
         );
         const tenant = updated.rows[0];
@@ -519,6 +741,13 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             displayName: tenant.display_name,
             status: tenant.status,
             membershipPlan: tenant.membership_plan,
+            membershipEntitlement: tenant.membership_plan
+              ? buildMembershipEntitlement(
+                  tenant.membership_plan,
+                  tenant.additional_employee_seats,
+                  tenant.membership_entitlement_version,
+                )
+              : null,
             members: Number(memberCount.rows[0]?.count ?? 0),
             readiness: {
               activeOwner: readiness.rows[0]?.active_owner ?? false,

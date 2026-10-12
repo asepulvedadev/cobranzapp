@@ -47,6 +47,16 @@ const supportAccessRecord: SupportAccessRecord = {
   expiresAt: null,
 };
 
+const proEntitlement = {
+  catalogVersion: 1,
+  version: 1,
+  includedEmployeeSeats: 5,
+  additionalEmployeeSeats: 0,
+  employeeSeatLimit: 5,
+  clientLimit: 100,
+  prioritySupport: false,
+};
+
 function dependencies(overrides?: {
   authService?: Partial<AuthService>;
   supportAccessService?: Partial<SupportAccessService>;
@@ -108,6 +118,7 @@ function dependencies(overrides?: {
       slug: input.slug,
       status: "draft",
       membershipPlan: input.membershipPlan,
+      membershipEntitlement: proEntitlement,
       members: 0,
       readiness: {
         activeOwner: false,
@@ -120,6 +131,25 @@ function dependencies(overrides?: {
     updateMembershipPlan: vi.fn(async (_actor, _tenantId, membershipPlan) => ({
       status: "updated",
       membershipPlan,
+      membershipEntitlement:
+        membershipPlan === "pro"
+          ? proEntitlement
+          : {
+              ...proEntitlement,
+              includedEmployeeSeats: 50,
+              employeeSeatLimit: 50,
+              clientLimit: 200,
+              prioritySupport: true,
+            },
+    })),
+    updateMembershipEntitlement: vi.fn(async (_actor, _tenantId, additionalEmployeeSeats) => ({
+      status: "updated",
+      membershipEntitlement: {
+        ...proEntitlement,
+        version: 2,
+        additionalEmployeeSeats,
+        employeeSeatLimit: proEntitlement.includedEmployeeSeats + additionalEmployeeSeats,
+      },
     })),
     updateTenantStatus: vi.fn(async (_actor, tenantId, status) => ({
       status: "updated",
@@ -129,6 +159,7 @@ function dependencies(overrides?: {
         slug: "empresa-uno",
         status,
         membershipPlan: "pro",
+        membershipEntitlement: proEntitlement,
         members: 1,
         readiness: {
           activeOwner: true,
@@ -178,6 +209,7 @@ function dependencies(overrides?: {
         pendingInvitations: 0,
         activeEmployeeSeats: 0,
       },
+      membershipEntitlement: { ...proEntitlement, availableEmployeeSeats: 5 },
       settings: {
         primaryColor: "#171717",
         accentColor: "#FBBF24",
@@ -615,13 +647,63 @@ describe("developer platform", () => {
       payload: { membershipPlan: "ultra" },
     });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ membershipPlan: "ultra" });
+    expect(response.json()).toMatchObject({
+      membershipPlan: "ultra",
+      membershipEntitlement: { employeeSeatLimit: 50, clientLimit: 200 },
+    });
     expect(deps.platformService.updateMembershipPlan).toHaveBeenCalledWith(
       developer.id,
       "5c58269f-ce16-4250-82e2-c0c16621b0fb",
       "ultra",
       expect.any(String),
     );
+  });
+
+  it("updates purchased employee capacity with recent reauthentication", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/v1/platform/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/membership-entitlement",
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { additionalEmployeeSeats: 3 },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      membershipEntitlement: { additionalEmployeeSeats: 3, employeeSeatLimit: 8, version: 2 },
+    });
+    expect(deps.platformService.updateMembershipEntitlement).toHaveBeenCalledWith(
+      developer.id,
+      "5c58269f-ce16-4250-82e2-c0c16621b0fb",
+      3,
+      expect.any(String),
+    );
+  });
+
+  it("rejects capacity reductions below active employee use", async () => {
+    const deps = dependencies();
+    vi.mocked(deps.platformService.updateMembershipEntitlement).mockResolvedValue({
+      status: "seat_limit_conflict",
+      activeEmployeeSeats: 7,
+      employeeSeatLimit: 5,
+    });
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/v1/platform/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/membership-entitlement",
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { additionalEmployeeSeats: 0 },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ error: { code: "EMPLOYEE_SEAT_LIMIT_CONFLICT" } });
   });
 
   it("rejects invalid commercial plans", async () => {
@@ -820,6 +902,28 @@ describe("tenant onboarding", () => {
     expect(acceptance.json()).toEqual({ tenantSlug: "empresa-uno" });
   });
 
+  it("keeps an employee invitation pending when no seat is available", async () => {
+    const deps = dependencies();
+    vi.mocked(deps.tenancyService.acceptInvitation).mockResolvedValue({
+      status: "seat_limit_reached",
+      employeeSeatLimit: 5,
+    });
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/invitations/valid-invitation-token-abcdefghijklmnopqrstuvwxyz/accept",
+      headers: { origin: "https://cobranzaap.tech" },
+      payload: {
+        username: "nuevo.cobrador",
+        displayName: "Nuevo Cobrador",
+        password: "new-collector-password",
+      },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ error: { code: "EMPLOYEE_SEAT_LIMIT_REACHED" } });
+  });
+
   it("lets an owner configure the workspace, branches and teams", async () => {
     const deps = dependencies({ authService: { authenticate: vi.fn(async () => tenantOwner) } });
     const app = buildApp(deps);
@@ -963,6 +1067,28 @@ describe("tenant onboarding", () => {
       userId,
       expect.objectContaining({ role: "collector", status: "suspended" }),
     );
+  });
+
+  it("prevents an owner from activating an employee above capacity", async () => {
+    const deps = dependencies({ authService: { authenticate: vi.fn(async () => tenantOwner) } });
+    vi.mocked(deps.tenancyService.updateMember).mockResolvedValue({
+      status: "seat_limit_reached",
+      employeeSeatLimit: 5,
+    });
+    const app = buildApp(deps);
+    apps.push(app);
+    const tenantId = tenantOwner.memberships[0]?.tenantId;
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/v1/tenants/${tenantId}/members/7727df33-e22e-4b17-9b4a-0e27f84b3da1`,
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { role: "collector", status: "active" },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ error: { code: "EMPLOYEE_SEAT_LIMIT_REACHED" } });
   });
 
   it("lets an owner revoke a pending non-owner invitation", async () => {

@@ -44,6 +44,10 @@ recorded as account-scoped audit events; no password or session token is include
 Invitation links expire after 72 hours and are single-use. Tenant owners can revoke pending
 non-owner invitations, while owner invitations remain protected behind platform administration;
 revocation requires recent password confirmation and creates a tenant-scoped audit event.
+Employee-seat activation is checked inside the same database transaction as invitation acceptance
+or membership reactivation. A tenant-scoped transaction advisory lock prevents concurrent
+acceptances from exceeding the versioned entitlement; a narrowly scoped database function returns
+only the active employee count needed for that check.
 
 This is an interim first-party identity baseline, not completion of the identity roadmap. OIDC with
 PKCE for mobile, MFA for privileged roles, approved support access, and an independent security
