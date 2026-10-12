@@ -1,5 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 import type {
+  MembershipPlan,
+  MembershipPlanUpdateResult,
   PlatformOverview,
   PlatformService,
   TenantDirectory,
@@ -17,6 +19,7 @@ type TenantRow = {
   slug: string;
   display_name: string;
   status: PlatformOverview["tenants"][number]["status"];
+  membership_plan: MembershipPlan | null;
   members: string;
   active_owner: boolean;
   active_branch: boolean;
@@ -30,11 +33,13 @@ function mapTenant(tenant: TenantRow): PlatformOverview["tenants"][number] {
     slug: tenant.slug,
     displayName: tenant.display_name,
     status: tenant.status,
+    membershipPlan: tenant.membership_plan,
     members: Number(tenant.members),
     readiness: {
       activeOwner: tenant.active_owner,
       activeBranch: tenant.active_branch,
       contactEmail: tenant.contact_email,
+      membershipPlan: tenant.membership_plan !== null,
     },
     createdAt: tenant.created_at.toISOString(),
   };
@@ -133,6 +138,7 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
         );
         const tenantsResult = await client.query<TenantRow>(
           `SELECT tenant.id, tenant.slug, tenant.display_name, tenant.status,
+                    tenant.membership_plan,
                     count(membership.user_id) FILTER (WHERE membership.status = 'active') AS members,
                     EXISTS (
                       SELECT 1 FROM tenant_memberships owner_membership
@@ -224,6 +230,7 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
         const offset = (page - 1) * query.pageSize;
         const tenantsResult = await client.query<TenantRow>(
           `SELECT tenant.id, tenant.slug, tenant.display_name, tenant.status,
+                    tenant.membership_plan,
                     count(membership.user_id) FILTER (WHERE membership.status = 'active') AS members,
                     EXISTS (
                       SELECT 1 FROM tenant_memberships owner_membership
@@ -276,12 +283,13 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           slug: string;
           display_name: string;
           status: PlatformOverview["tenants"][number]["status"];
+          membership_plan: MembershipPlan;
           created_at: Date;
         }>(
-          `INSERT INTO tenants (slug, display_name, created_by)
-           VALUES ($1, $2, $3)
-           RETURNING id, slug, display_name, status, created_at`,
-          [input.slug, input.displayName, actorUserId],
+          `INSERT INTO tenants (slug, display_name, membership_plan, created_by)
+           VALUES ($1, $2, $3, $4)
+           RETURNING id, slug, display_name, status, membership_plan, created_at`,
+          [input.slug, input.displayName, input.membershipPlan, actorUserId],
         );
         const tenant = result.rows[0];
         if (!tenant) throw new Error("Tenant insert did not return a record");
@@ -303,8 +311,15 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
         );
         await client.query(
           `INSERT INTO audit_events (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
-           VALUES ($1, $2, 'tenant.created', 'tenant', $1, $3, jsonb_build_object('slug', $4::text))`,
-          [tenant.id, actorUserId, input.requestId, tenant.slug],
+           VALUES (
+             $1, $2, 'tenant.created', 'tenant', $1, $3,
+             jsonb_build_object(
+               'slug', $4::text,
+               'membershipPlan', $5::text,
+               'membershipCatalogVersion', 1
+             )
+           )`,
+          [tenant.id, actorUserId, input.requestId, tenant.slug, tenant.membership_plan],
         );
         await client.query("COMMIT");
         return {
@@ -312,10 +327,61 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           slug: tenant.slug,
           displayName: tenant.display_name,
           status: tenant.status,
+          membershipPlan: tenant.membership_plan,
           members: 0,
-          readiness: { activeOwner: false, activeBranch: false, contactEmail: false },
+          readiness: {
+            activeOwner: false,
+            activeBranch: false,
+            contactEmail: false,
+            membershipPlan: true,
+          },
           createdAt: tenant.created_at.toISOString(),
         };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async updateMembershipPlan(actorUserId, tenantId, membershipPlan, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setPlatformContext(client, actorUserId);
+        const current = await client.query<{ membership_plan: MembershipPlan | null }>(
+          "SELECT membership_plan FROM tenants WHERE id = $1 FOR UPDATE",
+          [tenantId],
+        );
+        const tenant = current.rows[0];
+        if (!tenant) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies MembershipPlanUpdateResult;
+        }
+        if (tenant.membership_plan !== membershipPlan) {
+          await client.query(
+            `UPDATE tenants
+                SET membership_plan = $2, updated_at = now()
+              WHERE id = $1`,
+            [tenantId, membershipPlan],
+          );
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+             VALUES (
+               $1, $2, 'tenant.membership_plan_changed', 'tenant', $1, $3,
+               jsonb_build_object(
+                 'from', $4::text,
+                 'to', $5::text,
+                 'membershipCatalogVersion', 1
+               )
+             )`,
+            [tenantId, actorUserId, requestId, tenant.membership_plan, membershipPlan],
+          );
+        }
+        await client.query("COMMIT");
+        return { status: "updated", membershipPlan } satisfies MembershipPlanUpdateResult;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -355,6 +421,7 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             active_owner: boolean;
             active_branch: boolean;
             contact_email: boolean;
+            membership_plan: boolean;
           }>(
             `SELECT
               EXISTS (
@@ -368,14 +435,21 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
               EXISTS (
                 SELECT 1 FROM tenant_settings
                  WHERE tenant_id = $1 AND contact_email IS NOT NULL
-              ) AS contact_email`,
+              ) AS contact_email,
+              EXISTS (
+                SELECT 1 FROM tenants
+                 WHERE id = $1 AND membership_plan IS NOT NULL
+              ) AS membership_plan`,
             [tenantId],
           );
           const state = readiness.rows[0];
-          const missing: Array<"active_owner" | "active_branch" | "contact_email"> = [];
+          const missing: Array<
+            "active_owner" | "active_branch" | "contact_email" | "membership_plan"
+          > = [];
           if (!state?.active_owner) missing.push("active_owner");
           if (!state?.active_branch) missing.push("active_branch");
           if (!state?.contact_email) missing.push("contact_email");
+          if (!state?.membership_plan) missing.push("membership_plan");
           if (missing.length > 0) {
             await client.query("ROLLBACK");
             return { status: "not_ready", missing } satisfies TenantStatusUpdateResult;
@@ -387,12 +461,13 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           slug: string;
           display_name: string;
           status: TenantStatus;
+          membership_plan: MembershipPlan | null;
           created_at: Date;
         }>(
           `UPDATE tenants
               SET status = $2, updated_at = now()
             WHERE id = $1
-          RETURNING id, slug, display_name, status, created_at`,
+          RETURNING id, slug, display_name, status, membership_plan, created_at`,
           [tenantId, targetStatus],
         );
         const tenant = updated.rows[0];
@@ -407,6 +482,7 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           active_owner: boolean;
           active_branch: boolean;
           contact_email: boolean;
+          membership_plan: boolean;
         }>(
           `SELECT
              EXISTS (
@@ -420,7 +496,11 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
              EXISTS (
                SELECT 1 FROM tenant_settings
                 WHERE tenant_id = $1 AND contact_email IS NOT NULL
-             ) AS contact_email`,
+             ) AS contact_email,
+             EXISTS (
+               SELECT 1 FROM tenants
+                WHERE id = $1 AND membership_plan IS NOT NULL
+             ) AS membership_plan`,
           [tenantId],
         );
         await client.query(
@@ -438,11 +518,13 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             slug: tenant.slug,
             displayName: tenant.display_name,
             status: tenant.status,
+            membershipPlan: tenant.membership_plan,
             members: Number(memberCount.rows[0]?.count ?? 0),
             readiness: {
               activeOwner: readiness.rows[0]?.active_owner ?? false,
               activeBranch: readiness.rows[0]?.active_branch ?? false,
               contactEmail: readiness.rows[0]?.contact_email ?? false,
+              membershipPlan: readiness.rows[0]?.membership_plan ?? false,
             },
             createdAt: tenant.created_at.toISOString(),
           },

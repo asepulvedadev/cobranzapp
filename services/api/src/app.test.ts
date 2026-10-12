@@ -81,7 +81,7 @@ function dependencies(overrides?: {
   };
   const platformService: PlatformService = {
     systemStatus: vi.fn(async () => ({
-      schemaVersion: "0010_role_scoped_organization_visibility.sql",
+      schemaVersion: "0011_tenant_membership_plans.sql",
       jobs: {
         status: "operational",
         due: 0,
@@ -107,9 +107,19 @@ function dependencies(overrides?: {
       displayName: input.displayName,
       slug: input.slug,
       status: "draft",
+      membershipPlan: input.membershipPlan,
       members: 0,
-      readiness: { activeOwner: false, activeBranch: false, contactEmail: false },
+      readiness: {
+        activeOwner: false,
+        activeBranch: false,
+        contactEmail: false,
+        membershipPlan: true,
+      },
       createdAt: "2026-10-11T00:00:00.000Z",
+    })),
+    updateMembershipPlan: vi.fn(async (_actor, _tenantId, membershipPlan) => ({
+      status: "updated",
+      membershipPlan,
     })),
     updateTenantStatus: vi.fn(async (_actor, tenantId, status) => ({
       status: "updated",
@@ -118,8 +128,14 @@ function dependencies(overrides?: {
         displayName: "Empresa Uno",
         slug: "empresa-uno",
         status,
+        membershipPlan: "pro",
         members: 1,
-        readiness: { activeOwner: true, activeBranch: true, contactEmail: true },
+        readiness: {
+          activeOwner: true,
+          activeBranch: true,
+          contactEmail: true,
+          membershipPlan: true,
+        },
         createdAt: "2026-10-11T00:00:00.000Z",
       },
     })),
@@ -461,7 +477,7 @@ describe("developer platform", () => {
       api: { status: "operational", version: "test" },
       database: {
         status: "operational",
-        schemaVersion: "0010_role_scoped_organization_visibility.sql",
+        schemaVersion: "0011_tenant_membership_plans.sql",
       },
       jobs: {
         status: "operational",
@@ -562,10 +578,53 @@ describe("developer platform", () => {
         cookie: "cobranzapp_session=session-token",
         origin: "https://cobranzaap.tech",
       },
-      payload: { displayName: "Empresa Uno", slug: "empresa-uno" },
+      payload: { displayName: "Empresa Uno", slug: "empresa-uno", membershipPlan: "pro" },
     });
     expect(response.statusCode).toBe(201);
-    expect(response.json()).toMatchObject({ tenant: { slug: "empresa-uno", status: "draft" } });
+    expect(response.json()).toMatchObject({
+      tenant: { slug: "empresa-uno", status: "draft", membershipPlan: "pro" },
+    });
+  });
+
+  it("updates the commercial plan with recent reauthentication", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/v1/platform/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/membership-plan",
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { membershipPlan: "ultra" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ membershipPlan: "ultra" });
+    expect(deps.platformService.updateMembershipPlan).toHaveBeenCalledWith(
+      developer.id,
+      "5c58269f-ce16-4250-82e2-c0c16621b0fb",
+      "ultra",
+      expect.any(String),
+    );
+  });
+
+  it("rejects invalid commercial plans", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/v1/platform/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/membership-plan",
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { membershipPlan: "enterprise" },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ error: { code: "INVALID_MEMBERSHIP_PLAN" } });
+    expect(deps.platformService.updateMembershipPlan).not.toHaveBeenCalled();
   });
 
   it("creates a tenant invitation for the developer", async () => {

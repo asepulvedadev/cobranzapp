@@ -13,7 +13,7 @@ This is a logical schema with key columns and relationships, **not executable mi
 
 | Table | Important fields / relationships |
 |---|---|
-| `tenants` | `id`, slug, legal/display names, jurisdiction, currency, timezone, locale, lifecycle status |
+| `tenants` | `id`, slug, legal/display names, jurisdiction, currency, timezone, locale, lifecycle status; the current foundation also records the selected Pro/Ultra commercial plan without treating it as billing state |
 | `users` | Global ID, unique identity-provider issuer/subject, minimal login profile; no global tenant role |
 | `tenant_memberships` | Tenant + user, status, membership version; unique tenant/user |
 | `roles`, `permissions`, `role_permissions` | Controlled role definitions and capability catalog; platform templates separate from tenant role instances |

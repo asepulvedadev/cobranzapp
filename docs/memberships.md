@@ -1,6 +1,6 @@
 # Approved Memberships — Pro and Ultra
 
-> **Status:** Commercial scope confirmed by the owner on 2026-10-11. Public landing updated; backend quota enforcement, billing, customer links and financial workflows are not implemented by this change.
+> **Status:** Commercial scope confirmed by the owner on 2026-10-11. Public landing and audited per-tenant plan assignment are implemented; backend quota enforcement, billing, customer links and financial workflows remain unimplemented.
 
 This document owns subscription prices, included capacity, the separate setup fee and plan-related business permissions. The subscriber is the company owner, not each employee or borrower. Both memberships apply per tenant and have the same core features.
 
@@ -95,8 +95,10 @@ These are design requirements, not implemented controls in the landing update. S
 ## Implementation and verification boundaries
 
 - Public catalog: `apps/web/src/data/memberships.ts`; base prices, included seats, the COP 20,000 recurring employee add-on and customer limits are tested and reused in landing cards and pricing FAQ. `calculateMembershipMonthlyPrice` is a commercial estimate, not a billing or entitlement enforcement service.
+- Platform assignment: every newly created tenant records `pro` or `ultra`. The developer can correct that assignment with recent password confirmation, and each change is audited with its previous value, next value and catalog version. A plan is required before activating a new tenant.
+- Assignment is commercial metadata only. It does not charge the tenant, buy additional seats, enforce customer limits, determine taxes, prorate a cycle or represent payment status.
 - Public presentation: `PricingSection`, navigation and footer links, a visible pricing entry point, per-plan enquiry links and a separate setup-fee block.
-- This delivery does not change database subscriptions, private API roles, quota enforcement, billing or live lending authorization. Do not infer that a landing card enabled those features.
+- This delivery does not implement database subscription cycles, quota enforcement, billing or live lending authorization. Do not infer that assigning a plan enabled those features.
 - Before backend implementation, map this approved catalog into server-controlled entitlements and versioned subscription terms; verify isolation, over-quota concurrency, approved rate permissions and public-link data minimization.
 
 ## Related documents

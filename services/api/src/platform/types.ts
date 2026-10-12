@@ -10,11 +10,13 @@ export type PlatformOverview = {
     slug: string;
     displayName: string;
     status: "draft" | "active" | "suspended" | "archived";
+    membershipPlan: MembershipPlan | null;
     members: number;
     readiness: {
       activeOwner: boolean;
       activeBranch: boolean;
       contactEmail: boolean;
+      membershipPlan: boolean;
     };
     createdAt: string;
   }>;
@@ -29,6 +31,7 @@ export type PlatformOverview = {
   }>;
 };
 
+export type MembershipPlan = "pro" | "ultra";
 export type TenantStatus = PlatformOverview["tenants"][number]["status"];
 
 export type TenantDirectoryQuery = {
@@ -69,9 +72,13 @@ export type TenantStatusUpdateResult =
     }
   | {
       status: "not_ready";
-      missing: Array<"active_owner" | "active_branch" | "contact_email">;
+      missing: Array<"active_owner" | "active_branch" | "contact_email" | "membership_plan">;
     }
   | { status: "invalid_transition" }
+  | { status: "not_found" };
+
+export type MembershipPlanUpdateResult =
+  | { status: "updated"; membershipPlan: MembershipPlan }
   | { status: "not_found" };
 
 export interface PlatformService {
@@ -80,8 +87,19 @@ export interface PlatformService {
   systemStatus(actorUserId: string): Promise<PlatformDatabaseStatus>;
   createTenant(
     actorUserId: string,
-    input: { displayName: string; slug: string; requestId: string },
+    input: {
+      displayName: string;
+      slug: string;
+      membershipPlan: MembershipPlan;
+      requestId: string;
+    },
   ): Promise<PlatformOverview["tenants"][number]>;
+  updateMembershipPlan(
+    actorUserId: string,
+    tenantId: string,
+    membershipPlan: MembershipPlan,
+    requestId: string,
+  ): Promise<MembershipPlanUpdateResult>;
   updateTenantStatus(
     actorUserId: string,
     tenantId: string,

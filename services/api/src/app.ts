@@ -30,6 +30,7 @@ const tenantSchema = z.object({
     .toLowerCase()
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
     .max(63),
+  membershipPlan: z.enum(["pro", "ultra"]),
 });
 const tenantIdParamsSchema = z.object({ tenantId: z.uuid() });
 const tenantInvitationParamsSchema = z.object({ tenantId: z.uuid(), invitationId: z.uuid() });
@@ -43,6 +44,7 @@ const tenantTeamMemberParamsSchema = z.object({
 });
 const sessionIdParamsSchema = z.object({ sessionId: z.uuid() });
 const tenantStatusSchema = z.object({ status: z.enum(["active", "suspended", "archived"]) });
+const tenantMembershipPlanSchema = z.object({ membershipPlan: z.enum(["pro", "ultra"]) });
 const tenantDirectoryQuerySchema = z.object({
   q: z.string().trim().max(80).optional(),
   status: z.enum(["draft", "active", "suspended", "archived"]).optional(),
@@ -540,6 +542,7 @@ export function buildApp(dependencies: AppDependencies) {
           active_owner: "un propietario activo",
           active_branch: "una sede activa",
           contact_email: "un correo de contacto",
+          membership_plan: "un plan comercial",
         };
         return sendError(
           reply,
@@ -560,6 +563,34 @@ export function buildApp(dependencies: AppDependencies) {
       default:
         return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
     }
+  });
+
+  app.patch("/v1/platform/tenants/:tenantId/membership-plan", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = tenantMembershipPlanSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_MEMBERSHIP_PLAN",
+        "Selecciona un plan Pro o Ultra válido.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const result = await dependencies.platformService.updateMembershipPlan(
+      session.user.id,
+      params.data.tenantId,
+      body.data.membershipPlan,
+      request.id,
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
+    }
+    return reply.send({ membershipPlan: result.membershipPlan });
   });
 
   app.post("/v1/platform/tenants/:tenantId/invitations", async (request, reply) => {

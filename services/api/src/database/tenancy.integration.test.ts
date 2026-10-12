@@ -162,7 +162,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     const platform = createPostgresPlatformService(runtimePool);
     const supportAccess = createPostgresSupportAccessService(runtimePool);
     await expect(platform.systemStatus(developerId)).resolves.toMatchObject({
-      schemaVersion: "0010_role_scoped_organization_visibility.sql",
+      schemaVersion: "0011_tenant_membership_plans.sql",
       jobs: {
         status: expect.stringMatching(/^(operational|attention)$/),
         due: expect.any(Number),
@@ -176,14 +176,63 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     const tenant = await platform.createTenant(developerId, {
       displayName: "Tenant Integration",
       slug,
+      membershipPlan: "pro",
       requestId: `test-${suffix}`,
     });
     const secondTenant = await platform.createTenant(developerId, {
       displayName: "Tenant Secondary",
       slug: secondSlug,
+      membershipPlan: "ultra",
       requestId: `test-secondary-${suffix}`,
     });
     expect(tenant.status).toBe("draft");
+    expect(tenant).toMatchObject({ membershipPlan: "pro", readiness: { membershipPlan: true } });
+    expect(secondTenant).toMatchObject({ membershipPlan: "ultra" });
+    await expect(
+      platform.updateMembershipPlan(developerId, tenant.id, "ultra", `membership-plan-${suffix}`),
+    ).resolves.toEqual({ status: "updated", membershipPlan: "ultra" });
+    expect(
+      (
+        await ownerPool.query<{ membership_plan: string }>(
+          "SELECT membership_plan FROM tenants WHERE id = $1",
+          [tenant.id],
+        )
+      ).rows[0]?.membership_plan,
+    ).toBe("ultra");
+    expect(
+      (
+        await ownerPool.query<{ metadata: { from: string; to: string } }>(
+          `SELECT metadata
+             FROM audit_events
+            WHERE tenant_id = $1 AND action = 'tenant.membership_plan_changed'
+            ORDER BY happened_at DESC
+            LIMIT 1`,
+          [tenant.id],
+        )
+      ).rows[0]?.metadata,
+    ).toMatchObject({ from: "pro", to: "ultra" });
+    await ownerPool.query("UPDATE tenants SET membership_plan = NULL WHERE id = $1", [
+      secondTenant.id,
+    ]);
+    await expect(
+      platform.updateTenantStatus(
+        developerId,
+        secondTenant.id,
+        "active",
+        `activate-without-plan-${suffix}`,
+      ),
+    ).resolves.toMatchObject({
+      status: "not_ready",
+      missing: expect.arrayContaining(["membership_plan"]),
+    });
+    await expect(
+      platform.updateMembershipPlan(
+        developerId,
+        secondTenant.id,
+        "ultra",
+        `restore-plan-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "updated", membershipPlan: "ultra" });
     await ownerPool.query(
       `INSERT INTO outbox_events (
          tenant_id, event_type, aggregate_type, aggregate_id,
@@ -217,6 +266,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       activeOwner: false,
       activeBranch: false,
       contactEmail: false,
+      membershipPlan: true,
     });
     const supportRequest = await supportAccess.requestAccess(developerId, tenant.id, {
       purpose: "Revisar la configuración inicial de la empresa",
@@ -612,7 +662,12 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     expect(
       (await platform.overview(developerId)).tenants.find((item) => item.id === tenant.id)
         ?.readiness,
-    ).toEqual({ activeOwner: true, activeBranch: true, contactEmail: true });
+    ).toEqual({
+      activeOwner: true,
+      activeBranch: true,
+      contactEmail: true,
+      membershipPlan: true,
+    });
     await expect(
       tenancy.removeTeamMember(
         ownerActor,
