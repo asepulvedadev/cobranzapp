@@ -30,3 +30,8 @@ La foto de perfil es la imagen que la persona designa para su ficha; **no es una
 
 La API solo expone la red cuando existe `VERIFICATION_NETWORK_HMAC_KEY` y la política operativa ha sido aprobada. Antes de activarla en producción faltan: revisión jurídica colombiana, texto de consentimiento en la interfaz, acuerdo entre participantes, procedimiento de corrección, retención/borrado, pruebas de aislamiento entre empresas y prueba de restauración de la base.
 
+La interfaz de la empresa ya incluye un panel de piloto para registrar el consentimiento,
+entregar el token, consultar el resultado mínimo, publicar una observación con vencimiento y
+abrir una corrección. El panel no persiste el token en el navegador y muestra un mensaje de
+funcionalidad pendiente cuando la clave operativa todavía no está configurada. La activación
+de producción sigue siendo una decisión separada de la entrega de la interfaz.

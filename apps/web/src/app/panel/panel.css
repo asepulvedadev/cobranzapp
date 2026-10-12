@@ -3691,6 +3691,115 @@ html:has(.panel-shell) {
   color: #a63a3a;
 }
 
+.verification-network-card {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+  background: linear-gradient(145deg, #fffdf8 0%, #f6fbf8 100%);
+}
+
+.verification-form {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--panel-line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--panel-surface) 86%, #f3c343 14%);
+}
+
+.verification-form h3 {
+  margin: 0 0 2px;
+  color: var(--panel-ink);
+  font-size: 15px;
+}
+
+.verification-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--panel-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.verification-form textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.verification-form button,
+.verification-token button {
+  justify-self: start;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--panel-ink);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.verification-form button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.verification-token,
+.verification-result {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #e6d49d;
+  border-radius: 14px;
+  background: #fff8e5;
+}
+
+.verification-token code {
+  overflow-wrap: anywhere;
+  padding: 10px;
+  border-radius: 9px;
+  background: #fff;
+  color: var(--panel-ink);
+  font-size: 12px;
+}
+
+.verification-token button {
+  background: #9b6a00;
+}
+
+.verification-result {
+  border-color: #b9d9c8;
+  background: #f0faf4;
+}
+
+.verification-result p {
+  margin: 0;
+  color: var(--panel-muted);
+}
+
+.status-not_found,
+.status-no_observation {
+  background: #e6f5ed;
+  color: #176b43;
+}
+
+.status-reported {
+  background: #fff1d1;
+  color: #8b5b00;
+}
+
+.status-disputed,
+.status-no_consent {
+  background: #fdeaea;
+  color: #a63a3a;
+}
+
+.form-help {
+  margin: 0;
+  color: var(--panel-muted);
+  font-size: 12px;
+}
+
 @media (min-width: 900px) {
   .borrower-directory-grid {
     grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.8fr);

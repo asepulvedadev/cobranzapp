@@ -20,6 +20,7 @@ import { PendingInvitationList } from "./PendingInvitationList";
 import { SettingsVersionHistory } from "./SettingsVersionHistory";
 import { SupportAccessReview } from "./SupportAccessReview";
 import { TeamAssignmentManager } from "./TeamAssignmentManager";
+import { VerificationNetworkPanel } from "./VerificationNetworkPanel";
 import { WorkspaceMembershipSummary } from "./WorkspaceMembershipSummary";
 import { CreateBranchForm, CreateTeamForm, WorkspaceSettingsForm } from "./WorkspaceOperations";
 
@@ -273,6 +274,13 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
           </p>
         </section>
       )}
+
+      {overview.actorRole !== "support" ? (
+        <VerificationNetworkPanel
+          canPublish={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
+          tenantId={overview.tenant.id}
+        />
+      ) : null}
 
       <section className="workspace-configuration" id="configuracion">
         <div className="dashboard-card settings-card">
