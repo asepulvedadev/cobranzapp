@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import type { LoanProduct } from "../../../../lib/platform";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
+import { LoanProductDraftEditor } from "./LoanProductDraftEditor";
+import { LoanSchedulePreview } from "./LoanSchedulePreview";
 
 const statusLabels: Record<LoanProduct["status"], string> = {
   draft: "Borrador",
@@ -165,8 +167,10 @@ export function CreditProductCatalog({
                       Agrega una referencia normativa para habilitar la revisión.
                     </small>
                   )}
+                  <LoanProductDraftEditor product={product} tenantId={tenantId} />
                 </div>
               ) : null}
+              <LoanSchedulePreview product={product} tenantId={tenantId} />
             </article>
           ))}
         </div>

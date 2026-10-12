@@ -125,11 +125,26 @@ importers:
         specifier: 'catalog:'
         version: 5.0.3(@types/node@26.6.5)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/financial:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.5
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.3(@types/node@26.6.5)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
   services/api:
     dependencies:
       '@cobranzapp/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@cobranzapp/financial':
+        specifier: workspace:*
+        version: link:../../packages/financial
       '@fastify/multipart':
         specifier: ^9.4.0
         version: 9.4.0

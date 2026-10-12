@@ -1,7 +1,7 @@
 # Loan Calculations and Financial Integrity
 
-> **Status:** Planning draft v0.4 — not implementation authorization.
-> **Updated:** 2026-10-11.
+> **Status:** Planning draft v0.5 — preview engine implemented; posting and disbursement remain gated.
+> **Updated:** 2026-10-12.
 
 Owns nominal/net amounts, charge/interest treatment, schedule arithmetic, allocations, decimal/ledger invariants and approval boundaries.
 
@@ -46,6 +46,20 @@ Persist nominal contractual amount, charge amount/rate/basis, withheld amount, n
 Cash/bank outflow is the actual net amount delivered. How the nominal receivable and retained documentation amount are posted depends on approved accounting and legal classification; do not invent fee income or falsely record COP 100,000 physically delivered. Store approved posting templates before activating the product.
 
 Use configurable, jurisdiction-approved products rather than hardcoding 10% or 30%. Until compliance review and applicable-category checks pass, the described example remains planning/simulation evidence, not an enabled live product. Preserve historical facts where lawfully required, without using them as authorization for new lending.
+
+## Configurable owner preview
+
+The owner or supervisor can adjust a product while it is still a draft. The catalog supports:
+
+- Daily, weekly, fortnightly and monthly due dates.
+- Flat total interest, simple interest per period on the opening balance, or effective annual interest converted to the selected frequency.
+- A configurable documentation charge withheld from the nominal amount and shown separately as net disbursement.
+- Exact COP-cent output with the remainder absorbed by the final installment.
+- Monthly dates that preserve the end of month (for example, January 31 → February 28).
+
+The web panel exposes **Ajustar intereses y cobro** for drafts and a non-binding **Ver proyección de cuotas** action. The API endpoint `/v1/tenants/{tenantId}/loan-products/{productId}/schedule-preview` only calculates a preview; it never creates a debt, journal, receipt, payment or disbursement. Editing a draft resets its compliance state and requires the product to be reviewed again.
+
+This preview is deliberately not the final financial engine. Before activation, the owner and legal/accounting reviewers must approve the rate basis, day-count convention, first due date, rounding policy, component allocation, early/late/partial/overpayment handling and posting templates. Approved terms must be snapshotted before any money movement is enabled.
 
 ### Accounting and loan invariants
 

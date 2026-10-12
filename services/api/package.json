@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@cobranzapp/contracts": "workspace:*",
+    "@cobranzapp/financial": "workspace:*",
     "@fastify/multipart": "^9.4.0",
     "fastify": "5.12.5",
     "otpauth": "9.5.2",

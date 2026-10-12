@@ -1,4 +1,5 @@
 import type { LoanApplication, LoanProduct } from "@cobranzapp/contracts";
+import { buildSchedulePreview } from "@cobranzapp/financial";
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
 import type {
@@ -8,6 +9,8 @@ import type {
   LoanApplicationReviewStartResult,
   LoanProductResult,
   LoanProductReviewResult,
+  LoanProductSchedulePreviewResult,
+  LoanProductUpdateResult,
 } from "./types.js";
 
 type LoanProductRow = {
@@ -189,6 +192,83 @@ export function createPostgresCreditService(pool: Pool): CreditService {
       });
     },
 
+    async updateProduct(actor, tenantId, productId, input): Promise<LoanProductUpdateResult> {
+      if (!canManageProducts(actor)) return { status: "forbidden" };
+      return withTransaction(actor, tenantId, async (client) => {
+        const currentResult = await client.query<LoanProductRow>(
+          `SELECT id, name, status, currency, principal_min, principal_max,
+                  term_count, payment_frequency, rate_basis, nominal_rate,
+                  documentation_fee_rate, compliance_status, compliance_source_ref,
+                  created_at, updated_at
+             FROM loan_products
+            WHERE tenant_id = $1 AND id = $2
+            FOR UPDATE`,
+          [tenantId, productId],
+        );
+        const current = currentResult.rows[0];
+        if (!current) return { status: "not_found" };
+        if (current.status !== "draft") return { status: "invalid_state" };
+        try {
+          const updated = await client.query<LoanProductRow>(
+            `UPDATE loan_products
+                SET name = $3,
+                    principal_min = $4::numeric,
+                    principal_max = $5::numeric,
+                    term_count = $6,
+                    payment_frequency = $7,
+                    rate_basis = $8,
+                    nominal_rate = $9::numeric,
+                    documentation_fee_rate = $10::numeric,
+                    compliance_source_ref = $11,
+                    compliance_status = 'pending',
+                    reviewed_by = NULL,
+                    updated_at = now()
+              WHERE tenant_id = $1 AND id = $2
+              RETURNING id, name, status, currency, principal_min, principal_max,
+                        term_count, payment_frequency, rate_basis, nominal_rate,
+                        documentation_fee_rate, compliance_status, compliance_source_ref,
+                        created_at, updated_at`,
+            [
+              tenantId,
+              productId,
+              input.name,
+              input.principalMin,
+              input.principalMax,
+              input.termCount,
+              input.paymentFrequency,
+              input.rateBasis,
+              input.nominalRate,
+              input.documentationFeeRate,
+              input.complianceSourceRef,
+            ],
+          );
+          const row = updated.rows[0];
+          if (!row) throw new Error("LOAN_PRODUCT_UPDATE_FAILED");
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+             VALUES ($1, $2, 'loan_product.draft_updated', 'loan_product', $3, $4,
+                     jsonb_build_object('status', 'draft', 'rateBasis', $5,
+                       'paymentFrequency', $6))`,
+            [
+              tenantId,
+              actor.userId,
+              productId,
+              input.requestId,
+              input.rateBasis,
+              input.paymentFrequency,
+            ],
+          );
+          return { status: "updated", product: mapProduct(row) };
+        } catch (error) {
+          if (error && typeof error === "object" && "code" in error && error.code === "23505") {
+            return { status: "duplicate" };
+          }
+          throw error;
+        }
+      });
+    },
+
     async submitProductForReview(
       actor,
       tenantId,
@@ -233,6 +313,48 @@ export function createPostgresCreditService(pool: Pool): CreditService {
           [tenantId, actor.userId, productId, requestId, product.compliance_source_ref],
         );
         return { status: "submitted", product: mapProduct(row) };
+      });
+    },
+
+    async previewSchedule(
+      actor,
+      tenantId,
+      productId,
+      input,
+    ): Promise<LoanProductSchedulePreviewResult> {
+      if (!canReadProducts(actor)) return { status: "forbidden" };
+      return withTransaction(actor, tenantId, async (client) => {
+        const result = await client.query<LoanProductRow>(
+          `SELECT id, name, status, currency, principal_min, principal_max,
+                  term_count, payment_frequency, rate_basis, nominal_rate,
+                  documentation_fee_rate, compliance_status, compliance_source_ref,
+                  created_at, updated_at
+             FROM loan_products
+            WHERE tenant_id = $1 AND id = $2`,
+          [tenantId, productId],
+        );
+        const product = result.rows[0];
+        if (!product) return { status: "not_found" };
+        if (input.termCount > product.term_count) return { status: "invalid_parameters" };
+        try {
+          const preview = buildSchedulePreview({
+            principal: input.principal,
+            termCount: input.termCount,
+            paymentFrequency: product.payment_frequency,
+            rateBasis: product.rate_basis,
+            nominalRate: product.nominal_rate,
+            documentationFeeRate: product.documentation_fee_rate,
+            startDate: input.startDate,
+          });
+          const amountCheck = await client.query<{ out_of_range: boolean }>(
+            `SELECT ($3::numeric < $1::numeric OR $3::numeric > $2::numeric) AS out_of_range`,
+            [product.principal_min, product.principal_max, input.principal],
+          );
+          if (amountCheck.rows[0]?.out_of_range) return { status: "invalid_parameters" };
+          return { status: "previewed", preview };
+        } catch {
+          return { status: "invalid_parameters" };
+        }
       });
     },
 

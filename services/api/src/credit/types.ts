@@ -3,7 +3,9 @@ import type {
   LoanApplicationCreateRequest,
   LoanProduct,
   LoanProductCreateRequest,
+  LoanProductUpdateRequest,
 } from "@cobranzapp/contracts";
+import type { SchedulePreview } from "@cobranzapp/financial";
 import type { TenantActor } from "../tenancy/types.js";
 
 export type LoanProductResult =
@@ -17,6 +19,19 @@ export type LoanProductReviewResult =
   | { status: "forbidden" }
   | { status: "invalid_state" }
   | { status: "missing_evidence" };
+
+export type LoanProductUpdateResult =
+  | { status: "updated"; product: LoanProduct }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "invalid_state" }
+  | { status: "duplicate" };
+
+export type LoanProductSchedulePreviewResult =
+  | { status: "previewed"; preview: SchedulePreview }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "invalid_parameters" };
 
 export type LoanApplicationResult =
   | { status: "created"; application: LoanApplication }
@@ -47,12 +62,24 @@ export interface CreditService {
     tenantId: string,
     input: LoanProductCreateRequest & { requestId: string },
   ): Promise<LoanProductResult>;
+  updateProduct(
+    actor: TenantActor,
+    tenantId: string,
+    productId: string,
+    input: LoanProductUpdateRequest & { requestId: string },
+  ): Promise<LoanProductUpdateResult>;
   submitProductForReview(
     actor: TenantActor,
     tenantId: string,
     productId: string,
     requestId: string,
   ): Promise<LoanProductReviewResult>;
+  previewSchedule(
+    actor: TenantActor,
+    tenantId: string,
+    productId: string,
+    input: { principal: string; termCount: number; startDate: string },
+  ): Promise<LoanProductSchedulePreviewResult>;
   listApplications(actor: TenantActor, tenantId: string): Promise<LoanApplication[]>;
   createApplication(
     actor: TenantActor,

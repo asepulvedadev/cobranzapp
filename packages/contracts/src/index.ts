@@ -705,6 +705,8 @@ export const loanProductCreateRequestSchema = z
     }
   });
 
+export const loanProductUpdateRequestSchema = loanProductCreateRequestSchema;
+
 export const loanProductSchema = z.object({
   id: z.uuid(),
   name: z.string().min(2),
@@ -727,6 +729,34 @@ export const loanProductDirectorySchema = z.object({
   products: z.array(loanProductSchema),
 });
 export const loanProductResponseSchema = z.object({ product: loanProductSchema });
+
+export const financialSchedulePreviewRequestSchema = z.object({
+  principal: decimalAmountSchema,
+  termCount: z.number().int().min(1).max(365),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe usar AAAA-MM-DD."),
+});
+export const financialSchedulePeriodSchema = z.object({
+  period: z.number().int().positive(),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  principal: decimalAmountSchema,
+  interest: decimalAmountSchema,
+  installment: decimalAmountSchema,
+  balance: decimalAmountSchema,
+});
+export const financialSchedulePreviewSchema = z.object({
+  currency: z.literal("COP"),
+  principal: decimalAmountSchema,
+  documentationFee: decimalAmountSchema,
+  netDisbursement: decimalAmountSchema,
+  interestTotal: decimalAmountSchema,
+  scheduledTotal: decimalAmountSchema,
+  totalCost: decimalAmountSchema,
+  periodicRate: decimalRateSchema,
+  periods: z.array(financialSchedulePeriodSchema).min(1).max(365),
+});
+export const financialSchedulePreviewResponseSchema = z.object({
+  preview: financialSchedulePreviewSchema,
+});
 
 export const loanApplicationStatusSchema = z.enum([
   "draft",
@@ -989,12 +1019,16 @@ export type LoanProductFrequency = z.infer<typeof loanProductFrequencySchema>;
 export type LoanProductRateBasis = z.infer<typeof loanProductRateBasisSchema>;
 export type LoanProductComplianceStatus = z.infer<typeof loanProductComplianceStatusSchema>;
 export type LoanProductCreateRequest = z.infer<typeof loanProductCreateRequestSchema>;
+export type LoanProductUpdateRequest = z.infer<typeof loanProductUpdateRequestSchema>;
 export type LoanProduct = z.infer<typeof loanProductSchema>;
 export type LoanProductDirectory = z.infer<typeof loanProductDirectorySchema>;
 export type LoanApplicationStatus = z.infer<typeof loanApplicationStatusSchema>;
 export type LoanApplicationCreateRequest = z.infer<typeof loanApplicationCreateRequestSchema>;
 export type LoanApplication = z.infer<typeof loanApplicationSchema>;
 export type LoanApplicationDirectory = z.infer<typeof loanApplicationDirectorySchema>;
+export type FinancialSchedulePreviewRequest = z.infer<typeof financialSchedulePreviewRequestSchema>;
+export type FinancialSchedulePeriod = z.infer<typeof financialSchedulePeriodSchema>;
+export type FinancialSchedulePreview = z.infer<typeof financialSchedulePreviewSchema>;
 export type BorrowerDocument = z.infer<typeof borrowerDocumentSchema>;
 export type BorrowerCreateRequest = z.infer<typeof borrowerCreateRequestSchema>;
 export type BorrowerReviewRequest = z.infer<typeof borrowerReviewRequestSchema>;

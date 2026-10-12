@@ -1774,7 +1774,123 @@ html:has(.panel-shell) {
 .credit-product-review-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   min-height: 32px;
+}
+
+.secondary-action-button {
+  border: 1px solid var(--panel-line-strong);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--panel-dark);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.credit-product-editor {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: 9px;
+  background: #fafbfa;
+}
+
+.credit-product-editor-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.credit-product-editor-heading small,
+.credit-schedule-preview .form-help,
+.schedule-preview-result > small {
+  color: var(--panel-muted);
+  font-size: 11px;
+}
+
+.credit-product-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.credit-product-editor-actions button:last-child {
+  border: 1px solid var(--panel-line-strong);
+  background: transparent;
+  color: var(--panel-dark);
+}
+
+.credit-schedule-preview {
+  border-top: 1px solid var(--panel-line);
+  padding-top: 10px;
+}
+
+.credit-schedule-preview summary {
+  cursor: pointer;
+  color: var(--panel-dark);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.credit-schedule-preview .tenant-form {
+  margin-top: 10px;
+}
+
+.schedule-preview-result {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.schedule-preview-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.schedule-preview-summary span {
+  display: grid;
+  gap: 2px;
+  padding: 9px;
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+  color: var(--panel-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.schedule-preview-summary strong {
+  color: var(--panel-dark);
+  font-size: 12px;
+  text-transform: none;
+}
+
+.schedule-preview-table-wrap {
+  overflow-x: auto;
+}
+
+.schedule-preview-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.schedule-preview-table th,
+.schedule-preview-table td {
+  padding: 7px 6px;
+  border-bottom: 1px solid var(--panel-line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.schedule-preview-table th:first-child,
+.schedule-preview-table td:first-child,
+.schedule-preview-table th:nth-child(2),
+.schedule-preview-table td:nth-child(2) {
+  text-align: left;
 }
 
 .credit-product-form {
@@ -4351,6 +4467,10 @@ html:has(.panel-shell) {
   }
 
   .credit-product-item dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .schedule-preview-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

@@ -44,6 +44,13 @@ describe("OpenAPI contract", () => {
     expect(
       document.paths["/v1/tenants/{tenantId}/loan-products/{productId}/review"].post.operationId,
     ).toBe("submitLoanProductForReview");
+    expect(
+      document.paths["/v1/tenants/{tenantId}/loan-products/{productId}"].patch.operationId,
+    ).toBe("updateLoanProductDraft");
+    expect(
+      document.paths["/v1/tenants/{tenantId}/loan-products/{productId}/schedule-preview"].post
+        .operationId,
+    ).toBe("previewLoanProductSchedule");
     expect(document.paths["/v1/tenants/{tenantId}/loan-applications"].post.operationId).toBe(
       "createLoanApplicationDraft",
     );
