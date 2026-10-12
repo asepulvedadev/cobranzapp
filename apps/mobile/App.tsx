@@ -20,6 +20,7 @@ import {
   View,
 } from "react-native";
 import { MobileApi, MobileApiError } from "./src/api";
+import { BorrowerCreateForm } from "./src/BorrowerCreateForm";
 
 type Screen =
   | { kind: "loading" }
@@ -360,19 +361,25 @@ function DeveloperHome({
 }
 
 function TenantHome({
+  api,
   overview,
   directory,
   routes,
   directorySearch,
   onDirectoryPageChange,
   onDirectorySearch,
+  onBorrowerCreated,
+  onNeedsReauthentication,
 }: {
+  api: MobileApi;
   overview: TenantOverview;
   directory: BorrowerDirectory | null;
   routes: RouteDirectory | null;
   directorySearch: string;
   onDirectoryPageChange: (page: number) => void;
   onDirectorySearch: (search: string) => void;
+  onBorrowerCreated: () => void;
+  onNeedsReauthentication: () => void;
 }) {
   const [searchInput, setSearchInput] = useState(directorySearch);
   useEffect(() => setSearchInput(directorySearch), [directorySearch]);
@@ -418,6 +425,14 @@ function TenantHome({
           recaudo se habilitarán después de la aprobación legal y contable.
         </Text>
       </View>
+      {overview.actorRole !== "customer" && overview.actorRole !== "support" ? (
+        <BorrowerCreateForm
+          api={api}
+          onCreated={onBorrowerCreated}
+          onNeedsReauthentication={onNeedsReauthentication}
+          tenantId={overview.tenant.id}
+        />
+      ) : null}
       <Text style={styles.cardTitle}>Estructura operativa</Text>
       {overview.branches.slice(0, 4).map((branch) => (
         <View key={branch.id} style={styles.listRow}>
@@ -738,12 +753,18 @@ function AuthenticatedHome({
             </View>
             {tenant ? (
               <TenantHome
+                api={api}
                 directory={directory}
                 directorySearch={directorySearch}
+                onBorrowerCreated={() => setReloadKey((current) => current + 1)}
                 onDirectoryPageChange={setDirectoryPage}
                 onDirectorySearch={(search) => {
                   setDirectorySearch(search);
                   setDirectoryPage(1);
+                }}
+                onNeedsReauthentication={() => {
+                  setNeedsReauthentication(true);
+                  setMessage("Confirma tu contraseña para continuar con esta acción.");
                 }}
                 overview={tenant}
                 routes={routes}

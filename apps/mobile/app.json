@@ -28,6 +28,14 @@
     "extra": {
       "defaultLocale": "es-CO"
     },
-    "plugins": ["expo-secure-store"]
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permite a cobranzapp seleccionar documentos y fotos de perfil para el expediente del cliente."
+        }
+      ]
+    ]
   }
 }

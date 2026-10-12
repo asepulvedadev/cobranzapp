@@ -1,7 +1,10 @@
 import {
   authenticatedResponseSchema,
+  type BorrowerCreateRequest,
   type BorrowerDirectory,
   borrowerDirectorySchema,
+  borrowerDocumentResponseSchema,
+  borrowerResponseSchema,
   type CurrentUser,
   currentUserSchema,
   messageResponseSchema,
@@ -217,6 +220,58 @@ export class MobileApi {
         response.status,
       );
     return borrowerDirectorySchema.parse(await response.json());
+  }
+
+  async createBorrower(tenantId: string, input: BorrowerCreateRequest) {
+    const response = await this.request(`/v1/tenants/${tenantId}/borrowers`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible crear el cliente."),
+        response.status,
+      );
+    }
+    return borrowerResponseSchema.parse(await response.json()).borrower;
+  }
+
+  async uploadBorrowerDocument(
+    tenantId: string,
+    borrowerId: string,
+    input: {
+      uri: string;
+      name: string;
+      type: string;
+      file?: Blob;
+      category: "identity" | "profile_photo";
+      side?: "front" | "back";
+    },
+  ) {
+    const form = new FormData();
+    form.append(
+      "file",
+      input.file ??
+        ({
+          uri: input.uri,
+          name: input.name,
+          type: input.type,
+        } as unknown as Blob),
+    );
+    form.append("category", input.category);
+    if (input.side) form.append("side", input.side);
+    const response = await this.request(
+      `/v1/tenants/${tenantId}/borrowers/${borrowerId}/documents`,
+      { method: "POST", body: form },
+    );
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible guardar el documento."),
+        response.status,
+      );
+    }
+    return borrowerDocumentResponseSchema.parse(await response.json()).document;
   }
 
   async routeDirectory(tenantId: string): Promise<RouteDirectory> {
