@@ -4,6 +4,7 @@ import type { TenantActor } from "../tenancy/types.js";
 import type {
   CreditService,
   LoanApplicationResult,
+  LoanApplicationReviewResult,
   LoanProductResult,
   LoanProductReviewResult,
 } from "./types.js";
@@ -350,6 +351,87 @@ export function createPostgresCreditService(pool: Pool): CreditService {
           ],
         );
         return { status: "created", application: mapApplication(row) };
+      });
+    },
+
+    async submitApplicationForReview(
+      actor,
+      tenantId,
+      applicationId,
+      requestId,
+    ): Promise<LoanApplicationReviewResult> {
+      if (!canManageApplications(actor)) return { status: "forbidden" };
+      return withTransaction(actor, tenantId, async (client) => {
+        const current = await client.query<{
+          status: LoanApplication["status"];
+          borrower_verification_state: "manual_pending" | "reviewed" | "rejected";
+          product_status: LoanProduct["status"];
+        }>(
+          `SELECT application.status,
+                  identity.verification_state AS borrower_verification_state,
+                  product.status AS product_status
+             FROM loan_applications application
+             JOIN borrower_identities identity
+               ON identity.tenant_id = application.tenant_id
+              AND identity.borrower_id = application.borrower_id
+             JOIN loan_products product
+               ON product.tenant_id = application.tenant_id
+              AND product.id = application.loan_product_id
+            WHERE application.tenant_id = $1 AND application.id = $2
+            FOR UPDATE`,
+          [tenantId, applicationId],
+        );
+        const state = current.rows[0];
+        if (!state) return { status: "not_found" };
+        if (state.status !== "draft") return { status: "invalid_state" };
+        if (state.borrower_verification_state !== "reviewed") {
+          return { status: "borrower_not_verified" };
+        }
+        if (!["under_review", "approved"].includes(state.product_status)) {
+          return { status: "product_not_reviewed" };
+        }
+        const updated = await client.query<LoanApplicationRow>(
+          `UPDATE loan_applications
+              SET status = 'submitted', submitted_at = now(), updated_at = now()
+            WHERE tenant_id = $1 AND id = $2
+            RETURNING id, borrower_id, requested_principal, requested_term_count, purpose,
+                      status, created_at, updated_at`,
+          [tenantId, applicationId],
+        );
+        const row = updated.rows[0];
+        if (!row) throw new Error("LOAN_APPLICATION_SUBMISSION_FAILED");
+        const complete = await client.query<LoanApplicationRow>(
+          `SELECT application.id,
+                  application.borrower_id,
+                  borrower.full_name AS borrower_name,
+                  application.loan_product_id,
+                  product.name AS loan_product_name,
+                  application.requested_principal,
+                  application.requested_term_count,
+                  application.purpose,
+                  application.status,
+                  application.created_at,
+                  application.updated_at
+             FROM loan_applications application
+             JOIN borrowers borrower
+               ON borrower.tenant_id = application.tenant_id
+              AND borrower.id = application.borrower_id
+             JOIN loan_products product
+               ON product.tenant_id = application.tenant_id
+              AND product.id = application.loan_product_id
+            WHERE application.tenant_id = $1 AND application.id = $2`,
+          [tenantId, applicationId],
+        );
+        const application = complete.rows[0];
+        if (!application) throw new Error("LOAN_APPLICATION_NOT_FOUND_AFTER_SUBMISSION");
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'loan_application.submitted_for_review', 'loan_application', $3, $4,
+                   jsonb_build_object('status', 'submitted'))`,
+          [tenantId, actor.userId, applicationId, requestId],
+        );
+        return { status: "submitted", application: mapApplication(application) };
       });
     },
   };

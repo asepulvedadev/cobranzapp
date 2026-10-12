@@ -113,9 +113,11 @@ financiera vigente sin revisión legal, contable y de calendario.
 
 Propietarios, supervisores y cobradores pueden registrar una solicitud asociando un cliente activo
 con un producto disponible. La API valida el rango de monto y el máximo de periodos del producto,
-guarda el estado `draft` y registra el actor en auditoría. La interfaz deja claro que esta captura
-no aprueba, desembolsa, calcula cuotas ni registra pagos; esas decisiones requieren los controles
-legales, contables y de calendario de las siguientes fases.
+guarda el estado `draft` y registra el actor en auditoría. Una solicitud solo puede enviarse a
+revisión cuando la identidad del cliente está revisada y el producto está en `under_review` o
+`approved`; el envío también queda auditado. La interfaz deja claro que esto no aprueba,
+desembolsa, calcula cuotas ni registra pagos; esas decisiones requieren los controles legales,
+contables y de calendario de las siguientes fases.
 
 ## Document capture and manual identity review — no AI
 

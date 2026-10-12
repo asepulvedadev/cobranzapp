@@ -51,6 +51,10 @@ const sessionCookieName = "cobranzapp_session";
 const mfaChallengeCookieName = "cobranzapp_mfa_challenge";
 const tenantIdParamsSchema = z.object({ tenantId: z.uuid() });
 const tenantLoanProductParamsSchema = z.object({ tenantId: z.uuid(), productId: z.uuid() });
+const tenantLoanApplicationParamsSchema = z.object({
+  tenantId: z.uuid(),
+  applicationId: z.uuid(),
+});
 const tenantInvitationParamsSchema = z.object({ tenantId: z.uuid(), invitationId: z.uuid() });
 const tenantMemberParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
 const tenantMemberProfileParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
@@ -2829,6 +2833,103 @@ export function buildApp(dependencies: AppDependencies) {
     }
     return reply.code(201).send({ application: result.application });
   });
+
+  app.post(
+    "/v1/tenants/:tenantId/loan-applications/:applicationId/submit",
+    async (request, reply) => {
+      if (!requireAllowedOrigin(request, reply)) return;
+      const session = await requireUser(request, reply);
+      if (!session) return;
+      const params = tenantLoanApplicationParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return sendError(
+          reply,
+          404,
+          "LOAN_APPLICATION_NOT_FOUND",
+          "La solicitud no existe.",
+          request.id,
+        );
+      }
+      const membership = session.user.memberships.find(
+        (item) => item.tenantId === params.data.tenantId,
+      );
+      if (!membership || !["owner", "supervisor", "collector"].includes(membership.role)) {
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "No puedes enviar solicitudes de crédito a revisión.",
+          request.id,
+        );
+      }
+      if (!(await requireRecentReauthentication(session, request, reply))) return;
+      if (!dependencies.creditService) {
+        return sendError(
+          reply,
+          503,
+          "CREDIT_APPLICATIONS_UNAVAILABLE",
+          "Las solicitudes de crédito todavía no están configuradas.",
+          request.id,
+        );
+      }
+      const result = await dependencies.creditService.submitApplicationForReview(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.applicationId,
+        request.id,
+      );
+      if (result.status === "forbidden") {
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "No puedes enviar solicitudes de crédito a revisión.",
+          request.id,
+        );
+      }
+      if (result.status === "not_found") {
+        return sendError(
+          reply,
+          404,
+          "LOAN_APPLICATION_NOT_FOUND",
+          "La solicitud no existe.",
+          request.id,
+        );
+      }
+      if (result.status === "invalid_state") {
+        return sendError(
+          reply,
+          409,
+          "LOAN_APPLICATION_INVALID_STATE",
+          "Solo un borrador puede enviarse a revisión.",
+          request.id,
+        );
+      }
+      if (result.status === "borrower_not_verified") {
+        return sendError(
+          reply,
+          409,
+          "BORROWER_IDENTITY_REVIEW_REQUIRED",
+          "La identidad del cliente debe estar revisada antes de enviar la solicitud.",
+          request.id,
+        );
+      }
+      if (result.status === "product_not_reviewed") {
+        return sendError(
+          reply,
+          409,
+          "LOAN_PRODUCT_REVIEW_REQUIRED",
+          "El producto debe estar en revisión o aprobado antes de enviar la solicitud.",
+          request.id,
+        );
+      }
+      return reply.send({ application: result.application });
+    },
+  );
 
   app.patch("/v1/tenants/:tenantId/settings", async (request, reply) => {
     if (!requireAllowedOrigin(request, reply)) return;

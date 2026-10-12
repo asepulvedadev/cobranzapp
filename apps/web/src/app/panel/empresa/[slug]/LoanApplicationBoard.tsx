@@ -37,6 +37,7 @@ export function LoanApplicationBoard({
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const [reviewingApplicationId, setReviewingApplicationId] = useState<string | null>(null);
   const activeBorrowers = borrowers.filter((borrower) => borrower.status === "active");
   const availableProducts = products.filter((product) => product.status !== "retired");
 
@@ -66,6 +67,25 @@ export function LoanApplicationBoard({
     event.currentTarget.reset();
     setMessage("Solicitud guardada como borrador. Aún no genera aprobación ni desembolso.");
     setIsBusy(false);
+    router.refresh();
+  }
+
+  async function submitForReview(application: LoanApplication) {
+    setReviewingApplicationId(application.id);
+    setMessage("");
+    setIsError(false);
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/loan-applications/${application.id}/submit`,
+      { method: "POST" },
+    ).catch(() => null);
+    if (!response?.ok) {
+      setMessage(await errorMessage(response));
+      setIsError(true);
+      setReviewingApplicationId(null);
+      return;
+    }
+    setMessage(`La solicitud de ${application.borrowerName} quedó enviada a revisión.`);
+    setReviewingApplicationId(null);
     router.refresh();
   }
 
@@ -99,6 +119,15 @@ export function LoanApplicationBoard({
                 </span>
               </div>
               {application.purpose ? <p>{application.purpose}</p> : null}
+              {application.status === "draft" ? (
+                <button
+                  disabled={reviewingApplicationId !== null}
+                  onClick={() => void submitForReview(application)}
+                  type="button"
+                >
+                  {reviewingApplicationId === application.id ? "Enviando…" : "Enviar a revisión"}
+                </button>
+              ) : null}
             </article>
           ))}
         </div>

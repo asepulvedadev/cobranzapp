@@ -26,6 +26,14 @@ export type LoanApplicationResult =
   | { status: "amount_out_of_range" }
   | { status: "term_out_of_range" };
 
+export type LoanApplicationReviewResult =
+  | { status: "submitted"; application: LoanApplication }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "invalid_state" }
+  | { status: "borrower_not_verified" }
+  | { status: "product_not_reviewed" };
+
 export interface CreditService {
   listProducts(actor: TenantActor, tenantId: string): Promise<LoanProduct[]>;
   createProduct(
@@ -45,4 +53,10 @@ export interface CreditService {
     tenantId: string,
     input: LoanApplicationCreateRequest & { requestId: string },
   ): Promise<LoanApplicationResult>;
+  submitApplicationForReview(
+    actor: TenantActor,
+    tenantId: string,
+    applicationId: string,
+    requestId: string,
+  ): Promise<LoanApplicationReviewResult>;
 }
