@@ -378,6 +378,59 @@ export const tenantOverviewSchema = z.object({
 
 export const tenantOverviewResponseSchema = z.object({ overview: tenantOverviewSchema });
 
+export const tenantSettingsUpdateRequestSchema = z.object({
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  contactEmail: z.union([z.email(), z.literal(""), z.null()]),
+  contactPhone: z.union([z.string().trim().min(1).max(30), z.literal(""), z.null()]),
+  address: z.union([z.string().trim().min(1).max(240), z.literal(""), z.null()]),
+  version: z.number().int().positive(),
+});
+
+export const createBranchRequestSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    .max(40),
+  displayName: z.string().trim().min(2).max(100),
+});
+
+export const createTeamRequestSchema = z.object({
+  branchId: z.uuid().nullable(),
+  displayName: z.string().trim().min(2).max(100),
+});
+
+export const organizationStatusUpdateRequestSchema = z.object({ status: organizationStatusSchema });
+
+export const tenantMemberUpdateRequestSchema = z.object({
+  role: z.enum(["supervisor", "collector", "customer"]),
+  status: z.enum(["active", "suspended", "revoked"]),
+});
+
+export const tenantInvitationRequestSchema = z.object({
+  email: z.email(),
+  role: tenantRoleSchema,
+});
+
+export const tenantInvitationCreatedSchema = z.object({
+  id: z.uuid(),
+  email: z.email(),
+  role: tenantRoleSchema,
+  expiresAt: z.iso.datetime(),
+  acceptanceUrl: z.url(),
+});
+
+export const tenantInvitationCreatedResponseSchema = z.object({
+  invitation: tenantInvitationCreatedSchema,
+});
+
+export const tenantSettingsResponseSchema = z.object({ settings: tenantSettingsSchema });
+export const tenantBranchResponseSchema = z.object({ branch: tenantBranchSchema });
+export const tenantTeamResponseSchema = z.object({ team: tenantTeamSchema });
+export const tenantMemberResponseSchema = z.object({ member: tenantMemberSchema });
+
 export const mfaStatusSchema = z.object({
   enabled: z.boolean(),
   setupPending: z.boolean(),
@@ -466,6 +519,12 @@ export type PlatformSystemStatus = z.infer<typeof platformSystemStatusSchema>;
 export type SupportAccessStatus = z.infer<typeof supportAccessStatusSchema>;
 export type SupportAccessRecord = z.infer<typeof supportAccessRecordSchema>;
 export type TenantOverview = z.infer<typeof tenantOverviewSchema>;
+export type TenantSettingsUpdateRequest = z.infer<typeof tenantSettingsUpdateRequestSchema>;
+export type CreateBranchRequest = z.infer<typeof createBranchRequestSchema>;
+export type CreateTeamRequest = z.infer<typeof createTeamRequestSchema>;
+export type OrganizationStatusUpdateRequest = z.infer<typeof organizationStatusUpdateRequestSchema>;
+export type TenantMemberUpdateRequest = z.infer<typeof tenantMemberUpdateRequestSchema>;
+export type TenantInvitationRequest = z.infer<typeof tenantInvitationRequestSchema>;
 export type MfaStatus = z.infer<typeof mfaStatusSchema>;
 export type ReauthenticationRequest = z.infer<typeof reauthenticationRequestSchema>;
 export type ChangePasswordRequest = z.infer<typeof changePasswordRequestSchema>;

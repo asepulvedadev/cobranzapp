@@ -1,4 +1,11 @@
-import type { TenantOverview as SharedTenantOverview } from "@cobranzapp/contracts";
+import type {
+  CreateBranchRequest,
+  CreateTeamRequest,
+  TenantOverview as SharedTenantOverview,
+  TenantInvitationRequest,
+  TenantMemberUpdateRequest,
+  TenantSettingsUpdateRequest,
+} from "@cobranzapp/contracts";
 import type { PlatformRole, TenantRole } from "../auth/types.js";
 
 export type TenantActor = {
@@ -66,7 +73,7 @@ export interface TenancyService {
   createInvitation(
     actor: TenantActor,
     tenantId: string,
-    input: { email: string; role: TenantRole; requestId: string },
+    input: TenantInvitationRequest & { requestId: string },
   ): Promise<{
     id: string;
     email: string;
@@ -90,7 +97,7 @@ export interface TenancyService {
   updateSettings(
     actor: TenantActor,
     tenantId: string,
-    input: TenantOverview["settings"] & { requestId: string },
+    input: TenantSettingsUpdateRequest & { requestId: string },
   ): Promise<
     | { status: "updated"; settings: TenantOverview["settings"] }
     | { status: "stale" }
@@ -99,12 +106,12 @@ export interface TenancyService {
   createBranch(
     actor: TenantActor,
     tenantId: string,
-    input: { code: string; displayName: string; requestId: string },
+    input: CreateBranchRequest & { requestId: string },
   ): Promise<TenantOverview["branches"][number] | null>;
   createTeam(
     actor: TenantActor,
     tenantId: string,
-    input: { branchId: string | null; displayName: string; requestId: string },
+    input: CreateTeamRequest & { requestId: string },
   ): Promise<TenantOverview["teams"][number] | null>;
   updateBranchStatus(
     actor: TenantActor,
@@ -138,10 +145,6 @@ export interface TenancyService {
     actor: TenantActor,
     tenantId: string,
     userId: string,
-    input: {
-      role: Exclude<TenantRole, "owner">;
-      status: "active" | "suspended" | "revoked";
-      requestId: string;
-    },
+    input: TenantMemberUpdateRequest & { requestId: string },
   ): Promise<MemberUpdateResult>;
 }

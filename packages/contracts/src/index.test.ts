@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createBranchRequestSchema,
   createPlatformTenantRequestSchema,
   currentUserSchema,
   loginRequestSchema,
@@ -8,6 +9,7 @@ import {
   platformTenantStatusUpdateRequestSchema,
   platformUserDirectoryQuerySchema,
   tenantOverviewSchema,
+  tenantSettingsUpdateRequestSchema,
 } from "./index.js";
 
 describe("shared API contracts", () => {
@@ -130,5 +132,21 @@ describe("shared API contracts", () => {
       activity: [],
     });
     expect(result.success).toBe(true);
+  });
+
+  it("normalizes workspace settings and branch inputs", () => {
+    expect(
+      tenantSettingsUpdateRequestSchema.parse({
+        primaryColor: "#111111",
+        accentColor: "#FBBF24",
+        contactEmail: "OPERACIONES@EXAMPLE.COM",
+        contactPhone: "",
+        address: "",
+        version: 2,
+      }),
+    ).toMatchObject({ contactEmail: "OPERACIONES@EXAMPLE.COM", contactPhone: "", address: "" });
+    expect(
+      createBranchRequestSchema.parse({ code: " Centro ", displayName: " Sede Centro " }),
+    ).toEqual({ code: "centro", displayName: "Sede Centro" });
   });
 });

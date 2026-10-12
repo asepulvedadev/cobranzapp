@@ -1,8 +1,11 @@
 import {
   changePasswordRequestSchema,
+  createBranchRequestSchema,
   createPlatformTenantRequestSchema,
+  createTeamRequestSchema,
   loginRequestSchema,
   mfaCodeRequestSchema,
+  organizationStatusUpdateRequestSchema,
   platformActivityQuerySchema,
   platformMembershipEntitlementUpdateRequestSchema,
   platformMembershipPlanUpdateRequestSchema,
@@ -12,6 +15,9 @@ import {
   platformUserStatusUpdateRequestSchema,
   reauthenticationRequestSchema,
   type ServiceStatus,
+  tenantInvitationRequestSchema,
+  tenantMemberUpdateRequestSchema,
+  tenantSettingsUpdateRequestSchema,
 } from "@cobranzapp/contracts";
 import { createOpenApiDocument } from "@cobranzapp/contracts/openapi";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
@@ -40,10 +46,6 @@ const tenantTeamParamsSchema = z.object({ tenantId: z.uuid(), teamId: z.uuid() }
 const sessionIdParamsSchema = z.object({ sessionId: z.uuid() });
 const platformUserParamsSchema = z.object({ userId: z.uuid() });
 const invitationTokenParamsSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{40,60}$/) });
-const invitationSchema = z.object({
-  email: z.email().transform((value) => value.toLowerCase()),
-  role: z.enum(["owner", "supervisor", "collector", "customer"]),
-});
 const invitationAcceptanceSchema = z.object({
   username: z
     .string()
@@ -52,38 +54,6 @@ const invitationAcceptanceSchema = z.object({
     .regex(/^[a-z0-9._-]{3,40}$/),
   displayName: z.string().trim().min(2).max(100),
   password: z.string().min(12).max(256),
-});
-const nullableText = (maxLength: number) =>
-  z.union([z.string().trim().min(1).max(maxLength), z.literal("").transform(() => null), z.null()]);
-const tenantSettingsSchema = z.object({
-  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
-  accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
-  contactEmail: z.union([
-    z.email().transform((value) => value.toLowerCase()),
-    z.literal("").transform(() => null),
-    z.null(),
-  ]),
-  contactPhone: nullableText(30),
-  address: nullableText(240),
-  version: z.number().int().positive(),
-});
-const branchSchema = z.object({
-  code: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-    .max(40),
-  displayName: z.string().trim().min(2).max(100),
-});
-const teamSchema = z.object({
-  branchId: z.uuid().nullable(),
-  displayName: z.string().trim().min(2).max(100),
-});
-const organizationStatusSchema = z.object({ status: z.enum(["active", "inactive"]) });
-const memberUpdateSchema = z.object({
-  role: z.enum(["supervisor", "collector", "customer"]),
-  status: z.enum(["active", "suspended", "revoked"]),
 });
 const supportAccessRequestSchema = z.object({
   purpose: z.string().trim().min(12).max(240),
@@ -954,7 +924,7 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session || !requireDeveloper(session.user, request, reply)) return;
     const params = tenantIdParamsSchema.safeParse(request.params);
-    const body = invitationSchema.safeParse(request.body);
+    const body = tenantInvitationRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       return sendError(
         reply,
@@ -968,7 +938,7 @@ export function buildApp(dependencies: AppDependencies) {
     const invitation = await dependencies.tenancyService.createInvitation(
       { userId: session.user.id, platformRole: "developer", tenantRole: null },
       params.data.tenantId,
-      { ...body.data, requestId: request.id },
+      { ...body.data, email: body.data.email.toLowerCase(), requestId: request.id },
     );
     if (!invitation)
       return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
@@ -1027,7 +997,10 @@ export function buildApp(dependencies: AppDependencies) {
     const result = await dependencies.supportAccessService.requestAccess(
       session.user.id,
       params.data.tenantId,
-      { ...body.data, requestId: request.id },
+      {
+        ...body.data,
+        requestId: request.id,
+      },
     );
     if (result.status === "tenant_not_found") {
       return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
@@ -1326,7 +1299,7 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session) return;
     const params = tenantIdParamsSchema.safeParse(request.params);
-    const body = invitationSchema.safeParse(request.body);
+    const body = tenantInvitationRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       return sendError(
         reply,
@@ -1365,7 +1338,7 @@ export function buildApp(dependencies: AppDependencies) {
         tenantRole: membership.role,
       },
       params.data.tenantId,
-      { ...body.data, requestId: request.id },
+      { ...body.data, email: body.data.email.toLowerCase(), requestId: request.id },
     );
     if (!invitation)
       return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
@@ -1429,7 +1402,7 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session) return;
     const params = tenantMemberParamsSchema.safeParse(request.params);
-    const body = memberUpdateSchema.safeParse(request.body);
+    const body = tenantMemberUpdateRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       return sendError(
         reply,
@@ -1500,7 +1473,7 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session) return;
     const params = tenantIdParamsSchema.safeParse(request.params);
-    const body = tenantSettingsSchema.safeParse(request.body);
+    const body = tenantSettingsUpdateRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       return sendError(
         reply,
@@ -1529,7 +1502,13 @@ export function buildApp(dependencies: AppDependencies) {
         tenantRole: membership.role,
       },
       params.data.tenantId,
-      { ...body.data, requestId: request.id },
+      {
+        ...body.data,
+        contactEmail: body.data.contactEmail ? body.data.contactEmail.toLowerCase() : null,
+        contactPhone: body.data.contactPhone || null,
+        address: body.data.address || null,
+        requestId: request.id,
+      },
     );
     if (result.status === "stale") {
       return sendError(
@@ -1557,7 +1536,7 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session) return;
     const params = tenantIdParamsSchema.safeParse(request.params);
-    const body = branchSchema.safeParse(request.body);
+    const body = createBranchRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       return sendError(
         reply,
@@ -1604,7 +1583,7 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session) return;
     const params = tenantIdParamsSchema.safeParse(request.params);
-    const body = teamSchema.safeParse(request.body);
+    const body = createTeamRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       return sendError(
         reply,
@@ -1651,7 +1630,7 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session) return;
     const params = tenantBranchParamsSchema.safeParse(request.params);
-    const body = organizationStatusSchema.safeParse(request.body);
+    const body = organizationStatusUpdateRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       return sendError(
         reply,
@@ -1705,7 +1684,7 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session) return;
     const params = tenantTeamParamsSchema.safeParse(request.params);
-    const body = organizationStatusSchema.safeParse(request.body);
+    const body = organizationStatusUpdateRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       return sendError(
         reply,
