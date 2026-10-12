@@ -3,6 +3,7 @@ import type { AuditActivity } from "../../lib/platform";
 const actionLabels: Record<string, string> = {
   "tenant.created": "Creó la empresa",
   "tenant.membership_plan_changed": "Cambió el plan comercial",
+  "tenant.membership_capacity_changed": "Actualizó la capacidad de empleados",
   "tenant.status_changed": "Cambió el estado de la empresa",
   "invitation.created": "Creó una invitación",
   "invitation.accepted": "Aceptó una invitación",

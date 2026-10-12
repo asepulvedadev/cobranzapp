@@ -6,6 +6,16 @@ import { WorkspaceMembershipSummary } from "./WorkspaceMembershipSummary";
 const overview = {
   tenant: { membershipPlan: "pro" },
   metrics: { activeEmployeeSeats: 2, branches: 0 },
+  membershipEntitlement: {
+    catalogVersion: 1,
+    version: 2,
+    includedEmployeeSeats: 5,
+    additionalEmployeeSeats: 2,
+    employeeSeatLimit: 7,
+    availableEmployeeSeats: 5,
+    clientLimit: 100,
+    prioritySupport: false,
+  },
   settings: { contactEmail: "operaciones@example.com" },
 } as TenantOverview;
 
@@ -14,16 +24,22 @@ describe("WorkspaceMembershipSummary", () => {
     const html = renderToStaticMarkup(<WorkspaceMembershipSummary overview={overview} />);
 
     expect(html).toContain("Plan Pro");
-    expect(html).toContain("2 de 5 incluidos");
+    expect(html).toContain("2 de 7 cupos");
+    expect(html).toContain("5 incluidos + 2 adicionales");
+    expect(html).toContain("Cupos disponibles");
     expect(html).toContain("Hasta 100");
     expect(html).toContain("3/4");
-    expect(html).toContain("Las invitaciones no generan cobros automáticos");
+    expect(html).toContain("Las invitaciones no reservan cupos ni generan cobros automáticos");
   });
 
   it("renders an explicit pending state when a legacy tenant has no assigned plan", () => {
     const html = renderToStaticMarkup(
       <WorkspaceMembershipSummary
-        overview={{ ...overview, tenant: { ...overview.tenant, membershipPlan: null } }}
+        overview={{
+          ...overview,
+          tenant: { ...overview.tenant, membershipPlan: null },
+          membershipEntitlement: null,
+        }}
       />,
     );
 

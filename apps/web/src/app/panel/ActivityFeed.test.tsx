@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ActivityFeed } from "./ActivityFeed";
 
 describe("ActivityFeed", () => {
-  it("explains organization lifecycle events in Spanish", () => {
+  it("explains administrative events in Spanish", () => {
     const html = renderToStaticMarkup(
       <ActivityFeed
         activity={[
@@ -21,11 +21,19 @@ describe("ActivityFeed", () => {
             actorUsername: "supervisora",
             happenedAt: "2026-10-11T12:01:00.000Z",
           },
+          {
+            id: "capacity-event",
+            action: "tenant.membership_capacity_changed",
+            actorDisplayName: "Desarrollador",
+            actorUsername: "desarrollador",
+            happenedAt: "2026-10-11T12:02:00.000Z",
+          },
         ]}
       />,
     );
 
     expect(html).toContain("Cambió el estado de una sede");
     expect(html).toContain("Cambió el estado de un equipo");
+    expect(html).toContain("Actualizó la capacidad de empleados");
   });
 });

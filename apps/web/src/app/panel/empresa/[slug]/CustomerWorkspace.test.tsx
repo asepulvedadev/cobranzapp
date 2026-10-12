@@ -22,6 +22,7 @@ const overview: TenantOverview = {
     pendingInvitations: 0,
     activeEmployeeSeats: 0,
   },
+  membershipEntitlement: null,
   settings: {
     primaryColor: "#171717",
     accentColor: "#FBBF24",

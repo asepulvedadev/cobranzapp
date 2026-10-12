@@ -247,6 +247,7 @@ export default async function DeveloperDashboard({
                       </td>
                       <td data-label="Plan">
                         <TenantMembershipPlanControl
+                          membershipEntitlement={tenant.membershipEntitlement}
                           membershipPlan={tenant.membershipPlan}
                           tenantId={tenant.id}
                         />

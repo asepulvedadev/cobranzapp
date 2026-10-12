@@ -4,6 +4,7 @@ import type { TenantOverview } from "../../../../lib/platform";
 
 export function WorkspaceMembershipSummary({ overview }: { overview: TenantOverview }) {
   const plan = memberships.find((item) => item.id === overview.tenant.membershipPlan) ?? null;
+  const entitlement = overview.membershipEntitlement;
   const steps = [
     { label: "Plan comercial asignado", complete: plan !== null },
     { label: "Propietario con acceso activo", complete: true },
@@ -24,27 +25,40 @@ export function WorkspaceMembershipSummary({ overview }: { overview: TenantOverv
               : "El equipo de cobranzapp debe asignar el plan antes de activar la empresa."}
           </p>
         </div>
-        {plan ? (
+        {plan && entitlement ? (
           <dl>
             <div>
               <dt>Personal activo</dt>
               <dd>
-                {overview.metrics.activeEmployeeSeats} de {plan.includedEmployeeSeats} incluidos
+                {overview.metrics.activeEmployeeSeats} de {entitlement.employeeSeatLimit} cupos
               </dd>
             </div>
             <div>
+              <dt>Capacidad contratada</dt>
+              <dd>
+                {entitlement.includedEmployeeSeats} incluidos
+                {entitlement.additionalEmployeeSeats > 0
+                  ? ` + ${entitlement.additionalEmployeeSeats} adicionales`
+                  : ""}
+              </dd>
+            </div>
+            <div>
+              <dt>Cupos disponibles</dt>
+              <dd>{entitlement.availableEmployeeSeats}</dd>
+            </div>
+            <div>
               <dt>Clientes</dt>
-              <dd>Hasta {plan.clientLimit}</dd>
+              <dd>Hasta {entitlement.clientLimit}</dd>
             </div>
             <div>
               <dt>Soporte</dt>
-              <dd>{plan.prioritySupport ? "Prioritario" : "Estándar"}</dd>
+              <dd>{entitlement.prioritySupport ? "Prioritario" : "Estándar"}</dd>
             </div>
           </dl>
         ) : null}
         <small>
-          Las invitaciones no generan cobros automáticos. Las ampliaciones de capacidad se coordinan
-          con cobranzapp.
+          Las invitaciones no reservan cupos ni generan cobros automáticos. La capacidad se valida
+          al activar cada empleado.
         </small>
       </article>
 

@@ -51,6 +51,15 @@ export type SupportAccessRecord = {
 };
 
 export type MembershipPlan = "pro" | "ultra";
+export type MembershipEntitlement = {
+  catalogVersion: number;
+  version: number;
+  includedEmployeeSeats: number;
+  additionalEmployeeSeats: number;
+  employeeSeatLimit: number;
+  clientLimit: number;
+  prioritySupport: boolean;
+};
 
 export type PlatformOverview = {
   metrics: {
@@ -65,6 +74,7 @@ export type PlatformOverview = {
     displayName: string;
     status: "draft" | "active" | "suspended" | "archived";
     membershipPlan: MembershipPlan | null;
+    membershipEntitlement: MembershipEntitlement | null;
     members: number;
     readiness: {
       activeOwner: boolean;
@@ -135,6 +145,7 @@ export type TenantOverview = {
     pendingInvitations: number;
     activeEmployeeSeats: number;
   };
+  membershipEntitlement: (MembershipEntitlement & { availableEmployeeSeats: number }) | null;
   settings: {
     primaryColor: string;
     accentColor: string;
