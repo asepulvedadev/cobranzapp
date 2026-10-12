@@ -360,6 +360,379 @@ export function createOpenApiDocument(version: string) {
           },
         },
       },
+      "/v1/tenants/{tenantId}/invitations": {
+        post: {
+          tags: ["Empresas"],
+          operationId: "createTenantInvitation",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("TenantInvitationRequest")),
+          },
+          responses: {
+            "201": response(
+              "Invitación empresarial creada.",
+              schemaReference("TenantInvitationCreatedResponse"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("La empresa no existe.", schemaReference("ApiError")),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/invitations/{invitationId}": {
+        delete: {
+          tags: ["Empresas"],
+          operationId: "revokeTenantInvitation",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "invitationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "204": response("Invitación revocada."),
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response(
+              "La invitación no existe o ya no está pendiente.",
+              schemaReference("ApiError"),
+            ),
+            "409": response(
+              "La invitación está protegida y requiere administración de plataforma.",
+              schemaReference("ApiError"),
+            ),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/members/{userId}": {
+        patch: {
+          tags: ["Empresas"],
+          operationId: "updateTenantMember",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("TenantMemberUpdateRequest")),
+          },
+          responses: {
+            "200": response(
+              "Acceso del integrante actualizado.",
+              schemaReference("TenantMemberResponse"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("El integrante no existe.", schemaReference("ApiError")),
+            "409": response(
+              "El acceso está protegido, revocado o no hay cupos disponibles.",
+              schemaReference("ApiError"),
+            ),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/settings": {
+        patch: {
+          tags: ["Empresas"],
+          operationId: "updateTenantSettings",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("TenantSettingsUpdateRequest")),
+          },
+          responses: {
+            "200": response(
+              "Configuración empresarial actualizada.",
+              schemaReference("TenantSettingsResponse"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("La empresa no está disponible.", schemaReference("ApiError")),
+            "409": response(
+              "La configuración cambió en otra sesión y debe actualizarse.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/branches": {
+        post: {
+          tags: ["Empresas"],
+          operationId: "createTenantBranch",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("CreateBranchRequest")),
+          },
+          responses: {
+            "201": response("Sede creada.", schemaReference("TenantBranchResponse")),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("La empresa no está disponible.", schemaReference("ApiError")),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/teams": {
+        post: {
+          tags: ["Empresas"],
+          operationId: "createTenantTeam",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("CreateTeamRequest")),
+          },
+          responses: {
+            "201": response("Equipo creado.", schemaReference("TenantTeamResponse")),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response(
+              "La empresa o la sede no está disponible.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/branches/{branchId}/status": {
+        patch: {
+          tags: ["Empresas"],
+          operationId: "updateTenantBranchStatus",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "branchId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("OrganizationStatusUpdateRequest")),
+          },
+          responses: {
+            "200": response("Estado de la sede actualizado.", {
+              type: "object",
+              properties: { status: { type: "string", enum: ["active", "inactive"] } },
+              required: ["status"],
+            }),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("La sede no existe.", schemaReference("ApiError")),
+            "409": response(
+              "La sede tiene equipos activos vinculados.",
+              schemaReference("ApiError"),
+            ),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/teams/{teamId}/status": {
+        patch: {
+          tags: ["Empresas"],
+          operationId: "updateTenantTeamStatus",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "teamId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("OrganizationStatusUpdateRequest")),
+          },
+          responses: {
+            "200": response("Estado del equipo actualizado.", {
+              type: "object",
+              properties: { status: { type: "string", enum: ["active", "inactive"] } },
+              required: ["status"],
+            }),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("El equipo no existe.", schemaReference("ApiError")),
+            "409": response("La sede vinculada está inactiva.", schemaReference("ApiError")),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/teams/{teamId}/members/{userId}": {
+        put: {
+          tags: ["Empresas"],
+          operationId: "addTenantTeamMember",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "teamId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": response("Integrante agregado al equipo.", {
+              type: "object",
+              properties: { assigned: { type: "boolean", const: true } },
+              required: ["assigned"],
+            }),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("El equipo o integrante no existe.", schemaReference("ApiError")),
+            "409": response(
+              "El integrante no puede pertenecer al equipo.",
+              schemaReference("ApiError"),
+            ),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
+        delete: {
+          tags: ["Empresas"],
+          operationId: "removeTenantTeamMember",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "teamId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "204": response("Integrante retirado del equipo."),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("El equipo o integrante no existe.", schemaReference("ApiError")),
+            "409": response(
+              "El integrante no puede pertenecer al equipo.",
+              schemaReference("ApiError"),
+            ),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
+      },
       "/v1/platform/overview": {
         get: {
           tags: ["Plataforma"],

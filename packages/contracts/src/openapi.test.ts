@@ -11,6 +11,36 @@ describe("OpenAPI contract", () => {
     expect(document.paths["/v1/tenants/{tenantId}/overview"].get.operationId).toBe(
       "getTenantOverview",
     );
+    expect(document.paths["/v1/tenants/{tenantId}/invitations"].post.operationId).toBe(
+      "createTenantInvitation",
+    );
+    expect(
+      document.paths["/v1/tenants/{tenantId}/invitations/{invitationId}"].delete.operationId,
+    ).toBe("revokeTenantInvitation");
+    expect(document.paths["/v1/tenants/{tenantId}/members/{userId}"].patch.operationId).toBe(
+      "updateTenantMember",
+    );
+    expect(document.paths["/v1/tenants/{tenantId}/settings"].patch.operationId).toBe(
+      "updateTenantSettings",
+    );
+    expect(document.paths["/v1/tenants/{tenantId}/branches"].post.operationId).toBe(
+      "createTenantBranch",
+    );
+    expect(document.paths["/v1/tenants/{tenantId}/teams"].post.operationId).toBe(
+      "createTenantTeam",
+    );
+    expect(
+      document.paths["/v1/tenants/{tenantId}/branches/{branchId}/status"].patch.operationId,
+    ).toBe("updateTenantBranchStatus");
+    expect(document.paths["/v1/tenants/{tenantId}/teams/{teamId}/status"].patch.operationId).toBe(
+      "updateTenantTeamStatus",
+    );
+    expect(
+      document.paths["/v1/tenants/{tenantId}/teams/{teamId}/members/{userId}"].put.operationId,
+    ).toBe("addTenantTeamMember");
+    expect(
+      document.paths["/v1/tenants/{tenantId}/teams/{teamId}/members/{userId}"].delete.operationId,
+    ).toBe("removeTenantTeamMember");
     expect(document.paths["/v1/platform/overview"].get.operationId).toBe("getPlatformOverview");
     expect(document.paths["/v1/platform/system-status"].get.operationId).toBe(
       "getPlatformSystemStatus",
