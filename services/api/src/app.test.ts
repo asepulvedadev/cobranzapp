@@ -366,6 +366,22 @@ describe("health endpoints", () => {
     expect(response.statusCode).toBe(503);
     expect(response.json()).toMatchObject({ service: "api", status: "degraded" });
   });
+
+  it("publishes the versioned authentication contract", async () => {
+    const app = buildApp(dependencies());
+    apps.push(app);
+    const response = await app.inject({ method: "GET", url: "/v1/openapi.json" });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("public, max-age=300");
+    expect(response.json()).toMatchObject({
+      openapi: "3.1.0",
+      info: { title: "cobranzapp API", version: "test" },
+      paths: {
+        "/v1/auth/login": { post: { operationId: "login" } },
+        "/v1/auth/me": { get: { operationId: "getCurrentUser" } },
+      },
+    });
+  });
 });
 
 describe("authentication", () => {

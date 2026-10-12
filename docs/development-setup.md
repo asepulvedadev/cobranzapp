@@ -18,6 +18,10 @@ pnpm dev
 
 La aplicación web se ejecuta en `http://localhost:3000`, la API en `http://localhost:3001` y PostgreSQL escucha únicamente en la interfaz local, puerto `5432`.
 
+El contrato OpenAPI 3.1 disponible se consulta en
+`http://localhost:3001/v1/openapi.json`. Sus esquemas de autenticación se generan desde
+`packages/contracts`, que también consumen la API y la aplicación web.
+
 Inicie por separado el entorno de Expo:
 
 ```bash

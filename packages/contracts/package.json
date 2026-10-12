@@ -7,6 +7,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./openapi": {
+      "types": "./src/openapi.ts",
+      "default": "./dist/openapi.js"
     }
   },
   "files": [

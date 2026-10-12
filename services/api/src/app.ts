@@ -5,6 +5,7 @@ import {
   reauthenticationRequestSchema,
   type ServiceStatus,
 } from "@cobranzapp/contracts";
+import { createOpenApiDocument } from "@cobranzapp/contracts/openapi";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import QRCode from "qrcode";
 import { z } from "zod";
@@ -286,6 +287,11 @@ export function buildApp(dependencies: AppDependencies) {
       timestamp: new Date().toISOString(),
     }),
   );
+
+  app.get("/v1/openapi.json", async (_request, reply) => {
+    reply.header("cache-control", "public, max-age=300");
+    return createOpenApiDocument(dependencies.version);
+  });
 
   app.post("/v1/auth/login", async (request, reply) => {
     if (!requireAllowedOrigin(request, reply)) return;
