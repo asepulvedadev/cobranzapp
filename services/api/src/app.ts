@@ -1,4 +1,10 @@
-import type { ServiceStatus } from "@cobranzapp/contracts";
+import {
+  changePasswordRequestSchema,
+  loginRequestSchema,
+  mfaCodeRequestSchema,
+  reauthenticationRequestSchema,
+  type ServiceStatus,
+} from "@cobranzapp/contracts";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import QRCode from "qrcode";
 import { z } from "zod";
@@ -10,21 +16,6 @@ import type { TenancyService } from "./tenancy/types.js";
 
 const sessionCookieName = "cobranzapp_session";
 const mfaChallengeCookieName = "cobranzapp_mfa_challenge";
-const loginSchema = z.object({
-  identifier: z.string().trim().min(3).max(254),
-  password: z.string().min(12).max(256),
-});
-const passwordSchema = z
-  .object({
-    currentPassword: z.string().min(12).max(256),
-    newPassword: z.string().min(12).max(256),
-  })
-  .refine((value) => value.currentPassword !== value.newPassword, {
-    message: "La nueva contraseña debe ser diferente.",
-    path: ["newPassword"],
-  });
-const reauthenticationSchema = z.object({ password: z.string().min(12).max(256) });
-const mfaCodeSchema = z.object({ code: z.string().trim().min(6).max(32) });
 const tenantSchema = z.object({
   displayName: z.string().trim().min(2).max(120),
   slug: z
@@ -298,7 +289,7 @@ export function buildApp(dependencies: AppDependencies) {
 
   app.post("/v1/auth/login", async (request, reply) => {
     if (!requireAllowedOrigin(request, reply)) return;
-    const parsed = loginSchema.safeParse(request.body);
+    const parsed = loginRequestSchema.safeParse(request.body);
     if (!parsed.success)
       return sendError(
         reply,
@@ -345,7 +336,7 @@ export function buildApp(dependencies: AppDependencies) {
 
   app.post("/v1/auth/mfa/verify-login", async (request, reply) => {
     if (!requireAllowedOrigin(request, reply)) return;
-    const parsed = mfaCodeSchema.safeParse(request.body);
+    const parsed = mfaCodeRequestSchema.safeParse(request.body);
     if (!parsed.success) {
       return sendError(
         reply,
@@ -470,7 +461,7 @@ export function buildApp(dependencies: AppDependencies) {
     if (!requireAllowedOrigin(request, reply)) return;
     const session = await requireUser(request, reply);
     if (!session || !(await requireRecentReauthentication(session, request, reply))) return;
-    const parsed = mfaCodeSchema.safeParse(request.body);
+    const parsed = mfaCodeRequestSchema.safeParse(request.body);
     if (!parsed.success) {
       return sendError(
         reply,
@@ -528,7 +519,7 @@ export function buildApp(dependencies: AppDependencies) {
     if (!requireAllowedOrigin(request, reply)) return;
     const session = await requireUser(request, reply);
     if (!session || !(await requireRecentReauthentication(session, request, reply))) return;
-    const parsed = mfaCodeSchema.safeParse(request.body);
+    const parsed = mfaCodeRequestSchema.safeParse(request.body);
     if (!parsed.success) {
       return sendError(
         reply,
@@ -617,7 +608,7 @@ export function buildApp(dependencies: AppDependencies) {
     if (!requireAllowedOrigin(request, reply)) return;
     const session = await requireUser(request, reply);
     if (!session) return;
-    const parsed = reauthenticationSchema.safeParse(request.body);
+    const parsed = reauthenticationRequestSchema.safeParse(request.body);
     if (!parsed.success) {
       return sendError(reply, 400, "INVALID_PASSWORD", "Escribe tu contraseña actual.", request.id);
     }
@@ -663,7 +654,7 @@ export function buildApp(dependencies: AppDependencies) {
     if (!requireAllowedOrigin(request, reply)) return;
     const session = await requireUser(request, reply);
     if (!session) return;
-    const parsed = passwordSchema.safeParse(request.body);
+    const parsed = changePasswordRequestSchema.safeParse(request.body);
     if (!parsed.success) {
       return sendError(
         reply,

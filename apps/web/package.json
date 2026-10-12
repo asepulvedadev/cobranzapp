@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@cobranzapp/contracts": "workspace:*",
     "@phosphor-icons/react": "2.1.10",
     "next": "16.4.0",
     "react": "19.3.0",

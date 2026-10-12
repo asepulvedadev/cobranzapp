@@ -1,21 +1,14 @@
-export type PlatformRole = "developer" | null;
-export type TenantRole = "owner" | "supervisor" | "collector" | "customer";
+import type {
+  AccountSession as ContractAccountSession,
+  MfaStatus as ContractMfaStatus,
+  SecurityActivity as ContractSecurityActivity,
+  TenantRole as ContractTenantRole,
+  CurrentUser,
+} from "@cobranzapp/contracts";
 
-export type AuthenticatedUser = {
-  id: string;
-  username: string;
-  email: string;
-  displayName: string;
-  platformRole: PlatformRole;
-  mustChangePassword: boolean;
-  mfaEnabled: boolean;
-  memberships: Array<{
-    tenantId: string;
-    tenantName: string;
-    tenantSlug: string;
-    role: TenantRole;
-  }>;
-};
+export type PlatformRole = CurrentUser["platformRole"];
+export type TenantRole = ContractTenantRole;
+export type AuthenticatedUser = CurrentUser;
 
 export type SessionMetadata = {
   requestId: string;
@@ -23,26 +16,9 @@ export type SessionMetadata = {
   ipAddress?: string;
 };
 
-export type AccountSession = {
-  id: string;
-  userAgent: string | null;
-  createdAt: string;
-  lastSeenAt: string;
-  expiresAt: string;
-  current: boolean;
-};
-
-export type SecurityActivity = {
-  id: string;
-  action: string;
-  happenedAt: string;
-};
-
-export type MfaStatus = {
-  enabled: boolean;
-  setupPending: boolean;
-  setupExpiresAt: string | null;
-};
+export type AccountSession = ContractAccountSession;
+export type SecurityActivity = ContractSecurityActivity;
+export type MfaStatus = ContractMfaStatus;
 
 export type MfaEnrollmentResult =
   | { status: "created"; secret: string; uri: string; expiresAt: string }

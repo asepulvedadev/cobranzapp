@@ -1,12 +1,8 @@
 "use client";
 
+import type { ApiError, MfaLoginRequiredResponse } from "@cobranzapp/contracts";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
-
-type LoginResponse = {
-  mfaRequired?: boolean;
-  error?: { message?: string };
-};
 
 type LoginStep = "credentials" | "mfa";
 
@@ -39,12 +35,13 @@ export function LoginForm() {
         }),
       });
       if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as LoginResponse;
-        setMessage(body.error?.message ?? "No pudimos iniciar la sesión. Intenta nuevamente.");
+        const body = (await response.json().catch(() => null)) as ApiError | null;
+        setMessage(body?.error.message ?? "No pudimos iniciar la sesión. Intenta nuevamente.");
         return;
       }
-      const body = (await response.json()) as LoginResponse;
-      if (response.status === 202 && body.mfaRequired) {
+      if (response.status === 202) {
+        const body = (await response.json()) as MfaLoginRequiredResponse;
+        if (!body.mfaRequired) throw new Error("Respuesta MFA inválida");
         setStep("mfa");
         return;
       }
@@ -68,8 +65,8 @@ export function LoginForm() {
         body: JSON.stringify({ code: form.get("code") }),
       });
       if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as LoginResponse;
-        setMessage(body.error?.message ?? "No pudimos verificar el código. Intenta nuevamente.");
+        const body = (await response.json().catch(() => null)) as ApiError | null;
+        setMessage(body?.error.message ?? "No pudimos verificar el código. Intenta nuevamente.");
         return;
       }
       enterPanel();

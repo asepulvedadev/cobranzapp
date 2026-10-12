@@ -1,39 +1,9 @@
-export type CurrentUser = {
-  id: string;
-  username: string;
-  email: string;
-  displayName: string;
-  platformRole: "developer" | null;
-  mustChangePassword: boolean;
-  mfaEnabled: boolean;
-  memberships: Array<{
-    tenantId: string;
-    tenantName: string;
-    tenantSlug: string;
-    role: "owner" | "supervisor" | "collector" | "customer";
-  }>;
-};
-
-export type AccountSession = {
-  id: string;
-  userAgent: string | null;
-  createdAt: string;
-  lastSeenAt: string;
-  expiresAt: string;
-  current: boolean;
-};
-
-export type SecurityActivity = {
-  id: string;
-  action: string;
-  happenedAt: string;
-};
-
-export type MfaStatus = {
-  enabled: boolean;
-  setupPending: boolean;
-  setupExpiresAt: string | null;
-};
+export type {
+  AccountSession,
+  CurrentUser,
+  MfaStatus,
+  SecurityActivity,
+} from "@cobranzapp/contracts";
 
 export type AuditActivity = {
   id: string;
