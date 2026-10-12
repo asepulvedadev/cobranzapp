@@ -1,10 +1,13 @@
+import { createHash, randomBytes } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
+import { hashPassword } from "../auth/password.js";
 import {
   buildMembershipEntitlement,
   membershipCatalog,
   membershipCatalogVersion,
 } from "../memberships/catalog.js";
 import type {
+  CompanyCreationCode,
   MembershipEntitlementUpdateResult,
   MembershipPlan,
   MembershipPlanUpdateResult,
@@ -17,6 +20,19 @@ import type {
   TenantStatus,
   TenantStatusUpdateResult,
 } from "./types.js";
+
+function normalizeCompanyCode(code: string) {
+  return code.trim().toUpperCase();
+}
+
+function companyCodeHash(code: string) {
+  return createHash("sha256").update(normalizeCompanyCode(code)).digest();
+}
+
+function generateCompanyCode() {
+  const segment = () => randomBytes(2).toString("hex").toUpperCase();
+  return `CZA-${segment()}-${segment()}-${segment()}`;
+}
 
 async function insertEntitlementVersion(
   client: Pick<PoolClient, "query">,
@@ -579,12 +595,147 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
       }
     },
 
+    async createOwnerAccount(actorUserId, input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setPlatformContext(client, actorUserId);
+        const passwordHash = await hashPassword(input.temporaryPassword);
+        const result = await client.query<{
+          id: string;
+          username: string;
+          email: string;
+          display_name: string;
+          status: "active" | "disabled";
+          created_at: Date;
+        }>(
+          `INSERT INTO users (username, email, display_name, password_hash, platform_role, must_change_password)
+           VALUES ($1, $2, $3, $4, NULL, true)
+           RETURNING id, username, email, display_name, status, created_at`,
+          [input.username, input.email, input.displayName, passwordHash],
+        );
+        const user = result.rows[0];
+        if (!user) throw new Error("Owner account insert did not return a record");
+        await client.query(
+          `INSERT INTO audit_events (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES (NULL, $1, 'owner.account_created', 'user', $2, $3,
+                   jsonb_build_object('username', $4::text, 'email', $5::text))`,
+          [actorUserId, user.id, input.requestId, user.username, user.email],
+        );
+        await client.query("COMMIT");
+        return {
+          user: {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            displayName: user.display_name,
+            platformRole: null,
+            status: user.status,
+            activeMemberships: 0,
+            activeSessions: 0,
+            lastSeenAt: null,
+            createdAt: user.created_at.toISOString(),
+          },
+          temporaryPassword: input.temporaryPassword,
+        };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async issueCompanyCreationCode(actorUserId, input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setPlatformContext(client, actorUserId);
+        const ownerResult = await client.query<{ id: string; display_name: string }>(
+          `SELECT id, display_name
+             FROM users
+            WHERE id = $1 AND status = 'active' AND platform_role IS NULL`,
+          [input.ownerUserId],
+        );
+        const owner = ownerResult.rows[0];
+        if (!owner) throw new Error("OWNER_NOT_FOUND");
+        let code = "";
+        let result: {
+          id: string;
+          expires_at: Date;
+        } | null = null;
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          code = generateCompanyCode();
+          try {
+            const inserted = await client.query<{ id: string; expires_at: Date }>(
+              `INSERT INTO company_creation_codes (
+                 owner_user_id, code_hash, membership_plan, expires_at, created_by
+               ) VALUES ($1, $2, $3, now() + interval '30 days', $4)
+               RETURNING id, expires_at`,
+              [input.ownerUserId, companyCodeHash(code), input.membershipPlan, actorUserId],
+            );
+            result = inserted.rows[0] ?? null;
+            break;
+          } catch (error) {
+            if ((error as { code?: string }).code !== "23505" || attempt === 4) throw error;
+          }
+        }
+        if (!result) throw new Error("Company creation code insert did not return a record");
+        await client.query(
+          `INSERT INTO audit_events (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES (NULL, $1, 'company_creation_code.issued', 'company_creation_code', $2, $3,
+                   jsonb_build_object('ownerUserId', $4::text, 'membershipPlan', $5::text))`,
+          [actorUserId, result.id, input.requestId, input.ownerUserId, input.membershipPlan],
+        );
+        await client.query("COMMIT");
+        return {
+          id: result.id,
+          code,
+          ownerUserId: owner.id,
+          ownerDisplayName: owner.display_name,
+          membershipPlan: input.membershipPlan,
+          expiresAt: result.expires_at.toISOString(),
+        } satisfies CompanyCreationCode;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
     async createTenantForOwner(actorUserId, input) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
         await client.query("SELECT set_config('app.user_id', $1, true)", [actorUserId]);
         await client.query("SELECT set_config('app.platform_role', '', true)");
+        const codeResult = await client.query<{
+          id: string;
+          owner_user_id: string;
+          membership_plan: MembershipPlan;
+          expires_at: Date;
+        }>(
+          `SELECT id, owner_user_id, membership_plan, expires_at
+             FROM company_creation_codes
+            WHERE code_hash = $1
+              AND owner_user_id = $2
+              AND status = 'issued'
+            FOR UPDATE`,
+          [companyCodeHash(input.code), actorUserId],
+        );
+        const code = codeResult.rows[0];
+        if (!code) {
+          await client.query("ROLLBACK");
+          return { status: "invalid_code" as const };
+        }
+        if (code.expires_at <= new Date()) {
+          await client.query(`UPDATE company_creation_codes SET status = 'revoked' WHERE id = $1`, [
+            code.id,
+          ]);
+          await client.query("COMMIT");
+          return { status: "expired_code" as const };
+        }
         const base = tenantSlugSeed(input.displayName);
         await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))", [base]);
         let slug = base;
@@ -599,9 +750,9 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           slug: string;
         }>(
           `INSERT INTO tenants (slug, display_name, membership_plan, created_by)
-           VALUES ($1, $2, 'pro', $3)
+           VALUES ($1, $2, $3, $4)
            RETURNING id, display_name, slug`,
-          [slug, input.displayName, actorUserId],
+          [slug, input.displayName, code.membership_plan, actorUserId],
         );
         const tenant = tenantResult.rows[0];
         if (!tenant) throw new Error("Owner tenant insert did not return a record");
@@ -619,7 +770,7 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
         await insertEntitlementVersion(client, {
           actorUserId,
           additionalEmployeeSeats: 0,
-          membershipPlan: "pro",
+          membershipPlan: code.membership_plan,
           requestId: input.requestId,
           tenantId: tenant.id,
           version: 1,
@@ -642,11 +793,18 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
         await client.query(
           `INSERT INTO audit_events (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
            VALUES ($1, $2, 'tenant.created_by_owner', 'tenant', $1, $3,
-                   jsonb_build_object('slug', $4::text, 'membershipPlan', 'pro'))`,
-          [tenant.id, actorUserId, input.requestId, tenant.slug],
+                   jsonb_build_object('slug', $4::text, 'membershipPlan', $5::text, 'creationCodeId', $6::text))`,
+          [tenant.id, actorUserId, input.requestId, tenant.slug, code.membership_plan, code.id],
+        );
+        await client.query(
+          `UPDATE company_creation_codes
+              SET status = 'redeemed', redeemed_at = now(), redeemed_tenant_id = $2
+            WHERE id = $1`,
+          [code.id, tenant.id],
         );
         await client.query("COMMIT");
         return {
+          status: "created" as const,
           tenantId: tenant.id,
           tenantName: tenant.display_name,
           tenantSlug: tenant.slug,

@@ -10,7 +10,8 @@ import type {
 } from "../../../lib/platform";
 import { serverApi } from "../../../lib/server-api";
 import { ActivityFeed, activityActionLabel } from "../ActivityFeed";
-import { CreateTenantForm } from "./CreateTenantForm";
+import { IssueCompanyCodeForm } from "./IssueCompanyCodeForm";
+import { RegisterOwnerForm } from "./RegisterOwnerForm";
 import { SupportAccessControl } from "./SupportAccessControl";
 import { TenantMembershipPlanControl } from "./TenantMembershipPlanControl";
 import { TenantReadiness } from "./TenantReadiness";
@@ -152,6 +153,9 @@ export default async function DeveloperDashboard({
   const overview = (await response.json()) as PlatformOverview;
   const directory = (await directoryResponse.json()) as TenantDirectory;
   const userDirectory = (await userDirectoryResponse.json()) as PlatformUserDirectory;
+  const ownerUsers = userDirectory.users.filter(
+    (user) => user.platformRole === null && user.status === "active",
+  );
   const activityDirectory = (await activityDirectoryResponse.json()) as PlatformActivityDirectory;
   const { access } = (await supportResponse.json()) as { access: SupportAccessRecord[] };
   const system = (await systemResponse.json()) as PlatformSystemStatus;
@@ -380,24 +384,31 @@ export default async function DeveloperDashboard({
           <aside className="dashboard-card create-card">
             <div className="card-heading">
               <div>
-                <span className="panel-eyebrow">Alta controlada</span>
-                <h2>Nueva empresa</h2>
+                <span className="panel-eyebrow">Acceso inicial</span>
+                <h2>Registrar propietario</h2>
               </div>
             </div>
-            <p>Crea únicamente el espacio aislado. Los usuarios y reglas se configuran después.</p>
-            <CreateTenantForm />
+            <p>Crea la cuenta que recibirá el acceso y podrá administrar varias empresas.</p>
+            <RegisterOwnerForm />
           </aside>
           <aside className="dashboard-card create-card">
             <div className="card-heading">
               <div>
-                <span className="panel-eyebrow">Acceso inicial</span>
-                <h2>Propietario autónomo</h2>
+                <span className="panel-eyebrow">Suscripción confirmada</span>
+                <h2>Emitir código de empresa</h2>
               </div>
             </div>
             <p>
-              El propietario crea su empresa desde el primer ingreso y puede administrar varias
-              empresas con la misma cuenta.
+              Emite un código por empresa pagada. El propietario lo usa una sola vez para crear su
+              espacio.
             </p>
+            <IssueCompanyCodeForm
+              owners={ownerUsers.map((user) => ({
+                id: user.id,
+                displayName: user.displayName,
+                email: user.email,
+              }))}
+            />
           </aside>
         </div>
       </div>

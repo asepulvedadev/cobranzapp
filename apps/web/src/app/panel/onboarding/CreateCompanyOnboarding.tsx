@@ -18,6 +18,9 @@ export function CreateCompanyOnboarding() {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
+        code: String(form.get("code") ?? "")
+          .trim()
+          .toUpperCase(),
         displayName: String(form.get("displayName") ?? "").trim(),
         password: String(form.get("password") ?? ""),
       }),
@@ -35,6 +38,20 @@ export function CreateCompanyOnboarding() {
 
   return (
     <form className="tenant-form onboarding-company-form" onSubmit={submit}>
+      <label htmlFor="company-code">Código de suscripción</label>
+      <input
+        autoCapitalize="characters"
+        autoComplete="one-time-code"
+        id="company-code"
+        name="code"
+        pattern="CZA-[A-Z0-9]{4}(?:-[A-Z0-9]{4}){2}"
+        placeholder="CZA-AB12-CD34-EF56"
+        required
+        spellCheck={false}
+      />
+      <small>
+        Es un código único entregado por cobranzapp después de confirmar tu suscripción.
+      </small>
       <label htmlFor="company-display-name">Nombre de la empresa</label>
       <input
         autoComplete="organization"

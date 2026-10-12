@@ -1680,6 +1680,25 @@ html:has(.panel-shell) {
   font-weight: 700;
 }
 
+.creation-code-result {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid #f0cb69;
+  border-radius: 8px;
+  background: #fff8dd;
+  color: #5e4a14;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.creation-code-result strong {
+  color: #171917;
+  font-size: 18px;
+  letter-spacing: 0.08em;
+}
+
 .member-profile-form {
   max-width: 720px;
 }

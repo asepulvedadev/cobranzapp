@@ -1,20 +1,24 @@
 import type {
+  CompanyCreationCode,
   MembershipEntitlement,
   MembershipPlan,
   PlatformActivityDirectory,
   PlatformOverview,
   PlatformTenantDirectory,
   PlatformTenantStatus,
+  PlatformUser,
   PlatformUserDirectory,
   PlatformUserStatus,
 } from "@cobranzapp/contracts";
 
 export type {
+  CompanyCreationCode,
   MembershipEntitlement,
   MembershipPlan,
   PlatformActivityDirectory,
   PlatformAuditActivity,
   PlatformOverview,
+  PlatformUser,
   PlatformUserDirectory,
   PlatformUserStatus,
 } from "@cobranzapp/contracts";
@@ -114,13 +118,36 @@ export interface PlatformService {
   ): Promise<PlatformOverview["tenants"][number]>;
   createTenantForOwner?(
     actorUserId: string,
-    input: { displayName: string; requestId: string },
-  ): Promise<{
-    tenantId: string;
-    tenantName: string;
-    tenantSlug: string;
-    role: "owner";
-  }>;
+    input: { code: string; displayName: string; requestId: string },
+  ): Promise<
+    | {
+        status: "created";
+        tenantId: string;
+        tenantName: string;
+        tenantSlug: string;
+        role: "owner";
+      }
+    | { status: "invalid_code" }
+    | { status: "expired_code" }
+  >;
+  createOwnerAccount?(
+    actorUserId: string,
+    input: {
+      username: string;
+      email: string;
+      displayName: string;
+      temporaryPassword: string;
+      requestId: string;
+    },
+  ): Promise<{ user: PlatformUser; temporaryPassword: string }>;
+  issueCompanyCreationCode?(
+    actorUserId: string,
+    input: {
+      ownerUserId: string;
+      membershipPlan: MembershipPlan;
+      requestId: string;
+    },
+  ): Promise<CompanyCreationCode>;
   updateMembershipPlan(
     actorUserId: string,
     tenantId: string,

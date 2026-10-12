@@ -19,15 +19,15 @@ export default async function CompanyOnboardingPage() {
           <span className="panel-eyebrow">Nuevo espacio</span>
           <h1>Crea tu empresa</h1>
           <p>
-            Una misma cuenta puede administrar varias empresas. Empieza con el nombre y completa los
-            datos operativos en el siguiente paso.
+            Usa el código de suscripción que te entregó cobranzapp. Una misma cuenta puede
+            administrar varias empresas, cada una con su propio código.
           </p>
         </div>
       </header>
       <section className="dashboard-card onboarding-card">
         <div className="card-heading">
           <div>
-            <span className="panel-eyebrow">Paso 1 de 2</span>
+            <span className="panel-eyebrow">Activación de empresa</span>
             <h2>Datos esenciales</h2>
           </div>
           <span className="onboarding-user">{user.email}</span>

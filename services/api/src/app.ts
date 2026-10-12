@@ -4,7 +4,9 @@ import {
   borrowerReviewRequestSchema,
   changePasswordRequestSchema,
   createBranchRequestSchema,
+  createCompanyCreationCodeRequestSchema,
   createOwnerTenantRequestSchema,
+  createPlatformOwnerRequestSchema,
   createPlatformTenantRequestSchema,
   createTeamRequestSchema,
   financialSchedulePreviewRequestSchema,
@@ -430,7 +432,7 @@ export function buildApp(dependencies: AppDependencies) {
         reply,
         403,
         "PLATFORM_ACCOUNT_ONLY",
-        "Las cuentas de plataforma crean empresas desde la consola de desarrollador.",
+        "Las empresas se crean con un código de suscripción asignado a su propietario.",
         request.id,
       );
     }
@@ -440,7 +442,7 @@ export function buildApp(dependencies: AppDependencies) {
         reply,
         400,
         "INVALID_COMPANY_ONBOARDING",
-        "Revisa el nombre y la contraseña de confirmación.",
+        "Revisa el código, el nombre y la contraseña de confirmación.",
         request.id,
       );
     }
@@ -461,10 +463,36 @@ export function buildApp(dependencies: AppDependencies) {
     }
     try {
       const tenant = await dependencies.platformService.createTenantForOwner(session.user.id, {
+        code: body.data.code,
         displayName: body.data.displayName,
         requestId: request.id,
       });
-      return reply.code(201).send({ tenant });
+      if (tenant.status === "invalid_code") {
+        return sendError(
+          reply,
+          403,
+          "COMPANY_CODE_INVALID",
+          "El código no corresponde a esta cuenta o ya fue utilizado.",
+          request.id,
+        );
+      }
+      if (tenant.status === "expired_code") {
+        return sendError(
+          reply,
+          410,
+          "COMPANY_CODE_EXPIRED",
+          "El código de empresa venció. Solicita uno nuevo.",
+          request.id,
+        );
+      }
+      return reply.code(201).send({
+        tenant: {
+          tenantId: tenant.tenantId,
+          tenantName: tenant.tenantName,
+          tenantSlug: tenant.tenantSlug,
+          role: tenant.role,
+        },
+      });
     } catch (error) {
       if (error && typeof error === "object" && "code" in error && error.code === "23505") {
         return sendError(
@@ -897,6 +925,76 @@ export function buildApp(dependencies: AppDependencies) {
       requestId: request.id,
     });
     return reply.code(201).send({ tenant });
+  });
+
+  app.post("/v1/platform/owners", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const parsed = createPlatformOwnerRequestSchema.safeParse(request.body);
+    if (!parsed.success || !dependencies.platformService.createOwnerAccount) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_OWNER_ACCOUNT",
+        "Revisa los datos del propietario.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    try {
+      const result = await dependencies.platformService.createOwnerAccount(session.user.id, {
+        ...parsed.data,
+        requestId: request.id,
+      });
+      return reply.code(201).send(result);
+    } catch (error) {
+      if ((error as { code?: string }).code === "23505") {
+        return sendError(
+          reply,
+          409,
+          "OWNER_ACCOUNT_EXISTS",
+          "Ya existe una cuenta con ese usuario o correo.",
+          request.id,
+        );
+      }
+      throw error;
+    }
+  });
+
+  app.post("/v1/platform/company-codes", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const parsed = createCompanyCreationCodeRequestSchema.safeParse(request.body);
+    if (!parsed.success || !dependencies.platformService.issueCompanyCreationCode) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_COMPANY_CODE",
+        "Selecciona un propietario y un plan válido.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    try {
+      const code = await dependencies.platformService.issueCompanyCreationCode(session.user.id, {
+        ...parsed.data,
+        requestId: request.id,
+      });
+      return reply.code(201).send({ code });
+    } catch (error) {
+      if (error instanceof Error && error.message === "OWNER_NOT_FOUND") {
+        return sendError(
+          reply,
+          404,
+          "OWNER_NOT_FOUND",
+          "El propietario no existe o está deshabilitado.",
+          request.id,
+        );
+      }
+      throw error;
+    }
   });
 
   app.patch("/v1/platform/tenants/:tenantId/status", async (request, reply) => {

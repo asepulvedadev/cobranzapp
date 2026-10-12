@@ -8,7 +8,8 @@
 |---|---|---|
 | Plataforma y autenticación | Completado | Inicio por usuario o correo, sesiones HttpOnly, cambio obligatorio de contraseña inicial, MFA y reautenticación |
 | Multitenencia | Completado | Empresas, membresías, roles, sedes, equipos, invitaciones, RLS y claves compuestas por empresa |
-| Consola de desarrollador | Completado | Directorios paginados, planes, cupos, estados, actividad, estado técnico y soporte temporal auditado |
+| Alta comercial | Completado | El desarrollador registra propietarios, emite códigos únicos por suscripción y cada propietario crea varias empresas desde su panel |
+| Consola de desarrollador | Completado | Directorios paginados, registro de propietarios, emisión de códigos, planes, cupos, estados, actividad, estado técnico y soporte temporal auditado |
 | Expediente de cliente | Completado | Identidad manual, teléfonos, direcciones, contactos de emergencia, foto designada y documentos privados |
 | Personal operativo | Completado | Perfil de supervisores y cobradores, identidad cifrada, últimos cuatro dígitos, tipo de sangre con consentimiento y documentos privados |
 | Verificación compartida | Completado con activación controlada | Consentimiento, propósito, vencimiento, consulta mínima, correcciones, disputas y auditoría; no es lista negra |

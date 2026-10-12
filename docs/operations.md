@@ -7,6 +7,19 @@ Owns operational journeys, borrower dossier/document capture, routes, supervisio
 
 ## Main user journeys
 
+### Activación comercial de empresas
+
+La consola de plataforma no crea empresas operativas directamente. El flujo controlado es:
+
+1. El desarrollador registra la cuenta del propietario y entrega el acceso inicial.
+2. Después de confirmar el pago, emite un código único asociado al propietario y al plan.
+3. El propietario inicia sesión, cambia su contraseña y usa el código para crear una empresa.
+4. El código se consume una sola vez; para otra empresa se emite otro código.
+5. El selector de espacios permite cambiar entre empresas y mantiene separados empleados, clientes,
+   configuración y análisis.
+
+Los códigos se almacenan como hash, expiran en 30 días y nunca se guardan en texto plano.
+
 ### Tenant onboarding
 
 1. Owner registers and verifies identity-provider login; organization identity is a separate business verification workflow.

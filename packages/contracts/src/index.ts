@@ -184,6 +184,11 @@ export const createPlatformTenantRequestSchema = z.object({
 
 export const createOwnerTenantRequestSchema = z.object({
   displayName: z.string().trim().min(2).max(120),
+  code: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^CZA-[A-Z0-9]{4}(?:-[A-Z0-9]{4}){2}$/),
   password: z.string().min(12).max(256),
 });
 
@@ -192,6 +197,35 @@ export const ownerTenantResponseSchema = z.object({
 });
 
 export const platformTenantResponseSchema = z.object({ tenant: platformTenantSchema });
+
+export const createPlatformOwnerRequestSchema = z.object({
+  username: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9._-]{3,40}$/),
+  email: z.email(),
+  displayName: z.string().trim().min(2).max(100),
+  temporaryPassword: z.string().min(12).max(256),
+});
+
+export const createCompanyCreationCodeRequestSchema = z.object({
+  ownerUserId: z.uuid(),
+  membershipPlan: membershipPlanSchema,
+});
+
+export const companyCreationCodeSchema = z.object({
+  id: z.uuid(),
+  code: z.string().regex(/^CZA-[A-Z0-9]{4}(?:-[A-Z0-9]{4}){2}$/),
+  ownerUserId: z.uuid(),
+  ownerDisplayName: z.string().min(1),
+  membershipPlan: membershipPlanSchema,
+  expiresAt: z.iso.datetime(),
+});
+
+export const companyCreationCodeResponseSchema = z.object({
+  code: companyCreationCodeSchema,
+});
 
 export const platformTenantStatusUpdateRequestSchema = z.object({
   status: platformTenantStatusSchema.exclude(["draft"]),
@@ -247,6 +281,11 @@ export const platformUserStatusUpdateRequestSchema = z.object({
 export const platformUserStatusUpdateResponseSchema = z.object({
   status: platformUserStatusSchema,
   revokedSessions: z.number().int().nonnegative(),
+});
+
+export const platformOwnerCreatedResponseSchema = z.object({
+  user: platformUserSchema,
+  temporaryPassword: z.string().min(12),
 });
 
 export const platformSystemStatusSchema = z.object({
@@ -964,6 +1003,12 @@ export type PlatformTenant = z.infer<typeof platformTenantSchema>;
 export type PlatformOverview = z.infer<typeof platformOverviewSchema>;
 export type PlatformTenantDirectory = z.infer<typeof platformTenantDirectorySchema>;
 export type CreatePlatformTenantRequest = z.infer<typeof createPlatformTenantRequestSchema>;
+export type CreatePlatformOwnerRequest = z.infer<typeof createPlatformOwnerRequestSchema>;
+export type CreateCompanyCreationCodeRequest = z.infer<
+  typeof createCompanyCreationCodeRequestSchema
+>;
+export type CompanyCreationCode = z.infer<typeof companyCreationCodeSchema>;
+export type PlatformOwnerCreatedResponse = z.infer<typeof platformOwnerCreatedResponseSchema>;
 export type PlatformTenantStatusUpdateRequest = z.infer<
   typeof platformTenantStatusUpdateRequestSchema
 >;
