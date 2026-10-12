@@ -23,9 +23,6 @@ export function SiteHeader() {
             </Link>
           ))}
         </div>
-        <Link className="nav-plans-shortcut" href="/#planes">
-          Planes
-        </Link>
         <div className="nav-actions">
           <Link className="nav-login" href="/ingresar" aria-label="Ingresar" title="Ingresar">
             <SignInIcon size={24} weight="bold" aria-hidden="true" focusable="false" />

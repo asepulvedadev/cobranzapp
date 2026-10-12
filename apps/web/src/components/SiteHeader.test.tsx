@@ -3,6 +3,15 @@ import { describe, expect, it } from "vitest";
 import { SiteHeader } from "./SiteHeader";
 
 describe("simplified public navigation", () => {
+  it("keeps Plans in the desktop navigation and mobile menu without an external shortcut", () => {
+    const html = renderToStaticMarkup(<SiteHeader />);
+    expect(html).not.toContain("nav-plans-shortcut");
+    expect(html.match(/href="\/#planes"/g)).toHaveLength(2);
+    const mobileMenu = html.match(/class="mobile-menu-panel">(.*?)<\/div>/)?.[1];
+    expect(mobileMenu).toContain('href="/#planes"');
+    expect(mobileMenu).toContain("Planes");
+  });
+
   it("removes the demo CTA from desktop and mobile navigation", () => {
     const html = renderToStaticMarkup(<SiteHeader />);
     expect(html).not.toContain("Solicitar demostración");
