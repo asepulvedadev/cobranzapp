@@ -160,6 +160,53 @@
   font-weight: 800;
 }
 
+.login-mfa-intro {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 8px;
+  padding: 14px;
+  border: 1px solid #e5c664;
+  border-radius: 10px;
+  background: #fff8dd;
+}
+
+.login-mfa-intro strong {
+  font-size: 14px;
+}
+
+.login-mfa-intro p {
+  margin: 0;
+  color: #6e5a21;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.login-mfa-form input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+
+.login-secondary {
+  min-height: 48px;
+  border: 1px solid #cfd4cf;
+  border-radius: 10px;
+  background: transparent;
+  color: #303530;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.login-secondary:focus-visible {
+  outline: 3px solid #fbbf24;
+  outline-offset: 3px;
+}
+
+.login-secondary:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .login-submit:hover {
   background: #2b302c;
 }
