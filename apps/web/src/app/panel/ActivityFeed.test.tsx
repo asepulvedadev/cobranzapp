@@ -1,0 +1,31 @@
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import { ActivityFeed } from "./ActivityFeed";
+
+describe("ActivityFeed", () => {
+  it("explains organization lifecycle events in Spanish", () => {
+    const html = renderToStaticMarkup(
+      <ActivityFeed
+        activity={[
+          {
+            id: "branch-event",
+            action: "branch.status_changed",
+            actorDisplayName: "Propietaria",
+            actorUsername: "propietaria",
+            happenedAt: "2026-10-11T12:00:00.000Z",
+          },
+          {
+            id: "team-event",
+            action: "team.status_changed",
+            actorDisplayName: "Supervisora",
+            actorUsername: "supervisora",
+            happenedAt: "2026-10-11T12:01:00.000Z",
+          },
+        ]}
+      />,
+    );
+
+    expect(html).toContain("Cambió el estado de una sede");
+    expect(html).toContain("Cambió el estado de un equipo");
+  });
+});

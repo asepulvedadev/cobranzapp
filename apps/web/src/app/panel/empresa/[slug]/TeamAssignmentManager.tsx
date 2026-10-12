@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useMemo, useState } from "react";
 import type { TenantOverview } from "../../../../lib/platform";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
+import { OrganizationStatusButton } from "./OrganizationStatusButton";
 
 type Member = TenantOverview["members"][number];
 type Team = TenantOverview["teams"][number];
@@ -117,9 +118,18 @@ export function TeamAssignmentManager({
                   <strong>{team.displayName}</strong>
                   <small>{team.branchName ?? "Sin sede asignada"}</small>
                 </span>
-                <span className={`status status-${team.status}`}>
-                  {team.status === "active" ? "Activo" : "Inactivo"}
-                </span>
+                <div className="organization-status-actions">
+                  <span className={`status status-${team.status}`}>
+                    {team.status === "active" ? "Activo" : "Inactivo"}
+                  </span>
+                  <OrganizationStatusButton
+                    kind="team"
+                    name={team.displayName}
+                    resourceId={team.id}
+                    status={team.status}
+                    tenantId={tenantId}
+                  />
+                </div>
               </div>
               {assignedMembers.length ? (
                 <ul className="team-member-list" aria-label={`Integrantes de ${team.displayName}`}>

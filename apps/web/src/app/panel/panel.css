@@ -215,6 +215,7 @@ html:has(.panel-shell) {
 .member-access-control button:focus-visible,
 .team-assignment-manager select:focus,
 .team-assignment-manager button:focus-visible,
+.organization-status-control button:focus-visible,
 .session-manager button:focus-visible,
 .tenant-form input:focus,
 .tenant-form select:focus,
@@ -1428,6 +1429,11 @@ html:has(.panel-shell) {
   color: #065f46;
 }
 
+.status-inactive {
+  background: #e5e7eb;
+  color: #374151;
+}
+
 .status-suspended {
   background: #fef3c7;
   color: #92400e;
@@ -2089,6 +2095,50 @@ html:has(.panel-shell) {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.organization-status-actions {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: end;
+  gap: 6px;
+}
+
+.organization-status-control {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+}
+
+.organization-status-control button {
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid #c9d0ca;
+  border-radius: 7px;
+  background: #fff;
+  color: var(--panel-dark);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.organization-status-control button.danger-action {
+  border-color: #fecaca;
+  color: var(--panel-danger);
+}
+
+.organization-status-control button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.organization-status-control small {
+  max-width: 220px;
+  color: var(--panel-danger);
+  font-size: 10px;
+  line-height: 1.35;
+  text-align: right;
 }
 
 .team-item-heading > span:first-child,

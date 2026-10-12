@@ -7,6 +7,7 @@ import { ActivityFeed } from "../../ActivityFeed";
 import { InviteUserForm } from "../../InviteUserForm";
 import { CustomerWorkspace } from "./CustomerWorkspace";
 import { MemberAccessControl } from "./MemberAccessControl";
+import { OrganizationStatusButton } from "./OrganizationStatusButton";
 import { PendingInvitationList } from "./PendingInvitationList";
 import { SettingsVersionHistory } from "./SettingsVersionHistory";
 import { SupportAccessReview } from "./SupportAccessReview";
@@ -284,9 +285,18 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
                         <strong>{branch.displayName}</strong>
                         <small>Código: {branch.code}</small>
                       </span>
-                      <span className={`status status-${branch.status}`}>
-                        {branch.status === "active" ? "Activa" : "Inactiva"}
-                      </span>
+                      <div className="organization-status-actions">
+                        <span className={`status status-${branch.status}`}>
+                          {branch.status === "active" ? "Activa" : "Inactiva"}
+                        </span>
+                        <OrganizationStatusButton
+                          kind="branch"
+                          name={branch.displayName}
+                          resourceId={branch.id}
+                          status={branch.status}
+                          tenantId={overview.tenant.id}
+                        />
+                      </div>
                     </article>
                   ))}
                 </div>
@@ -298,6 +308,10 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
               <h3>Equipos</h3>
               {canSeeTeam ? (
                 <TeamAssignmentManager
+                  key={[
+                    ...overview.branches.map((branch) => `${branch.id}:${branch.status}`),
+                    ...overview.teams.map((team) => `${team.id}:${team.status}`),
+                  ].join("|")}
                   members={overview.members}
                   teams={overview.teams}
                   tenantId={overview.tenant.id}
