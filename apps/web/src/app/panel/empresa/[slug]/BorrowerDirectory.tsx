@@ -46,6 +46,18 @@ export function BorrowerDirectory({
     setIsError(false);
     setIsSubmitting(true);
     const form = new FormData(event.currentTarget);
+    const requiredFiles = ["identityFront", "identityBack", "profilePhoto"];
+    if (
+      requiredFiles.some((field) => {
+        const file = form.get(field);
+        return !(file instanceof File) || file.size === 0;
+      })
+    ) {
+      setMessage("Adjunta frente, reverso y foto designada de perfil antes de guardar.");
+      setIsError(true);
+      setIsSubmitting(false);
+      return;
+    }
     const response = await sensitiveFetch(`/api/v1/tenants/${tenantId}/borrowers`, {
       method: "POST",
       headers: { "content-type": "application/json" },
