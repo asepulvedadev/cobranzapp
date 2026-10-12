@@ -436,13 +436,10 @@ export default function Home() {
           <span className="eyebrow">Construyamos la operación correcta</span>
           <h2>Cuéntanos cómo cobras hoy y qué necesitas controlar mañana.</h2>
           <p>Estamos validando cobranzapp con propietarios y equipos de cobranza en Colombia.</p>
-          <a
-            className="button button-light"
-            href="mailto:info@cobranzaap.tech?subject=Quiero%20participar%20en%20la%20validación%20de%20cobranzapp"
-          >
+          <a className="button button-light" href="/contacto?source=inicio">
             Hablar con el equipo
           </a>
-          <a className="email-link" href="mailto:info@cobranzaap.tech">
+          <a className="email-link" href="/contacto?source=inicio">
             info@cobranzaap.tech
           </a>
         </section>

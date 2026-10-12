@@ -75,14 +75,15 @@ describe("approved membership catalog", () => {
     );
   });
 
-  it("formats Colombian pesos and sends each plan enquiry to the existing contact mailbox", () => {
+  it("formats Colombian pesos and routes each plan enquiry to the quick contact form", () => {
     expect(formatCop(150_000)).toBe("$150.000");
     expect(formatCop(300_000)).toBe("$300.000");
     for (const plan of memberships) {
-      const link = new URL(membershipContactHref(plan.name));
-      expect(link.protocol).toBe("mailto:");
-      expect(link.pathname).toBe("info@cobranzaap.tech");
-      expect(link.searchParams.get("subject")).toContain(`plan ${plan.name}`);
+      const link = new URL(membershipContactHref(plan.name), "https://cobranzaap.tech");
+      expect(link.protocol).toBe("https:");
+      expect(link.pathname).toBe("/contacto");
+      expect(link.searchParams.get("plan")).toBe(plan.name);
+      expect(link.searchParams.get("source")).toBe("planes");
     }
   });
 });

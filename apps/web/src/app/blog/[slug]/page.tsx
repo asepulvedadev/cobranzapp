@@ -89,10 +89,7 @@ export default async function BlogArticlePage({ params }: PageProps) {
                 Si administras una cartera en Colombia, cuéntanos cómo organizas hoy tus rutas y
                 cierres.
               </p>
-              <a
-                className="button"
-                href="mailto:info@cobranzaap.tech?subject=Quiero%20conversar%20sobre%20cobranzapp"
-              >
+              <a className="button" href="/contacto?source=blog">
                 Conversar con cobranzapp
               </a>
             </aside>

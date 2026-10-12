@@ -90,10 +90,7 @@ export default function AboutPage() {
           <h2>
             Queremos entender cómo funciona una jornada real antes de cerrarla en una pantalla.
           </h2>
-          <a
-            className="button button-light"
-            href="mailto:info@cobranzaap.tech?subject=Quiero%20conversar%20sobre%20cobranzapp"
-          >
+          <a className="button button-light" href="/contacto?source=nosotros">
             Conversar con el equipo
           </a>
         </section>

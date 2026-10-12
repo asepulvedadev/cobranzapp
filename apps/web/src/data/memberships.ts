@@ -99,6 +99,5 @@ export function formatCop(amount: number): string {
 }
 
 export function membershipContactHref(name: string): string {
-  const subject = encodeURIComponent(`Información del plan ${name} de cobranzapp`);
-  return `mailto:info@cobranzaap.tech?subject=${subject}`;
+  return `/contacto?plan=${encodeURIComponent(name)}&source=planes`;
 }

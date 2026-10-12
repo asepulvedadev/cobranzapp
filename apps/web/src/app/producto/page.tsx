@@ -160,10 +160,7 @@ export default function ProductPage() {
               revisar el cierre. Cada empresa opera en un espacio independiente y cada perfil entra
               solo a lo que necesita.
             </p>
-            <a
-              className="button"
-              href="mailto:info@cobranzaap.tech?subject=Quiero%20conocer%20el%20producto%20cobranzapp"
-            >
+            <a className="button" href="/contacto?source=producto">
               Solicitar una demostración
             </a>
           </div>
@@ -290,10 +287,7 @@ export default function ProductPage() {
             Cuéntanos cómo administras hoy la cartera, las rutas y el recaudo. Así podremos validar
             el alcance antes de ofrecer una promesa comercial.
           </p>
-          <a
-            className="button button-light"
-            href="mailto:info@cobranzaap.tech?subject=Quiero%20validar%20cobranzapp%20con%20mi%20operación"
-          >
+          <a className="button button-light" href="/contacto?source=producto">
             Hablar con el equipo
           </a>
         </section>

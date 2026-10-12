@@ -34,26 +34,30 @@ export default function PrivacyPage() {
           <section>
             <h2>Datos de contacto</h2>
             <p>
-              Cuando escribes a <a href="mailto:info@cobranzaap.tech">info@cobranzaap.tech</a>,
-              usamos la información que envías para responder tu solicitud y dar seguimiento a la
-              conversación.
+              El formulario público solicita únicamente tu nombre y teléfono para que nuestro equipo
+              responda tu solicitud. Los enviamos mediante Resend al correo institucional
+              info@cobranzaap.tech. No solicitamos cédula, datos de préstamos ni información
+              financiera en este formulario, ni te suscribimos a campañas comerciales.
             </p>
           </section>
           <section>
             <h2>Datos del sitio</h2>
             <p>
-              Actualmente el sitio público no incluye formularios, cuentas ni analítica de terceros.
-              Los registros técnicos indispensables del servidor pueden conservar dirección IP,
-              fecha, recurso solicitado y resultado para seguridad y diagnóstico.
+              El formulario usa Resend como proveedor de envío de correo. Los datos de la solicitud
+              se procesan en ese servicio y llegan al buzón del equipo; el sitio no conserva una
+              base comercial de contactos. Resend puede procesar información fuera de Colombia. El
+              sitio público no incorpora analítica comercial de terceros. Los registros técnicos
+              indispensables del servidor pueden conservar dirección IP, fecha, recurso solicitado y
+              resultado para seguridad y diagnóstico.
             </p>
           </section>
           <section>
             <h2>Derechos y solicitudes</h2>
             <p>
               Puedes solicitar consulta, corrección o eliminación de la información que hayas
-              enviado al correo de contacto. Antes del lanzamiento se publicará la identificación
-              completa del responsable y los procedimientos exigidos por la normativa colombiana
-              aplicable.
+              enviado escribiendo a <a href="mailto:info@cobranzaap.tech">info@cobranzaap.tech</a>.
+              Antes del lanzamiento se publicará la identificación completa del responsable y los
+              procedimientos exigidos por la normativa colombiana aplicable.
             </p>
           </section>
         </article>

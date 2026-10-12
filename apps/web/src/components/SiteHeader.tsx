@@ -29,10 +29,7 @@ export function SiteHeader() {
           <Link className="nav-login" href="/ingresar">
             Ingresar
           </Link>
-          <a
-            className="button button-small"
-            href="mailto:info@cobranzaap.tech?subject=Demostración%20de%20cobranzapp"
-          >
+          <a className="button button-small" href="/contacto?source=demo">
             Solicitar demostración
           </a>
         </div>
@@ -48,9 +45,7 @@ export function SiteHeader() {
               </Link>
             ))}
             <Link href="/ingresar">Ingresar al sistema</Link>
-            <a href="mailto:info@cobranzaap.tech?subject=Demostración%20de%20cobranzapp">
-              Solicitar demostración
-            </a>
+            <a href="/contacto?source=demo">Solicitar demostración</a>
           </div>
         </details>
       </nav>

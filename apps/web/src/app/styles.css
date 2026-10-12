@@ -1436,6 +1436,85 @@ select {
   color: #57534e;
 }
 
+.contact-intro {
+  max-width: 480px;
+  margin-top: 28px;
+  color: var(--muted);
+  font-size: 19px;
+}
+
+.contact-card h2 {
+  margin: 22px 0 30px;
+  font-size: clamp(28px, 3vw, 38px);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.quick-contact {
+  display: grid;
+  gap: 20px;
+}
+
+.contact-field {
+  display: grid;
+  gap: 8px;
+}
+
+.contact-field label {
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.contact-field input {
+  width: 100%;
+  min-height: 56px;
+  padding: 14px 16px;
+  border: 1px solid #817225;
+  border-radius: 12px;
+  background: #fffcf0;
+  color: var(--dark);
+  font: inherit;
+  font-size: 16px;
+}
+
+.contact-field input:focus-visible {
+  outline: 3px solid var(--dark);
+  outline-offset: 3px;
+}
+
+.contact-trap {
+  display: none;
+}
+
+.contact-card .contact-consent {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.contact-consent a {
+  text-decoration: underline;
+}
+
+.contact-card .contact-feedback {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.contact-feedback:empty {
+  display: none;
+}
+
+.contact-card .contact-feedback-error {
+  color: #842617;
+}
+
+.quick-contact button:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
 .product-page {
   background: var(--light);
 }
@@ -2057,8 +2136,8 @@ select {
     padding: 32px 24px;
   }
   .contact-layout {
-    gap: 48px;
-    padding-block: 56px;
+    gap: 32px;
+    padding-block: 32px;
   }
   .contact-layout h1 {
     font-size: 48px;

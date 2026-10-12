@@ -29,12 +29,8 @@ describe("membership landing presentation", () => {
     expect(html).toContain("nunca al enlace del cliente");
     expect(html).toContain("El dueño controla los porcentajes");
     expect(html).toContain("supervisor o el dueño autoriza");
-    expect(html).toContain(
-      "mailto:info@cobranzaap.tech?subject=Informaci%C3%B3n%20del%20plan%20Pro",
-    );
-    expect(html).toContain(
-      "mailto:info@cobranzaap.tech?subject=Informaci%C3%B3n%20del%20plan%20Ultra",
-    );
+    expect(html).toContain("/contacto?plan=Pro&amp;source=planes");
+    expect(html).toContain("/contacto?plan=Ultra&amp;source=planes");
     expect(html).not.toContain("La plataforma y las funciones operativas están en desarrollo");
     expect(html).not.toContain("La contratación y el onboarding se coordinan con el equipo");
     expect(html).not.toContain("El comprobante diario no se presenta como facturación electrónica");

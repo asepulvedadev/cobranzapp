@@ -26,7 +26,7 @@ export default function LoginPage() {
           <LoginForm />
           <div className="login-support">
             <p>¿Tienes problemas para ingresar?</p>
-            <a href="mailto:info@cobranzaap.tech">info@cobranzaap.tech</a>
+            <a href="/contacto?source=soporte">info@cobranzaap.tech</a>
           </div>
           <Link className="login-back" href="/">
             ← Volver al sitio público

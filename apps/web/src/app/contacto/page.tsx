@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ContactForm } from "../../components/ContactForm";
 import { SiteFooter } from "../../components/SiteFooter";
 import { SiteHeader } from "../../components/SiteHeader";
 
@@ -10,7 +11,24 @@ export const metadata: Metadata = {
   alternates: { canonical: "/contacto" },
 };
 
-export default function ContactPage() {
+export default async function ContactPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ plan?: string; source?: string }>;
+}) {
+  const query = await searchParams;
+  const plan = query.plan === "Pro" || query.plan === "Ultra" ? query.plan : undefined;
+  const sources = [
+    "contacto",
+    "demo",
+    "planes",
+    "producto",
+    "nosotros",
+    "blog",
+    "soporte",
+    "inicio",
+  ];
+  const source = query.source && sources.includes(query.source) ? query.source : "contacto";
   return (
     <>
       <a className="skip-link" href="#contenido">
@@ -25,22 +43,20 @@ export default function ContactPage() {
               <span>/</span>
               <span>Contacto</span>
             </div>
-            <span className="eyebrow">Hablemos de la operación</span>
-            <h1>Cuéntanos qué necesitas controlar, no qué pantalla quieres comprar.</h1>
+            <span className="eyebrow">Hablemos, sin vueltas</span>
+            <h1>Te llamamos. Así de simple.</h1>
+            <p className="contact-intro">
+              Déjanos tu nombre y teléfono. Nuestro equipo se comunica contigo.
+            </p>
           </div>
           <div className="contact-card">
-            <span>Correo de contacto</span>
-            <a href="mailto:info@cobranzaap.tech">info@cobranzaap.tech</a>
-            <p>
-              Para preparar una conversación útil, incluye el tamaño aproximado de tu cartera, los
-              perfiles de tu equipo y cómo realizas hoy el cierre diario.
-            </p>
-            <a
-              className="button"
-              href="mailto:info@cobranzaap.tech?subject=Demostración%20de%20cobranzapp&body=Empresa:%0AOperación%20actual:%0ANúmero%20de%20personas:%0APrincipal%20problema:%0A"
-            >
-              Preparar mi solicitud
-            </a>
+            <span>Contacto rápido</span>
+            <h2>
+              Solo dos datos.
+              <br />
+              El resto lo conversamos.
+            </h2>
+            <ContactForm plan={plan} source={source} />
             <small>Cúcuta, Norte de Santander, Colombia</small>
           </div>
         </section>
