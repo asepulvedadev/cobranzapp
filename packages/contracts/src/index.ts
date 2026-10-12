@@ -74,6 +74,38 @@ export const securityActivityResponseSchema = z.object({
   activity: z.array(securityActivitySchema),
 });
 
+export const platformAuditActivitySchema = z.object({
+  id: z.uuid(),
+  action: z.string().min(1),
+  actorDisplayName: z.string().nullable(),
+  actorUsername: z.string().nullable(),
+  tenantId: z.uuid().nullable(),
+  tenantName: z.string().nullable(),
+  happenedAt: z.iso.datetime(),
+});
+
+export const platformActivityQuerySchema = z.object({
+  q: z.string().trim().max(80).optional(),
+  action: z
+    .string()
+    .trim()
+    .regex(/^[a-z][a-z0-9_.]{2,80}$/)
+    .optional(),
+  page: z.coerce.number().int().min(1).max(100_000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+export const platformActivityDirectorySchema = z.object({
+  activity: z.array(platformAuditActivitySchema),
+  availableActions: z.array(z.string().regex(/^[a-z][a-z0-9_.]{2,80}$/)),
+  pagination: z.object({
+    page: z.number().int().positive(),
+    pageSize: z.number().int().positive(),
+    total: z.number().int().nonnegative(),
+    totalPages: z.number().int().positive(),
+  }),
+});
+
 export const mfaStatusSchema = z.object({
   enabled: z.boolean(),
   setupPending: z.boolean(),
@@ -136,6 +168,8 @@ export type MfaLoginRequiredResponse = z.infer<typeof mfaLoginRequiredResponseSc
 export type MfaCodeRequest = z.infer<typeof mfaCodeRequestSchema>;
 export type AccountSession = z.infer<typeof accountSessionSchema>;
 export type SecurityActivity = z.infer<typeof securityActivitySchema>;
+export type PlatformAuditActivity = z.infer<typeof platformAuditActivitySchema>;
+export type PlatformActivityDirectory = z.infer<typeof platformActivityDirectorySchema>;
 export type MfaStatus = z.infer<typeof mfaStatusSchema>;
 export type ReauthenticationRequest = z.infer<typeof reauthenticationRequestSchema>;
 export type ChangePasswordRequest = z.infer<typeof changePasswordRequestSchema>;

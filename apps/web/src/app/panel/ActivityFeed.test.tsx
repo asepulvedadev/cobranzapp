@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ActivityFeed } from "./ActivityFeed";
+import { ActivityFeed, activityActionLabel } from "./ActivityFeed";
 
 describe("ActivityFeed", () => {
   it("explains administrative events in Spanish", () => {
@@ -43,5 +43,10 @@ describe("ActivityFeed", () => {
     expect(html).toContain("Cambió el estado de un equipo");
     expect(html).toContain("Actualizó la capacidad de empleados");
     expect(html).toContain("Cambió el acceso de un usuario");
+  });
+
+  it("provides readable labels for audit filters", () => {
+    expect(activityActionLabel("auth.mfa_enabled")).toBe("Activó la verificación en dos pasos");
+    expect(activityActionLabel("custom.event")).toBe("custom.event");
   });
 });

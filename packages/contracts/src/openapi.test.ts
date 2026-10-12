@@ -8,6 +8,7 @@ describe("OpenAPI contract", () => {
     expect(document.openapi).toBe("3.1.0");
     expect(document.info.version).toBe("test-sha");
     expect(document.paths["/v1/auth/login"].post.responses["202"]).toBeDefined();
+    expect(document.paths["/v1/platform/activity"].get.operationId).toBe("listPlatformActivity");
     expect(document.components.securitySchemes.cookieAuth.name).toBe("cobranzapp_session");
     expect(
       apiErrorSchema.safeParse({ error: { code: "AUTH_REQUIRED", message: "x" } }).success,

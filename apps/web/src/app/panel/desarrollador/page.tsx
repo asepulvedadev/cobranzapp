@@ -1,6 +1,7 @@
 import { CloudCheck, Database, GitCommit, Queue } from "@phosphor-icons/react/dist/ssr";
 import { redirect } from "next/navigation";
 import type {
+  PlatformActivityDirectory,
   PlatformOverview,
   PlatformSystemStatus,
   PlatformUserDirectory,
@@ -8,7 +9,7 @@ import type {
   TenantDirectory,
 } from "../../../lib/platform";
 import { serverApi } from "../../../lib/server-api";
-import { ActivityFeed } from "../ActivityFeed";
+import { ActivityFeed, activityActionLabel } from "../ActivityFeed";
 import { InviteUserForm } from "../InviteUserForm";
 import { CreateTenantForm } from "./CreateTenantForm";
 import { SupportAccessControl } from "./SupportAccessControl";
@@ -48,6 +49,15 @@ function userDirectoryHref(page: number, search: string, status: string | null) 
   return `/panel/desarrollador${query ? `?${query}` : ""}#usuarios`;
 }
 
+function activityDirectoryHref(page: number, search: string, action: string | null) {
+  const params = new URLSearchParams();
+  if (search) params.set("actividad", search);
+  if (action) params.set("accion", action);
+  if (page > 1) params.set("paginaActividad", String(page));
+  const query = params.toString();
+  return `/panel/desarrollador${query ? `?${query}` : ""}#actividad`;
+}
+
 function jobStatusDetail(jobs: PlatformSystemStatus["jobs"]) {
   if (jobs.dead > 0) {
     return jobs.dead === 1 ? "1 trabajo en cola de errores" : `${jobs.dead} trabajos con error`;
@@ -75,6 +85,9 @@ export default async function DeveloperDashboard({
     usuario?: string | string[];
     estadoUsuario?: string | string[];
     paginaUsuario?: string | string[];
+    actividad?: string | string[];
+    accion?: string | string[];
+    paginaActividad?: string | string[];
   }>;
 }) {
   const query = await searchParams;
@@ -98,24 +111,49 @@ export default async function DeveloperDashboard({
   const userDirectoryQuery = new URLSearchParams({ page: String(userPage), pageSize: "20" });
   if (userSearch) userDirectoryQuery.set("q", userSearch);
   if (userStatus) userDirectoryQuery.set("status", userStatus);
-  const [response, directoryResponse, userDirectoryResponse, supportResponse, systemResponse] =
-    await Promise.all([
-      serverApi("/v1/platform/overview"),
-      serverApi(`/v1/platform/tenants?${directoryQuery}`),
-      serverApi(`/v1/platform/users?${userDirectoryQuery}`),
-      serverApi("/v1/platform/support-access"),
-      serverApi("/v1/platform/system-status"),
-    ]);
+  const activitySearch = (firstQueryValue(query.actividad) ?? "").trim().slice(0, 80);
+  const requestedActivityAction = (firstQueryValue(query.accion) ?? "").trim();
+  const activityAction = /^[a-z][a-z0-9_.]{2,80}$/.test(requestedActivityAction)
+    ? requestedActivityAction
+    : null;
+  const requestedActivityPage = Number(firstQueryValue(query.paginaActividad));
+  const activityPage =
+    Number.isInteger(requestedActivityPage) && requestedActivityPage > 0
+      ? requestedActivityPage
+      : 1;
+  const activityDirectoryQuery = new URLSearchParams({
+    page: String(activityPage),
+    pageSize: "20",
+  });
+  if (activitySearch) activityDirectoryQuery.set("q", activitySearch);
+  if (activityAction) activityDirectoryQuery.set("action", activityAction);
+  const [
+    response,
+    directoryResponse,
+    userDirectoryResponse,
+    activityDirectoryResponse,
+    supportResponse,
+    systemResponse,
+  ] = await Promise.all([
+    serverApi("/v1/platform/overview"),
+    serverApi(`/v1/platform/tenants?${directoryQuery}`),
+    serverApi(`/v1/platform/users?${userDirectoryQuery}`),
+    serverApi(`/v1/platform/activity?${activityDirectoryQuery}`),
+    serverApi("/v1/platform/support-access"),
+    serverApi("/v1/platform/system-status"),
+  ]);
   if (response.status === 401) redirect("/ingresar");
   if (response.status === 403) redirect("/ingresar?error=sin-acceso");
   if (!response.ok) throw new Error("No fue posible cargar la consola de plataforma");
   if (!directoryResponse.ok) throw new Error("No fue posible cargar el directorio de empresas");
   if (!userDirectoryResponse.ok) throw new Error("No fue posible cargar el directorio de usuarios");
+  if (!activityDirectoryResponse.ok) throw new Error("No fue posible cargar la actividad");
   if (!supportResponse.ok) throw new Error("No fue posible cargar los accesos de soporte");
   if (!systemResponse.ok) throw new Error("No fue posible validar el estado de la plataforma");
   const overview = (await response.json()) as PlatformOverview;
   const directory = (await directoryResponse.json()) as TenantDirectory;
   const userDirectory = (await userDirectoryResponse.json()) as PlatformUserDirectory;
+  const activityDirectory = (await activityDirectoryResponse.json()) as PlatformActivityDirectory;
   const { access } = (await supportResponse.json()) as { access: SupportAccessRecord[] };
   const system = (await systemResponse.json()) as PlatformSystemStatus;
   const version =
@@ -499,10 +537,81 @@ export default async function DeveloperDashboard({
         <div className="card-heading">
           <div>
             <span className="panel-eyebrow">Trazabilidad</span>
-            <h2>Actividad reciente</h2>
+            <h2>Actividad de la plataforma</h2>
           </div>
+          <span>
+            {activityDirectory.pagination.total}{" "}
+            {activityDirectory.pagination.total === 1 ? "evento" : "eventos"}
+          </span>
         </div>
-        <ActivityFeed activity={overview.activity} />
+        <p className="operational-note">
+          Consulta acciones administrativas globales y por empresa. El registro conserva el actor,
+          la fecha y el contexto original.
+        </p>
+        <form className="tenant-directory-filters" action="/panel/desarrollador#actividad">
+          <label>
+            <span>Buscar actividad</span>
+            <input
+              defaultValue={activitySearch}
+              maxLength={80}
+              name="actividad"
+              placeholder="Actor, empresa o acción"
+              type="search"
+            />
+          </label>
+          <label>
+            <span>Tipo de acción</span>
+            <select defaultValue={activityAction ?? ""} name="accion">
+              <option value="">Todas</option>
+              {activityDirectory.availableActions.map((action) => (
+                <option key={action} value={action}>
+                  {activityActionLabel(action)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="tenant-directory-filter-actions">
+            <button type="submit">Filtrar</button>
+            {activitySearch || activityAction ? (
+              <a href="/panel/desarrollador#actividad">Limpiar</a>
+            ) : null}
+          </div>
+        </form>
+        <ActivityFeed activity={activityDirectory.activity} />
+        {activityDirectory.pagination.totalPages > 1 ? (
+          <nav className="tenant-directory-pagination" aria-label="Páginas de actividad">
+            {activityDirectory.pagination.page > 1 ? (
+              <a
+                href={activityDirectoryHref(
+                  activityDirectory.pagination.page - 1,
+                  activitySearch,
+                  activityAction,
+                )}
+              >
+                Anterior
+              </a>
+            ) : (
+              <span aria-disabled="true">Anterior</span>
+            )}
+            <strong>
+              Página {activityDirectory.pagination.page} de{" "}
+              {activityDirectory.pagination.totalPages}
+            </strong>
+            {activityDirectory.pagination.page < activityDirectory.pagination.totalPages ? (
+              <a
+                href={activityDirectoryHref(
+                  activityDirectory.pagination.page + 1,
+                  activitySearch,
+                  activityAction,
+                )}
+              >
+                Siguiente
+              </a>
+            ) : (
+              <span aria-disabled="true">Siguiente</span>
+            )}
+          </nav>
+        ) : null}
       </section>
 
       <section className="dashboard-card activity-card">

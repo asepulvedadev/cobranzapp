@@ -15,6 +15,8 @@ import {
   mfaLoginRequiredResponseSchema,
   mfaStatusResponseSchema,
   mfaStatusSchema,
+  platformActivityDirectorySchema,
+  platformActivityQuerySchema,
   reauthenticationRequestSchema,
   reauthenticationResponseSchema,
   securityActivityResponseSchema,
@@ -53,6 +55,8 @@ const documentedSchemas = {
   MfaEnrollmentResponse: mfaEnrollmentResponseSchema,
   MfaLoginRequiredResponse: mfaLoginRequiredResponseSchema,
   MfaStatus: mfaStatusSchema,
+  PlatformActivityDirectory: platformActivityDirectorySchema,
+  PlatformActivityQuery: platformActivityQuerySchema,
   ReauthenticationRequest: reauthenticationRequestSchema,
   ReauthenticationResponse: reauthenticationResponseSchema,
   SecurityActivity: securityActivitySchema,
@@ -79,6 +83,7 @@ export function createOpenApiDocument(version: string) {
     tags: [
       { name: "Estado", description: "Salud y disponibilidad del servicio." },
       { name: "Autenticación", description: "Sesiones web, MFA y seguridad de la cuenta." },
+      { name: "Plataforma", description: "Operaciones exclusivas del desarrollador." },
     ],
     paths: {
       "/health": {
@@ -270,6 +275,44 @@ export function createOpenApiDocument(version: string) {
           security: sessionSecurity,
           responses: {
             "204": response("Sesión cerrada."),
+            "403": errorResponses["403"],
+          },
+        },
+      },
+      "/v1/platform/activity": {
+        get: {
+          tags: ["Plataforma"],
+          operationId: "listPlatformActivity",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "q",
+              in: "query",
+              schema: { type: "string", maxLength: 80 },
+            },
+            {
+              name: "action",
+              in: "query",
+              schema: { type: "string", pattern: "^[a-z][a-z0-9_.]{2,80}$" },
+            },
+            {
+              name: "page",
+              in: "query",
+              schema: { type: "integer", minimum: 1, default: 1 },
+            },
+            {
+              name: "pageSize",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+            },
+          ],
+          responses: {
+            "200": response(
+              "Actividad administrativa paginada.",
+              schemaReference("PlatformActivityDirectory"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
             "403": errorResponses["403"],
           },
         },

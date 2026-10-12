@@ -2,6 +2,7 @@ import {
   changePasswordRequestSchema,
   loginRequestSchema,
   mfaCodeRequestSchema,
+  platformActivityQuerySchema,
   reauthenticationRequestSchema,
   type ServiceStatus,
 } from "@cobranzapp/contracts";
@@ -56,16 +57,6 @@ const platformUserStatusSchema = z.object({ status: z.enum(["active", "disabled"
 const platformUserDirectoryQuerySchema = z.object({
   q: z.string().trim().max(80).optional(),
   status: z.enum(["active", "disabled"]).optional(),
-  page: z.coerce.number().int().min(1).max(100_000).default(1),
-  pageSize: z.coerce.number().int().min(1).max(50).default(20),
-});
-const platformActivityDirectoryQuerySchema = z.object({
-  q: z.string().trim().max(80).optional(),
-  action: z
-    .string()
-    .trim()
-    .regex(/^[a-z][a-z0-9_.]{2,80}$/)
-    .optional(),
   page: z.coerce.number().int().min(1).max(100_000).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
 });
@@ -707,7 +698,7 @@ export function buildApp(dependencies: AppDependencies) {
   app.get("/v1/platform/activity", async (request, reply) => {
     const session = await requireUser(request, reply);
     if (!session || !requireDeveloper(session.user, request, reply)) return;
-    const parsed = platformActivityDirectoryQuerySchema.safeParse(request.query);
+    const parsed = platformActivityQuerySchema.safeParse(request.query);
     if (!parsed.success) {
       return sendError(
         reply,

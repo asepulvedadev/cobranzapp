@@ -2,6 +2,7 @@ export type {
   AccountSession,
   CurrentUser,
   MfaStatus,
+  PlatformActivityDirectory,
   SecurityActivity,
 } from "@cobranzapp/contracts";
 

@@ -54,6 +54,10 @@ requires recent password confirmation, immediately revokes every active session 
 global audit event without credentials or session tokens. Developer identities are protected from
 this general-purpose control to prevent accidental platform lockout.
 
+The developer can search and paginate the global audit directory by actor, company, action text or
+an exact action type. This view is read-only, requires the platform developer role, and returns actor
+and tenant context without exposing event metadata that may contain internal operational details.
+
 Users can enroll TOTP verification from the security screen. Setup and removal require password
 confirmation when the latest credential proof is older than ten minutes. TOTP secrets are encrypted
 with AES-256-GCM using the deployment key in `MFA_ENCRYPTION_KEY`; recovery codes are stored only as

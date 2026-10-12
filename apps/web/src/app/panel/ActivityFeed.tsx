@@ -23,6 +23,13 @@ const actionLabels: Record<string, string> = {
   "auth.password_changed": "Cambió su contraseña",
   "auth.session_revoked": "Cerró una sesión remota",
   "auth.other_sessions_revoked": "Cerró sus demás sesiones",
+  "auth.mfa_setup_started": "Inició la configuración de seguridad",
+  "auth.mfa_enabled": "Activó la verificación en dos pasos",
+  "auth.mfa_disabled": "Desactivó la verificación en dos pasos",
+  "auth.mfa_challenge_created": "Solicitó el segundo factor",
+  "auth.mfa_login_succeeded": "Ingresó con segundo factor",
+  "auth.mfa_login_failed": "Falló la verificación del segundo factor",
+  "auth.mfa_login_locked": "Bloqueó la verificación por intentos fallidos",
   "support_access.requested": "Solicitó acceso temporal de soporte",
   "support_access.approved": "Autorizó acceso temporal de soporte",
   "support_access.denied": "Rechazó acceso temporal de soporte",
@@ -30,6 +37,10 @@ const actionLabels: Record<string, string> = {
   "support_access.cancelled": "Canceló una solicitud de soporte",
   "support_access.expired": "Venció el acceso temporal de soporte",
 };
+
+export function activityActionLabel(action: string) {
+  return actionLabels[action] ?? action;
+}
 
 type ActivityItem = AuditActivity & { tenantName?: string | null };
 

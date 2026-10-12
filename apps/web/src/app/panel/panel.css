@@ -593,6 +593,10 @@ html:has(.panel-shell) {
   cursor: pointer;
 }
 
+.tenant-directory-filter-actions > :only-child {
+  grid-column: 1 / -1;
+}
+
 .tenant-directory-pagination {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1883,6 +1887,10 @@ html:has(.panel-shell) {
   margin: 0;
   font-size: 13px;
   line-height: 1.4;
+}
+
+.audit-feed p strong {
+  margin-right: 4px;
 }
 
 .audit-feed small,

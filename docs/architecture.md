@@ -80,11 +80,11 @@ authenticated-user, tenant-membership, session and MFA payloads. The API imports
 request schemas that clients compile against, so username/email login and account-security
 validation cannot drift into separate web and server definitions.
 
-The API publishes its current OpenAPI 3.1 document at `/v1/openapi.json`. The first documented
-surface covers service status and the complete first-party web authentication lifecycle, including
-MFA challenges, enrollment, reauthentication, password changes and session metadata. Administrative
-and business operations must be added to the document together with their vertical slice; the
-current document must not be represented as coverage of endpoints that it does not list.
+The API publishes its current OpenAPI 3.1 document at `/v1/openapi.json`. The documented surface
+covers service status, the complete first-party web authentication lifecycle, and the developer's
+paginated platform-audit query. Administrative and business operations must be added to the document
+together with their vertical slice; the current document must not be represented as coverage of
+endpoints that it does not list.
 
 ## Related documents
 
