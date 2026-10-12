@@ -5,6 +5,7 @@ import type { CurrentUser, SupportAccessRecord, TenantOverview } from "../../../
 import { serverApi } from "../../../../lib/server-api";
 import { ActivityFeed } from "../../ActivityFeed";
 import { InviteUserForm } from "../../InviteUserForm";
+import { CustomerWorkspace } from "./CustomerWorkspace";
 import { MemberAccessControl } from "./MemberAccessControl";
 import { PendingInvitationList } from "./PendingInvitationList";
 import { SettingsVersionHistory } from "./SettingsVersionHistory";
@@ -70,6 +71,10 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
     "--tenant-brand-accent": overview.settings.accentColor,
   } as CSSProperties;
 
+  if (overview.actorRole === "customer") {
+    return <CustomerWorkspace overview={overview} />;
+  }
+
   return (
     <div className="dashboard-page tenant-dashboard" style={brandStyle}>
       <div className="tenant-brand-band" aria-hidden="true" />
@@ -87,28 +92,53 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
         </span>
       </header>
 
-      <section aria-label="Indicadores de la empresa" className="metric-grid tenant-metrics">
-        <article>
-          <span>Integrantes activos</span>
-          <strong>{overview.metrics.members}</strong>
-          <small>Accesos vigentes</small>
-        </article>
-        <article>
-          <span>Sedes activas</span>
-          <strong>{overview.metrics.branches}</strong>
-          <small>Estructura operativa</small>
-        </article>
-        <article>
-          <span>Equipos activos</span>
-          <strong>{overview.metrics.teams}</strong>
-          <small>Grupos de operación</small>
-        </article>
-        <article className="metric-accent">
-          <span>Invitaciones pendientes</span>
-          <strong>{overview.metrics.pendingInvitations}</strong>
-          <small>Vencen automáticamente</small>
-        </article>
-      </section>
+      {overview.actorRole === "collector" ? (
+        <section aria-label="Alcance asignado" className="metric-grid tenant-metrics">
+          <article>
+            <span>Sedes asignadas</span>
+            <strong>{overview.metrics.branches}</strong>
+            <small>Solo las vinculadas a tus equipos</small>
+          </article>
+          <article>
+            <span>Equipos asignados</span>
+            <strong>{overview.metrics.teams}</strong>
+            <small>Alcance operativo vigente</small>
+          </article>
+          <article>
+            <span>Perfil</span>
+            <strong>Campo</strong>
+            <small>Acceso de cobrador</small>
+          </article>
+          <article className="metric-accent">
+            <span>Aislamiento</span>
+            <strong>RLS</strong>
+            <small>Sin acceso a la organización completa</small>
+          </article>
+        </section>
+      ) : (
+        <section aria-label="Indicadores de la empresa" className="metric-grid tenant-metrics">
+          <article>
+            <span>Integrantes activos</span>
+            <strong>{overview.metrics.members}</strong>
+            <small>Accesos vigentes</small>
+          </article>
+          <article>
+            <span>Sedes activas</span>
+            <strong>{overview.metrics.branches}</strong>
+            <small>Estructura operativa</small>
+          </article>
+          <article>
+            <span>Equipos activos</span>
+            <strong>{overview.metrics.teams}</strong>
+            <small>Grupos de operación</small>
+          </article>
+          <article className="metric-accent">
+            <span>Invitaciones pendientes</span>
+            <strong>{overview.metrics.pendingInvitations}</strong>
+            <small>Vencen automáticamente</small>
+          </article>
+        </section>
+      )}
 
       <div className="dashboard-columns">
         <section className="dashboard-card tenant-card" id="equipo">

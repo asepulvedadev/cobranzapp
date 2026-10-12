@@ -51,6 +51,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
           <PanelNavigation
             dashboardHref={dashboardHref}
             isDeveloper={user.platformRole === "developer"}
+            memberships={user.memberships}
           />
           <div className="panel-sidebar-footer">
             <div className="panel-profile">
