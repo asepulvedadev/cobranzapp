@@ -31,6 +31,7 @@ import {
   routeStopCreateRequestSchema,
   type ServiceStatus,
   tenantInvitationRequestSchema,
+  tenantMemberCreateRequestSchema,
   tenantMemberProfileRequestSchema,
   tenantMemberUpdateRequestSchema,
   tenantSettingsUpdateRequestSchema,
@@ -3371,6 +3372,64 @@ export function buildApp(dependencies: AppDependencies) {
     return reply.code(204).send();
   });
 
+  app.post("/v1/tenants/:tenantId/members", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = tenantMemberCreateRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_MEMBER_CREATE",
+        "Revisa el nombre de usuario, teléfono, contraseña y rol.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (membership?.role !== "owner") {
+      return sendError(
+        reply,
+        403,
+        "OWNER_REQUIRED",
+        "Solo el propietario puede crear empleados.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const result = await dependencies.tenancyService.createMember(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      { ...body.data, requestId: request.id },
+    );
+    if (result.status === "username_unavailable") {
+      return sendError(
+        reply,
+        409,
+        "USERNAME_UNAVAILABLE",
+        "Ese nombre de usuario ya está ocupado. Elige otro.",
+        request.id,
+      );
+    }
+    if (result.status === "seat_limit_reached") {
+      return sendError(
+        reply,
+        409,
+        "EMPLOYEE_SEAT_LIMIT_REACHED",
+        `El plan permite ${result.employeeSeatLimit} empleados activos. Actualiza el plan para crear más accesos.`,
+        request.id,
+      );
+    }
+    return reply.code(201).send({ member: result.member });
+  });
+
   app.patch("/v1/tenants/:tenantId/members/:userId", async (request, reply) => {
     if (!requireAllowedOrigin(request, reply)) return;
     const session = await requireUser(request, reply);
@@ -4082,6 +4141,153 @@ export function buildApp(dependencies: AppDependencies) {
       return reply.send({ application: result.application });
     },
   );
+
+  app.get("/v1/tenants/:tenantId/brand-logo", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    if (!params.success)
+      return sendError(reply, 400, "INVALID_TENANT", "La empresa no es válida.", request.id);
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (!membership)
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a esta empresa.", request.id);
+    const overview = await dependencies.tenancyService.overview(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+    );
+    const objectKey = overview?.settings.logoObjectKey;
+    const storage = dependencies.documentStorage;
+    if (!objectKey || !storage || !objectKey.startsWith(`tenant/${params.data.tenantId}/brand/`)) {
+      return sendError(
+        reply,
+        404,
+        "BRAND_LOGO_NOT_FOUND",
+        "La empresa todavía no tiene logo.",
+        request.id,
+      );
+    }
+    const stored = await storage.read(objectKey);
+    if (!stored)
+      return sendError(
+        reply,
+        404,
+        "BRAND_LOGO_NOT_FOUND",
+        "La empresa todavía no tiene logo.",
+        request.id,
+      );
+    return reply
+      .type(stored.mediaType)
+      .header("cache-control", "private, max-age=300")
+      .send(stored.bytes);
+  });
+
+  app.post("/v1/tenants/:tenantId/brand-logo", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    if (!params.success)
+      return sendError(reply, 400, "INVALID_TENANT", "La empresa no es válida.", request.id);
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (membership?.role !== "owner")
+      return sendError(
+        reply,
+        403,
+        "OWNER_REQUIRED",
+        "Solo el propietario puede cambiar el logo.",
+        request.id,
+      );
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const storage = dependencies.documentStorage;
+    const setTenantLogo = dependencies.tenancyService.setTenantLogo;
+    if (!storage?.quarantineTenantBrandLogo || !setTenantLogo) {
+      return sendError(
+        reply,
+        503,
+        "BRAND_LOGO_UNAVAILABLE",
+        "El almacenamiento del logo todavía no está disponible.",
+        request.id,
+      );
+    }
+    let mediaType = "";
+    let fileBytes: Buffer | null = null;
+    for await (const part of request.parts()) {
+      if (part.type !== "file") continue;
+      if (fileBytes)
+        return sendError(
+          reply,
+          400,
+          "TOO_MANY_BRAND_LOGOS",
+          "Solo puedes cargar un logo.",
+          request.id,
+        );
+      mediaType = part.mimetype;
+      fileBytes = await part.toBuffer();
+    }
+    if (!fileBytes || !mediaType)
+      return sendError(
+        reply,
+        400,
+        "BRAND_LOGO_REQUIRED",
+        "Selecciona una imagen para el logo.",
+        request.id,
+      );
+    try {
+      const stored = await storage.quarantineTenantBrandLogo({
+        tenantId: params.data.tenantId,
+        mediaType,
+        bytes: fileBytes,
+      });
+      const result = await setTenantLogo(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        stored.objectKey,
+        request.id,
+      );
+      if (result.status !== "updated") {
+        await storage.remove(stored.objectKey).catch(() => undefined);
+        return sendError(
+          reply,
+          404,
+          "TENANT_NOT_FOUND",
+          "La empresa no está disponible.",
+          request.id,
+        );
+      }
+      return reply.send({ logoObjectKey: result.logoObjectKey });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        [
+          "UNSUPPORTED_DOCUMENT_TYPE",
+          "PROFILE_PHOTO_TYPE_INVALID",
+          "DOCUMENT_CONTENT_INVALID",
+          "DOCUMENT_SIZE_INVALID",
+        ].includes(error.message)
+      ) {
+        return sendError(
+          reply,
+          400,
+          "INVALID_BRAND_LOGO",
+          "El logo debe ser una imagen JPG, PNG o WebP de máximo 10 MB.",
+          request.id,
+        );
+      }
+      throw error;
+    }
+  });
 
   app.patch("/v1/tenants/:tenantId/settings", async (request, reply) => {
     if (!requireAllowedOrigin(request, reply)) return;

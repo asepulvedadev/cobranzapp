@@ -26,6 +26,7 @@ const overview: TenantOverview = {
   settings: {
     primaryColor: "#171717",
     accentColor: "#FBBF24",
+    logoObjectKey: null,
     contactEmail: "contacto@example.com",
     contactPhone: "+57 300 000 0000",
     address: "Cúcuta, Colombia",

@@ -12,6 +12,7 @@ import { buildMembershipEntitlement, membershipCatalog } from "../memberships/ca
 import type {
   InvitationAcceptanceResult,
   InvitationPreview,
+  MemberCreateResult,
   MemberIdentityDocumentResult,
   MemberProfilePhotoResult,
   MemberProfileResult,
@@ -531,12 +532,13 @@ export function createPostgresTenancyService(
         const settings = await client.query<{
           primary_color: string;
           accent_color: string;
+          logo_object_key: string | null;
           contact_email: string | null;
           contact_phone: string | null;
           address: string | null;
           version: number;
         }>(
-          `SELECT primary_color, accent_color, contact_email, contact_phone, address, version
+          `SELECT primary_color, accent_color, logo_object_key, contact_email, contact_phone, address, version
              FROM tenant_settings
             WHERE tenant_id = $1`,
           [tenantId],
@@ -626,10 +628,12 @@ export function createPostgresTenancyService(
               display_name: string;
               email: string;
               username: string;
+              phone: string | null;
               role: TenantRole;
               status: "invited" | "active" | "suspended" | "revoked";
             }>(
               `SELECT membership.user_id, users.display_name, users.email, users.username,
+                      users.profile_phone AS phone,
                       membership.role, membership.status
                  FROM tenant_memberships membership
                  JOIN users ON users.id = membership.user_id
@@ -698,6 +702,7 @@ export function createPostgresTenancyService(
           settings: {
             primaryColor: tenantSettings.primary_color,
             accentColor: tenantSettings.accent_color,
+            logoObjectKey: tenantSettings.logo_object_key,
             contactEmail: tenantSettings.contact_email,
             contactPhone: tenantSettings.contact_phone,
             address: tenantSettings.address,
@@ -716,6 +721,7 @@ export function createPostgresTenancyService(
             displayName: member.display_name,
             email: member.email,
             username: member.username,
+            phone: member.phone,
             role: member.role,
             status: member.status,
           })),
@@ -763,6 +769,7 @@ export function createPostgresTenancyService(
         const updated = await client.query<{
           primary_color: string;
           accent_color: string;
+          logo_object_key: string | null;
           contact_email: string | null;
           contact_phone: string | null;
           address: string | null;
@@ -778,7 +785,7 @@ export function createPostgresTenancyService(
                   updated_by = $8,
                   updated_at = now()
             WHERE tenant_id = $1 AND version = $2
-          RETURNING primary_color, accent_color, contact_email, contact_phone, address, version`,
+          RETURNING primary_color, accent_color, logo_object_key, contact_email, contact_phone, address, version`,
           [
             tenantId,
             input.version,
@@ -823,12 +830,49 @@ export function createPostgresTenancyService(
           settings: {
             primaryColor: row.primary_color,
             accentColor: row.accent_color,
+            logoObjectKey: row.logo_object_key,
             contactEmail: row.contact_email,
             contactPhone: row.contact_phone,
             address: row.address,
             version: row.version,
           },
         } as const;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async setTenantLogo(actor, tenantId, objectKey, requestId) {
+      if (actor.tenantRole !== "owner") return { status: "forbidden" };
+      const expectedPrefix = `tenant/${tenantId}/brand/`;
+      if (!objectKey.startsWith(expectedPrefix)) return { status: "forbidden" };
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setActorContext(client, actor, tenantId);
+        const updated = await client.query<{ logo_object_key: string | null }>(
+          `UPDATE tenant_settings
+              SET logo_object_key = $2, version = version + 1, updated_by = $3, updated_at = now()
+            WHERE tenant_id = $1
+          RETURNING logo_object_key`,
+          [tenantId, objectKey, actor.userId],
+        );
+        const row = updated.rows[0];
+        if (!row) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" };
+        }
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'tenant.logo_updated', 'tenant', $1, $3, '{}'::jsonb)`,
+          [tenantId, actor.userId, requestId],
+        );
+        await client.query("COMMIT");
+        return { status: "updated", logoObjectKey: row.logo_object_key };
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -1475,6 +1519,105 @@ export function createPostgresTenancyService(
       }
     },
 
+    async createMember(actor, tenantId, input) {
+      const passwordHash = await hashPassword(input.password);
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setActorContext(client, actor, tenantId);
+        await lockTenantMembershipCapacity(client, tenantId);
+        const tenant = await client.query<{
+          membership_plan: "pro" | "ultra" | null;
+          additional_employee_seats: number;
+        }>(
+          `SELECT membership_plan, additional_employee_seats
+             FROM tenants WHERE id = $1`,
+          [tenantId],
+        );
+        const tenantRow = tenant.rows[0];
+        if (!tenantRow) {
+          await client.query("ROLLBACK");
+          return { status: "username_unavailable" } satisfies MemberCreateResult;
+        }
+        const employeeSeatLimit = tenantRow.membership_plan
+          ? membershipCatalog[tenantRow.membership_plan].includedEmployeeSeats +
+            tenantRow.additional_employee_seats
+          : 0;
+        const occupied = await client.query<{ count: string }>(
+          "SELECT tenant_active_employee_seat_count($1) AS count",
+          [tenantId],
+        );
+        if (Number(occupied.rows[0]?.count ?? 0) >= employeeSeatLimit) {
+          await client.query("ROLLBACK");
+          return { status: "seat_limit_reached", employeeSeatLimit } satisfies MemberCreateResult;
+        }
+        const exists = await client.query<{ exists: boolean }>(
+          "SELECT EXISTS (SELECT 1 FROM users WHERE username = $1) AS exists",
+          [input.username],
+        );
+        if (exists.rows[0]?.exists) {
+          await client.query("ROLLBACK");
+          return { status: "username_unavailable" } satisfies MemberCreateResult;
+        }
+        const created = await client.query<{ id: string }>(
+          `INSERT INTO users
+             (username, email, display_name, password_hash, must_change_password, profile_phone)
+           VALUES ($1, $2, $3, $4, false, $5)
+           RETURNING id`,
+          [
+            input.username,
+            `${input.username}@staff.cobranzapp.tech`,
+            input.displayName,
+            passwordHash,
+            input.phone,
+          ],
+        );
+        const user = created.rows[0];
+        if (!user) throw new Error("User insert did not return a record");
+        await client.query(
+          `INSERT INTO tenant_memberships (tenant_id, user_id, role, status, created_by)
+           VALUES ($1, $2, $3, 'active', $4)`,
+          [tenantId, user.id, input.role, actor.userId],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'membership.created', 'tenant_membership', $3, $4,
+                   jsonb_build_object('username', $5::text, 'role', $6::text, 'phone', $7::text))`,
+          [
+            tenantId,
+            actor.userId,
+            user.id,
+            input.requestId,
+            input.username,
+            input.role,
+            input.phone,
+          ],
+        );
+        await client.query("COMMIT");
+        return {
+          status: "created",
+          member: {
+            userId: user.id,
+            displayName: input.displayName,
+            email: `${input.username}@staff.cobranzapp.tech`,
+            username: input.username,
+            phone: input.phone,
+            role: input.role,
+            status: "active",
+          },
+        } satisfies MemberCreateResult;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        if ((error as { code?: string }).code === "23505") {
+          return { status: "username_unavailable" } satisfies MemberCreateResult;
+        }
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
     async updateMember(actor, tenantId, userId, input) {
       if (actor.userId === userId) return { status: "protected" };
       const client = await pool.connect();
@@ -1499,10 +1642,11 @@ export function createPostgresTenancyService(
           display_name: string;
           email: string;
           username: string;
+          phone: string | null;
           role: TenantRole;
           status: "invited" | "active" | "suspended" | "revoked";
         }>(
-          `SELECT users.display_name, users.email, users.username,
+          `SELECT users.display_name, users.email, users.username, users.profile_phone AS phone,
                   membership.role, membership.status
              FROM tenant_memberships membership
              JOIN users ON users.id = membership.user_id
@@ -1595,6 +1739,7 @@ export function createPostgresTenancyService(
             displayName: previous.display_name,
             email: previous.email,
             username: previous.username,
+            phone: previous.phone,
             role: member.role,
             status: member.status,
           },

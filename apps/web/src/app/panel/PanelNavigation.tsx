@@ -84,17 +84,23 @@ export function PanelNavigation({
 
   const standardTenantItems: NavigationItem[] = [
     { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },
-    { href: `${effectiveDashboardHref}/equipo`, label: "Equipo", icon: UsersThree },
+    { href: `${effectiveDashboardHref}/equipo`, label: "Personal", icon: UsersThree },
     { href: `${effectiveDashboardHref}/clientes`, label: "Clientes", icon: Buildings },
     {
       href: `${effectiveDashboardHref}/configuracion`,
       label: "Configurar",
       icon: SlidersHorizontal,
     },
-    { href: "/panel/onboarding", label: "Nueva empresa", icon: Buildings },
     { href: "/panel/seguridad", label: "Seguridad", icon: ShieldCheck },
     { href: "/panel/perfil", label: "Mi perfil", icon: UserCircle },
   ];
+  if (!isDeveloper && currentMembership?.role === "owner") {
+    standardTenantItems.splice(4, 0, {
+      href: "/panel/onboarding",
+      label: "Nueva empresa",
+      icon: Buildings,
+    });
+  }
   const items: NavigationItem[] = isDeveloper
     ? [
         { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },

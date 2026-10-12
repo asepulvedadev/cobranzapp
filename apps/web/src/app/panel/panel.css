@@ -24,6 +24,8 @@ html:has(.panel-shell) {
   min-height: 100dvh;
   background: var(--panel-bg);
   color: var(--panel-dark);
+  --tenant-brand-primary: var(--panel-yellow);
+  --tenant-brand-accent: var(--panel-dark);
 }
 
 .panel-sidebar {
@@ -74,8 +76,8 @@ html:has(.panel-shell) {
   height: 40px;
   place-items: center;
   border-radius: 10px;
-  background: var(--panel-yellow);
-  color: #171a18;
+  background: var(--tenant-brand-primary);
+  color: var(--tenant-brand-accent);
   font-weight: 900;
 }
 
@@ -2525,6 +2527,86 @@ html:has(.panel-shell) {
   margin: 0;
 }
 
+.sidebar-company-brand {
+  align-items: center;
+  display: flex;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.sidebar-company-brand strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-company-mark {
+  align-items: center;
+  background: var(--tenant-brand-primary);
+  border-radius: 10px;
+  color: var(--tenant-brand-accent);
+  display: inline-flex;
+  flex: 0 0 2rem;
+  font-weight: 800;
+  height: 2rem;
+  justify-content: center;
+  width: 2rem;
+}
+
+.sidebar-company-logo {
+  background: #fff;
+  border-radius: 10px;
+  flex: 0 0 2rem;
+  height: 2rem;
+  object-fit: cover;
+  width: 2rem;
+}
+
+.directory-header-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.primary-action {
+  background: var(--tenant-brand-primary);
+  border: 1px solid color-mix(in srgb, var(--tenant-brand-primary) 80%, #000 20%);
+  border-radius: 10px;
+  color: var(--tenant-brand-accent);
+  cursor: pointer;
+  font-weight: 750;
+  min-height: 2.75rem;
+  padding: 0.65rem 1rem;
+}
+
+.credential-result dl {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.credential-result dl div {
+  background: var(--panel-muted);
+  border-radius: 10px;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 0.75rem;
+}
+
+.credential-result dt {
+  color: var(--panel-muted-text);
+  font-size: 0.85rem;
+}
+
+.credential-result dd {
+  font-weight: 700;
+  margin: 0;
+  text-align: right;
+}
+
 @media (max-width: 720px) {
   .settings-summary {
     grid-template-columns: 1fr;
@@ -3985,13 +4067,13 @@ html:has(.panel-shell) {
   .panel-nav-desktop a:hover,
   .panel-nav-desktop a:focus-visible,
   .panel-nav-desktop a[aria-current="page"] {
-    background: #282d29;
+    background: color-mix(in srgb, var(--tenant-brand-primary) 20%, #282d29 80%);
     color: #fff;
   }
 
   .panel-nav-desktop a svg {
     flex: 0 0 auto;
-    color: var(--panel-yellow);
+    color: var(--tenant-brand-primary);
   }
 
   .panel-mobile-nav {

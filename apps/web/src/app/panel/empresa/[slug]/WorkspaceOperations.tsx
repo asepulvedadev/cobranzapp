@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import type { TenantOverview } from "../../../../lib/platform";
+import { useSensitiveFetch } from "../../ReauthenticationProvider";
 
 function useMutationFeedback() {
   const [message, setMessage] = useState("");
@@ -27,6 +28,8 @@ export function WorkspaceSettingsForm({
 }) {
   const router = useRouter();
   const feedback = useMutationFeedback();
+  const sensitiveFetch = useSensitiveFetch();
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,55 +60,101 @@ export function WorkspaceSettingsForm({
     router.refresh();
   }
 
+  async function uploadLogo(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const file = form.get("logo");
+    if (!(file instanceof File) || file.size === 0) {
+      feedback.setMessage("Selecciona una imagen para el logo.");
+      feedback.setIsError(true);
+      return;
+    }
+    setIsUploadingLogo(true);
+    feedback.setMessage("");
+    feedback.setIsError(false);
+    const body = new FormData();
+    body.append("file", file);
+    const response = await sensitiveFetch(`/api/v1/tenants/${tenantId}/brand-logo`, {
+      method: "POST",
+      body,
+    }).catch(() => null);
+    if (!response?.ok) {
+      feedback.setMessage(await errorMessage(response, "No fue posible guardar el logo."));
+      feedback.setIsError(true);
+      setIsUploadingLogo(false);
+      return;
+    }
+    feedback.setMessage("Logo guardado en almacenamiento privado.");
+    setIsUploadingLogo(false);
+    event.currentTarget.reset();
+    router.refresh();
+  }
+
   return (
-    <form className="tenant-form settings-form" onSubmit={submit}>
-      <label htmlFor="contactEmail">Correo operativo</label>
-      <input
-        defaultValue={settings.contactEmail ?? ""}
-        id="contactEmail"
-        name="contactEmail"
-        placeholder="operaciones@empresa.com"
-        type="email"
-      />
-      <label htmlFor="contactPhone">Teléfono de contacto</label>
-      <input
-        defaultValue={settings.contactPhone ?? ""}
-        id="contactPhone"
-        maxLength={30}
-        name="contactPhone"
-        placeholder="+57 300 000 0000"
-        type="tel"
-      />
-      <label htmlFor="address">Dirección principal</label>
-      <input
-        defaultValue={settings.address ?? ""}
-        id="address"
-        maxLength={240}
-        name="address"
-        placeholder="Dirección, ciudad"
-      />
-      <div className="color-fields">
-        <label>
-          Color principal
-          <input defaultValue={settings.primaryColor} name="primaryColor" type="color" />
-        </label>
-        <label>
-          Color de acento
-          <input defaultValue={settings.accentColor} name="accentColor" type="color" />
-        </label>
-      </div>
-      {feedback.message ? (
-        <p
-          className={`tenant-form-message${feedback.isError ? " form-message-error" : ""}`}
-          role="status"
-        >
-          {feedback.message}
-        </p>
-      ) : null}
-      <button disabled={feedback.isSubmitting} type="submit">
-        {feedback.isSubmitting ? "Guardando…" : "Guardar configuración"}
-      </button>
-    </form>
+    <div className="tenant-form settings-form">
+      <form onSubmit={uploadLogo}>
+        <label htmlFor="tenant-logo">Logo de la empresa</label>
+        <input
+          accept="image/jpeg,image/png,image/webp"
+          id="tenant-logo"
+          name="logo"
+          required
+          type="file"
+        />
+        <small>JPG, PNG o WebP. Máximo 10 MB.</small>
+        <button disabled={isUploadingLogo} type="submit">
+          {isUploadingLogo ? "Cargando…" : "Guardar logo"}
+        </button>
+      </form>
+      <form onSubmit={submit}>
+        <label htmlFor="contactEmail">Correo operativo</label>
+        <input
+          defaultValue={settings.contactEmail ?? ""}
+          id="contactEmail"
+          name="contactEmail"
+          placeholder="operaciones@empresa.com"
+          type="email"
+        />
+        <label htmlFor="contactPhone">Teléfono de contacto</label>
+        <input
+          defaultValue={settings.contactPhone ?? ""}
+          id="contactPhone"
+          maxLength={30}
+          name="contactPhone"
+          placeholder="+57 300 000 0000"
+          type="tel"
+        />
+        <label htmlFor="address">Dirección principal</label>
+        <input
+          defaultValue={settings.address ?? ""}
+          id="address"
+          maxLength={240}
+          name="address"
+          placeholder="Dirección, ciudad"
+        />
+        <div className="color-fields">
+          <label>
+            Color principal
+            <input defaultValue={settings.primaryColor} name="primaryColor" type="color" />
+          </label>
+          <label>
+            Color de acento
+            <input defaultValue={settings.accentColor} name="accentColor" type="color" />
+          </label>
+        </div>
+        {feedback.message ? (
+          <p
+            className={`tenant-form-message${feedback.isError ? " form-message-error" : ""}`}
+            role="status"
+          >
+            {feedback.message}
+          </p>
+        ) : null}
+        <button disabled={feedback.isSubmitting} type="submit">
+          {feedback.isSubmitting ? "Guardando…" : "Guardar configuración"}
+        </button>
+      </form>
+    </div>
   );
 }
 

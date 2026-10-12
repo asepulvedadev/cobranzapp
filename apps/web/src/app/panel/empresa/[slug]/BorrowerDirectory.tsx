@@ -3,6 +3,7 @@
 import type { Borrower, BorrowerDirectory as BorrowerDirectoryData } from "@cobranzapp/contracts";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { Modal } from "../../Modal";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
 import { BorrowerDocumentUpload } from "./BorrowerDocumentUpload";
 import { BorrowerReviewControl } from "./BorrowerReviewControl";
@@ -23,12 +24,14 @@ function documentLabel(category: Borrower["documents"][number]["category"], side
 export function BorrowerDirectory({
   tenantId,
   directory,
+  canCreate,
   canReview,
   search,
   tenantSlug,
 }: {
   tenantId: string;
   directory: BorrowerDirectoryData;
+  canCreate: boolean;
   canReview: boolean;
   search: string;
   tenantSlug: string;
@@ -38,6 +41,7 @@ export function BorrowerDirectory({
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [includeSecondContact, setIncludeSecondContact] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -138,6 +142,7 @@ export function BorrowerDirectory({
         : "Cliente creado con documento frente, reverso y foto de perfil en cuarentena privada; queda pendiente la revisión humana.",
     );
     setIsSubmitting(false);
+    setIsCreateOpen(false);
     router.refresh();
   }
 
@@ -149,7 +154,18 @@ export function BorrowerDirectory({
             <span className="panel-eyebrow">Cartera</span>
             <h2>Clientes</h2>
           </div>
-          <span>{directory.pagination.total} registrados</span>
+          <div className="directory-header-actions">
+            <span>{directory.pagination.total} registrados</span>
+            {canCreate ? (
+              <button
+                className="primary-action"
+                onClick={() => setIsCreateOpen(true)}
+                type="button"
+              >
+                Nuevo cliente
+              </button>
+            ) : null}
+          </div>
         </div>
         <p className="operational-note">
           La búsqueda muestra el nombre y los últimos cuatro dígitos. Nunca se expone el número
@@ -293,152 +309,154 @@ export function BorrowerDirectory({
         ) : null}
       </section>
 
-      <section className="dashboard-card borrower-create-card">
-        <div className="card-heading">
-          <div>
-            <span className="panel-eyebrow">Alta rápida</span>
-            <h2>Nuevo cliente</h2>
+      {canCreate && isCreateOpen ? (
+        <Modal onClose={() => setIsCreateOpen(false)} title="Nuevo cliente">
+          <div className="card-heading">
+            <div>
+              <span className="panel-eyebrow">Alta rápida</span>
+              <h2>Nuevo cliente</h2>
+            </div>
           </div>
-        </div>
-        <p className="operational-note">
-          Esta captura no hace OCR ni afirma autenticidad. Las imágenes se validan y se guardan en
-          cuarentena privada para la revisión humana.
-        </p>
-        <form className="tenant-form" onSubmit={submit}>
-          <label htmlFor="borrower-full-name">Nombre completo</label>
-          <input id="borrower-full-name" name="fullName" required maxLength={160} />
-          <div className="borrower-form-row">
+          <p className="operational-note">
+            Esta captura no hace OCR ni afirma autenticidad. Las imágenes se validan y se guardan en
+            cuarentena privada para la revisión humana.
+          </p>
+          <form className="tenant-form" onSubmit={submit}>
+            <label htmlFor="borrower-full-name">Nombre completo</label>
+            <input id="borrower-full-name" name="fullName" required maxLength={160} />
+            <div className="borrower-form-row">
+              <label>
+                Tipo
+                <select defaultValue="CC" name="documentType">
+                  <option value="CC">Cédula de ciudadanía</option>
+                  <option value="CE">Cédula de extranjería</option>
+                  <option value="PPT">Permiso por protección temporal</option>
+                </select>
+              </label>
+              <label>
+                Número de documento
+                <input name="documentNumber" required inputMode="numeric" maxLength={32} />
+              </label>
+            </div>
+            <label htmlFor="borrower-phone">Celular</label>
+            <input id="borrower-phone" name="phone" required maxLength={30} type="tel" />
+            <label htmlFor="borrower-home">Dirección de casa</label>
+            <input id="borrower-home" name="homeAddress" required maxLength={240} />
+            <label htmlFor="borrower-work">Dirección de trabajo</label>
+            <input id="borrower-work" name="workAddress" required maxLength={240} />
+            <div className="borrower-form-row borrower-document-fields">
+              <label>
+                Cédula · frente
+                <input
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  name="identityFront"
+                  required
+                  type="file"
+                />
+              </label>
+              <label>
+                Cédula · reverso
+                <input
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  name="identityBack"
+                  required
+                  type="file"
+                />
+              </label>
+            </div>
             <label>
-              Tipo
-              <select defaultValue="CC" name="documentType">
-                <option value="CC">Cédula de ciudadanía</option>
-                <option value="CE">Cédula de extranjería</option>
-                <option value="PPT">Permiso por protección temporal</option>
-              </select>
-            </label>
-            <label>
-              Número de documento
-              <input name="documentNumber" required inputMode="numeric" maxLength={32} />
-            </label>
-          </div>
-          <label htmlFor="borrower-phone">Celular</label>
-          <input id="borrower-phone" name="phone" required maxLength={30} type="tel" />
-          <label htmlFor="borrower-home">Dirección de casa</label>
-          <input id="borrower-home" name="homeAddress" required maxLength={240} />
-          <label htmlFor="borrower-work">Dirección de trabajo</label>
-          <input id="borrower-work" name="workAddress" required maxLength={240} />
-          <div className="borrower-form-row borrower-document-fields">
-            <label>
-              Cédula · frente
+              Foto designada de perfil
               <input
-                accept="image/jpeg,image/png,image/webp,application/pdf"
-                name="identityFront"
+                accept="image/jpeg,image/png,image/webp"
+                name="profilePhoto"
                 required
                 type="file"
               />
             </label>
-            <label>
-              Cédula · reverso
+            <small>
+              Máximo 10 MB por archivo. No es una selfie ni se usa para afirmar autenticidad.
+            </small>
+            <fieldset className="borrower-contact-fieldset">
+              <legend>Contacto de emergencia</legend>
               <input
-                accept="image/jpeg,image/png,image/webp,application/pdf"
-                name="identityBack"
+                aria-label="Nombre del contacto"
+                name="contactName"
+                placeholder="Nombre completo"
                 required
-                type="file"
+                maxLength={120}
               />
-            </label>
-          </div>
-          <label>
-            Foto designada de perfil
-            <input
-              accept="image/jpeg,image/png,image/webp"
-              name="profilePhoto"
-              required
-              type="file"
-            />
-          </label>
-          <small>
-            Máximo 10 MB por archivo. No es una selfie ni se usa para afirmar autenticidad.
-          </small>
-          <fieldset className="borrower-contact-fieldset">
-            <legend>Contacto de emergencia</legend>
-            <input
-              aria-label="Nombre del contacto"
-              name="contactName"
-              placeholder="Nombre completo"
-              required
-              maxLength={120}
-            />
-            <input
-              aria-label="Relación del contacto"
-              name="contactRelationship"
-              placeholder="Relación"
-              required
-              maxLength={80}
-            />
-            <input
-              aria-label="Celular del contacto"
-              name="contactPhone"
-              placeholder="Celular"
-              required
-              maxLength={30}
-              type="tel"
-            />
-            <label className="checkbox-row">
               <input
-                checked={includeSecondContact}
-                onChange={(event) => setIncludeSecondContact(event.target.checked)}
-                type="checkbox"
+                aria-label="Relación del contacto"
+                name="contactRelationship"
+                placeholder="Relación"
+                required
+                maxLength={80}
               />
-              <span>Agregar un segundo contacto</span>
-            </label>
-            {includeSecondContact ? (
-              <>
+              <input
+                aria-label="Celular del contacto"
+                name="contactPhone"
+                placeholder="Celular"
+                required
+                maxLength={30}
+                type="tel"
+              />
+              <label className="checkbox-row">
                 <input
-                  aria-label="Nombre del segundo contacto"
-                  name="secondContactName"
-                  placeholder="Segundo contacto · nombre completo"
-                  required
-                  maxLength={120}
+                  checked={includeSecondContact}
+                  onChange={(event) => setIncludeSecondContact(event.target.checked)}
+                  type="checkbox"
                 />
-                <input
-                  aria-label="Relación del segundo contacto"
-                  name="secondContactRelationship"
-                  placeholder="Segundo contacto · relación"
-                  required
-                  maxLength={80}
-                />
-                <input
-                  aria-label="Celular del segundo contacto"
-                  name="secondContactPhone"
-                  placeholder="Segundo contacto · celular"
-                  required
-                  maxLength={30}
-                  type="tel"
-                />
-              </>
+                <span>Agregar un segundo contacto</span>
+              </label>
+              {includeSecondContact ? (
+                <>
+                  <input
+                    aria-label="Nombre del segundo contacto"
+                    name="secondContactName"
+                    placeholder="Segundo contacto · nombre completo"
+                    required
+                    maxLength={120}
+                  />
+                  <input
+                    aria-label="Relación del segundo contacto"
+                    name="secondContactRelationship"
+                    placeholder="Segundo contacto · relación"
+                    required
+                    maxLength={80}
+                  />
+                  <input
+                    aria-label="Celular del segundo contacto"
+                    name="secondContactPhone"
+                    placeholder="Segundo contacto · celular"
+                    required
+                    maxLength={30}
+                    type="tel"
+                  />
+                </>
+              ) : null}
+            </fieldset>
+            <label htmlFor="borrower-consent">Referencia de consentimiento</label>
+            <input
+              id="borrower-consent"
+              name="consentEvidenceRef"
+              placeholder="Ej. formulario físico 2026-10-12"
+              required
+              maxLength={240}
+            />
+            {message ? (
+              <p
+                className={`tenant-form-message${isError ? " form-message-error" : ""}`}
+                role="status"
+              >
+                {message}
+              </p>
             ) : null}
-          </fieldset>
-          <label htmlFor="borrower-consent">Referencia de consentimiento</label>
-          <input
-            id="borrower-consent"
-            name="consentEvidenceRef"
-            placeholder="Ej. formulario físico 2026-10-12"
-            required
-            maxLength={240}
-          />
-          {message ? (
-            <p
-              className={`tenant-form-message${isError ? " form-message-error" : ""}`}
-              role="status"
-            >
-              {message}
-            </p>
-          ) : null}
-          <button disabled={isSubmitting} type="submit">
-            {isSubmitting ? "Guardando…" : "Crear cliente"}
-          </button>
-        </form>
-      </section>
+            <button disabled={isSubmitting} type="submit">
+              {isSubmitting ? "Guardando…" : "Crear cliente"}
+            </button>
+          </form>
+        </Modal>
+      ) : null}
     </div>
   );
 }

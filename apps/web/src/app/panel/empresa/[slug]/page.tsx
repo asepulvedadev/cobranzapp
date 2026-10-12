@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { CSSProperties } from "react";
 import type {
@@ -13,7 +14,6 @@ import type {
 } from "../../../../lib/platform";
 import { serverApi } from "../../../../lib/server-api";
 import { ActivityFeed } from "../../ActivityFeed";
-import { InviteUserForm } from "../../InviteUserForm";
 import { BorrowerDirectory as BorrowerDirectoryView } from "./BorrowerDirectory";
 import { CollectionRouteBoard } from "./CollectionRouteBoard";
 import { CreditProductCatalog } from "./CreditProductCatalog";
@@ -23,7 +23,6 @@ import { MemberAccessControl } from "./MemberAccessControl";
 import { MemberProfileDirectory } from "./MemberProfileDirectory";
 import { MemberProfileForm } from "./MemberProfileForm";
 import { OrganizationStatusButton } from "./OrganizationStatusButton";
-import { PendingInvitationList } from "./PendingInvitationList";
 import { SettingsVersionHistory } from "./SettingsVersionHistory";
 import { SupportAccessReview } from "./SupportAccessReview";
 import { TeamAssignmentManager } from "./TeamAssignmentManager";
@@ -221,19 +220,9 @@ export default async function TenantDashboard({
             <small>Accesos vigentes</small>
           </article>
           <article>
-            <span>Sedes activas</span>
-            <strong>{overview.metrics.branches}</strong>
-            <small>Estructura operativa</small>
-          </article>
-          <article>
-            <span>Equipos activos</span>
-            <strong>{overview.metrics.teams}</strong>
-            <small>Grupos de operación</small>
-          </article>
-          <article className="metric-accent">
-            <span>Invitaciones pendientes</span>
-            <strong>{overview.metrics.pendingInvitations}</strong>
-            <small>Vencen automáticamente</small>
+            <span>Cupos de empleados</span>
+            <strong>{overview.membershipEntitlement?.availableEmployeeSeats ?? "—"}</strong>
+            <small>Disponibles según tu plan</small>
           </article>
         </section>
       )}
@@ -328,7 +317,7 @@ export default async function TenantDashboard({
               <h3>{canSeeTeam ? "Aún no hay más integrantes" : "Información protegida"}</h3>
               <p>
                 {canSeeTeam
-                  ? "Invita al equipo cuando la estructura operativa esté definida."
+                  ? "Crea empleados desde la vista Personal cuando necesites ampliar la operación."
                   : "Tu rol no permite consultar el directorio completo de la empresa."}
               </p>
             </div>
@@ -339,19 +328,17 @@ export default async function TenantDashboard({
           <aside className="dashboard-card create-card">
             <div className="card-heading">
               <div>
-                <span className="panel-eyebrow">Equipo</span>
-                <h2>Invitar persona</h2>
+                <span className="panel-eyebrow">Personal</span>
+                <h2>Gestiona empleados</h2>
               </div>
             </div>
-            <p>Asigna solo el rol necesario. El acceso se activa desde un enlace individual.</p>
-            <InviteUserForm
-              allowedRoles={["supervisor", "collector", "customer"]}
-              tenantId={overview.tenant.id}
-            />
-            <PendingInvitationList
-              invitations={overview.pendingInvitations}
-              tenantId={overview.tenant.id}
-            />
+            <p>Crea accesos directos con usuario, teléfono y contraseña desde la vista Personal.</p>
+            <Link
+              className="primary-action"
+              href={`/panel/empresa/${membership.tenantSlug}/equipo`}
+            >
+              Abrir Personal
+            </Link>
           </aside>
         ) : (
           <aside className="dashboard-card create-card">
@@ -402,6 +389,7 @@ export default async function TenantDashboard({
       {borrowerDirectory ? (
         <section className="dashboard-card borrower-directory-card" id="clientes">
           <BorrowerDirectoryView
+            canCreate={false}
             canReview={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
             directory={borrowerDirectory}
             search={borrowerSearch}

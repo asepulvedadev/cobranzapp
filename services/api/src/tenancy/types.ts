@@ -3,6 +3,7 @@ import type {
   CreateTeamRequest,
   TenantOverview as SharedTenantOverview,
   TenantInvitationRequest,
+  TenantMemberCreateRequest,
   TenantMemberProfile,
   TenantMemberProfileRequest,
   TenantMemberUpdateRequest,
@@ -36,6 +37,16 @@ export type MemberUpdateResult =
   | { status: "protected" }
   | { status: "seat_limit_reached"; employeeSeatLimit: number }
   | { status: "invalid_transition" };
+
+export type MemberCreateResult =
+  | { status: "created"; member: ManagedMember }
+  | { status: "username_unavailable" }
+  | { status: "seat_limit_reached"; employeeSeatLimit: number };
+
+export type TenantLogoResult =
+  | { status: "updated"; logoObjectKey: string | null }
+  | { status: "not_found" }
+  | { status: "forbidden" };
 
 export type TeamMemberUpdateResult =
   | { status: "updated" }
@@ -125,6 +136,12 @@ export interface TenancyService {
     | { status: "stale" }
     | { status: "not_found" }
   >;
+  setTenantLogo?(
+    actor: TenantActor,
+    tenantId: string,
+    objectKey: string,
+    requestId: string,
+  ): Promise<TenantLogoResult>;
   createBranch(
     actor: TenantActor,
     tenantId: string,
@@ -169,6 +186,11 @@ export interface TenancyService {
     userId: string,
     input: TenantMemberUpdateRequest & { requestId: string },
   ): Promise<MemberUpdateResult>;
+  createMember(
+    actor: TenantActor,
+    tenantId: string,
+    input: TenantMemberCreateRequest & { requestId: string },
+  ): Promise<MemberCreateResult>;
   getMemberProfile?(
     actor: TenantActor,
     tenantId: string,

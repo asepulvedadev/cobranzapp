@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Brand } from "../../components/Brand";
 import type { CurrentUser } from "../../lib/platform";
 import { serverApi } from "../../lib/server-api";
@@ -22,6 +22,22 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   if (!response.ok) throw new Error("No fue posible validar la sesión");
   const { user } = (await response.json()) as { user: CurrentUser };
   const primaryMembership = user.memberships[0];
+  const canSwitchCompanies = primaryMembership?.role === "owner" && user.memberships.length > 1;
+  const brandResponse = primaryMembership
+    ? await serverApi(`/v1/tenants/${primaryMembership.tenantId}/overview`)
+    : null;
+  const brandOverview = brandResponse?.ok
+    ? ((await brandResponse.json()) as {
+        overview?: {
+          settings?: { primaryColor?: string; accentColor?: string; logoObjectKey?: string | null };
+        };
+      })
+    : null;
+  const brandPrimary = brandOverview?.overview?.settings?.primaryColor ?? "#fbbf24";
+  const brandAccent = brandOverview?.overview?.settings?.accentColor ?? "#151817";
+  const brandLogo = brandOverview?.overview?.settings?.logoObjectKey
+    ? `/api/v1/tenants/${primaryMembership?.tenantId}/brand-logo`
+    : null;
   if (user.mustChangePassword) {
     return (
       <ReauthenticationProvider username={user.username}>
@@ -59,20 +75,38 @@ export default async function PanelLayout({ children }: { children: ReactNode })
 
   return (
     <ReauthenticationProvider username={user.username}>
-      <div className="panel-shell">
+      <div
+        className="panel-shell"
+        style={
+          {
+            "--tenant-brand-primary": brandPrimary,
+            "--tenant-brand-accent": brandAccent,
+          } as CSSProperties
+        }
+      >
         <aside className="panel-sidebar">
           <Brand href={dashboardHref} light />
           <div className="panel-context">
-            <span>{user.platformRole === "developer" ? "Plataforma" : "Espacios"}</span>
+            <span>{user.platformRole === "developer" ? "Plataforma" : "Empresa"}</span>
             {user.platformRole === "developer" ? (
               <strong>Administración</strong>
-            ) : user.memberships.length > 1 ? (
+            ) : canSwitchCompanies ? (
               <WorkspaceSwitcher
                 className="workspace-switcher-desktop"
                 memberships={user.memberships}
               />
             ) : primaryMembership ? (
-              <strong>{primaryMembership?.tenantName}</strong>
+              <div className="sidebar-company-brand">
+                {brandLogo ? (
+                  // biome-ignore lint/performance/noImgElement: Private API image is not externally optimizable.
+                  <img alt="" className="sidebar-company-logo" src={brandLogo} />
+                ) : (
+                  <span className="sidebar-company-mark" aria-hidden="true">
+                    {primaryMembership.tenantName.slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+                <strong>{primaryMembership.tenantName}</strong>
+              </div>
             ) : (
               <strong>Crear empresa</strong>
             )}
@@ -94,7 +128,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
           </div>
         </aside>
         <main className="panel-main" id="contenido">
-          {user.platformRole !== "developer" && user.memberships.length > 0 ? (
+          {user.platformRole !== "developer" && canSwitchCompanies ? (
             <WorkspaceSwitcher
               className="workspace-switcher-mobile"
               memberships={user.memberships}

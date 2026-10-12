@@ -262,6 +262,7 @@ describe("shared API contracts", () => {
       settings: {
         primaryColor: "#111111",
         accentColor: "#FBBF24",
+        logoObjectKey: null,
         contactEmail: "operaciones@example.com",
         contactPhone: null,
         address: null,

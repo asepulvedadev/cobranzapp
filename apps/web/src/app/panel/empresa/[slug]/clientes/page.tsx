@@ -25,6 +25,11 @@ export default async function CustomersPage({ params }: { params: Promise<{ slug
       <section className="dashboard-card borrower-directory-card">
         {directory ? (
           <BorrowerDirectoryView
+            canCreate={
+              overview.actorRole === "owner" ||
+              overview.actorRole === "supervisor" ||
+              overview.actorRole === "collector"
+            }
             canReview={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
             directory={directory}
             search=""

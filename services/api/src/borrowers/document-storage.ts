@@ -45,6 +45,12 @@ export type QuarantineUserProfileInput = {
   bytes: Buffer;
 };
 
+export type QuarantineTenantBrandLogoInput = {
+  tenantId: string;
+  mediaType: string;
+  bytes: Buffer;
+};
+
 export type StoredDocument = {
   bytes: Buffer;
   mediaType: string;
@@ -57,6 +63,7 @@ export interface BorrowerDocumentStorage {
     input: QuarantineMemberIdentityInput,
   ): Promise<QuarantinedDocument>;
   quarantineUserProfile(input: QuarantineUserProfileInput): Promise<QuarantinedDocument>;
+  quarantineTenantBrandLogo?(input: QuarantineTenantBrandLogoInput): Promise<QuarantinedDocument>;
   read(objectKey: string): Promise<StoredDocument | null>;
   remove(objectKey: string): Promise<void>;
 }
@@ -149,6 +156,11 @@ export function createLocalBorrowerDocumentStorage(root: string): BorrowerDocume
 
     async quarantineUserProfile(input) {
       const objectKey = `users/${input.userId}/profile/${randomUUID()}.bin`;
+      return validateAndWrite(input.bytes, input.mediaType, objectKey, false);
+    },
+
+    async quarantineTenantBrandLogo(input) {
+      const objectKey = `tenant/${input.tenantId}/brand/${randomUUID()}.bin`;
       return validateAndWrite(input.bytes, input.mediaType, objectKey, false);
     },
 

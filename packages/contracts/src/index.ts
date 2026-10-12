@@ -369,6 +369,7 @@ export const platformSupportAccessResponseSchema = z.object({
 export const tenantSettingsSchema = z.object({
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
   accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  logoObjectKey: z.string().nullable(),
   contactEmail: z.email().nullable(),
   contactPhone: z.string().min(1).max(30).nullable(),
   address: z.string().min(1).max(240).nullable(),
@@ -383,6 +384,7 @@ export const tenantMemberSchema = z.object({
   displayName: z.string().min(1),
   email: z.email(),
   username: z.string().min(1),
+  phone: z.string().min(1).max(30).nullable(),
   role: tenantRoleSchema,
   status: tenantMemberStatusSchema,
 });
@@ -489,6 +491,18 @@ export const organizationStatusUpdateRequestSchema = z.object({ status: organiza
 export const tenantMemberUpdateRequestSchema = z.object({
   role: z.enum(["supervisor", "collector", "customer"]),
   status: z.enum(["active", "suspended", "revoked"]),
+});
+
+export const tenantMemberCreateRequestSchema = z.object({
+  username: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9][a-z0-9._-]{2,31}$/),
+  displayName: z.string().trim().min(2).max(160),
+  phone: z.string().trim().min(7).max(30),
+  password: z.string().min(12).max(256),
+  role: z.enum(["supervisor", "collector"]),
 });
 
 export const tenantInvitationRequestSchema = z.object({
@@ -1070,6 +1084,7 @@ export type CreateBranchRequest = z.infer<typeof createBranchRequestSchema>;
 export type CreateTeamRequest = z.infer<typeof createTeamRequestSchema>;
 export type OrganizationStatusUpdateRequest = z.infer<typeof organizationStatusUpdateRequestSchema>;
 export type TenantMemberUpdateRequest = z.infer<typeof tenantMemberUpdateRequestSchema>;
+export type TenantMemberCreateRequest = z.infer<typeof tenantMemberCreateRequestSchema>;
 export type TenantInvitationRequest = z.infer<typeof tenantInvitationRequestSchema>;
 export type MfaStatus = z.infer<typeof mfaStatusSchema>;
 export type ReauthenticationRequest = z.infer<typeof reauthenticationRequestSchema>;

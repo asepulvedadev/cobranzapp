@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import type { TenantMemberProfile } from "../../../../../lib/platform";
 import { serverApi } from "../../../../../lib/server-api";
-import { InviteUserForm } from "../../../InviteUserForm";
+import { CreateMemberModal } from "../CreateMemberModal";
 import { MemberAccessControl } from "../MemberAccessControl";
 import { MemberProfileDirectory } from "../MemberProfileDirectory";
-import { PendingInvitationList } from "../PendingInvitationList";
 import { loadTenantContext } from "../tenant-context";
 
-export const metadata: Metadata = { title: "Equipo" };
+export const metadata: Metadata = { title: "Personal" };
 
 export default async function TeamPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -35,8 +34,8 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
       <header className="dashboard-header">
         <div>
           <span className="panel-eyebrow">{overview.tenant.displayName}</span>
-          <h1>Equipo de trabajo</h1>
-          <p>Administra accesos, roles y datos operativos desde una vista independiente.</p>
+          <h1>Personal de la empresa</h1>
+          <p>Administra empleados, roles y datos operativos desde una vista independiente.</p>
         </div>
       </header>
       <div className="dashboard-columns">
@@ -63,7 +62,7 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
                     <tr key={member.userId}>
                       <td data-label="Persona">
                         <strong>{member.displayName}</strong>
-                        <small>{member.email}</small>
+                        <small>{member.phone ?? "Sin teléfono registrado"}</small>
                       </td>
                       <td data-label="Rol">{member.role}</td>
                       <td data-label="Estado">
@@ -89,17 +88,13 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
           <aside className="dashboard-card create-card">
             <div className="card-heading">
               <div>
-                <span className="panel-eyebrow">Equipo</span>
-                <h2>Agregar persona</h2>
+                <span className="panel-eyebrow">Personal</span>
+                <h2>Crear empleado</h2>
               </div>
             </div>
-            <p>Elige el rol mínimo necesario. El acceso se activa desde un enlace individual.</p>
-            <InviteUserForm
-              allowedRoles={["supervisor", "collector", "customer"]}
-              tenantId={overview.tenant.id}
-            />
-            <PendingInvitationList
-              invitations={overview.pendingInvitations}
+            <p>Registra el acceso directamente. No se envían invitaciones ni se requiere correo.</p>
+            <CreateMemberModal
+              availableSeats={overview.membershipEntitlement?.availableEmployeeSeats ?? null}
               tenantId={overview.tenant.id}
             />
           </aside>
