@@ -2181,6 +2181,7 @@ export function buildApp(dependencies: AppDependencies) {
         request.id,
       );
     }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
     if (!dependencies.borrowerService) {
       return sendError(
         reply,
