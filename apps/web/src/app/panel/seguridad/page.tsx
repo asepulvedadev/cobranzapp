@@ -1,17 +1,23 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import type { AccountSession } from "../../../lib/platform";
+import type { AccountSession, SecurityActivity } from "../../../lib/platform";
 import { serverApi } from "../../../lib/server-api";
 import { PasswordForm } from "./PasswordForm";
+import { SecurityActivityList } from "./SecurityActivityList";
 import { SessionManager } from "./SessionManager";
 
 export const metadata: Metadata = { title: "Seguridad" };
 
 export default async function SecurityPage() {
-  const response = await serverApi("/v1/auth/sessions");
-  if (response.status === 401) redirect("/ingresar");
-  if (!response.ok) throw new Error("No fue posible cargar las sesiones activas");
-  const { sessions } = (await response.json()) as { sessions: AccountSession[] };
+  const [sessionsResponse, activityResponse] = await Promise.all([
+    serverApi("/v1/auth/sessions"),
+    serverApi("/v1/auth/security-activity"),
+  ]);
+  if (sessionsResponse.status === 401 || activityResponse.status === 401) redirect("/ingresar");
+  if (!sessionsResponse.ok) throw new Error("No fue posible cargar las sesiones activas");
+  if (!activityResponse.ok) throw new Error("No fue posible cargar la actividad de seguridad");
+  const { sessions } = (await sessionsResponse.json()) as { sessions: AccountSession[] };
+  const { activity } = (await activityResponse.json()) as { activity: SecurityActivity[] };
 
   return (
     <div className="dashboard-page narrow-page">
@@ -43,6 +49,15 @@ export default async function SecurityPage() {
             </div>
           </div>
           <PasswordForm />
+        </section>
+        <section className="dashboard-card security-card">
+          <div className="card-heading">
+            <div>
+              <span className="panel-eyebrow">Trazabilidad</span>
+              <h2>Actividad de seguridad</h2>
+            </div>
+          </div>
+          <SecurityActivityList activity={activity} />
         </section>
       </div>
     </div>

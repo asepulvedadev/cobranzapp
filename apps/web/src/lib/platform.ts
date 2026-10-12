@@ -22,6 +22,12 @@ export type AccountSession = {
   current: boolean;
 };
 
+export type SecurityActivity = {
+  id: string;
+  action: string;
+  happenedAt: string;
+};
+
 export type AuditActivity = {
   id: string;
   action: string;
