@@ -1159,8 +1159,7 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
         const member = await client.query<{ role: TenantRole; status: string }>(
           `SELECT role, status
              FROM tenant_memberships
-            WHERE tenant_id = $1 AND user_id = $2
-            FOR UPDATE`,
+            WHERE tenant_id = $1 AND user_id = $2`,
           [tenantId, userId],
         );
         const membership = member.rows[0];
