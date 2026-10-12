@@ -616,6 +616,9 @@ export const routeAddressKindSchema = z.enum(["home", "work"]);
 export const routeStatusUpdateRequestSchema = z.object({
   status: z.enum(["active", "archived"]),
 });
+export const routeAssignmentUpdateRequestSchema = z.object({
+  collectorId: z.uuid().nullable(),
+});
 export const routeCreateRequestSchema = z.object({
   name: z.string().trim().min(2).max(120),
   description: z.string().trim().max(240).nullable(),
@@ -641,6 +644,8 @@ export const routeSchema = z.object({
   status: routeStatusSchema,
   branchId: z.uuid().nullable(),
   branchName: z.string().nullable(),
+  assignedCollectorId: z.uuid().nullable(),
+  assignedCollectorName: z.string().nullable(),
   stops: z.array(routeStopSchema).max(500),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
@@ -954,6 +959,7 @@ export type TenantMemberProfile = z.infer<typeof tenantMemberProfileSchema>;
 export type RouteStatus = z.infer<typeof routeStatusSchema>;
 export type RouteAddressKind = z.infer<typeof routeAddressKindSchema>;
 export type RouteStatusUpdateRequest = z.infer<typeof routeStatusUpdateRequestSchema>;
+export type RouteAssignmentUpdateRequest = z.infer<typeof routeAssignmentUpdateRequestSchema>;
 export type RouteCreateRequest = z.infer<typeof routeCreateRequestSchema>;
 export type RouteStopCreateRequest = z.infer<typeof routeStopCreateRequestSchema>;
 export type RouteStop = z.infer<typeof routeStopSchema>;

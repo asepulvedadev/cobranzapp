@@ -514,6 +514,11 @@ function TenantHome({
                   <Text style={styles.muted}>
                     {route.branchName ?? "Sin sede"} · {route.stops.length} parada(s)
                   </Text>
+                  <Text style={styles.muted}>
+                    {route.assignedCollectorName
+                      ? `Cobrador: ${route.assignedCollectorName}`
+                      : "Sin cobrador asignado"}
+                  </Text>
                 </View>
                 <Text style={styles.routeStatus}>
                   {route.status === "draft"

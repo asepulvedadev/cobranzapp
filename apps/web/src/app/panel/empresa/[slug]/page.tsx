@@ -391,6 +391,9 @@ export default async function TenantDashboard({
           branches={overview.branches}
           borrowers={borrowerDirectory.borrowers}
           canManage={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
+          collectors={overview.members.filter(
+            (member) => member.role === "collector" && member.status === "active",
+          )}
           routes={routes}
           tenantId={overview.tenant.id}
         />

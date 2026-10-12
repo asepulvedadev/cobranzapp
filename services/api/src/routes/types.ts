@@ -1,5 +1,6 @@
 import type {
   Route,
+  RouteAssignmentUpdateRequest,
   RouteCreateRequest,
   RouteStatusUpdateRequest,
   RouteStopCreateRequest,
@@ -24,6 +25,13 @@ export type RouteStatusUpdateResult =
   | { status: "forbidden" }
   | { status: "invalid_transition"; reason: "empty_route" | "invalid_transition" };
 
+export type RouteAssignmentResult =
+  | { status: "updated"; route: Route }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "collector_not_found" }
+  | { status: "collector_inactive" };
+
 export interface RouteService {
   list(actor: TenantActor, tenantId: string): Promise<Route[]>;
   create(
@@ -43,4 +51,10 @@ export interface RouteService {
     routeId: string,
     input: RouteStatusUpdateRequest & { requestId: string },
   ): Promise<RouteStatusUpdateResult>;
+  assignCollector(
+    actor: TenantActor,
+    tenantId: string,
+    routeId: string,
+    input: RouteAssignmentUpdateRequest & { requestId: string },
+  ): Promise<RouteAssignmentResult>;
 }

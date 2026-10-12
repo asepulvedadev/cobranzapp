@@ -1872,8 +1872,34 @@ html:has(.panel-shell) {
 
 .route-board-actions {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   padding-top: 2px;
+}
+
+.route-assignment-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.route-assignment-form label {
+  color: var(--panel-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.route-assignment-form select {
+  min-height: 32px;
+  max-width: 220px;
+  padding: 0 8px;
+  border: 1px solid var(--panel-line);
+  border-radius: 6px;
+  background: #f7fafb;
+  color: var(--panel-ink);
+  font-size: 12px;
 }
 
 .route-board-actions .button-link {

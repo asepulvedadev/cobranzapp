@@ -11,6 +11,7 @@ import {
   platformTenantDirectoryQuerySchema,
   platformTenantStatusUpdateRequestSchema,
   platformUserDirectoryQuerySchema,
+  routeAssignmentUpdateRequestSchema,
   routeStatusUpdateRequestSchema,
   tenantMemberProfileRequestSchema,
   tenantOverviewSchema,
@@ -197,6 +198,17 @@ describe("shared API contracts", () => {
       status: "archived",
     });
     expect(routeStatusUpdateRequestSchema.safeParse({ status: "draft" }).success).toBe(false);
+  });
+
+  it("allows an explicit collector assignment or a cleared assignment", () => {
+    expect(
+      routeAssignmentUpdateRequestSchema.parse({
+        collectorId: "03d87dd0-dfc6-4948-bef1-a04f06b61ca6",
+      }),
+    ).toEqual({ collectorId: "03d87dd0-dfc6-4948-bef1-a04f06b61ca6" });
+    expect(routeAssignmentUpdateRequestSchema.parse({ collectorId: null })).toEqual({
+      collectorId: null,
+    });
   });
 
   it("keeps tenant overview scope and branding fields explicit", () => {

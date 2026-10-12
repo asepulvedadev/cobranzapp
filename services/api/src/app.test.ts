@@ -371,6 +371,8 @@ describe("collection route status", () => {
       status: "active",
       branchId: null,
       branchName: null,
+      assignedCollectorId: null,
+      assignedCollectorName: null,
       stops: [
         {
           id: "193a2db4-2349-4a48-8833-746a2a334260",
@@ -390,6 +392,7 @@ describe("collection route status", () => {
       create: vi.fn(),
       addStop: vi.fn(),
       updateStatus,
+      assignCollector: vi.fn(),
     };
     const app = buildApp(
       dependencies({
@@ -418,6 +421,61 @@ describe("collection route status", () => {
       "5c58269f-ce16-4250-82e2-c0c16621b0fb",
       "f9a9ef72-e2d6-44c6-8d89-30d7e1f9b9c8",
       { status: "active", requestId: expect.any(String) },
+    );
+  });
+
+  it("assigns a route to a collector through the manager endpoint", async () => {
+    const route: Route = {
+      id: "f9a9ef72-e2d6-44c6-8d89-30d7e1f9b9c8",
+      name: "Ruta Centro",
+      description: null,
+      status: "active",
+      branchId: null,
+      branchName: null,
+      assignedCollectorId: "193a2db4-2349-4a48-8833-746a2a334260",
+      assignedCollectorName: "Cobrador de prueba",
+      stops: [],
+      createdAt: "2026-10-11T00:00:00.000Z",
+      updatedAt: "2026-10-11T00:01:00.000Z",
+    };
+    const assignCollector = vi.fn(async () => ({ status: "updated" as const, route }));
+    const routeService: RouteService = {
+      list: vi.fn(async () => []),
+      create: vi.fn(),
+      addStop: vi.fn(),
+      updateStatus: vi.fn(),
+      assignCollector,
+    };
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => tenantOwner) },
+        routeService,
+      }),
+    );
+    apps.push(app);
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/v1/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/routes/f9a9ef72-e2d6-44c6-8d89-30d7e1f9b9c8/assignment",
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+      },
+      payload: { collectorId: "193a2db4-2349-4a48-8833-746a2a334260" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ route });
+    expect(assignCollector).toHaveBeenCalledWith(
+      {
+        userId: tenantOwner.id,
+        platformRole: null,
+        tenantRole: "owner",
+      },
+      "5c58269f-ce16-4250-82e2-c0c16621b0fb",
+      "f9a9ef72-e2d6-44c6-8d89-30d7e1f9b9c8",
+      {
+        collectorId: "193a2db4-2349-4a48-8833-746a2a334260",
+        requestId: expect.any(String),
+      },
     );
   });
 });

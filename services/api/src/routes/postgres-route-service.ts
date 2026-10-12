@@ -1,12 +1,13 @@
 import type {
   Route,
+  RouteAssignmentUpdateRequest,
   RouteCreateRequest,
   RouteStatusUpdateRequest,
   RouteStopCreateRequest,
 } from "@cobranzapp/contracts";
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
-import type { RouteResult, RouteService, RouteStopResult } from "./types.js";
+import type { RouteAssignmentResult, RouteResult, RouteService, RouteStopResult } from "./types.js";
 
 type RouteRow = {
   id: string;
@@ -15,6 +16,8 @@ type RouteRow = {
   status: Route["status"];
   branch_id: string | null;
   branch_name: string | null;
+  assigned_collector_id: string | null;
+  assigned_collector_name: string | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -53,10 +56,14 @@ async function loadRoute(client: Pick<PoolClient, "query">, tenantId: string, ro
   const routeResult = await client.query<RouteRow>(
     `SELECT route.id, route.name, route.description, route.status,
             route.branch_id, branch.display_name AS branch_name,
+            route.assigned_collector_id,
+            assigned_user.display_name AS assigned_collector_name,
             route.created_at, route.updated_at
        FROM collection_routes route
        LEFT JOIN branches branch
          ON branch.tenant_id = route.tenant_id AND branch.id = route.branch_id
+       LEFT JOIN users assigned_user
+         ON assigned_user.id = route.assigned_collector_id
       WHERE route.tenant_id = $1 AND route.id = $2`,
     [tenantId, routeId],
   );
@@ -81,6 +88,8 @@ async function loadRoute(client: Pick<PoolClient, "query">, tenantId: string, ro
     status: row.status,
     branchId: row.branch_id,
     branchName: row.branch_name,
+    assignedCollectorId: row.assigned_collector_id,
+    assignedCollectorName: row.assigned_collector_name,
     stops: stops.rows.map((stop) => ({
       id: stop.id,
       borrowerId: stop.borrower_id,
@@ -269,6 +278,60 @@ export function createPostgresRouteService(pool: Pool): RouteService {
             [tenantId, actor.userId, routeId, input.requestId, current.status, input.status],
           );
         }
+        const route = await loadRoute(client, tenantId, routeId);
+        if (!route) return { status: "not_found" };
+        return { status: "updated", route };
+      });
+    },
+
+    async assignCollector(
+      actor,
+      tenantId,
+      routeId,
+      input: RouteAssignmentUpdateRequest & { requestId: string },
+    ): Promise<RouteAssignmentResult> {
+      if (!canManage(actor)) return { status: "forbidden" };
+      return withTransaction(actor, tenantId, async (client) => {
+        const routeResult = await client.query<{ id: string }>(
+          `SELECT id
+             FROM collection_routes
+            WHERE tenant_id = $1 AND id = $2
+            FOR UPDATE`,
+          [tenantId, routeId],
+        );
+        if (!routeResult.rows[0]) return { status: "not_found" };
+
+        if (input.collectorId) {
+          const membershipResult = await client.query<{
+            role: string;
+            status: string;
+          }>(
+            `SELECT role, status
+               FROM tenant_memberships
+              WHERE tenant_id = $1 AND user_id = $2`,
+            [tenantId, input.collectorId],
+          );
+          const membership = membershipResult.rows[0];
+          if (membership?.role !== "collector") {
+            return { status: "collector_not_found" };
+          }
+          if (membership.status !== "active") {
+            return { status: "collector_inactive" };
+          }
+        }
+
+        await client.query(
+          `UPDATE collection_routes
+              SET assigned_collector_id = $3, updated_at = now()
+            WHERE tenant_id = $1 AND id = $2`,
+          [tenantId, routeId, input.collectorId],
+        );
+        await client.query(
+          `INSERT INTO audit_events (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'collection_route.assignment_changed', 'collection_route', $3, $4,
+                   jsonb_build_object('collectorId', $5::text))`,
+          [tenantId, actor.userId, routeId, input.requestId, input.collectorId],
+        );
         const route = await loadRoute(client, tenantId, routeId);
         if (!route) return { status: "not_found" };
         return { status: "updated", route };

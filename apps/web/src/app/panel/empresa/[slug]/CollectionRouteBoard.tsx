@@ -22,12 +22,14 @@ export function CollectionRouteBoard({
   branches,
   borrowers,
   canManage,
+  collectors,
   routes,
   tenantId,
 }: {
   branches: TenantOverview["branches"];
   borrowers: Borrower[];
   canManage: boolean;
+  collectors: TenantOverview["members"];
   routes: Route[];
   tenantId: string;
 }) {
@@ -36,6 +38,7 @@ export function CollectionRouteBoard({
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const [assignmentBusyRouteId, setAssignmentBusyRouteId] = useState<string | null>(null);
   const [selectedRouteId, setSelectedRouteId] = useState(routes[0]?.id ?? "");
 
   async function createRoute(event: FormEvent<HTMLFormElement>) {
@@ -127,6 +130,32 @@ export function CollectionRouteBoard({
     router.refresh();
   }
 
+  async function assignCollector(event: FormEvent<HTMLFormElement>, route: Route) {
+    event.preventDefault();
+    setAssignmentBusyRouteId(route.id);
+    setMessage("");
+    setIsError(false);
+    const form = new FormData(event.currentTarget);
+    const collectorId = String(form.get("collectorId") ?? "").trim() || null;
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/routes/${route.id}/assignment`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ collectorId }),
+      },
+    ).catch(() => null);
+    if (!response?.ok) {
+      setMessage(await errorMessage(response, "No fue posible asignar el cobrador."));
+      setIsError(true);
+      setAssignmentBusyRouteId(null);
+      return;
+    }
+    setMessage(collectorId ? "Cobrador asignado a la ruta." : "Asignación retirada.");
+    setAssignmentBusyRouteId(null);
+    router.refresh();
+  }
+
   return (
     <section className="dashboard-card route-board-card" id="rutas">
       <div className="card-heading">
@@ -150,6 +179,11 @@ export function CollectionRouteBoard({
                   <strong>{route.name}</strong>
                   <small>
                     {route.branchName ?? "Sin sede"} · {route.stops.length} parada(s)
+                  </small>
+                  <small>
+                    {route.assignedCollectorName
+                      ? `Cobrador: ${route.assignedCollectorName}`
+                      : "Sin cobrador asignado"}
                   </small>
                 </div>
                 <span className={`status status-${route.status}`}>
@@ -176,6 +210,31 @@ export function CollectionRouteBoard({
               )}
               {canManage ? (
                 <div className="route-board-actions">
+                  <form
+                    className="route-assignment-form"
+                    onSubmit={(event) => assignCollector(event, route)}
+                  >
+                    <label htmlFor={`route-collector-${route.id}`}>Cobrador</label>
+                    <select
+                      defaultValue={route.assignedCollectorId ?? ""}
+                      id={`route-collector-${route.id}`}
+                      name="collectorId"
+                    >
+                      <option value="">Sin asignar</option>
+                      {collectors.map((collector) => (
+                        <option key={collector.userId} value={collector.userId}>
+                          {collector.displayName}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="button-link"
+                      disabled={assignmentBusyRouteId === route.id}
+                      type="submit"
+                    >
+                      {assignmentBusyRouteId === route.id ? "Guardando…" : "Guardar"}
+                    </button>
+                  </form>
                   {route.status === "draft" ? (
                     <button
                       className="button-link"

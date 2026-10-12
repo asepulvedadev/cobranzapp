@@ -19,6 +19,7 @@ import {
   platformUserDirectoryQuerySchema,
   platformUserStatusUpdateRequestSchema,
   reauthenticationRequestSchema,
+  routeAssignmentUpdateRequestSchema,
   routeCreateRequestSchema,
   routeStatusUpdateRequestSchema,
   routeStopCreateRequestSchema,
@@ -1802,6 +1803,86 @@ export function buildApp(dependencies: AppDependencies) {
         result.reason === "empty_route"
           ? "Agrega al menos una parada antes de activar la ruta."
           : "La ruta no puede cambiar a ese estado.",
+        request.id,
+      );
+    }
+    return reply.send({ route: result.route });
+  });
+
+  app.patch("/v1/tenants/:tenantId/routes/:routeId/assignment", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantRouteParamsSchema.safeParse(request.params);
+    const body = routeAssignmentUpdateRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_ROUTE_ASSIGNMENT",
+        "Selecciona un cobrador válido o deja la ruta sin asignar.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo propietarios y supervisores pueden asignar rutas.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    if (!dependencies.routeService) {
+      return sendError(
+        reply,
+        503,
+        "ROUTES_UNAVAILABLE",
+        "Las rutas todavía no están configuradas.",
+        request.id,
+      );
+    }
+    const result = await dependencies.routeService.assignCollector(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.routeId,
+      { ...body.data, requestId: request.id },
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "ROUTE_NOT_FOUND", "La ruta no existe.", request.id);
+    }
+    if (result.status === "collector_not_found") {
+      return sendError(
+        reply,
+        404,
+        "COLLECTOR_NOT_FOUND",
+        "El usuario seleccionado no es un cobrador de esta empresa.",
+        request.id,
+      );
+    }
+    if (result.status === "collector_inactive") {
+      return sendError(
+        reply,
+        409,
+        "COLLECTOR_INACTIVE",
+        "El cobrador seleccionado no tiene un acceso activo.",
+        request.id,
+      );
+    }
+    if (result.status === "forbidden") {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo propietarios y supervisores pueden asignar rutas.",
         request.id,
       );
     }
