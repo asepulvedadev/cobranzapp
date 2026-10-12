@@ -21,7 +21,8 @@
     "test": "pnpm -r --if-present test",
     "compose:up": "docker compose -f compose.dev.yaml up -d --build",
     "compose:down": "docker compose -f compose.dev.yaml down",
-    "compose:logs": "docker compose -f compose.dev.yaml logs -f"
+    "compose:logs": "docker compose -f compose.dev.yaml logs -f",
+    "deploy:direct": "bash infrastructure/scripts/deploy-direct-vps.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

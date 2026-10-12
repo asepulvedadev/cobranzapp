@@ -27,7 +27,7 @@ Plataforma móvil y multiempresa para gestionar créditos y cobranzas de prestam
 | [Despliegue en VPS](docs/deployment.md) | Alojamiento, lanzamientos, migraciones, monitoreo, copias de seguridad y recuperación |
 | [Plan de desarrollo](docs/development-plan.md) | Fases, unidades de trabajo, controles de calidad, lanzamiento en VPS y finalización del piloto |
 | [Estado de implementación](docs/implementation-status.md) | Entregas verificadas, límites actuales y bloques protegidos |
-| [Manual de operaciones](docs/operations-runbook.md) | Repositorio, CI/CD, VPS, verificaciones de salud, copias de seguridad e incidentes |
+| [Manual de operaciones](docs/operations-runbook.md) | Repositorio, despliegue directo al VPS, verificaciones de salud, copias de seguridad e incidentes |
 | [Dominio y correo](docs/domain-email-setup.md) | Registros DNS, Hostinger Email y activación TLS |
 | [Hoja de ruta](docs/roadmap.md) | Decisiones pendientes, evidencia, riesgos y autorización de construcción |
 | [Referencias](docs/references.md) | Registro de fuentes primarias y procedencia |
@@ -60,10 +60,14 @@ pnpm dev
 
 Consulte la [configuración de desarrollo](docs/development-setup.md) para conocer los servicios locales, las validaciones y la entrega automática.
 
-- Repositorio privado: `https://github.com/asepulvedadev/cobranzapp`
+- Repositorio público: `https://github.com/asepulvedadev/cobranzapp`
 - Aplicación: `https://cobranzaap.tech`
 - Dirección técnica de respaldo: `https://cobranzapp.2.24.115.58.sslip.io`
 - Correo institucional aprobado: `info@cobranzaap.tech`
+
+## Despliegue directo al VPS
+
+El despliegue de producción se ejecuta directamente desde una máquina autorizada al VPS; no depende de GitHub Actions ni de un registro de imágenes. Use siempre el orden estricto de `pnpm deploy:direct`: control de calidad, construcción, transferencia de imágenes, PostgreSQL, migraciones, servicios y pruebas de humo.
 
 ## Despliegue seguro de identidad
 

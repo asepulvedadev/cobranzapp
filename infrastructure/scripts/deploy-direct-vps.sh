@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+cd "$ROOT_DIR"
+
+host=${COBRANZAPP_VPS_HOST:-2.24.115.58}
+user=${COBRANZAPP_VPS_USER:-root}
+password_file=${COBRANZAPP_VPS_PASSWORD_FILE:-$HOME/.autoking-vps-password}
+release=$(git rev-parse HEAD)
+
+if [[ -n "$(git status --short)" ]]; then
+  echo "Working tree must be clean before a direct deployment" >&2
+  exit 65
+fi
+if [[ ! -r "$password_file" ]]; then
+  echo "Missing VPS password file: $password_file" >&2
+  exit 66
+fi
+command -v docker >/dev/null || { echo "Docker is required" >&2; exit 69; }
+command -v sshpass >/dev/null || { echo "sshpass is required" >&2; exit 69; }
+
+echo "Running quality gate before deploying ${release}"
+pnpm check
+
+export SSHPASS
+SSHPASS=$(cat "$password_file")
+ssh_opts=(-o StrictHostKeyChecking=no -o ConnectTimeout=15)
+remote_tmp="/tmp/cobranzapp-direct-${release}"
+archive="${remote_tmp}.tar.gz"
+local_archive=$(mktemp "${TMPDIR:-/tmp}/cobranzapp-direct.XXXXXX.tar.gz")
+cleanup() {
+  rm -f "$local_archive"
+}
+trap cleanup EXIT
+
+services=(api worker web)
+declare -A dockerfiles=(
+  [api]=infrastructure/docker/Dockerfile.api
+  [worker]=infrastructure/docker/Dockerfile.worker
+  [web]=infrastructure/docker/Dockerfile.web
+)
+images=()
+
+for service in "${services[@]}"; do
+  image="ghcr.io/asepulvedadev/cobranzapp-${service}:${release}"
+  images+=("$image")
+  echo "Building ${service}"
+  docker buildx build \
+    --platform linux/amd64 \
+    --file "${dockerfiles[$service]}" \
+    --tag "$image" \
+    --load \
+    .
+done
+
+echo "Transferring immutable images to ${user}@${host}"
+docker save "${images[@]}" | gzip -1 > "$local_archive"
+sshpass -e scp "${ssh_opts[@]}" "$local_archive" "${user}@${host}:${archive}"
+sshpass -e scp "${ssh_opts[@]}" \
+  infrastructure/scripts/deploy-direct-remote.sh \
+  "${user}@${host}:${remote_tmp}.sh"
+
+sshpass -e ssh "${ssh_opts[@]}" "${user}@${host}" \
+  "chmod 700 '${remote_tmp}.sh' && '${remote_tmp}.sh' '${release}' '${archive}' && rm -f '${remote_tmp}.sh'"
+
+echo "Direct deployment completed: ${release}"

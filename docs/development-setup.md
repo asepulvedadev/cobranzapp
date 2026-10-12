@@ -36,7 +36,7 @@ pnpm check
 
 ## Entrega a producción
 
-Cada envío a `main` ejecuta el control de calidad, construye imágenes inmutables para la API, el procesador y la aplicación web, las publica en GHCR y despliega el SHA exacto de la confirmación mediante el punto de entrada restringido del VPS. Las solicitudes de integración ejecutan el mismo flujo de calidad sin desplegar. PostgreSQL permanece privado en la red de Docker; nginx solo accede a los puertos locales de la web y la API.
+El despliegue no depende de GitHub Actions. Desde una máquina autorizada, `pnpm deploy:direct` ejecuta el control de calidad, construye imágenes inmutables con el SHA exacto, las transfiere por SSH y aplica el orden estricto de PostgreSQL → migraciones → servicios → pruebas de humo. PostgreSQL permanece privado en la red de Docker; nginx solo accede a los puertos locales de la web y la API.
 
 El entorno desplegado está disponible en `https://cobranzaap.tech`. La dirección técnica `https://cobranzapp.2.24.115.58.sslip.io` se conserva únicamente como respaldo operativo.
 

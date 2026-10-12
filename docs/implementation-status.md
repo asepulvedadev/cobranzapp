@@ -14,7 +14,7 @@
 | Verificación compartida | Completado con activación controlada | Consentimiento, propósito, vencimiento, consulta mínima, correcciones, disputas y auditoría; no es lista negra |
 | Rutas de cobranza | Completado | Plantillas, paradas, estados y asignación de cobradores con alcance por empresa |
 | Originación preliminar | Completado como borrador | Catálogo configurable, edición por propietario/supervisor, proyección de cuotas y solicitudes; no aprueba, desembolsa ni registra obligaciones |
-| Entrega VPS | Completado para el entorno actual | Imágenes inmutables, GitHub Actions, health/readiness, Caddy y roles PostgreSQL separados |
+| Entrega VPS | Completado para el entorno actual | Imágenes inmutables transferidas por SSH, orden estricto de despliegue, health/readiness, Caddy y roles PostgreSQL separados |
 
 ## Bloques deliberadamente protegidos
 

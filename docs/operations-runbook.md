@@ -6,8 +6,8 @@
 
 | Componente | Ubicación |
 |---|---|
-| Repositorio privado | `github.com/asepulvedadev/cobranzapp` |
-| GitHub Actions | `.github/workflows/ci.yml` y `.github/workflows/deploy.yml` |
+| Repositorio público | `github.com/asepulvedadev/cobranzapp` |
+| Despliegue directo | `pnpm deploy:direct` desde una máquina autorizada |
 | VPS | Servidor compartido AutoKing `2.24.115.58` |
 | Directorio de ejecución | `/srv/cobranzapp` |
 | Dirección HTTPS principal | `https://cobranzaap.tech` |
@@ -16,22 +16,28 @@
 | Puertos locales web/API | `127.0.0.1:13200` / `127.0.0.1:18200` |
 | Roles PostgreSQL de ejecución | `cobranzapp_app` para API y `cobranzapp_worker` para trabajos |
 | Sitio nginx | `/etc/nginx/sites-available/cobranzapp.conf` |
-| Punto de entrada de despliegue | `/usr/local/sbin/cobranzapp-deploy-entry` |
+| Punto de entrada de despliegue | `infrastructure/scripts/deploy-direct-vps.sh` |
 | Script de copia de seguridad | `/usr/local/sbin/cobranzapp-backup` |
 
-La clave SSH de GitHub Actions está limitada al punto de entrada de despliegue. No puede solicitar una consola, reenviar puertos ni ejecutar órdenes arbitrarias. El punto de entrada valida el SHA y el actor autorizado antes de invocar el script de despliegue, propiedad de `root`.
+La contraseña del VPS se lee únicamente desde `~/.autoking-vps-password`. El script exige un árbol Git limpio, ejecuta `pnpm check`, construye imágenes con el SHA completo y transfiere un archivo temporal al VPS. No usa GitHub Actions ni publica imágenes en un registro.
 
 ## Lanzamiento normal
 
-Envíe una confirmación aprobada a `main`. GitHub Actions:
+Ejecute desde el árbol limpio del repositorio:
+
+```bash
+pnpm deploy:direct
+```
+
+El comando aplica siempre este orden estricto:
 
 1. Ejecuta formato, comprobación de tipos, pruebas unitarias y compilaciones.
-2. Construye las imágenes de la API, el procesador y la web, y publica etiquetas con el SHA en paquetes privados de GHCR.
-3. Se conecta mediante la clave restringida de despliegue.
-4. Descarga las imágenes del SHA exacto.
+2. Construye las imágenes de la API, el procesador y la web con el SHA exacto.
+3. Transfiere y carga las tres imágenes en el VPS.
+4. Espera PostgreSQL saludable.
 5. Aplica migraciones con el propietario de migración; la API y el procesador conservan roles separados.
-6. Espera contenedores saludables y ejecuta pruebas de humo.
-7. Registra la versión en `/srv/cobranzapp/.deployed-release`.
+6. Levanta API, procesador y web, esperando sus health checks.
+7. Ejecuta pruebas de humo y registra la versión en `/srv/cobranzapp/.deployed-release`.
 
 El script restaura la etiqueta anterior cuando falla una versión posterior y existe una versión
 previa. Las migraciones progresivas autorizadas se ejecutan antes de reemplazar los servicios. Una
@@ -86,7 +92,7 @@ Esta copia local solo es suficiente para la base de desarrollo. **No se deben in
 - Solo nginx expone puertos públicos; la web y la API escuchan en la interfaz local, y PostgreSQL permanece en la red privada de Docker.
 - Los secretos de ejecución viven en `/srv/cobranzapp/.env`, con modo `0600`, y no aparecen en Git, imágenes, registros ni GitHub Actions.
 - La API y el procesador usan credenciales PostgreSQL diferentes. El procesador no puede leer usuarios globales ni tablas ajenas a sus manejadores autorizados.
-- Las credenciales de GHCR existen únicamente durante el trabajo y usan una configuración temporal de Docker que se elimina al finalizar.
+- Las imágenes se transfieren por SSH en un archivo temporal y se eliminan después del lanzamiento.
 - Las imágenes de aplicación se ejecutan con UID/GID `10001`; las imágenes base están fijadas por resumen y los recursos tienen límites.
 - El dominio público corresponde todavía a un entorno de desarrollo, no a una autorización para operar un piloto real de crédito.
 

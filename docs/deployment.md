@@ -24,7 +24,7 @@ Provisional capacity hypothesis: 4 vCPU, 8–16 GB RAM, SSD storage sized from d
 
 ### Delivery and migrations
 
-The engineering foundation was authorized on 2026-10-11. Its delivery path is: automated checks → immutable GHCR images → restricted GitHub Actions deployment → production health checks. Future schema delivery remains: reviewed staging migration/acceptance → approved production release → smoke checks → monitored rollout. Use reviewed expand/contract migrations, a migration role separate from runtime, lock/time limits, and backups before destructive changes. Never auto-run irreversible migrations on every API restart.
+The engineering foundation was authorized on 2026-10-11. Its delivery path is: automated checks → immutable local images tagged with the full Git SHA → SSH transfer to the VPS → PostgreSQL health → migrations → application health checks. The canonical command is `pnpm deploy:direct`; it does not use GitHub Actions or GHCR. Future schema delivery remains: reviewed staging migration/acceptance → approved production release → smoke checks → monitored rollout. Use reviewed expand/contract migrations, a migration role separate from runtime, lock/time limits, and backups before destructive changes. Never auto-run irreversible migrations on every API restart.
 
 Roll back application images only when compatible with the current schema. Database rollback needs an explicit forward-fix or restoration procedure; restoring a backup loses later transactions unless recovered/reconciled. Mobile clients need backwards-compatible API windows and a minimum-supported-version policy.
 
