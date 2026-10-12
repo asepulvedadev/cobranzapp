@@ -15,11 +15,13 @@
 
 html:has(.panel-shell) {
   background: var(--panel-bg);
+  scroll-padding-top: 84px;
+  scroll-padding-bottom: calc(88px + var(--panel-safe-bottom));
   overscroll-behavior-y: contain;
 }
 
 .panel-shell {
-  min-height: 100svh;
+  min-height: 100dvh;
   background: var(--panel-bg);
   color: var(--panel-dark);
 }
@@ -106,19 +108,21 @@ html:has(.panel-shell) {
 
 .panel-mobile-nav {
   position: fixed;
-  right: 8px;
-  bottom: max(8px, var(--panel-safe-bottom));
-  left: 8px;
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 50;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
-  min-height: 66px;
-  padding: 6px;
-  border: 1px solid #323732;
-  border-radius: 14px;
-  background: rgba(21, 24, 23, 0.98);
-  box-shadow: 0 16px 44px rgba(21, 24, 23, 0.3);
+  min-height: calc(68px + var(--panel-safe-bottom));
+  padding: 6px 8px calc(6px + var(--panel-safe-bottom));
+  border: 0;
+  border-top: 1px solid #373c38;
+  border-radius: 16px 16px 0 0;
+  background: rgba(21, 24, 23, 0.97);
+  box-shadow: 0 -12px 36px rgba(21, 24, 23, 0.18);
+  backdrop-filter: blur(14px);
 }
 
 .panel-mobile-nav.panel-nav-count-2 {
@@ -130,6 +134,7 @@ html:has(.panel-shell) {
 }
 
 .panel-mobile-nav a {
+  position: relative;
   display: flex;
   min-width: 0;
   min-height: 52px;
@@ -151,6 +156,16 @@ html:has(.panel-shell) {
   color: var(--panel-yellow);
 }
 
+.panel-mobile-nav a[aria-current="page"]::before {
+  position: absolute;
+  top: 1px;
+  width: 22px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--panel-yellow);
+  content: "";
+}
+
 .panel-mobile-nav a span {
   overflow: hidden;
   max-width: 100%;
@@ -160,7 +175,7 @@ html:has(.panel-shell) {
 
 .panel-main {
   min-width: 0;
-  padding: 16px 16px calc(98px + var(--panel-safe-bottom));
+  padding: 16px 16px calc(92px + var(--panel-safe-bottom));
 }
 
 .workspace-switcher-mobile,
@@ -2852,7 +2867,7 @@ html:has(.panel-shell) {
   }
 }
 
-@media (min-width: 761px) {
+@media (min-width: 761px) and (min-height: 620px) {
   #empresas,
   #actividad,
   #equipo,
@@ -2869,7 +2884,7 @@ html:has(.panel-shell) {
     position: sticky;
     top: 0;
     display: flex;
-    height: 100svh;
+    height: 100dvh;
     flex-direction: column;
     align-items: stretch;
     gap: 0;
@@ -3137,6 +3152,93 @@ html:has(.panel-shell) {
 
   .customer-boundary-status > div:last-child {
     border-right: 0;
+  }
+}
+
+@media (max-width: 380px) {
+  .panel-sidebar {
+    gap: 8px;
+    padding-inline: 10px;
+  }
+
+  .panel-sidebar .brand {
+    font-size: 15px;
+  }
+
+  .panel-sidebar .brand img {
+    width: 30px;
+    height: 30px;
+  }
+
+  .panel-profile > span {
+    width: 38px;
+    height: 38px;
+  }
+
+  .panel-main {
+    padding-inline: 12px;
+  }
+
+  .panel-mobile-nav {
+    padding-inline: 4px;
+  }
+
+  .panel-mobile-nav a {
+    font-size: 9px;
+  }
+
+  .dashboard-header h1 {
+    font-size: clamp(29px, 9.5vw, 36px);
+  }
+
+  .metric-grid article {
+    min-height: 106px;
+    padding: 13px;
+  }
+
+  .metric-grid strong {
+    font-size: 27px;
+  }
+
+  .card-heading {
+    padding-inline: 14px;
+  }
+
+  .tenant-table tr,
+  .tenant-directory-filters,
+  .tenant-form,
+  .password-form,
+  .structure-grid,
+  .operations-grid,
+  .session-manager {
+    padding-inline: 14px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 619px) {
+  .panel-sidebar {
+    min-height: 56px;
+    padding-block: 6px;
+  }
+
+  .panel-main {
+    padding-top: 12px;
+    padding-bottom: calc(72px + var(--panel-safe-bottom));
+  }
+
+  .panel-mobile-nav {
+    min-height: calc(58px + var(--panel-safe-bottom));
+    padding-block: 3px calc(3px + var(--panel-safe-bottom));
+  }
+
+  .panel-mobile-nav a {
+    min-height: 48px;
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .panel-mobile-nav a[aria-current="page"]::before {
+    top: 0;
   }
 }
 

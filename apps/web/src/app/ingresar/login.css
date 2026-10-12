@@ -1,6 +1,6 @@
 /* biome-ignore-all lint/style/noDescendingSpecificity: Login selectors are isolated from the public site and ordered by component flow. */
 .login-page {
-  min-height: 100svh;
+  min-height: 100dvh;
   padding: 24px;
   background: #111312;
   color: #f8faf9;
@@ -8,8 +8,9 @@
 
 .login-stage {
   display: grid;
-  min-height: calc(100svh - 48px);
+  min-height: calc(100dvh - 48px);
   grid-template-columns: minmax(0, 1.05fr) minmax(420px, 0.95fr);
+  grid-template-areas: "context form";
   overflow: hidden;
   border: 1px solid #303430;
   border-radius: 24px;
@@ -17,6 +18,7 @@
 }
 
 .login-context {
+  grid-area: context;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -39,7 +41,7 @@
   text-transform: uppercase;
 }
 
-.login-context h1 {
+.login-context h2 {
   max-width: 620px;
   margin: 0 0 24px;
   font-size: clamp(42px, 5.5vw, 76px);
@@ -91,6 +93,7 @@
 }
 
 .login-form-shell {
+  grid-area: form;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -99,7 +102,11 @@
   color: #171917;
 }
 
-.login-heading h2 {
+.login-mobile-brand {
+  display: none;
+}
+
+.login-heading h1 {
   margin: 0 0 10px;
   font-size: clamp(32px, 4vw, 48px);
   letter-spacing: -0.05em;
@@ -210,18 +217,31 @@
   }
 
   .login-stage {
-    min-height: 100svh;
+    min-height: 100dvh;
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "form"
+      "context";
     border: 0;
     border-radius: 0;
   }
 
+  .login-form-shell {
+    min-height: 100dvh;
+    justify-content: center;
+  }
+
+  .login-mobile-brand {
+    display: block;
+    margin-bottom: clamp(36px, 8dvh, 72px);
+  }
+
   .login-context {
-    min-height: 390px;
+    min-height: min(520px, 100dvh);
     gap: 64px;
   }
 
-  .login-context h1 {
+  .login-context h2 {
     font-size: clamp(40px, 10vw, 62px);
   }
 }
@@ -234,5 +254,25 @@
 
   .login-context > div > p {
     font-size: 15px;
+  }
+
+  .login-form {
+    margin-top: 28px;
+  }
+
+  .login-support,
+  .login-back {
+    margin-top: 28px;
+  }
+}
+
+@media (max-width: 380px) {
+  .login-context,
+  .login-form-shell {
+    padding-inline: 18px;
+  }
+
+  .login-heading h1 {
+    font-size: 30px;
   }
 }
