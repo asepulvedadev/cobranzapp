@@ -4,6 +4,7 @@ import type {
   PlatformOverview,
   PlatformSystemStatus,
   RouteDirectory,
+  TenantMemberProfile,
   TenantOverview,
 } from "@cobranzapp/contracts";
 import { StatusBar } from "expo-status-bar";
@@ -21,6 +22,7 @@ import {
 } from "react-native";
 import { MobileApi, MobileApiError } from "./src/api";
 import { BorrowerCreateForm } from "./src/BorrowerCreateForm";
+import { MemberProfileForm } from "./src/MemberProfileForm";
 import { VerificationNetworkCard } from "./src/VerificationNetworkCard";
 
 type Screen =
@@ -364,6 +366,7 @@ function DeveloperHome({
 function TenantHome({
   api,
   overview,
+  memberProfile,
   directory,
   routes,
   directorySearch,
@@ -374,6 +377,7 @@ function TenantHome({
 }: {
   api: MobileApi;
   overview: TenantOverview;
+  memberProfile: TenantMemberProfile | null;
   directory: BorrowerDirectory | null;
   routes: RouteDirectory | null;
   directorySearch: string;
@@ -426,6 +430,15 @@ function TenantHome({
           recaudo se habilitarán después de la aprobación legal y contable.
         </Text>
       </View>
+      {overview.actorRole !== "customer" && overview.actorRole !== "support" && memberProfile ? (
+        <MemberProfileForm
+          api={api}
+          onNeedsReauthentication={onNeedsReauthentication}
+          profile={memberProfile}
+          tenantId={overview.tenant.id}
+          userId={memberProfile.userId}
+        />
+      ) : null}
       {overview.actorRole !== "customer" && overview.actorRole !== "support" ? (
         <BorrowerCreateForm
           api={api}
@@ -588,6 +601,7 @@ function AuthenticatedHome({
 }) {
   const [tenantId, setTenantId] = useState(user.memberships[0]?.tenantId ?? null);
   const [tenant, setTenant] = useState<TenantOverview | null>(null);
+  const [memberProfile, setMemberProfile] = useState<TenantMemberProfile | null>(null);
   const [directory, setDirectory] = useState<BorrowerDirectory | null>(null);
   const [routes, setRoutes] = useState<RouteDirectory | null>(null);
   const [platform, setPlatform] = useState<PlatformOverview | null>(null);
@@ -614,19 +628,30 @@ function AuthenticatedHome({
       user.platformRole === "developer" ? api.platformOverview() : Promise.resolve(null),
       user.platformRole === "developer" ? api.systemStatus() : Promise.resolve(null),
       tenantId ? api.tenantOverview(tenantId) : Promise.resolve(null),
+      tenantId && canReadBorrowers ? api.memberProfile(tenantId, user.id) : Promise.resolve(null),
       tenantId && canReadBorrowers
         ? api.borrowerDirectory(tenantId, { search: directorySearch, page: directoryPage })
         : Promise.resolve(null),
       tenantId && canReadBorrowers ? api.routeDirectory(tenantId) : Promise.resolve(null),
     ])
-      .then(([platformResult, systemResult, tenantResult, borrowerResult, routeResult]) => {
-        if (!mounted) return;
-        setPlatform(platformResult);
-        setSystem(systemResult);
-        setTenant(tenantResult);
-        setDirectory(borrowerResult);
-        setRoutes(routeResult);
-      })
+      .then(
+        ([
+          platformResult,
+          systemResult,
+          tenantResult,
+          memberProfileResult,
+          borrowerResult,
+          routeResult,
+        ]) => {
+          if (!mounted) return;
+          setPlatform(platformResult);
+          setSystem(systemResult);
+          setTenant(tenantResult);
+          setMemberProfile(memberProfileResult);
+          setDirectory(borrowerResult);
+          setRoutes(routeResult);
+        },
+      )
       .catch((error) => {
         if (!mounted) return;
         if (error instanceof MobileApiError && error.status === 428) {
@@ -649,6 +674,7 @@ function AuthenticatedHome({
     reloadKey,
     selectedMembershipRole,
     tenantId,
+    user.id,
     user.platformRole,
   ]);
 
@@ -765,6 +791,7 @@ function AuthenticatedHome({
                 api={api}
                 directory={directory}
                 directorySearch={directorySearch}
+                memberProfile={memberProfile}
                 onBorrowerCreated={() => setReloadKey((current) => current + 1)}
                 onDirectoryPageChange={setDirectoryPage}
                 onDirectorySearch={(search) => {

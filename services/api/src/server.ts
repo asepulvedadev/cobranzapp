@@ -49,7 +49,11 @@ const app = buildApp({
   platformService: createPostgresPlatformService(pool),
   sessionTtlHours: config.SESSION_TTL_HOURS,
   supportAccessService: createPostgresSupportAccessService(pool),
-  tenancyService: createPostgresTenancyService(pool, config.PUBLIC_WEB_URL),
+  tenancyService: createPostgresTenancyService(
+    pool,
+    config.PUBLIC_WEB_URL,
+    config.BORROWER_IDENTITY_KEY,
+  ),
   verificationNetworkService: createPostgresVerificationNetworkService(
     pool,
     config.VERIFICATION_NETWORK_HMAC_KEY,

@@ -75,13 +75,21 @@ export type MemberProfileResult =
   | { status: "updated"; profile: TenantMemberProfile }
   | { status: "not_found" }
   | { status: "forbidden" }
-  | { status: "invalid_photo_key" };
+  | { status: "invalid_photo_key" }
+  | { status: "identity_unavailable" }
+  | { status: "duplicate_identity" };
 
 export type MemberProfilePhotoResult =
   | { status: "updated"; profile: TenantMemberProfile }
   | { status: "not_found" }
   | { status: "forbidden" }
   | { status: "invalid_photo_key" };
+
+export type MemberIdentityDocumentResult =
+  | { status: "updated"; profile: TenantMemberProfile }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "invalid_document_key" };
 
 export interface TenancyService {
   createInvitation(
@@ -178,4 +186,10 @@ export interface TenancyService {
     userId: string,
     input: { objectKey: string; requestId: string },
   ): Promise<MemberProfilePhotoResult>;
+  setMemberIdentityDocument?(
+    actor: TenantActor,
+    tenantId: string,
+    userId: string,
+    input: { side: "front" | "back"; objectKey: string; requestId: string },
+  ): Promise<MemberIdentityDocumentResult>;
 }

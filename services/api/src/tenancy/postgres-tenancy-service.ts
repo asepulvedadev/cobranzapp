@@ -3,10 +3,16 @@ import type { TenantMemberProfile } from "@cobranzapp/contracts";
 import type { Pool, PoolClient } from "pg";
 import { hashPassword } from "../auth/password.js";
 import type { TenantRole } from "../auth/types.js";
+import {
+  borrowerDocumentLookupHmac,
+  encryptBorrowerDocumentNumber,
+  normalizeBorrowerDocumentNumber,
+} from "../borrowers/identity.js";
 import { buildMembershipEntitlement, membershipCatalog } from "../memberships/catalog.js";
 import type {
   InvitationAcceptanceResult,
   InvitationPreview,
+  MemberIdentityDocumentResult,
   MemberProfilePhotoResult,
   MemberProfileResult,
   TenancyService,
@@ -42,6 +48,12 @@ async function loadMemberProfile(
 ): Promise<TenantMemberProfile | null> {
   const member = await client.query<{
     user_id: string;
+    country: string;
+    document_type: string | null;
+    document_last4: string | null;
+    document_verification_state: "manual_pending" | "reviewed" | "rejected";
+    identity_front_object_key: string | null;
+    identity_back_object_key: string | null;
     phone: string | null;
     home_address: string | null;
     work_address: string | null;
@@ -51,6 +63,10 @@ async function loadMemberProfile(
     blood_type_consented_at: Date | null;
   }>(
     `SELECT membership.user_id,
+            COALESCE(profile.country, 'CO') AS country,
+            profile.document_type, profile.document_last4,
+            COALESCE(profile.document_verification_state, 'manual_pending') AS document_verification_state,
+            profile.identity_front_object_key, profile.identity_back_object_key,
             profile.phone, profile.home_address, profile.work_address,
             profile.profile_photo_object_key, profile.blood_type,
             profile.blood_type_consent_version, profile.blood_type_consented_at
@@ -79,6 +95,12 @@ async function loadMemberProfile(
   );
   return {
     userId: row.user_id,
+    country: row.country,
+    documentType: row.document_type,
+    documentLast4: row.document_last4,
+    documentVerificationState: row.document_verification_state,
+    identityFrontObjectKey: row.identity_front_object_key,
+    identityBackObjectKey: row.identity_back_object_key,
     phone: row.phone,
     homeAddress: row.home_address,
     workAddress: row.work_address,
@@ -131,7 +153,11 @@ async function loadInvitation(
   return row;
 }
 
-export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): TenancyService {
+export function createPostgresTenancyService(
+  pool: Pool,
+  publicWebUrl: string,
+  identityKey?: string,
+): TenancyService {
   return {
     async createInvitation(actor, tenantId, input) {
       const client = await pool.connect();
@@ -1188,14 +1214,69 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           return { status: "invalid_photo_key" } satisfies MemberProfileResult;
         }
 
+        const identityProvided =
+          input.country != null || input.documentType != null || input.documentNumber != null;
+        let identity: {
+          country: string;
+          documentType: string;
+          ciphertext: string;
+          lookupHmac: Buffer;
+          last4: string;
+        } | null = null;
+        if (identityProvided) {
+          if (!identityKey || !input.country || !input.documentType || !input.documentNumber) {
+            await client.query("ROLLBACK");
+            return { status: "identity_unavailable" } satisfies MemberProfileResult;
+          }
+          const normalizedNumber = normalizeBorrowerDocumentNumber(input.documentNumber);
+          identity = {
+            country: input.country.toUpperCase(),
+            documentType: input.documentType.trim().toUpperCase(),
+            ciphertext: encryptBorrowerDocumentNumber(identityKey, normalizedNumber),
+            lookupHmac: borrowerDocumentLookupHmac(identityKey, {
+              tenantId,
+              country: input.country,
+              documentType: input.documentType,
+              documentNumber: normalizedNumber,
+            }),
+            last4: normalizedNumber.slice(-4),
+          };
+          const duplicate = await client.query(
+            `SELECT 1
+               FROM tenant_member_profiles
+              WHERE tenant_id = $1
+                AND document_lookup_hmac = $2
+                AND user_id <> $3
+              LIMIT 1`,
+            [tenantId, identity.lookupHmac, userId],
+          );
+          if (duplicate.rows[0]) {
+            await client.query("ROLLBACK");
+            return { status: "duplicate_identity" } satisfies MemberProfileResult;
+          }
+        }
+
         await client.query(
           `INSERT INTO tenant_member_profiles (
-             tenant_id, user_id, phone, home_address, work_address,
+             tenant_id, user_id, country, document_type, document_number_ciphertext,
+             document_lookup_hmac, document_last4, document_verification_state,
+             phone, home_address, work_address,
              profile_photo_object_key, blood_type, blood_type_consent_version,
              blood_type_consented_at
-           ) VALUES ($1, $2, $3::text, $4::text, $5::text, $6::text, $7::text, $8::text,
-                     CASE WHEN $7::text IS NULL THEN NULL ELSE now() END)
+           ) VALUES ($1, $2,
+                     COALESCE($3::text, 'CO'),
+                     $4::text, $5::text, $6::bytea, $7::text,
+                     CASE WHEN $4::text IS NULL THEN 'manual_pending' ELSE 'manual_pending' END,
+                     $8::text, $9::text, $10::text, $11::text, $12::text,
+                     $13::text,
+                     CASE WHEN $12::text IS NULL THEN NULL ELSE now() END)
            ON CONFLICT (tenant_id, user_id) DO UPDATE SET
+             country = CASE WHEN EXCLUDED.document_type IS NULL THEN tenant_member_profiles.country ELSE EXCLUDED.country END,
+             document_type = CASE WHEN EXCLUDED.document_type IS NULL THEN tenant_member_profiles.document_type ELSE EXCLUDED.document_type END,
+             document_number_ciphertext = CASE WHEN EXCLUDED.document_type IS NULL THEN tenant_member_profiles.document_number_ciphertext ELSE EXCLUDED.document_number_ciphertext END,
+             document_lookup_hmac = CASE WHEN EXCLUDED.document_type IS NULL THEN tenant_member_profiles.document_lookup_hmac ELSE EXCLUDED.document_lookup_hmac END,
+             document_last4 = CASE WHEN EXCLUDED.document_type IS NULL THEN tenant_member_profiles.document_last4 ELSE EXCLUDED.document_last4 END,
+             document_verification_state = CASE WHEN EXCLUDED.document_type IS NULL THEN tenant_member_profiles.document_verification_state ELSE 'manual_pending' END,
              phone = EXCLUDED.phone,
              home_address = EXCLUDED.home_address,
              work_address = EXCLUDED.work_address,
@@ -1207,6 +1288,11 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           [
             tenantId,
             userId,
+            identity?.country ?? null,
+            identity?.documentType ?? null,
+            identity?.ciphertext ?? null,
+            identity?.lookupHmac ?? null,
+            identity?.last4 ?? null,
             input.phone,
             input.homeAddress,
             input.workAddress,
@@ -1240,6 +1326,7 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
             JSON.stringify({
               targetUserId: userId,
               hasPhone: input.phone !== null,
+              hasDocumentIdentity: identity !== null,
               hasHomeAddress: input.homeAddress !== null,
               hasWorkAddress: input.workAddress !== null,
               hasProfilePhoto: input.profilePhotoObjectKey !== null,
@@ -1317,6 +1404,69 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
         }
         await client.query("COMMIT");
         return { status: "updated", profile } satisfies MemberProfilePhotoResult;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async setMemberIdentityDocument(actor, tenantId, userId, input) {
+      const expectedPrefix = `tenant/${tenantId}/members/${userId}/identity/`;
+      if (!input.objectKey.startsWith(expectedPrefix)) {
+        return { status: "invalid_document_key" } satisfies MemberIdentityDocumentResult;
+      }
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setActorContext(client, actor, tenantId);
+        const member = await client.query<{ role: TenantRole; status: string }>(
+          `SELECT role, status
+             FROM tenant_memberships
+            WHERE tenant_id = $1 AND user_id = $2`,
+          [tenantId, userId],
+        );
+        const membership = member.rows[0];
+        if (!membership || membership.status === "revoked") {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies MemberIdentityDocumentResult;
+        }
+        if (actor.userId !== userId && !["owner", "supervisor"].includes(actor.tenantRole ?? "")) {
+          await client.query("ROLLBACK");
+          return { status: "forbidden" } satisfies MemberIdentityDocumentResult;
+        }
+        if (
+          actor.userId !== userId &&
+          actor.tenantRole === "supervisor" &&
+          membership.role === "owner"
+        ) {
+          await client.query("ROLLBACK");
+          return { status: "forbidden" } satisfies MemberIdentityDocumentResult;
+        }
+        const column =
+          input.side === "front" ? "identity_front_object_key" : "identity_back_object_key";
+        await client.query(
+          `INSERT INTO tenant_member_profiles (tenant_id, user_id, ${column})
+           VALUES ($1, $2, $3)
+           ON CONFLICT (tenant_id, user_id) DO UPDATE SET
+             ${column} = EXCLUDED.${column}, updated_at = now()`,
+          [tenantId, userId, input.objectKey],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'member.identity_document_uploaded', 'tenant_member_profile', $3, $4,
+                   jsonb_build_object('targetUserId', $5::text, 'side', $6::text))`,
+          [tenantId, actor.userId, userId, input.requestId, userId, input.side],
+        );
+        const profile = await loadMemberProfile(client, tenantId, userId);
+        if (!profile) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies MemberIdentityDocumentResult;
+        }
+        await client.query("COMMIT");
+        return { status: "updated", profile } satisfies MemberIdentityDocumentResult;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

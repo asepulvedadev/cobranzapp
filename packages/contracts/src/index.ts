@@ -555,6 +555,9 @@ export const verificationNetworkCorrectionResponseSchema = z.object({
 
 export const tenantMemberProfileRequestSchema = z
   .object({
+    country: z.string().trim().length(2).toUpperCase().nullable().optional().default(null),
+    documentType: z.string().trim().min(2).max(30).nullable().optional().default(null),
+    documentNumber: z.string().trim().min(4).max(32).nullable().optional().default(null),
     phone: z.string().trim().min(7).max(30).nullable(),
     homeAddress: z.string().trim().min(3).max(240).nullable(),
     workAddress: z.string().trim().min(3).max(240).nullable(),
@@ -572,6 +575,16 @@ export const tenantMemberProfileRequestSchema = z
       .max(2),
   })
   .superRefine((value, context) => {
+    const identityValues = [value.country, value.documentType, value.documentNumber];
+    const hasAnyIdentityValue = identityValues.some((item) => item !== null);
+    const hasCompleteIdentity = identityValues.every((item) => item !== null);
+    if (hasAnyIdentityValue && !hasCompleteIdentity) {
+      context.addIssue({
+        code: "custom",
+        path: ["documentNumber"],
+        message: "Completa país, tipo y número del documento.",
+      });
+    }
     if (value.bloodType && !value.bloodTypeConsentVersion) {
       context.addIssue({
         code: "custom",
@@ -597,6 +610,12 @@ export const tenantMemberEmergencyContactSchema = z.object({
 
 export const tenantMemberProfileSchema = z.object({
   userId: z.uuid(),
+  country: z.string().length(2),
+  documentType: z.string().nullable(),
+  documentLast4: z.string().nullable(),
+  documentVerificationState: z.enum(["manual_pending", "reviewed", "rejected"]),
+  identityFrontObjectKey: z.string().nullable(),
+  identityBackObjectKey: z.string().nullable(),
   phone: z.string().nullable(),
   homeAddress: z.string().nullable(),
   workAddress: z.string().nullable(),

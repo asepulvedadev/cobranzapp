@@ -1384,6 +1384,22 @@ export function buildApp(dependencies: AppDependencies) {
           "La foto debe provenir del almacenamiento privado de la empresa.",
           request.id,
         );
+      case "identity_unavailable":
+        return sendError(
+          reply,
+          503,
+          "MEMBER_IDENTITY_UNAVAILABLE",
+          "La identidad del personal requiere una clave de protección configurada.",
+          request.id,
+        );
+      case "duplicate_identity":
+        return sendError(
+          reply,
+          409,
+          "MEMBER_IDENTITY_DUPLICATE",
+          "El número de documento ya está registrado en esta empresa.",
+          request.id,
+        );
       case "forbidden":
         return sendError(
           reply,
@@ -1540,6 +1556,155 @@ export function buildApp(dependencies: AppDependencies) {
             400,
             "PROFILE_PHOTO_TYPE_INVALID",
             "La foto debe ser una imagen.",
+          ],
+        };
+        const mapped = messages[error.message];
+        if (mapped) return sendError(reply, mapped[0], mapped[1], mapped[2], request.id);
+      }
+      throw error;
+    }
+  });
+
+  app.post("/v1/tenants/:tenantId/members/:userId/profile-documents", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantMemberProfileParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "MEMBER_PROFILE_NOT_FOUND", "La ficha no existe.", request.id);
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership) {
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a esta empresa.", request.id);
+    }
+    if (
+      params.data.userId !== session.user.id &&
+      !["owner", "supervisor"].includes(membership.role)
+    ) {
+      return sendError(reply, 403, "SCOPE_DENIED", "No puedes cargar este documento.", request.id);
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const setMemberIdentityDocument = dependencies.tenancyService.setMemberIdentityDocument;
+    if (!setMemberIdentityDocument || !dependencies.documentStorage) {
+      return sendError(
+        reply,
+        503,
+        "MEMBER_DOCUMENTS_UNAVAILABLE",
+        "La carga privada de documentos todavía no está configurada.",
+        request.id,
+      );
+    }
+    let side: "front" | "back" | null = null;
+    let mediaType = "";
+    let fileBytes: Buffer | null = null;
+    try {
+      for await (const part of request.parts()) {
+        if (part.type === "field" && part.fieldname === "side") {
+          side = part.value === "front" || part.value === "back" ? part.value : null;
+        }
+        if (part.type === "file") {
+          if (fileBytes) {
+            return sendError(
+              reply,
+              400,
+              "TOO_MANY_MEMBER_DOCUMENTS",
+              "Solo puedes cargar un documento por vez.",
+              request.id,
+            );
+          }
+          mediaType = part.mimetype;
+          fileBytes = await part.toBuffer();
+        }
+      }
+    } catch (error) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === "FST_REQ_FILE_TOO_LARGE"
+      ) {
+        return sendError(
+          reply,
+          413,
+          "MEMBER_DOCUMENT_TOO_LARGE",
+          "El documento supera el límite de 10 MB.",
+          request.id,
+        );
+      }
+      throw error;
+    }
+    if (!side)
+      return sendError(
+        reply,
+        400,
+        "MEMBER_DOCUMENT_SIDE_REQUIRED",
+        "Indica si es el frente o el reverso.",
+        request.id,
+      );
+    if (!fileBytes || !mediaType)
+      return sendError(
+        reply,
+        400,
+        "MEMBER_DOCUMENT_REQUIRED",
+        "Debes seleccionar un documento.",
+        request.id,
+      );
+    try {
+      const stored = await dependencies.documentStorage.quarantineMemberIdentityDocument({
+        tenantId: params.data.tenantId,
+        userId: params.data.userId,
+        side,
+        mediaType,
+        bytes: fileBytes,
+      });
+      const result = await setMemberIdentityDocument(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.userId,
+        { side, objectKey: stored.objectKey, requestId: request.id },
+      );
+      if (result.status !== "updated")
+        await dependencies.documentStorage.remove(stored.objectKey).catch(() => undefined);
+      if (result.status === "not_found")
+        return sendError(reply, 404, "MEMBER_PROFILE_NOT_FOUND", "La ficha no existe.", request.id);
+      if (result.status === "forbidden")
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "No puedes actualizar esta ficha.",
+          request.id,
+        );
+      if (result.status === "invalid_document_key")
+        return sendError(
+          reply,
+          400,
+          "INVALID_MEMBER_DOCUMENT_KEY",
+          "La ruta privada no es válida.",
+          request.id,
+        );
+      return reply.send({ profile: result.profile });
+    } catch (error) {
+      if (error instanceof Error) {
+        const messages: Record<string, [number, string, string]> = {
+          UNSUPPORTED_DOCUMENT_TYPE: [
+            400,
+            "UNSUPPORTED_MEMBER_DOCUMENT_TYPE",
+            "El formato no está permitido.",
+          ],
+          DOCUMENT_SIZE_INVALID: [
+            400,
+            "MEMBER_DOCUMENT_SIZE_INVALID",
+            "El documento está vacío o supera 10 MB.",
+          ],
+          DOCUMENT_CONTENT_INVALID: [
+            400,
+            "MEMBER_DOCUMENT_CONTENT_INVALID",
+            "El contenido no coincide con su formato.",
           ],
         };
         const mapped = messages[error.message];

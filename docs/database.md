@@ -55,6 +55,10 @@ Migration `0020_loan_application_drafts.sql` adds controlled tenant-scoped appli
 
 Migration `0021_collection_routes.sql` adds tenant-scoped route templates and ordered borrower stops. Managers can move a route through the controlled `draft → active → archived` lifecycle; activation requires at least one stop and every transition is audited. Routes remain operational planning records only; they do not authorize payment capture, cash handling, offline operation or geolocation tracking.
 Migration `0022_collection_route_assignments.sql` adds an optional active-collector assignment to each route template. Assignment changes are tenant-scoped and audited; they do not grant payment, cash or offline permissions.
+
+Migration `0023_member_identity_profile.sql` adds tenant-scoped staff identity metadata. The full document number is encrypted, lookup uses a tenant-keyed HMAC, and the API exposes only the document type, last four digits and manual-review state. Existing staff profiles remain valid until they complete the required identity fields.
+
+Migration `0024_member_identity_documents.sql` adds private front/reverse identity-document references for staff profiles. Uploads are quarantined, content-validated and stored under tenant/member prefixes; the API exposes only presence references to authorized roles.
 Product review currently supports only the auditable `draft → under_review` transition when a
 normative reference is present. Approval remains disabled until legal, accounting and calendar
 evidence is accepted.

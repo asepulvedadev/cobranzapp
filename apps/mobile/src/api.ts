@@ -16,7 +16,9 @@ import {
   type RouteDirectory,
   reauthenticationResponseSchema,
   routeDirectorySchema,
+  type TenantMemberProfile,
   type TenantOverview,
+  tenantMemberProfileSchema,
   tenantOverviewSchema,
   type VerificationNetworkConsentRequest,
   type VerificationNetworkCorrectionRequest,
@@ -208,6 +210,97 @@ export class MobileApi {
         response.status,
       );
     return tenantOverviewSchema.parse((await response.json()).overview);
+  }
+
+  async memberProfile(tenantId: string, userId: string): Promise<TenantMemberProfile> {
+    const response = await this.request(`/v1/tenants/${tenantId}/members/${userId}/profile`);
+    if (!response.ok)
+      throw new MobileApiError(
+        await apiError(response, "No fue posible cargar tu ficha operativa."),
+        response.status,
+      );
+    return tenantMemberProfileSchema.parse((await response.json()).profile);
+  }
+
+  async updateMemberProfile(
+    tenantId: string,
+    userId: string,
+    input: {
+      country: string | null;
+      documentType: string | null;
+      documentNumber: string | null;
+      phone: string | null;
+      homeAddress: string | null;
+      workAddress: string | null;
+      profilePhotoObjectKey: string | null;
+      bloodType: TenantMemberProfile["bloodType"];
+      bloodTypeConsentVersion: string | null;
+      emergencyContacts: Array<{
+        fullName: string;
+        relationship: string;
+        phone: string;
+      }>;
+    },
+  ) {
+    const response = await this.request(`/v1/tenants/${tenantId}/members/${userId}/profile`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible guardar tu ficha operativa."),
+        response.status,
+      );
+    }
+    return tenantMemberProfileSchema.parse((await response.json()).profile);
+  }
+
+  async uploadMemberProfilePhoto(
+    tenantId: string,
+    userId: string,
+    input: { uri: string; name: string; type: string; file?: Blob },
+  ) {
+    const form = new FormData();
+    form.append(
+      "file",
+      input.file ?? ({ uri: input.uri, name: input.name, type: input.type } as unknown as Blob),
+    );
+    const response = await this.request(`/v1/tenants/${tenantId}/members/${userId}/profile-photo`, {
+      method: "POST",
+      body: form,
+    });
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible guardar la foto de perfil."),
+        response.status,
+      );
+    }
+    return tenantMemberProfileSchema.parse((await response.json()).profile);
+  }
+
+  async uploadMemberIdentityDocument(
+    tenantId: string,
+    userId: string,
+    input: { side: "front" | "back"; uri: string; name: string; type: string; file?: Blob },
+  ) {
+    const form = new FormData();
+    form.append("side", input.side);
+    form.append(
+      "file",
+      input.file ?? ({ uri: input.uri, name: input.name, type: input.type } as unknown as Blob),
+    );
+    const response = await this.request(
+      `/v1/tenants/${tenantId}/members/${userId}/profile-documents`,
+      { method: "POST", body: form },
+    );
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible guardar el documento de identidad."),
+        response.status,
+      );
+    }
+    return tenantMemberProfileSchema.parse((await response.json()).profile);
   }
 
   async borrowerDirectory(

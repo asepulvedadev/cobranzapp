@@ -103,6 +103,33 @@ describe("shared API contracts", () => {
     ).toBe(true);
   });
 
+  it("requires staff identity fields together when document registration starts", () => {
+    const base = {
+      phone: null,
+      homeAddress: null,
+      workAddress: null,
+      profilePhotoObjectKey: null,
+      bloodType: null,
+      bloodTypeConsentVersion: null,
+      emergencyContacts: [],
+    };
+    expect(
+      tenantMemberProfileRequestSchema.safeParse({
+        ...base,
+        country: "CO",
+        documentType: "CC",
+      }).success,
+    ).toBe(false);
+    expect(
+      tenantMemberProfileRequestSchema.safeParse({
+        ...base,
+        country: "CO",
+        documentType: "CC",
+        documentNumber: "1234567890",
+      }).success,
+    ).toBe(true);
+  });
+
   it("keeps borrower identity masked and requires an emergency contact", () => {
     const base = {
       fullName: "Cliente Ejemplo",

@@ -276,7 +276,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     const platform = createPostgresPlatformService(runtimePool);
     const supportAccess = createPostgresSupportAccessService(runtimePool);
     await expect(platform.systemStatus(developerId)).resolves.toMatchObject({
-      schemaVersion: "0022_collection_route_assignments.sql",
+      schemaVersion: "0024_member_identity_documents.sql",
       jobs: {
         status: expect.stringMatching(/^(operational|attention)$/),
         due: expect.any(Number),
@@ -502,7 +502,11 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       expect.objectContaining({ id: supportRequest.access.id, status: "pending" }),
     );
 
-    const tenancy = createPostgresTenancyService(runtimePool, "https://cobranzaap.tech");
+    const tenancy = createPostgresTenancyService(
+      runtimePool,
+      "https://cobranzaap.tech",
+      "integration-staff-identity-key",
+    );
     const invitation = await tenancy.createInvitation(
       { userId: developerId, platformRole: "developer", tenantRole: null },
       tenant.id,
@@ -604,6 +608,46 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
         emergencyContacts: [{ fullName: "Contacto Principal", relationship: "Hermana" }],
       },
     });
+    const identityUpdate = await tenancy.updateMemberProfile(
+      ownerActor,
+      tenant.id,
+      ownerLogin?.user.id ?? "",
+      {
+        country: "CO",
+        documentType: "CC",
+        documentNumber: "1.234.567.890",
+        phone: "+57 300 111 2233",
+        homeAddress: "Calle 10 # 20-30, Cúcuta",
+        workAddress: "Carrera 5 # 6-7, Cúcuta",
+        profilePhotoObjectKey: null,
+        bloodType: "O+",
+        bloodTypeConsentVersion: "staff-profile-v1",
+        emergencyContacts: [
+          { fullName: "Contacto Principal", relationship: "Hermana", phone: "+57 300 444 5566" },
+        ],
+        requestId: `profile-identity-${suffix}`,
+      },
+    );
+    expect(identityUpdate).toMatchObject({
+      status: "updated",
+      profile: {
+        country: "CO",
+        documentType: "CC",
+        documentLast4: "7890",
+        documentVerificationState: "manual_pending",
+      },
+    });
+    const storedIdentity = await ownerPool.query<{
+      document_number_ciphertext: string;
+      document_lookup_hmac: Buffer;
+    }>(
+      `SELECT document_number_ciphertext, document_lookup_hmac
+         FROM tenant_member_profiles
+        WHERE tenant_id = $1 AND user_id = $2`,
+      [tenant.id, ownerLogin?.user.id],
+    );
+    expect(storedIdentity.rows[0]?.document_number_ciphertext).not.toContain("1234567890");
+    expect(storedIdentity.rows[0]?.document_lookup_hmac).toBeInstanceOf(Buffer);
     await expect(
       tenancy.updateMemberProfile(ownerActor, tenant.id, ownerLogin?.user.id ?? "", {
         phone: null,

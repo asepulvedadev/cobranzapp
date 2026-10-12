@@ -47,6 +47,24 @@ export function MemberProfileDirectory({
               {profile ? (
                 <dl>
                   <div>
+                    <dt>Documento</dt>
+                    <dd>
+                      {profile.documentType && profile.documentLast4
+                        ? `${profile.documentType} · •••• ${profile.documentLast4}`
+                        : "Pendiente de registro"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Estado del documento</dt>
+                    <dd>
+                      {profile.documentVerificationState === "reviewed"
+                        ? "Revisado"
+                        : profile.documentVerificationState === "rejected"
+                          ? "Rechazado"
+                          : "Pendiente de revisión"}
+                    </dd>
+                  </div>
+                  <div>
                     <dt>Celular</dt>
                     <dd>{profile.phone ?? "Sin registrar"}</dd>
                   </div>
