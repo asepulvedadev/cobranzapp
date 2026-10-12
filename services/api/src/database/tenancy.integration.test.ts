@@ -162,7 +162,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     const platform = createPostgresPlatformService(runtimePool);
     const supportAccess = createPostgresSupportAccessService(runtimePool);
     await expect(platform.systemStatus(developerId)).resolves.toMatchObject({
-      schemaVersion: "0011_tenant_membership_plans.sql",
+      schemaVersion: "0012_inactive_organization_scope.sql",
       jobs: {
         status: expect.stringMatching(/^(operational|attention)$/),
         due: expect.any(Number),
@@ -626,6 +626,21 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     expect(collectorOverview?.branches.map((item) => item.id)).toEqual([branch?.id]);
     expect(collectorOverview?.teams.map((item) => item.id)).toEqual([team?.id]);
     expect(collectorOverview?.teams[0]?.memberIds).toEqual([]);
+
+    await ownerPool.query("UPDATE teams SET status = 'inactive' WHERE tenant_id = $1 AND id = $2", [
+      tenant.id,
+      team?.id,
+    ]);
+    const collectorWithoutActiveScope = await tenancy.overview(
+      { userId: memberId, platformRole: null, tenantRole: "collector" },
+      tenant.id,
+    );
+    expect(collectorWithoutActiveScope?.branches).toEqual([]);
+    expect(collectorWithoutActiveScope?.teams).toEqual([]);
+    await ownerPool.query("UPDATE teams SET status = 'active' WHERE tenant_id = $1 AND id = $2", [
+      tenant.id,
+      team?.id,
+    ]);
 
     const customerOverview = await tenancy.overview(
       { userId: customerId, platformRole: null, tenantRole: "customer" },

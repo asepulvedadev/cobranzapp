@@ -60,7 +60,8 @@ Organization visibility is also role scoped in PostgreSQL. Owners and supervisor
 tenant organization, collectors can read only teams assigned to their user and the branches that
 contain those teams, and customers cannot read branches, teams, team membership or organization
 counts. The API returns zeroed internal metrics for collectors and customers rather than exposing
-tenant-wide counts that their role does not need.
+tenant-wide counts that their role does not need. Inactive teams and branches are removed from a
+collector's database-visible scope even when the historical assignment remains stored.
 
 ### Implemented worker-security baseline
 
