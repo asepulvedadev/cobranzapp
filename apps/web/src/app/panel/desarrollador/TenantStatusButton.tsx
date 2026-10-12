@@ -58,7 +58,7 @@ export function TenantStatusButton({
         {isSubmitting ? "Procesando…" : activationBlocked ? "Preparación pendiente" : action.label}
       </button>
       {activationBlocked ? (
-        <small className="table-action-note">Completa los tres requisitos para activar.</small>
+        <small className="table-action-note">Completa todos los requisitos para activar.</small>
       ) : null}
       {message ? <small role="status">{message}</small> : null}
     </div>

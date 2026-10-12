@@ -62,11 +62,13 @@ export type PlatformOverview = {
     slug: string;
     displayName: string;
     status: "draft" | "active" | "suspended" | "archived";
+    membershipPlan: "pro" | "ultra" | null;
     members: number;
     readiness: {
       activeOwner: boolean;
       activeBranch: boolean;
       contactEmail: boolean;
+      membershipPlan: boolean;
     };
     createdAt: string;
   }>;

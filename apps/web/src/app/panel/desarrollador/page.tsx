@@ -11,6 +11,7 @@ import { ActivityFeed } from "../ActivityFeed";
 import { InviteUserForm } from "../InviteUserForm";
 import { CreateTenantForm } from "./CreateTenantForm";
 import { SupportAccessControl } from "./SupportAccessControl";
+import { TenantMembershipPlanControl } from "./TenantMembershipPlanControl";
 import { TenantReadiness } from "./TenantReadiness";
 import { TenantStatusButton } from "./TenantStatusButton";
 
@@ -224,6 +225,7 @@ export default async function DeveloperDashboard({
                   <tr>
                     <th>Empresa</th>
                     <th>Estado</th>
+                    <th>Plan</th>
                     <th>Miembros</th>
                     <th>Preparación</th>
                     <th>Soporte</th>
@@ -242,6 +244,12 @@ export default async function DeveloperDashboard({
                         <span className={`status status-${tenant.status}`}>
                           {statusLabels[tenant.status]}
                         </span>
+                      </td>
+                      <td data-label="Plan">
+                        <TenantMembershipPlanControl
+                          membershipPlan={tenant.membershipPlan}
+                          tenantId={tenant.id}
+                        />
                       </td>
                       <td data-label="Miembros">{tenant.members}</td>
                       <td data-label="Preparación">

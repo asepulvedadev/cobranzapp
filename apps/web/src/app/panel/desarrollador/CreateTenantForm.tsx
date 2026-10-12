@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { memberships } from "../../../data/memberships";
 import { useSensitiveFetch } from "../ReauthenticationProvider";
 
 export function CreateTenantForm() {
@@ -19,7 +20,11 @@ export function CreateTenantForm() {
     const response = await sensitiveFetch("/api/v1/platform/tenants", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ displayName: form.get("displayName"), slug: form.get("slug") }),
+      body: JSON.stringify({
+        displayName: form.get("displayName"),
+        slug: form.get("slug"),
+        membershipPlan: form.get("membershipPlan"),
+      }),
     }).catch(() => null);
     if (!response?.ok) {
       const body = (await response?.json().catch(() => ({}))) as
@@ -55,6 +60,15 @@ export function CreateTenantForm() {
         required
       />
       <small>Solo minúsculas, números y guiones.</small>
+      <label htmlFor="membershipPlan">Plan comercial</label>
+      <select defaultValue="pro" id="membershipPlan" name="membershipPlan" required>
+        {memberships.map((membership) => (
+          <option key={membership.id} value={membership.id}>
+            {membership.name} · hasta {membership.clientLimit} clientes
+          </option>
+        ))}
+      </select>
+      <small>Define la capacidad comercial; no registra ni cobra una suscripción.</small>
       {message ? (
         <p className="tenant-form-message" role="status">
           {message}

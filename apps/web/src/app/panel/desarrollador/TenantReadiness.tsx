@@ -3,6 +3,7 @@ import type { PlatformOverview } from "../../../lib/platform";
 type Readiness = PlatformOverview["tenants"][number]["readiness"];
 
 const readinessSteps: Array<{ key: keyof Readiness; label: string }> = [
+  { key: "membershipPlan", label: "Plan" },
   { key: "activeOwner", label: "Propietario" },
   { key: "contactEmail", label: "Contacto" },
   { key: "activeBranch", label: "Sede" },

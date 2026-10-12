@@ -2,6 +2,7 @@ import type { AuditActivity } from "../../lib/platform";
 
 const actionLabels: Record<string, string> = {
   "tenant.created": "Creó la empresa",
+  "tenant.membership_plan_changed": "Cambió el plan comercial",
   "tenant.status_changed": "Cambió el estado de la empresa",
   "invitation.created": "Creó una invitación",
   "invitation.accepted": "Aceptó una invitación",
@@ -23,6 +24,7 @@ const actionLabels: Record<string, string> = {
   "support_access.denied": "Rechazó acceso temporal de soporte",
   "support_access.revoked": "Revocó acceso temporal de soporte",
   "support_access.cancelled": "Canceló una solicitud de soporte",
+  "support_access.expired": "Venció el acceso temporal de soporte",
 };
 
 type ActivityItem = AuditActivity & { tenantName?: string | null };
