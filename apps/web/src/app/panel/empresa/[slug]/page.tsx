@@ -238,12 +238,7 @@ export default async function TenantDashboard({
         >
           <article>
             <span>Clientes activos</span>
-            <strong>
-              {
-                borrowerDirectory.borrowers.filter((borrower) => borrower.status === "active")
-                  .length
-              }
-            </strong>
+            <strong>{borrowerDirectory.borrowerSummary.active}</strong>
             <small>Registros disponibles para operación</small>
           </article>
           <article>

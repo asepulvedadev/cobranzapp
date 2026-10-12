@@ -836,6 +836,12 @@ export const borrowerDirectorySchema = z.object({
       rejected: z.number().int().nonnegative(),
     })
     .default({ pending: 0, reviewed: 0, rejected: 0 }),
+  borrowerSummary: z
+    .object({
+      active: z.number().int().nonnegative(),
+      archived: z.number().int().nonnegative(),
+    })
+    .default({ active: 0, archived: 0 }),
 });
 
 export type ServiceStatus = z.infer<typeof serviceStatusSchema>;

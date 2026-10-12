@@ -159,14 +159,16 @@ describe("shared API contracts", () => {
       borrowers: [],
       pagination: { page: 1, pageSize: 20, total: 42, totalPages: 3 },
       identitySummary: { pending: 12, reviewed: 28, rejected: 2 },
+      borrowerSummary: { active: 40, archived: 2 },
     });
     expect(result.identitySummary).toEqual({ pending: 12, reviewed: 28, rejected: 2 });
-    expect(
-      borrowerDirectorySchema.parse({
-        borrowers: [],
-        pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 },
-      }).identitySummary,
-    ).toEqual({ pending: 0, reviewed: 0, rejected: 0 });
+    expect(result.borrowerSummary).toEqual({ active: 40, archived: 2 });
+    const empty = borrowerDirectorySchema.parse({
+      borrowers: [],
+      pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 },
+    });
+    expect(empty.identitySummary).toEqual({ pending: 0, reviewed: 0, rejected: 0 });
+    expect(empty.borrowerSummary).toEqual({ active: 0, archived: 0 });
   });
 
   it("normalizes platform tenant creation and forbids returning to draft", () => {

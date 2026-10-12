@@ -190,6 +190,20 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
                 : "rejected";
           identitySummary[key] = Number(row.total);
         }
+        const statusRows = await client.query<{
+          status: Borrower["status"];
+          total: string;
+        }>(
+          `SELECT borrower.status, count(*) AS total
+             FROM borrowers borrower
+             JOIN borrower_identities identity
+               ON identity.tenant_id = borrower.tenant_id AND identity.borrower_id = borrower.id
+            WHERE borrower.tenant_id = $2 AND (${filter})
+            GROUP BY borrower.status`,
+          [query.search, tenantId],
+        );
+        const borrowerSummary = { active: 0, archived: 0 };
+        for (const row of statusRows.rows) borrowerSummary[row.status] = Number(row.total);
         const rows = await client.query<BorrowerRow>(
           `SELECT borrower.id, borrower.full_name, borrower.status,
                   borrower.phone, borrower.home_address, borrower.work_address,
@@ -211,6 +225,7 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
           borrowers: borrowers.filter((borrower): borrower is Borrower => borrower !== null),
           pagination: { page, pageSize: query.pageSize, total, totalPages },
           identitySummary,
+          borrowerSummary,
         };
       });
     },
