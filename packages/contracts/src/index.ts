@@ -667,6 +667,39 @@ export const loanProductDirectorySchema = z.object({
 });
 export const loanProductResponseSchema = z.object({ product: loanProductSchema });
 
+export const loanApplicationStatusSchema = z.enum([
+  "draft",
+  "submitted",
+  "under_review",
+  "approved",
+  "rejected",
+  "cancelled",
+]);
+export const loanApplicationCreateRequestSchema = z.object({
+  borrowerId: z.uuid(),
+  loanProductId: z.uuid(),
+  requestedPrincipal: decimalAmountSchema,
+  requestedTermCount: z.number().int().min(1).max(365),
+  purpose: z.string().trim().min(3).max(240).nullable(),
+});
+export const loanApplicationSchema = z.object({
+  id: z.uuid(),
+  borrowerId: z.uuid(),
+  borrowerName: z.string().min(2),
+  loanProductId: z.uuid(),
+  loanProductName: z.string().min(2),
+  requestedPrincipal: decimalAmountSchema,
+  requestedTermCount: z.number().int().positive(),
+  purpose: z.string().nullable(),
+  status: loanApplicationStatusSchema,
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+export const loanApplicationDirectorySchema = z.object({
+  applications: z.array(loanApplicationSchema),
+});
+export const loanApplicationResponseSchema = z.object({ application: loanApplicationSchema });
+
 export const borrowerDocumentSideSchema = z.enum(["front", "back"]);
 export const borrowerDocumentSchema = z.object({
   id: z.uuid(),
@@ -875,6 +908,10 @@ export type LoanProductComplianceStatus = z.infer<typeof loanProductComplianceSt
 export type LoanProductCreateRequest = z.infer<typeof loanProductCreateRequestSchema>;
 export type LoanProduct = z.infer<typeof loanProductSchema>;
 export type LoanProductDirectory = z.infer<typeof loanProductDirectorySchema>;
+export type LoanApplicationStatus = z.infer<typeof loanApplicationStatusSchema>;
+export type LoanApplicationCreateRequest = z.infer<typeof loanApplicationCreateRequestSchema>;
+export type LoanApplication = z.infer<typeof loanApplicationSchema>;
+export type LoanApplicationDirectory = z.infer<typeof loanApplicationDirectorySchema>;
 export type BorrowerDocument = z.infer<typeof borrowerDocumentSchema>;
 export type BorrowerCreateRequest = z.infer<typeof borrowerCreateRequestSchema>;
 export type BorrowerReviewRequest = z.infer<typeof borrowerReviewRequestSchema>;

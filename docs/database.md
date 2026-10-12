@@ -43,6 +43,7 @@ Global identity records are not readable by arbitrary tenants; expose only allow
 | `risk_cases`, `risk_case_events` | Borrower, category, evidence, review deadline; immutable case decisions/disputes/resolutions |
 | `data_subject_requests` | Borrower, request type, deadline, reviewer, outcome and permitted retention exception |
 | `loan_products` | Tenant-scoped version seed, COP amount bounds, term/frequency/rate basis, compliance state and review evidence; draft-only until financial approval |
+| `loan_applications` | Tenant-scoped request drafts linking an active borrower to a product, with requested amount/term, status and audit actor; no approval or disbursement state is implied |
 
 Identity uniqueness is tenant-local over normalized country/type/number HMAC for active identities; changes are reviewed. Keep document review evidence minimal; do not duplicate full document content in metadata.
 
@@ -50,6 +51,7 @@ The consent-gated shared verification foundation is implemented in migration `00
 
 Migration `0017_borrower_dossier_foundation.sql` now adds the first tenant-scoped borrower dossier slice. It stores legal name, required contact addresses, consent evidence, a tenant-keyed HMAC plus encrypted document number, masked last four digits, emergency contacts and private document metadata. API responses never return the full document number. Migration `0018_borrower_identity_reviews.sql` adds an append-only manual review history and keeps the current identity state on the borrower identity row. An approval requires accepted front, back and designated profile-photo objects plus explicit reviewer checklist confirmation. The current upload adapter writes opaque objects to a private VPS quarantine volume with `scan_status = pending`; staff profile photos use a separate tenant/member prefix and remain private. Antivirus scanning, off-site versioned storage and the promotion step remain operational gates before production approval.
 Migration `0019_loan_product_catalog.sql` adds a tenant-scoped, draft-only product catalog with typed COP bounds, term frequency, rate basis and compliance state. It does not authorize approval, loan origination, schedule calculation or disbursement; those remain separate Phase 4 gates.
+Migration `0020_loan_application_drafts.sql` adds controlled tenant-scoped application drafts. It validates borrower/product ownership through composite foreign keys, enforces product amount and term bounds, and records a redacted audit event. Submission, approval, schedule calculation, disbursement and payments remain separate gates.
 
 ### Lending and accounting
 

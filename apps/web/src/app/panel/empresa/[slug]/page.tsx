@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import type {
   BorrowerDirectory,
   CurrentUser,
+  LoanApplication,
   LoanProduct,
   SupportAccessRecord,
   TenantMemberProfile,
@@ -15,6 +16,7 @@ import { InviteUserForm } from "../../InviteUserForm";
 import { BorrowerDirectory as BorrowerDirectoryView } from "./BorrowerDirectory";
 import { CreditProductCatalog } from "./CreditProductCatalog";
 import { CustomerWorkspace } from "./CustomerWorkspace";
+import { LoanApplicationBoard } from "./LoanApplicationBoard";
 import { MemberAccessControl } from "./MemberAccessControl";
 import { MemberProfileDirectory } from "./MemberProfileDirectory";
 import { MemberProfileForm } from "./MemberProfileForm";
@@ -75,6 +77,7 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
   let memberProfile: TenantMemberProfile | null = null;
   let memberProfiles: TenantMemberProfile[] = [];
   let loanProducts: LoanProduct[] | null = null;
+  let loanApplications: LoanApplication[] | null = null;
   let borrowerDirectory: BorrowerDirectory | null = null;
   if (overview.actorRole !== "customer" && overview.actorRole !== "support") {
     const profileResponse = await serverApi(
@@ -108,11 +111,19 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
         )
       ).filter((profile): profile is TenantMemberProfile => profile !== null);
     }
-    if (overview.actorRole === "owner" || overview.actorRole === "supervisor") {
+    if (["owner", "supervisor", "collector"].includes(overview.actorRole)) {
       const productsResponse = await serverApi(`/v1/tenants/${membership.tenantId}/loan-products`);
       if (productsResponse.ok) {
         ({ products: loanProducts } = (await productsResponse.json()) as {
           products: LoanProduct[];
+        });
+      }
+      const applicationsResponse = await serverApi(
+        `/v1/tenants/${membership.tenantId}/loan-applications`,
+      );
+      if (applicationsResponse.ok) {
+        ({ applications: loanApplications } = (await applicationsResponse.json()) as {
+          applications: LoanApplication[];
         });
       }
     }
@@ -297,7 +308,18 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
       ) : null}
 
       {loanProducts ? (
-        <CreditProductCatalog products={loanProducts} tenantId={overview.tenant.id} />
+        overview.actorRole === "owner" || overview.actorRole === "supervisor" ? (
+          <CreditProductCatalog products={loanProducts} tenantId={overview.tenant.id} />
+        ) : null
+      ) : null}
+
+      {loanProducts && loanApplications && borrowerDirectory ? (
+        <LoanApplicationBoard
+          applications={loanApplications}
+          borrowers={borrowerDirectory.borrowers}
+          products={loanProducts}
+          tenantId={overview.tenant.id}
+        />
       ) : null}
 
       {borrowerDirectory ? (

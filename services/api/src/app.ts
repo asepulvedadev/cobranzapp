@@ -6,6 +6,7 @@ import {
   createBranchRequestSchema,
   createPlatformTenantRequestSchema,
   createTeamRequestSchema,
+  loanApplicationCreateRequestSchema,
   loanProductCreateRequestSchema,
   loginRequestSchema,
   mfaCodeRequestSchema,
@@ -2526,12 +2527,12 @@ export function buildApp(dependencies: AppDependencies) {
     const membership = session.user.memberships.find(
       (item) => item.tenantId === params.data.tenantId,
     );
-    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+    if (!membership || !["owner", "supervisor", "collector"].includes(membership.role)) {
       return sendError(
         reply,
         403,
         "SCOPE_DENIED",
-        "No puedes consultar productos de crédito.",
+        "No puedes consultar el catálogo de crédito.",
         request.id,
       );
     }
@@ -2620,6 +2621,139 @@ export function buildApp(dependencies: AppDependencies) {
       );
     }
     return reply.code(201).send({ product: result.product });
+  });
+
+  app.get("/v1/tenants/:tenantId/loan-applications", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (!membership || !["owner", "supervisor", "collector"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "No puedes consultar solicitudes de crédito.",
+        request.id,
+      );
+    }
+    if (!dependencies.creditService) {
+      return sendError(
+        reply,
+        503,
+        "CREDIT_APPLICATIONS_UNAVAILABLE",
+        "Las solicitudes de crédito todavía no están configuradas.",
+        request.id,
+      );
+    }
+    const applications = await dependencies.creditService.listApplications(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+    );
+    return reply.send({ applications });
+  });
+
+  app.post("/v1/tenants/:tenantId/loan-applications", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = loanApplicationCreateRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_LOAN_APPLICATION",
+        "Revisa el cliente, producto, monto y plazo solicitados.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (!membership || !["owner", "supervisor", "collector"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "No puedes crear solicitudes de crédito.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    if (!dependencies.creditService) {
+      return sendError(
+        reply,
+        503,
+        "CREDIT_APPLICATIONS_UNAVAILABLE",
+        "Las solicitudes de crédito todavía no están configuradas.",
+        request.id,
+      );
+    }
+    const result = await dependencies.creditService.createApplication(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      { ...body.data, requestId: request.id },
+    );
+    if (result.status === "forbidden") {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "No puedes crear solicitudes de crédito.",
+        request.id,
+      );
+    }
+    if (result.status === "not_found") {
+      return sendError(
+        reply,
+        404,
+        "BORROWER_OR_PRODUCT_NOT_FOUND",
+        "El cliente no existe o no está activo.",
+        request.id,
+      );
+    }
+    if (result.status === "invalid_product") {
+      return sendError(
+        reply,
+        409,
+        "LOAN_PRODUCT_NOT_AVAILABLE",
+        "El producto no está disponible para nuevas solicitudes.",
+        request.id,
+      );
+    }
+    if (result.status === "amount_out_of_range") {
+      return sendError(
+        reply,
+        409,
+        "LOAN_APPLICATION_AMOUNT_OUT_OF_RANGE",
+        "El monto está fuera del rango permitido por el producto.",
+        request.id,
+      );
+    }
+    if (result.status === "term_out_of_range") {
+      return sendError(
+        reply,
+        409,
+        "LOAN_APPLICATION_TERM_OUT_OF_RANGE",
+        "El plazo supera los periodos permitidos por el producto.",
+        request.id,
+      );
+    }
+    return reply.code(201).send({ application: result.application });
   });
 
   app.patch("/v1/tenants/:tenantId/settings", async (request, reply) => {

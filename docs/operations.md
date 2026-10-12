@@ -108,6 +108,14 @@ queda en `draft` y la API no permite todavía aprobar, calcular cuotas, originar
 registrar pagos. Esto evita convertir una tasa o ejemplo comercial en una regla financiera vigente
 sin revisión legal, contable y de calendario.
 
+### Solicitudes de crédito en borrador
+
+Propietarios, supervisores y cobradores pueden registrar una solicitud asociando un cliente activo
+con un producto disponible. La API valida el rango de monto y el máximo de periodos del producto,
+guarda el estado `draft` y registra el actor en auditoría. La interfaz deja claro que esta captura
+no aprueba, desembolsa, calcula cuotas ni registra pagos; esas decisiones requieren los controles
+legales, contables y de calendario de las siguientes fases.
+
 ## Document capture and manual identity review — no AI
 
 The latest instruction supersedes the earlier OCR/Hermes request. The baseline contains **no OCR/AI extraction**. Model-based OCR, such as the models documented for ML Kit, is excluded from a strict no-AI product. This is a conservative scope boundary, not a claim that all text recognition is AI. [ML Kit model deployment documentation](https://developers.google.com/ml-kit/vision/text-recognition/v2/android)

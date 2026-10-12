@@ -1781,6 +1781,59 @@ html:has(.panel-shell) {
   font-size: 15px;
 }
 
+.loan-application-card {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+  background: linear-gradient(145deg, #fffdf8 0%, #f5f8ff 100%);
+}
+
+.loan-application-list {
+  display: grid;
+  gap: 10px;
+}
+
+.loan-application-item {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.loan-application-item-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.loan-application-item-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.loan-application-item-heading small,
+.loan-application-item p {
+  color: var(--panel-muted);
+  font-size: 11px;
+}
+
+.loan-application-item p {
+  margin: 0;
+}
+
+.loan-application-form {
+  max-width: 720px;
+}
+
+.loan-application-form h3 {
+  margin: 0;
+  color: var(--panel-ink);
+  font-size: 15px;
+}
+
 .member-profile-fieldset {
   display: grid;
   gap: 8px;
