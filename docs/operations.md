@@ -115,7 +115,9 @@ Propietarios, supervisores y cobradores pueden registrar una solicitud asociando
 con un producto disponible. La API valida el rango de monto y el máximo de periodos del producto,
 guarda el estado `draft` y registra el actor en auditoría. Una solicitud solo puede enviarse a
 revisión cuando la identidad del cliente está revisada y el producto está en `under_review` o
-`approved`; el envío también queda auditado. La interfaz deja claro que esto no aprueba,
+`approved`; el envío también queda auditado. Propietarios y supervisores pueden tomar una
+solicitud `submitted` y moverla a `under_review` con reautenticación reciente; ese cambio también
+queda auditado. La interfaz deja claro que esto no aprueba,
 desembolsa, calcula cuotas ni registra pagos; esas decisiones requieren los controles legales,
 contables y de calendario de las siguientes fases.
 

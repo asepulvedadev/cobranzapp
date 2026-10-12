@@ -319,6 +319,7 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
           borrowers={borrowerDirectory.borrowers}
           products={loanProducts}
           tenantId={overview.tenant.id}
+          canReview={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
         />
       ) : null}
 

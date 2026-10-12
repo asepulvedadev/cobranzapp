@@ -51,6 +51,10 @@ describe("OpenAPI contract", () => {
       document.paths["/v1/tenants/{tenantId}/loan-applications/{applicationId}/submit"].post
         .operationId,
     ).toBe("submitLoanApplicationForReview");
+    expect(
+      document.paths["/v1/tenants/{tenantId}/loan-applications/{applicationId}/review"].post
+        .operationId,
+    ).toBe("startLoanApplicationReview");
     expect(document.paths["/v1/tenants/{tenantId}/settings"].patch.operationId).toBe(
       "updateTenantSettings",
     );

@@ -846,6 +846,42 @@ export function createOpenApiDocument(version: string) {
           },
         },
       },
+      "/v1/tenants/{tenantId}/loan-applications/{applicationId}/review": {
+        post: {
+          tags: ["Crédito"],
+          operationId: "startLoanApplicationReview",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "applicationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": response(
+              "Solicitud puesta en revisión.",
+              schemaReference("LoanApplicationResponse"),
+            ),
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("La solicitud no existe.", schemaReference("ApiError")),
+            "409": response(
+              "La solicitud no puede entrar en revisión.",
+              schemaReference("ApiError"),
+            ),
+            "428": response("Confirmación reciente requerida.", schemaReference("ApiError")),
+            "503": response("El módulo no está habilitado.", schemaReference("ApiError")),
+          },
+        },
+      },
       "/v1/tenants/{tenantId}/branches": {
         post: {
           tags: ["Empresas"],

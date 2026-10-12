@@ -34,6 +34,12 @@ export type LoanApplicationReviewResult =
   | { status: "borrower_not_verified" }
   | { status: "product_not_reviewed" };
 
+export type LoanApplicationReviewStartResult =
+  | { status: "review_started"; application: LoanApplication }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "invalid_state" };
+
 export interface CreditService {
   listProducts(actor: TenantActor, tenantId: string): Promise<LoanProduct[]>;
   createProduct(
@@ -59,4 +65,10 @@ export interface CreditService {
     applicationId: string,
     requestId: string,
   ): Promise<LoanApplicationReviewResult>;
+  startApplicationReview(
+    actor: TenantActor,
+    tenantId: string,
+    applicationId: string,
+    requestId: string,
+  ): Promise<LoanApplicationReviewStartResult>;
 }

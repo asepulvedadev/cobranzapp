@@ -26,11 +26,13 @@ export function LoanApplicationBoard({
   borrowers,
   products,
   applications,
+  canReview,
 }: {
   tenantId: string;
   borrowers: Borrower[];
   products: LoanProduct[];
   applications: LoanApplication[];
+  canReview: boolean;
 }) {
   const router = useRouter();
   const sensitiveFetch = useSensitiveFetch();
@@ -38,6 +40,7 @@ export function LoanApplicationBoard({
   const [isError, setIsError] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [reviewingApplicationId, setReviewingApplicationId] = useState<string | null>(null);
+  const [startingReviewId, setStartingReviewId] = useState<string | null>(null);
   const activeBorrowers = borrowers.filter((borrower) => borrower.status === "active");
   const availableProducts = products.filter((product) => product.status !== "retired");
 
@@ -89,6 +92,25 @@ export function LoanApplicationBoard({
     router.refresh();
   }
 
+  async function startReview(application: LoanApplication) {
+    setStartingReviewId(application.id);
+    setMessage("");
+    setIsError(false);
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/loan-applications/${application.id}/review`,
+      { method: "POST" },
+    ).catch(() => null);
+    if (!response?.ok) {
+      setMessage(await errorMessage(response));
+      setIsError(true);
+      setStartingReviewId(null);
+      return;
+    }
+    setMessage(`La solicitud de ${application.borrowerName} entró en revisión.`);
+    setStartingReviewId(null);
+    router.refresh();
+  }
+
   return (
     <section className="dashboard-card loan-application-card" id="solicitudes-credito">
       <div className="card-heading">
@@ -126,6 +148,15 @@ export function LoanApplicationBoard({
                   type="button"
                 >
                   {reviewingApplicationId === application.id ? "Enviando…" : "Enviar a revisión"}
+                </button>
+              ) : null}
+              {application.status === "submitted" && canReview ? (
+                <button
+                  disabled={startingReviewId !== null}
+                  onClick={() => void startReview(application)}
+                  type="button"
+                >
+                  {startingReviewId === application.id ? "Iniciando…" : "Iniciar revisión"}
                 </button>
               ) : null}
             </article>

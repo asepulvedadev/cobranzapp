@@ -2931,6 +2931,85 @@ export function buildApp(dependencies: AppDependencies) {
     },
   );
 
+  app.post(
+    "/v1/tenants/:tenantId/loan-applications/:applicationId/review",
+    async (request, reply) => {
+      if (!requireAllowedOrigin(request, reply)) return;
+      const session = await requireUser(request, reply);
+      if (!session) return;
+      const params = tenantLoanApplicationParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return sendError(
+          reply,
+          404,
+          "LOAN_APPLICATION_NOT_FOUND",
+          "La solicitud no existe.",
+          request.id,
+        );
+      }
+      const membership = session.user.memberships.find(
+        (item) => item.tenantId === params.data.tenantId,
+      );
+      if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "Solo un propietario o supervisor puede iniciar la revisión.",
+          request.id,
+        );
+      }
+      if (!(await requireRecentReauthentication(session, request, reply))) return;
+      if (!dependencies.creditService) {
+        return sendError(
+          reply,
+          503,
+          "CREDIT_APPLICATIONS_UNAVAILABLE",
+          "Las solicitudes de crédito todavía no están configuradas.",
+          request.id,
+        );
+      }
+      const result = await dependencies.creditService.startApplicationReview(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.applicationId,
+        request.id,
+      );
+      if (result.status === "forbidden") {
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "Solo un propietario o supervisor puede iniciar la revisión.",
+          request.id,
+        );
+      }
+      if (result.status === "not_found") {
+        return sendError(
+          reply,
+          404,
+          "LOAN_APPLICATION_NOT_FOUND",
+          "La solicitud no existe.",
+          request.id,
+        );
+      }
+      if (result.status === "invalid_state") {
+        return sendError(
+          reply,
+          409,
+          "LOAN_APPLICATION_INVALID_STATE",
+          "Solo una solicitud enviada puede entrar en revisión.",
+          request.id,
+        );
+      }
+      return reply.send({ application: result.application });
+    },
+  );
+
   app.patch("/v1/tenants/:tenantId/settings", async (request, reply) => {
     if (!requireAllowedOrigin(request, reply)) return;
     const session = await requireUser(request, reply);

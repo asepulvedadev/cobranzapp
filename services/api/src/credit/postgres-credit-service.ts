@@ -5,6 +5,7 @@ import type {
   CreditService,
   LoanApplicationResult,
   LoanApplicationReviewResult,
+  LoanApplicationReviewStartResult,
   LoanProductResult,
   LoanProductReviewResult,
 } from "./types.js";
@@ -51,6 +52,10 @@ function canReadProducts(actor: TenantActor) {
 
 function canManageApplications(actor: TenantActor) {
   return ["owner", "supervisor", "collector"].includes(actor.tenantRole ?? "");
+}
+
+function canReviewApplications(actor: TenantActor) {
+  return actor.tenantRole === "owner" || actor.tenantRole === "supervisor";
 }
 
 function mapProduct(row: LoanProductRow): LoanProduct {
@@ -432,6 +437,65 @@ export function createPostgresCreditService(pool: Pool): CreditService {
           [tenantId, actor.userId, applicationId, requestId],
         );
         return { status: "submitted", application: mapApplication(application) };
+      });
+    },
+
+    async startApplicationReview(
+      actor,
+      tenantId,
+      applicationId,
+      requestId,
+    ): Promise<LoanApplicationReviewStartResult> {
+      if (!canReviewApplications(actor)) return { status: "forbidden" };
+      return withTransaction(actor, tenantId, async (client) => {
+        const current = await client.query<{ status: LoanApplication["status"] }>(
+          `SELECT status
+             FROM loan_applications
+            WHERE tenant_id = $1 AND id = $2
+            FOR UPDATE`,
+          [tenantId, applicationId],
+        );
+        const state = current.rows[0];
+        if (!state) return { status: "not_found" };
+        if (state.status !== "submitted") return { status: "invalid_state" };
+        await client.query(
+          `UPDATE loan_applications
+              SET status = 'under_review', reviewed_by = $3, updated_at = now()
+            WHERE tenant_id = $1 AND id = $2`,
+          [tenantId, applicationId, actor.userId],
+        );
+        const complete = await client.query<LoanApplicationRow>(
+          `SELECT application.id,
+                  application.borrower_id,
+                  borrower.full_name AS borrower_name,
+                  application.loan_product_id,
+                  product.name AS loan_product_name,
+                  application.requested_principal,
+                  application.requested_term_count,
+                  application.purpose,
+                  application.status,
+                  application.created_at,
+                  application.updated_at
+             FROM loan_applications application
+             JOIN borrowers borrower
+               ON borrower.tenant_id = application.tenant_id
+              AND borrower.id = application.borrower_id
+             JOIN loan_products product
+               ON product.tenant_id = application.tenant_id
+              AND product.id = application.loan_product_id
+            WHERE application.tenant_id = $1 AND application.id = $2`,
+          [tenantId, applicationId],
+        );
+        const application = complete.rows[0];
+        if (!application) throw new Error("LOAN_APPLICATION_NOT_FOUND_AFTER_REVIEW_START");
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'loan_application.review_started', 'loan_application', $3, $4,
+                   jsonb_build_object('status', 'under_review'))`,
+          [tenantId, actor.userId, applicationId, requestId],
+        );
+        return { status: "review_started", application: mapApplication(application) };
       });
     },
   };

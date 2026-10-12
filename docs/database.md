@@ -56,6 +56,10 @@ Product review currently supports only the auditable `draft → under_review` tr
 normative reference is present. Approval remains disabled until legal, accounting and calendar
 evidence is accepted.
 
+Application review currently supports the auditable `submitted → under_review` transition for
+tenant owners and supervisors, with recent reauthentication and row-level tenant isolation.
+Approval, disbursement, schedule calculation and payments remain disabled.
+
 ### Lending and accounting
 
 | Table | Important fields / relationships |
