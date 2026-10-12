@@ -8,6 +8,7 @@ import type {
   PlatformTenantStatus,
   PlatformUser,
   PlatformUserDirectory,
+  PlatformUserMembershipUpdateRequest,
   PlatformUserStatus,
   UserProfile,
   UserProfileUpdateRequest,
@@ -22,6 +23,7 @@ export type {
   PlatformOverview,
   PlatformUser,
   PlatformUserDirectory,
+  PlatformUserMembershipUpdateRequest,
   PlatformUserStatus,
   UserProfile,
 } from "@cobranzapp/contracts";
@@ -57,6 +59,11 @@ export type PlatformUserStatusUpdateResult =
       userStatus: PlatformUserStatus;
       revokedSessions: number;
     }
+  | { status: "protected" }
+  | { status: "not_found" };
+
+export type PlatformUserMembershipUpdateResult =
+  | { status: "updated"; membershipPlan: MembershipPlan; activatedAt: string }
   | { status: "protected" }
   | { status: "not_found" };
 
@@ -193,4 +200,10 @@ export interface PlatformService {
     status: PlatformUserStatus,
     requestId: string,
   ): Promise<PlatformUserStatusUpdateResult>;
+  updateUserMembership?(
+    actorUserId: string,
+    userId: string,
+    input: PlatformUserMembershipUpdateRequest,
+    requestId: string,
+  ): Promise<PlatformUserMembershipUpdateResult>;
 }

@@ -22,6 +22,7 @@ import {
   platformTenantDirectoryQuerySchema,
   platformTenantStatusUpdateRequestSchema,
   platformUserDirectoryQuerySchema,
+  platformUserMembershipUpdateRequestSchema,
   platformUserStatusUpdateRequestSchema,
   reauthenticationRequestSchema,
   routeAssignmentUpdateRequestSchema,
@@ -1080,6 +1081,56 @@ export function buildApp(dependencies: AppDependencies) {
     return reply.send({
       status: result.userStatus,
       revokedSessions: result.revokedSessions,
+    });
+  });
+
+  app.patch("/v1/platform/users/:userId/membership", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const params = platformUserParamsSchema.safeParse(request.params);
+    const body = platformUserMembershipUpdateRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_USER_MEMBERSHIP",
+        "Selecciona una membresía Pro o Ultra válida.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const updateUserMembership = dependencies.platformService.updateUserMembership;
+    if (!updateUserMembership) {
+      return sendError(
+        reply,
+        501,
+        "USER_MEMBERSHIP_UNAVAILABLE",
+        "La activación de membresías todavía no está habilitada.",
+        request.id,
+      );
+    }
+    const result = await updateUserMembership(
+      session.user.id,
+      params.data.userId,
+      body.data,
+      request.id,
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "USER_NOT_FOUND", "El usuario no existe.", request.id);
+    }
+    if (result.status === "protected") {
+      return sendError(
+        reply,
+        409,
+        "USER_MEMBERSHIP_PROTECTED",
+        "No puedes activar membresías para una cuenta deshabilitada o de desarrollo.",
+        request.id,
+      );
+    }
+    return reply.send({
+      membershipPlan: result.membershipPlan,
+      activatedAt: result.activatedAt,
     });
   });
 

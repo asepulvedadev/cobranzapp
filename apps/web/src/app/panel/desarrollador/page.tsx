@@ -16,6 +16,7 @@ import { SupportAccessControl } from "./SupportAccessControl";
 import { TenantMembershipPlanControl } from "./TenantMembershipPlanControl";
 import { TenantReadiness } from "./TenantReadiness";
 import { TenantStatusButton } from "./TenantStatusButton";
+import { UserMembershipControl } from "./UserMembershipControl";
 import { UserStatusControl } from "./UserStatusControl";
 
 const statusLabels = {
@@ -425,8 +426,8 @@ export default async function DeveloperDashboard({
           </span>
         </div>
         <p className="operational-note">
-          Deshabilitar bloquea el ingreso y cierra todas las sesiones activas. No elimina el
-          historial ni las membresías empresariales.
+          Activa la membresía comercial directamente sobre la cuenta y conserva la fecha de inicio.
+          Deshabilitar bloquea el ingreso y cierra las sesiones sin borrar el historial.
         </p>
         <form className="tenant-directory-filters" action="/panel/desarrollador#usuarios">
           <label>
@@ -459,7 +460,8 @@ export default async function DeveloperDashboard({
                 <tr>
                   <th>Usuario</th>
                   <th>Estado</th>
-                  <th>Membresías</th>
+                  <th>Membresías empresariales</th>
+                  <th>Membresía comercial</th>
                   <th>Sesiones</th>
                   <th>Última actividad</th>
                   <th>Acción</th>
@@ -481,7 +483,19 @@ export default async function DeveloperDashboard({
                         {user.status === "active" ? "Activo" : "Deshabilitado"}
                       </span>
                     </td>
-                    <td data-label="Membresías">{user.activeMemberships}</td>
+                    <td data-label="Membresías empresariales">{user.activeMemberships}</td>
+                    <td data-label="Membresía comercial">
+                      {user.platformRole === "developer" ? (
+                        <span className="table-muted">Cuenta protegida</span>
+                      ) : (
+                        <UserMembershipControl
+                          disabled={user.status !== "active"}
+                          membershipActivatedAt={user.membershipActivatedAt}
+                          membershipPlan={user.membershipPlan}
+                          userId={user.id}
+                        />
+                      )}
+                    </td>
                     <td data-label="Sesiones">{user.activeSessions}</td>
                     <td data-label="Última actividad">
                       {user.lastSeenAt

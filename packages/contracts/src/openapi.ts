@@ -56,6 +56,8 @@ import {
   platformTenantStatusUpdateRequestSchema,
   platformUserDirectoryQuerySchema,
   platformUserDirectorySchema,
+  platformUserMembershipUpdateRequestSchema,
+  platformUserMembershipUpdateResponseSchema,
   platformUserStatusUpdateRequestSchema,
   platformUserStatusUpdateResponseSchema,
   reauthenticationRequestSchema,
@@ -155,6 +157,8 @@ const documentedSchemas = {
   PlatformTenantStatusUpdateRequest: platformTenantStatusUpdateRequestSchema,
   PlatformUserDirectory: platformUserDirectorySchema,
   PlatformUserDirectoryQuery: platformUserDirectoryQuerySchema,
+  PlatformUserMembershipUpdateRequest: platformUserMembershipUpdateRequestSchema,
+  PlatformUserMembershipUpdateResponse: platformUserMembershipUpdateResponseSchema,
   PlatformUserStatusUpdateRequest: platformUserStatusUpdateRequestSchema,
   PlatformUserStatusUpdateResponse: platformUserStatusUpdateResponseSchema,
   TenantOverview: tenantOverviewSchema,
@@ -1964,6 +1968,40 @@ export function createOpenApiDocument(version: string) {
             "403": errorResponses["403"],
             "404": response("El usuario no existe.", schemaReference("ApiError")),
             "409": response("La identidad está protegida.", schemaReference("ApiError")),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
+      },
+      "/v1/platform/users/{userId}/membership": {
+        patch: {
+          tags: ["Plataforma"],
+          operationId: "updatePlatformUserMembership",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("PlatformUserMembershipUpdateRequest")),
+          },
+          responses: {
+            "200": response(
+              "Membresía activada con fecha de inicio.",
+              schemaReference("PlatformUserMembershipUpdateResponse"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("El usuario no existe.", schemaReference("ApiError")),
+            "409": response("La cuenta está protegida.", schemaReference("ApiError")),
             "428": response(
               "Confirmación reciente de contraseña requerida.",
               schemaReference("ApiError"),

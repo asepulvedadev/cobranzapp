@@ -278,6 +278,8 @@ export const platformUserSchema = z.object({
   platformRole: z.literal("developer").nullable(),
   status: platformUserStatusSchema,
   activeMemberships: z.number().int().nonnegative(),
+  membershipPlan: membershipPlanSchema.nullable(),
+  membershipActivatedAt: z.iso.datetime().nullable(),
   activeSessions: z.number().int().nonnegative(),
   lastSeenAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
@@ -301,6 +303,15 @@ export const platformUserStatusUpdateRequestSchema = z.object({
 export const platformUserStatusUpdateResponseSchema = z.object({
   status: platformUserStatusSchema,
   revokedSessions: z.number().int().nonnegative(),
+});
+
+export const platformUserMembershipUpdateRequestSchema = z.object({
+  membershipPlan: membershipPlanSchema,
+});
+
+export const platformUserMembershipUpdateResponseSchema = z.object({
+  membershipPlan: membershipPlanSchema,
+  activatedAt: z.iso.datetime(),
 });
 
 export const platformOwnerCreatedResponseSchema = z.object({
@@ -1044,6 +1055,9 @@ export type PlatformUserStatus = z.infer<typeof platformUserStatusSchema>;
 export type PlatformUser = z.infer<typeof platformUserSchema>;
 export type PlatformUserDirectory = z.infer<typeof platformUserDirectorySchema>;
 export type PlatformUserStatusUpdateRequest = z.infer<typeof platformUserStatusUpdateRequestSchema>;
+export type PlatformUserMembershipUpdateRequest = z.infer<
+  typeof platformUserMembershipUpdateRequestSchema
+>;
 export type PlatformSystemStatus = z.infer<typeof platformSystemStatusSchema>;
 export type SupportAccessStatus = z.infer<typeof supportAccessStatusSchema>;
 export type SupportAccessRecord = z.infer<typeof supportAccessRecordSchema>;

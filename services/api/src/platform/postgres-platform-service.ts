@@ -15,6 +15,7 @@ import type {
   PlatformOverview,
   PlatformService,
   PlatformUserDirectory,
+  PlatformUserMembershipUpdateResult,
   PlatformUserStatusUpdateResult,
   TenantDirectory,
   TenantStatus,
@@ -131,6 +132,8 @@ type PlatformUserRow = {
   platform_role: "developer" | null;
   status: "active" | "disabled";
   active_memberships: string;
+  membership_plan: MembershipPlan | null;
+  membership_activated_at: Date | null;
   active_sessions: string;
   last_seen_at: Date | null;
   created_at: Date;
@@ -193,6 +196,8 @@ function mapPlatformUser(user: PlatformUserRow): PlatformUserDirectory["users"][
     platformRole: user.platform_role,
     status: user.status,
     activeMemberships: Number(user.active_memberships),
+    membershipPlan: user.membership_plan,
+    membershipActivatedAt: user.membership_activated_at?.toISOString() ?? null,
     activeSessions: Number(user.active_sessions),
     lastSeenAt: user.last_seen_at?.toISOString() ?? null,
     createdAt: user.created_at.toISOString(),
@@ -595,6 +600,8 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
                     SELECT count(*) FROM tenant_memberships membership
                      WHERE membership.user_id = app_user.id AND membership.status = 'active'
                   ) AS active_memberships,
+                  active_membership.membership_plan,
+                  active_membership.activated_at AS membership_activated_at,
                   (
                     SELECT count(*) FROM auth_sessions session
                      WHERE session.user_id = app_user.id
@@ -605,6 +612,9 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
                      WHERE session.user_id = app_user.id
                   ) AS last_seen_at
              FROM users app_user
+             LEFT JOIN user_memberships active_membership
+               ON active_membership.user_id = app_user.id
+              AND active_membership.status = 'active'
             WHERE ${filter}
             ORDER BY app_user.created_at DESC, app_user.id DESC
             LIMIT $3 OFFSET $4`,
@@ -744,6 +754,8 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             platformRole: null,
             status: user.status,
             activeMemberships: 0,
+            membershipPlan: null,
+            membershipActivatedAt: null,
             activeSessions: 0,
             lastSeenAt: null,
             createdAt: user.created_at.toISOString(),
@@ -1337,6 +1349,91 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           userStatus: targetStatus,
           revokedSessions,
         } satisfies PlatformUserStatusUpdateResult;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async updateUserMembership(actorUserId, userId, input, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setPlatformContext(client, actorUserId);
+        const userResult = await client.query<{
+          id: string;
+          platform_role: "developer" | null;
+          status: "active" | "disabled";
+        }>("SELECT id, platform_role, status FROM users WHERE id = $1 FOR UPDATE", [userId]);
+        const user = userResult.rows[0];
+        if (!user) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies PlatformUserMembershipUpdateResult;
+        }
+        if (user.platform_role === "developer" || user.status !== "active") {
+          await client.query("ROLLBACK");
+          return { status: "protected" } satisfies PlatformUserMembershipUpdateResult;
+        }
+        const currentResult = await client.query<{ id: string; membership_plan: MembershipPlan }>(
+          `SELECT id, membership_plan
+             FROM user_memberships
+            WHERE user_id = $1 AND status = 'active'
+            FOR UPDATE`,
+          [userId],
+        );
+        const current = currentResult.rows[0];
+        if (current?.membership_plan === input.membershipPlan) {
+          const activated = await client.query<{ activated_at: Date }>(
+            "SELECT activated_at FROM user_memberships WHERE id = $1",
+            [current.id],
+          );
+          await client.query("COMMIT");
+          return {
+            status: "updated",
+            membershipPlan: current.membership_plan,
+            activatedAt: activated.rows[0]?.activated_at.toISOString() ?? new Date().toISOString(),
+          } satisfies PlatformUserMembershipUpdateResult;
+        }
+        if (current) {
+          await client.query(
+            `UPDATE user_memberships
+                SET status = 'suspended', deactivated_at = now(), updated_at = now()
+              WHERE id = $1`,
+            [current.id],
+          );
+        }
+        const inserted = await client.query<{
+          membership_plan: MembershipPlan;
+          activated_at: Date;
+        }>(
+          `INSERT INTO user_memberships (user_id, membership_plan, assigned_by)
+           VALUES ($1, $2, $3)
+           RETURNING membership_plan, activated_at`,
+          [userId, input.membershipPlan, actorUserId],
+        );
+        const membership = inserted.rows[0];
+        if (!membership) throw new Error("User membership insert did not return a record");
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES (NULL, $1, 'user.membership_activated', 'user', $2, $3,
+                   jsonb_build_object('membershipPlan', $4::text, 'activatedAt', $5::text))`,
+          [
+            actorUserId,
+            userId,
+            requestId,
+            membership.membership_plan,
+            membership.activated_at.toISOString(),
+          ],
+        );
+        await client.query("COMMIT");
+        return {
+          status: "updated",
+          membershipPlan: membership.membership_plan,
+          activatedAt: membership.activated_at.toISOString(),
+        } satisfies PlatformUserMembershipUpdateResult;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
