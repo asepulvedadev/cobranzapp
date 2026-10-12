@@ -1649,6 +1649,68 @@ html:has(.panel-shell) {
   line-height: 1.4;
 }
 
+.member-profile-directory {
+  margin-top: 18px;
+}
+
+.member-profile-directory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.member-profile-summary {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.member-profile-summary-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.member-profile-summary-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.member-profile-summary-heading small {
+  color: var(--panel-muted);
+  font-size: 11px;
+}
+
+.member-profile-summary dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.member-profile-summary dl div {
+  min-width: 0;
+}
+
+.member-profile-summary dt {
+  color: var(--panel-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.member-profile-summary dd {
+  margin: 3px 0 0;
+  color: var(--panel-dark);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .member-profile-fieldset {
   display: grid;
   gap: 8px;
@@ -3956,6 +4018,11 @@ html:has(.panel-shell) {
 
 @media (max-width: 580px) {
   .borrower-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .member-profile-directory-grid,
+  .member-profile-summary dl {
     grid-template-columns: 1fr;
   }
 }

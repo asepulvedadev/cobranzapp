@@ -14,6 +14,7 @@ import { InviteUserForm } from "../../InviteUserForm";
 import { BorrowerDirectory as BorrowerDirectoryView } from "./BorrowerDirectory";
 import { CustomerWorkspace } from "./CustomerWorkspace";
 import { MemberAccessControl } from "./MemberAccessControl";
+import { MemberProfileDirectory } from "./MemberProfileDirectory";
 import { MemberProfileForm } from "./MemberProfileForm";
 import { OrganizationStatusButton } from "./OrganizationStatusButton";
 import { PendingInvitationList } from "./PendingInvitationList";
@@ -70,6 +71,7 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
   const overview = (await response.json()) as TenantOverview;
   const canSeeTeam = overview.actorRole === "owner" || overview.actorRole === "supervisor";
   let memberProfile: TenantMemberProfile | null = null;
+  let memberProfiles: TenantMemberProfile[] = [];
   let borrowerDirectory: BorrowerDirectory | null = null;
   if (overview.actorRole !== "customer" && overview.actorRole !== "support") {
     const profileResponse = await serverApi(
@@ -84,6 +86,24 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
     );
     if (borrowersResponse.ok) {
       borrowerDirectory = (await borrowersResponse.json()) as BorrowerDirectory;
+    }
+    if (canSeeTeam) {
+      const profileResponses = await Promise.all(
+        overview.members
+          .filter((member) => ["owner", "supervisor", "collector"].includes(member.role))
+          .map((member) =>
+            serverApi(`/v1/tenants/${membership.tenantId}/members/${member.userId}/profile`),
+          ),
+      );
+      memberProfiles = (
+        await Promise.all(
+          profileResponses.map(async (profileResponse) => {
+            if (!profileResponse.ok) return null;
+            const body = (await profileResponse.json()) as { profile: TenantMemberProfile };
+            return body.profile;
+          }),
+        )
+      ).filter((profile): profile is TenantMemberProfile => profile !== null);
     }
   }
   let supportAccess: SupportAccessRecord[] = [];
@@ -260,6 +280,10 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
           </aside>
         )}
       </div>
+
+      {canSeeTeam ? (
+        <MemberProfileDirectory members={overview.members} profiles={memberProfiles} />
+      ) : null}
 
       {borrowerDirectory ? (
         <section className="dashboard-card borrower-directory-card" id="clientes">
