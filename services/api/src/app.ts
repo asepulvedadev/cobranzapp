@@ -1,11 +1,15 @@
 import {
   changePasswordRequestSchema,
+  createPlatformTenantRequestSchema,
   loginRequestSchema,
   mfaCodeRequestSchema,
   platformActivityQuerySchema,
+  platformMembershipEntitlementUpdateRequestSchema,
+  platformMembershipPlanUpdateRequestSchema,
   platformTenantDirectoryQuerySchema,
+  platformTenantStatusUpdateRequestSchema,
   platformUserDirectoryQuerySchema,
-  platformUserStatusSchema,
+  platformUserStatusUpdateRequestSchema,
   reauthenticationRequestSchema,
   type ServiceStatus,
 } from "@cobranzapp/contracts";
@@ -21,16 +25,6 @@ import type { TenancyService } from "./tenancy/types.js";
 
 const sessionCookieName = "cobranzapp_session";
 const mfaChallengeCookieName = "cobranzapp_mfa_challenge";
-const tenantSchema = z.object({
-  displayName: z.string().trim().min(2).max(120),
-  slug: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-    .max(63),
-  membershipPlan: z.enum(["pro", "ultra"]),
-});
 const tenantIdParamsSchema = z.object({ tenantId: z.uuid() });
 const tenantInvitationParamsSchema = z.object({ tenantId: z.uuid(), invitationId: z.uuid() });
 const tenantMemberParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
@@ -44,13 +38,7 @@ const tenantTeamMemberParamsSchema = z.object({
 const tenantBranchParamsSchema = z.object({ tenantId: z.uuid(), branchId: z.uuid() });
 const tenantTeamParamsSchema = z.object({ tenantId: z.uuid(), teamId: z.uuid() });
 const sessionIdParamsSchema = z.object({ sessionId: z.uuid() });
-const tenantStatusSchema = z.object({ status: z.enum(["active", "suspended", "archived"]) });
-const tenantMembershipPlanSchema = z.object({ membershipPlan: z.enum(["pro", "ultra"]) });
-const tenantMembershipEntitlementSchema = z.object({
-  additionalEmployeeSeats: z.number().int().min(0).max(1000),
-});
 const platformUserParamsSchema = z.object({ userId: z.uuid() });
-const platformUserStatusUpdateSchema = z.object({ status: platformUserStatusSchema });
 const invitationTokenParamsSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{40,60}$/) });
 const invitationSchema = z.object({
   email: z.email().transform((value) => value.toLowerCase()),
@@ -766,7 +754,7 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session || !requireDeveloper(session.user, request, reply)) return;
     const params = platformUserParamsSchema.safeParse(request.params);
-    const body = platformUserStatusUpdateSchema.safeParse(request.body);
+    const body = platformUserStatusUpdateRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       return sendError(
         reply,
@@ -805,7 +793,7 @@ export function buildApp(dependencies: AppDependencies) {
     if (!requireAllowedOrigin(request, reply)) return;
     const session = await requireUser(request, reply);
     if (!session || !requireDeveloper(session.user, request, reply)) return;
-    const parsed = tenantSchema.safeParse(request.body);
+    const parsed = createPlatformTenantRequestSchema.safeParse(request.body);
     if (!parsed.success)
       return sendError(
         reply,
@@ -827,7 +815,7 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session || !requireDeveloper(session.user, request, reply)) return;
     const params = tenantIdParamsSchema.safeParse(request.params);
-    const body = tenantStatusSchema.safeParse(request.body);
+    const body = platformTenantStatusUpdateRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       return sendError(
         reply,
@@ -880,7 +868,7 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session || !requireDeveloper(session.user, request, reply)) return;
     const params = tenantIdParamsSchema.safeParse(request.params);
-    const body = tenantMembershipPlanSchema.safeParse(request.body);
+    const body = platformMembershipPlanUpdateRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       return sendError(
         reply,
@@ -920,7 +908,7 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session || !requireDeveloper(session.user, request, reply)) return;
     const params = tenantIdParamsSchema.safeParse(request.params);
-    const body = tenantMembershipEntitlementSchema.safeParse(request.body);
+    const body = platformMembershipEntitlementUpdateRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       return sendError(
         reply,

@@ -171,6 +171,40 @@ export const platformTenantDirectorySchema = z.object({
   pagination: platformPaginationSchema,
 });
 
+export const createPlatformTenantRequestSchema = z.object({
+  displayName: z.string().trim().min(2).max(120),
+  slug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    .max(63),
+  membershipPlan: membershipPlanSchema,
+});
+
+export const platformTenantResponseSchema = z.object({ tenant: platformTenantSchema });
+
+export const platformTenantStatusUpdateRequestSchema = z.object({
+  status: platformTenantStatusSchema.exclude(["draft"]),
+});
+
+export const platformMembershipPlanUpdateRequestSchema = z.object({
+  membershipPlan: membershipPlanSchema,
+});
+
+export const platformMembershipPlanUpdateResponseSchema = z.object({
+  membershipPlan: membershipPlanSchema,
+  membershipEntitlement: membershipEntitlementSchema,
+});
+
+export const platformMembershipEntitlementUpdateRequestSchema = z.object({
+  additionalEmployeeSeats: z.number().int().min(0).max(1000),
+});
+
+export const platformMembershipEntitlementUpdateResponseSchema = z.object({
+  membershipEntitlement: membershipEntitlementSchema,
+});
+
 export const platformUserStatusSchema = z.enum(["active", "disabled"]);
 
 export const platformUserSchema = z.object({
@@ -195,6 +229,15 @@ export const platformUserDirectoryQuerySchema = z.object({
 export const platformUserDirectorySchema = z.object({
   users: z.array(platformUserSchema),
   pagination: platformPaginationSchema,
+});
+
+export const platformUserStatusUpdateRequestSchema = z.object({
+  status: platformUserStatusSchema,
+});
+
+export const platformUserStatusUpdateResponseSchema = z.object({
+  status: platformUserStatusSchema,
+  revokedSessions: z.number().int().nonnegative(),
 });
 
 export const platformSystemStatusSchema = z.object({
@@ -311,9 +354,20 @@ export type PlatformTenantStatus = z.infer<typeof platformTenantStatusSchema>;
 export type PlatformTenant = z.infer<typeof platformTenantSchema>;
 export type PlatformOverview = z.infer<typeof platformOverviewSchema>;
 export type PlatformTenantDirectory = z.infer<typeof platformTenantDirectorySchema>;
+export type CreatePlatformTenantRequest = z.infer<typeof createPlatformTenantRequestSchema>;
+export type PlatformTenantStatusUpdateRequest = z.infer<
+  typeof platformTenantStatusUpdateRequestSchema
+>;
+export type PlatformMembershipPlanUpdateRequest = z.infer<
+  typeof platformMembershipPlanUpdateRequestSchema
+>;
+export type PlatformMembershipEntitlementUpdateRequest = z.infer<
+  typeof platformMembershipEntitlementUpdateRequestSchema
+>;
 export type PlatformUserStatus = z.infer<typeof platformUserStatusSchema>;
 export type PlatformUser = z.infer<typeof platformUserSchema>;
 export type PlatformUserDirectory = z.infer<typeof platformUserDirectorySchema>;
+export type PlatformUserStatusUpdateRequest = z.infer<typeof platformUserStatusUpdateRequestSchema>;
 export type PlatformSystemStatus = z.infer<typeof platformSystemStatusSchema>;
 export type SupportAccessStatus = z.infer<typeof supportAccessStatusSchema>;
 export type SupportAccessRecord = z.infer<typeof supportAccessRecordSchema>;

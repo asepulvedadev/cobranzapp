@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  createPlatformTenantRequestSchema,
   currentUserSchema,
   loginRequestSchema,
   platformSystemStatusSchema,
   platformTenantDirectoryQuerySchema,
+  platformTenantStatusUpdateRequestSchema,
   platformUserDirectoryQuerySchema,
 } from "./index.js";
 
@@ -71,5 +73,22 @@ describe("shared API contracts", () => {
         checkedAt: "2026-10-11T20:00:00.000Z",
       }).success,
     ).toBe(true);
+  });
+
+  it("normalizes platform tenant creation and forbids returning to draft", () => {
+    expect(
+      createPlatformTenantRequestSchema.parse({
+        displayName: "  Cobros del Norte  ",
+        slug: "Cobros-Del-Norte",
+        membershipPlan: "pro",
+      }),
+    ).toEqual({
+      displayName: "Cobros del Norte",
+      slug: "cobros-del-norte",
+      membershipPlan: "pro",
+    });
+    expect(platformTenantStatusUpdateRequestSchema.safeParse({ status: "draft" }).success).toBe(
+      false,
+    );
   });
 });
