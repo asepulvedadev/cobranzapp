@@ -81,10 +81,12 @@ request schemas that clients compile against, so username/email login and accoun
 validation cannot drift into separate web and server definitions.
 
 The API publishes its current OpenAPI 3.1 document at `/v1/openapi.json`. The documented surface
-covers service status, the complete first-party web authentication lifecycle, and the developer's
-paginated platform-audit query. Administrative and business operations must be added to the document
-together with their vertical slice; the current document must not be represented as coverage of
-endpoints that it does not list.
+covers service status, the complete first-party web authentication lifecycle, and the developer
+console's read models for the operational summary, runtime status, tenant directory, user directory,
+support authorizations and paginated audit history. These developer-dashboard payloads and filters
+are shared contracts consumed by both the API and the web application. Administrative mutations and
+business operations must be added to the document together with their vertical slice; the current
+document must not be represented as coverage of endpoints that it does not list.
 
 ## Related documents
 

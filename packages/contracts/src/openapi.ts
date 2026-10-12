@@ -17,6 +17,13 @@ import {
   mfaStatusSchema,
   platformActivityDirectorySchema,
   platformActivityQuerySchema,
+  platformOverviewSchema,
+  platformSupportAccessResponseSchema,
+  platformSystemStatusSchema,
+  platformTenantDirectoryQuerySchema,
+  platformTenantDirectorySchema,
+  platformUserDirectoryQuerySchema,
+  platformUserDirectorySchema,
   reauthenticationRequestSchema,
   reauthenticationResponseSchema,
   securityActivityResponseSchema,
@@ -57,6 +64,13 @@ const documentedSchemas = {
   MfaStatus: mfaStatusSchema,
   PlatformActivityDirectory: platformActivityDirectorySchema,
   PlatformActivityQuery: platformActivityQuerySchema,
+  PlatformOverview: platformOverviewSchema,
+  PlatformSupportAccessResponse: platformSupportAccessResponseSchema,
+  PlatformSystemStatus: platformSystemStatusSchema,
+  PlatformTenantDirectory: platformTenantDirectorySchema,
+  PlatformTenantDirectoryQuery: platformTenantDirectoryQuerySchema,
+  PlatformUserDirectory: platformUserDirectorySchema,
+  PlatformUserDirectoryQuery: platformUserDirectoryQuerySchema,
   ReauthenticationRequest: reauthenticationRequestSchema,
   ReauthenticationResponse: reauthenticationResponseSchema,
   SecurityActivity: securityActivitySchema,
@@ -275,6 +289,122 @@ export function createOpenApiDocument(version: string) {
           security: sessionSecurity,
           responses: {
             "204": response("Sesión cerrada."),
+            "403": errorResponses["403"],
+          },
+        },
+      },
+      "/v1/platform/overview": {
+        get: {
+          tags: ["Plataforma"],
+          operationId: "getPlatformOverview",
+          security: sessionSecurity,
+          responses: {
+            "200": response(
+              "Resumen operativo de la plataforma.",
+              schemaReference("PlatformOverview"),
+            ),
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+          },
+        },
+      },
+      "/v1/platform/system-status": {
+        get: {
+          tags: ["Plataforma"],
+          operationId: "getPlatformSystemStatus",
+          security: sessionSecurity,
+          responses: {
+            "200": response(
+              "Estado de la API, la base de datos y los trabajos automáticos.",
+              schemaReference("PlatformSystemStatus"),
+            ),
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+          },
+        },
+      },
+      "/v1/platform/tenants": {
+        get: {
+          tags: ["Plataforma"],
+          operationId: "listPlatformTenants",
+          security: sessionSecurity,
+          parameters: [
+            { name: "q", in: "query", schema: { type: "string", maxLength: 80 } },
+            {
+              name: "status",
+              in: "query",
+              schema: {
+                type: "string",
+                enum: ["draft", "active", "suspended", "archived"],
+              },
+            },
+            {
+              name: "page",
+              in: "query",
+              schema: { type: "integer", minimum: 1, default: 1 },
+            },
+            {
+              name: "pageSize",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+            },
+          ],
+          responses: {
+            "200": response(
+              "Directorio paginado de empresas.",
+              schemaReference("PlatformTenantDirectory"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+          },
+        },
+      },
+      "/v1/platform/users": {
+        get: {
+          tags: ["Plataforma"],
+          operationId: "listPlatformUsers",
+          security: sessionSecurity,
+          parameters: [
+            { name: "q", in: "query", schema: { type: "string", maxLength: 80 } },
+            {
+              name: "status",
+              in: "query",
+              schema: { type: "string", enum: ["active", "disabled"] },
+            },
+            {
+              name: "page",
+              in: "query",
+              schema: { type: "integer", minimum: 1, default: 1 },
+            },
+            {
+              name: "pageSize",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+            },
+          ],
+          responses: {
+            "200": response(
+              "Directorio paginado de identidades.",
+              schemaReference("PlatformUserDirectory"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+          },
+        },
+      },
+      "/v1/platform/support-access": {
+        get: {
+          tags: ["Plataforma"],
+          operationId: "listPlatformSupportAccess",
+          security: sessionSecurity,
+          responses: {
+            "200": response(
+              "Solicitudes y autorizaciones de soporte.",
+              schemaReference("PlatformSupportAccessResponse"),
+            ),
+            "401": errorResponses["401"],
             "403": errorResponses["403"],
           },
         },
