@@ -27,6 +27,7 @@
     },
     "extra": {
       "defaultLocale": "es-CO"
-    }
+    },
+    "plugins": ["expo-secure-store"]
   }
 }
