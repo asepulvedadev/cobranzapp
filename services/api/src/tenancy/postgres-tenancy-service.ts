@@ -346,8 +346,9 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           locale: string;
           timezone: string;
           currency: string;
+          membership_plan: "pro" | "ultra" | null;
         }>(
-          `SELECT id, slug, display_name, status, locale, timezone, currency
+          `SELECT id, slug, display_name, status, locale, timezone, currency, membership_plan
              FROM tenants WHERE id = $1`,
           [tenantId],
         );
@@ -377,13 +378,17 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           branches: string;
           teams: string;
           pending_invitations: string;
+          active_employee_seats: string;
         }>(
           `SELECT
              (SELECT count(*) FROM tenant_memberships WHERE tenant_id = $1 AND status = 'active') AS members,
              (SELECT count(*) FROM branches WHERE tenant_id = $1 AND status = 'active') AS branches,
              (SELECT count(*) FROM teams WHERE tenant_id = $1 AND status = 'active') AS teams,
              (SELECT count(*) FROM tenant_invitations WHERE tenant_id = $1 AND accepted_at IS NULL
-               AND revoked_at IS NULL AND expires_at > now()) AS pending_invitations`,
+               AND revoked_at IS NULL AND expires_at > now()) AS pending_invitations,
+             (SELECT count(*) FROM tenant_memberships
+               WHERE tenant_id = $1 AND status = 'active'
+                 AND role IN ('supervisor', 'collector')) AS active_employee_seats`,
           [tenantId],
         );
         const settings = await client.query<{
@@ -524,6 +529,8 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
             locale: tenantRow.locale,
             timezone: tenantRow.timezone,
             currency: tenantRow.currency,
+            membershipPlan:
+              actor.tenantRole === "owner" || isSupport ? tenantRow.membership_plan : null,
           },
           actorRole: actor.tenantRole ?? "support",
           metrics: {
@@ -531,6 +538,9 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
             branches: Number(counts?.branches ?? 0),
             teams: Number(counts?.teams ?? 0),
             pendingInvitations: maySeeOrganization ? Number(counts?.pending_invitations ?? 0) : 0,
+            activeEmployeeSeats: maySeeOrganization
+              ? Number(counts?.active_employee_seats ?? 0)
+              : 0,
           },
           settings: {
             primaryColor: tenantSettings.primary_color,

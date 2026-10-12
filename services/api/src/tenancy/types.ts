@@ -25,6 +25,7 @@ export type TenantOverview = {
     locale: string;
     timezone: string;
     currency: string;
+    membershipPlan: "pro" | "ultra" | null;
   };
   actorRole: TenantRole | "support";
   metrics: {
@@ -32,6 +33,7 @@ export type TenantOverview = {
     branches: number;
     teams: number;
     pendingInvitations: number;
+    activeEmployeeSeats: number;
   };
   settings: {
     primaryColor: string;

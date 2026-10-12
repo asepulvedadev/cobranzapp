@@ -337,7 +337,9 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       tenant.id,
     );
     expect(ownerOverview?.tenant.slug).toBe(slug);
+    expect(ownerOverview?.tenant.membershipPlan).toBe("ultra");
     expect(ownerOverview?.metrics.members).toBe(1);
+    expect(ownerOverview?.metrics.activeEmployeeSeats).toBe(0);
     expect(ownerOverview?.settings.version).toBe(1);
     expect(ownerOverview?.settingsHistory).toContainEqual(
       expect.objectContaining({
@@ -619,6 +621,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       branches: 1,
       teams: 1,
       pendingInvitations: 0,
+      activeEmployeeSeats: 0,
     });
     expect(collectorOverview?.branches.map((item) => item.id)).toEqual([branch?.id]);
     expect(collectorOverview?.teams.map((item) => item.id)).toEqual([team?.id]);

@@ -168,9 +168,16 @@ function dependencies(overrides?: {
         locale: "es-CO",
         timezone: "America/Bogota",
         currency: "COP",
+        membershipPlan: "pro",
       },
       actorRole: "owner",
-      metrics: { members: 1, branches: 0, teams: 0, pendingInvitations: 0 },
+      metrics: {
+        members: 1,
+        branches: 0,
+        teams: 0,
+        pendingInvitations: 0,
+        activeEmployeeSeats: 0,
+      },
       settings: {
         primaryColor: "#171717",
         accentColor: "#FBBF24",
