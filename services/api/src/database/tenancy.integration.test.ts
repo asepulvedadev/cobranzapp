@@ -457,6 +457,25 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
         tenantId: tenant.id,
       }),
     );
+    await expect(
+      platform.listActivity(developerId, {
+        search: "Tenant Integration",
+        action: "tenant.created",
+        page: 99,
+        pageSize: 1,
+      }),
+    ).resolves.toMatchObject({
+      activity: [
+        {
+          action: "tenant.created",
+          actorUsername: `developer-${suffix}`,
+          tenantId: tenant.id,
+          tenantName: "Tenant Integration",
+        },
+      ],
+      availableActions: expect.arrayContaining(["tenant.created"]),
+      pagination: { page: 1, pageSize: 1, total: 1, totalPages: 1 },
+    });
     expect(platformOverview.tenants.find((item) => item.id === tenant.id)?.readiness).toEqual({
       activeOwner: false,
       activeBranch: false,

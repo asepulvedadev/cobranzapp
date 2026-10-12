@@ -136,6 +136,21 @@ function dependencies(overrides?: {
       tenants: [],
       activity: [],
     })),
+    listActivity: vi.fn(async (_actor, query) => ({
+      activity: [
+        {
+          id: "f9563417-c0c1-4c8e-8470-61d288680561",
+          action: "tenant.created",
+          actorDisplayName: "Desarrollador",
+          actorUsername: "desarrollador",
+          tenantId: "5c58269f-ce16-4250-82e2-c0c16621b0fb",
+          tenantName: "Empresa Uno",
+          happenedAt: "2026-10-11T00:00:00.000Z",
+        },
+      ],
+      availableActions: ["tenant.created", "tenant.status_changed"],
+      pagination: { page: query.page, pageSize: query.pageSize, total: 1, totalPages: 1 },
+    })),
     listTenants: vi.fn(async (_actor, query) => ({
       tenants: [],
       pagination: { page: query.page, pageSize: query.pageSize, total: 0, totalPages: 1 },
@@ -763,6 +778,41 @@ describe("developer platform", () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ metrics: { users: 1 }, tenants: [] });
+  });
+
+  it("filters and paginates the platform audit directory", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/platform/activity?q=empresa&action=tenant.created&page=2&pageSize=10",
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(deps.platformService.listActivity).toHaveBeenCalledWith(developer.id, {
+      search: "empresa",
+      action: "tenant.created",
+      page: 2,
+      pageSize: 10,
+    });
+    expect(response.json()).toMatchObject({
+      activity: [{ action: "tenant.created", tenantName: "Empresa Uno" }],
+      availableActions: ["tenant.created", "tenant.status_changed"],
+      pagination: { page: 2, pageSize: 10, total: 1, totalPages: 1 },
+    });
+  });
+
+  it("rejects invalid platform audit filters", async () => {
+    const app = buildApp(dependencies());
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/platform/activity?action=DROP%20TABLE&pageSize=500",
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ error: { code: "INVALID_ACTIVITY_FILTERS" } });
   });
 
   it("filters and paginates the tenant directory for the developer", async () => {

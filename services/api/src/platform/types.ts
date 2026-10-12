@@ -37,6 +37,25 @@ export type PlatformOverview = {
 };
 
 export type TenantStatus = PlatformOverview["tenants"][number]["status"];
+export type PlatformAuditActivity = PlatformOverview["activity"][number];
+
+export type PlatformActivityDirectoryQuery = {
+  search: string | null;
+  action: string | null;
+  page: number;
+  pageSize: number;
+};
+
+export type PlatformActivityDirectory = {
+  activity: PlatformAuditActivity[];
+  availableActions: string[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+};
 
 export type TenantDirectoryQuery = {
   search: string | null;
@@ -137,6 +156,10 @@ export type MembershipEntitlementUpdateResult =
 
 export interface PlatformService {
   overview(actorUserId: string): Promise<PlatformOverview>;
+  listActivity(
+    actorUserId: string,
+    query: PlatformActivityDirectoryQuery,
+  ): Promise<PlatformActivityDirectory>;
   listTenants(actorUserId: string, query: TenantDirectoryQuery): Promise<TenantDirectory>;
   listUsers(actorUserId: string, query: PlatformUserDirectoryQuery): Promise<PlatformUserDirectory>;
   systemStatus(actorUserId: string): Promise<PlatformDatabaseStatus>;

@@ -8,6 +8,7 @@ import type {
   MembershipEntitlementUpdateResult,
   MembershipPlan,
   MembershipPlanUpdateResult,
+  PlatformActivityDirectory,
   PlatformOverview,
   PlatformService,
   PlatformUserDirectory,
@@ -116,6 +117,30 @@ type PlatformUserRow = {
   last_seen_at: Date | null;
   created_at: Date;
 };
+
+type PlatformAuditActivityRow = {
+  id: string;
+  action: string;
+  actor_display_name: string | null;
+  actor_username: string | null;
+  tenant_id: string | null;
+  tenant_name: string | null;
+  happened_at: Date;
+};
+
+function mapPlatformActivity(
+  event: PlatformAuditActivityRow,
+): PlatformOverview["activity"][number] {
+  return {
+    id: event.id,
+    action: event.action,
+    actorDisplayName: event.actor_display_name,
+    actorUsername: event.actor_username,
+    tenantId: event.tenant_id,
+    tenantName: event.tenant_name,
+    happenedAt: event.happened_at.toISOString(),
+  };
+}
 
 function mapPlatformUser(user: PlatformUserRow): PlatformUserDirectory["users"][number] {
   return {
@@ -249,15 +274,7 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
               ORDER BY tenant.created_at DESC
           LIMIT 100`,
         );
-        const activityResult = await client.query<{
-          id: string;
-          action: string;
-          actor_display_name: string | null;
-          actor_username: string | null;
-          tenant_id: string | null;
-          tenant_name: string | null;
-          happened_at: Date;
-        }>(
+        const activityResult = await client.query<PlatformAuditActivityRow>(
           `SELECT event.id, event.action,
                   actor.display_name AS actor_display_name,
                   actor.username AS actor_username,
@@ -280,16 +297,67 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             activeMemberships: Number(metrics?.active_memberships ?? 0),
           },
           tenants: tenantsResult.rows.map(mapTenant),
-          activity: activityResult.rows.map((event) => ({
-            id: event.id,
-            action: event.action,
-            actorDisplayName: event.actor_display_name,
-            actorUsername: event.actor_username,
-            tenantId: event.tenant_id,
-            tenantName: event.tenant_name,
-            happenedAt: event.happened_at.toISOString(),
-          })),
+          activity: activityResult.rows.map(mapPlatformActivity),
         };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async listActivity(actorUserId, query) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setPlatformContext(client, actorUserId);
+        const filter = `($1::text IS NULL
+                          OR event.action ILIKE '%' || $1 || '%'
+                          OR actor.display_name ILIKE '%' || $1 || '%'
+                          OR actor.username::text ILIKE '%' || $1 || '%'
+                          OR tenant.display_name ILIKE '%' || $1 || '%'
+                          OR tenant.slug::text ILIKE '%' || $1 || '%')
+                        AND ($2::text IS NULL OR event.action = $2)`;
+        const countResult = await client.query<{ total: string }>(
+          `SELECT count(*) AS total
+             FROM audit_events event
+             LEFT JOIN users actor ON actor.id = event.actor_user_id
+             LEFT JOIN tenants tenant ON tenant.id = event.tenant_id
+            WHERE ${filter}`,
+          [query.search, query.action],
+        );
+        const total = Number(countResult.rows[0]?.total ?? 0);
+        const totalPages = Math.max(1, Math.ceil(total / query.pageSize));
+        const page = Math.min(query.page, totalPages);
+        const offset = (page - 1) * query.pageSize;
+        const activityResult = await client.query<PlatformAuditActivityRow>(
+          `SELECT event.id, event.action,
+                  actor.display_name AS actor_display_name,
+                  actor.username AS actor_username,
+                  tenant.id AS tenant_id,
+                  tenant.display_name AS tenant_name,
+                  event.happened_at
+             FROM audit_events event
+             LEFT JOIN users actor ON actor.id = event.actor_user_id
+             LEFT JOIN tenants tenant ON tenant.id = event.tenant_id
+            WHERE ${filter}
+            ORDER BY event.happened_at DESC, event.id DESC
+            LIMIT $3 OFFSET $4`,
+          [query.search, query.action, query.pageSize, offset],
+        );
+        const actionsResult = await client.query<{ action: string }>(
+          `SELECT DISTINCT action
+             FROM audit_events
+            ORDER BY action ASC
+            LIMIT 200`,
+        );
+        await client.query("COMMIT");
+        return {
+          activity: activityResult.rows.map(mapPlatformActivity),
+          availableActions: actionsResult.rows.map((row) => row.action),
+          pagination: { page, pageSize: query.pageSize, total, totalPages },
+        } satisfies PlatformActivityDirectory;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

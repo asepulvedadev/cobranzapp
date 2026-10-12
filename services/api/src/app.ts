@@ -59,6 +59,16 @@ const platformUserDirectoryQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(100_000).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
 });
+const platformActivityDirectoryQuerySchema = z.object({
+  q: z.string().trim().max(80).optional(),
+  action: z
+    .string()
+    .trim()
+    .regex(/^[a-z][a-z0-9_.]{2,80}$/)
+    .optional(),
+  page: z.coerce.number().int().min(1).max(100_000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+});
 const invitationTokenParamsSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{40,60}$/) });
 const invitationSchema = z.object({
   email: z.email().transform((value) => value.toLowerCase()),
@@ -692,6 +702,27 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session || !requireDeveloper(session.user, request, reply)) return;
     return dependencies.platformService.overview(session.user.id);
+  });
+
+  app.get("/v1/platform/activity", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const parsed = platformActivityDirectoryQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_ACTIVITY_FILTERS",
+        "Revisa los filtros de actividad.",
+        request.id,
+      );
+    }
+    return dependencies.platformService.listActivity(session.user.id, {
+      search: parsed.data.q || null,
+      action: parsed.data.action || null,
+      page: parsed.data.page,
+      pageSize: parsed.data.pageSize,
+    });
   });
 
   app.get("/v1/platform/system-status", async (request, reply) => {
