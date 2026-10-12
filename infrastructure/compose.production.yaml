@@ -22,7 +22,10 @@ services:
 
   api:
     image: ghcr.io/asepulvedadev/cobranzapp-api:${IMAGE_TAG}
-    env_file: .env
+    env_file:
+      - .env
+      - path: .env.resend
+        required: false
     environment:
       NODE_ENV: production
       API_HOST: 0.0.0.0

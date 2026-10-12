@@ -3,6 +3,7 @@ import { buildApp } from "./app.js";
 import { parseMfaEncryptionKey } from "./auth/mfa.js";
 import { createPostgresAuthService } from "./auth/postgres-auth-service.js";
 import { loadConfig, parseAllowedOrigins } from "./config.js";
+import { createResendContactMailer } from "./contact/resend.js";
 import { createPostgresPlatformService } from "./platform/postgres-platform-service.js";
 import { createPostgresSupportAccessService } from "./support-access/postgres-support-access-service.js";
 import { createPostgresTenancyService } from "./tenancy/postgres-tenancy-service.js";
@@ -15,6 +16,13 @@ const pool = new pg.Pool({
 });
 
 const app = buildApp({
+  contactMailer: config.RESEND_API_KEY
+    ? createResendContactMailer({
+        apiKey: config.RESEND_API_KEY,
+        from: config.RESEND_FROM,
+        to: config.CONTACT_TO_EMAIL,
+      })
+    : undefined,
   allowedWebOrigins: parseAllowedOrigins(config.ALLOWED_WEB_ORIGINS),
   authService: createPostgresAuthService(
     pool,

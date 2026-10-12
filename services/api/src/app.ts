@@ -25,6 +25,8 @@ import QRCode from "qrcode";
 import { z } from "zod";
 import { LoginRateLimiter } from "./auth/login-rate-limiter.js";
 import type { AuthenticatedUser, AuthService } from "./auth/types.js";
+import type { ContactMailer } from "./contact/resend.js";
+import { registerContactRoutes } from "./contact/routes.js";
 import type { PlatformService } from "./platform/types.js";
 import type { SupportAccessService } from "./support-access/types.js";
 import type { TenancyService } from "./tenancy/types.js";
@@ -62,6 +64,7 @@ const supportAccessRequestSchema = z.object({
 const supportAccessReviewSchema = z.object({ action: z.enum(["approve", "deny", "revoke"]) });
 
 export interface AppDependencies {
+  contactMailer?: ContactMailer;
   allowedWebOrigins?: string[];
   authService: AuthService;
   checkDatabase: () => Promise<void>;
@@ -119,6 +122,10 @@ export function buildApp(dependencies: AppDependencies) {
     requestIdHeader: "x-request-id",
   });
   const allowedOrigins = new Set(dependencies.allowedWebOrigins ?? ["http://localhost:3000"]);
+  registerContactRoutes(app, {
+    allowedOrigins: [...allowedOrigins],
+    mailer: dependencies.contactMailer,
+  });
   const loginRateLimiter = new LoginRateLimiter();
   const reauthenticationRateLimiter = new LoginRateLimiter();
   const secureCookies = dependencies.isProduction ?? false;

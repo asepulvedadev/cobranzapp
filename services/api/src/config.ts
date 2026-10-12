@@ -10,6 +10,9 @@ const configSchema = z.object({
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PUBLIC_WEB_URL: z.url().default("http://localhost:3000"),
+  RESEND_API_KEY: z.string().min(1).optional(),
+  RESEND_FROM: z.string().min(1).default("cobranzapp <contacto@cobranzaap.tech>"),
+  CONTACT_TO_EMAIL: z.email().default("info@cobranzaap.tech"),
 });
 
 export type ApiConfig = z.infer<typeof configSchema>;
