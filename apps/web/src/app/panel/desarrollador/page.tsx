@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type {
   PlatformOverview,
   PlatformSystemStatus,
+  PlatformUserDirectory,
   SupportAccessRecord,
   TenantDirectory,
 } from "../../../lib/platform";
@@ -14,6 +15,7 @@ import { SupportAccessControl } from "./SupportAccessControl";
 import { TenantMembershipPlanControl } from "./TenantMembershipPlanControl";
 import { TenantReadiness } from "./TenantReadiness";
 import { TenantStatusButton } from "./TenantStatusButton";
+import { UserStatusControl } from "./UserStatusControl";
 
 const statusLabels = {
   draft: "Borrador",
@@ -35,6 +37,15 @@ function directoryHref(page: number, search: string, status: string | null) {
   if (page > 1) params.set("pagina", String(page));
   const query = params.toString();
   return `/panel/desarrollador${query ? `?${query}` : ""}#empresas`;
+}
+
+function userDirectoryHref(page: number, search: string, status: string | null) {
+  const params = new URLSearchParams();
+  if (search) params.set("usuario", search);
+  if (status) params.set("estadoUsuario", status);
+  if (page > 1) params.set("paginaUsuario", String(page));
+  const query = params.toString();
+  return `/panel/desarrollador${query ? `?${query}` : ""}#usuarios`;
 }
 
 function jobStatusDetail(jobs: PlatformSystemStatus["jobs"]) {
@@ -61,6 +72,9 @@ export default async function DeveloperDashboard({
     q?: string | string[];
     estado?: string | string[];
     pagina?: string | string[];
+    usuario?: string | string[];
+    estadoUsuario?: string | string[];
+    paginaUsuario?: string | string[];
   }>;
 }) {
   const query = await searchParams;
@@ -72,20 +86,36 @@ export default async function DeveloperDashboard({
   const directoryQuery = new URLSearchParams({ page: String(page), pageSize: "20" });
   if (search) directoryQuery.set("q", search);
   if (status) directoryQuery.set("status", status);
-  const [response, directoryResponse, supportResponse, systemResponse] = await Promise.all([
-    serverApi("/v1/platform/overview"),
-    serverApi(`/v1/platform/tenants?${directoryQuery}`),
-    serverApi("/v1/platform/support-access"),
-    serverApi("/v1/platform/system-status"),
-  ]);
+  const userSearch = (firstQueryValue(query.usuario) ?? "").trim().slice(0, 80);
+  const requestedUserStatus = firstQueryValue(query.estadoUsuario) ?? null;
+  const userStatus =
+    requestedUserStatus === "active" || requestedUserStatus === "disabled"
+      ? requestedUserStatus
+      : null;
+  const requestedUserPage = Number(firstQueryValue(query.paginaUsuario));
+  const userPage =
+    Number.isInteger(requestedUserPage) && requestedUserPage > 0 ? requestedUserPage : 1;
+  const userDirectoryQuery = new URLSearchParams({ page: String(userPage), pageSize: "20" });
+  if (userSearch) userDirectoryQuery.set("q", userSearch);
+  if (userStatus) userDirectoryQuery.set("status", userStatus);
+  const [response, directoryResponse, userDirectoryResponse, supportResponse, systemResponse] =
+    await Promise.all([
+      serverApi("/v1/platform/overview"),
+      serverApi(`/v1/platform/tenants?${directoryQuery}`),
+      serverApi(`/v1/platform/users?${userDirectoryQuery}`),
+      serverApi("/v1/platform/support-access"),
+      serverApi("/v1/platform/system-status"),
+    ]);
   if (response.status === 401) redirect("/ingresar");
   if (response.status === 403) redirect("/ingresar?error=sin-acceso");
   if (!response.ok) throw new Error("No fue posible cargar la consola de plataforma");
   if (!directoryResponse.ok) throw new Error("No fue posible cargar el directorio de empresas");
+  if (!userDirectoryResponse.ok) throw new Error("No fue posible cargar el directorio de usuarios");
   if (!supportResponse.ok) throw new Error("No fue posible cargar los accesos de soporte");
   if (!systemResponse.ok) throw new Error("No fue posible validar el estado de la plataforma");
   const overview = (await response.json()) as PlatformOverview;
   const directory = (await directoryResponse.json()) as TenantDirectory;
+  const userDirectory = (await userDirectoryResponse.json()) as PlatformUserDirectory;
   const { access } = (await supportResponse.json()) as { access: SupportAccessRecord[] };
   const system = (await systemResponse.json()) as PlatformSystemStatus;
   const version =
@@ -339,6 +369,131 @@ export default async function DeveloperDashboard({
           </aside>
         </div>
       </div>
+
+      <section className="dashboard-card activity-card user-directory-card" id="usuarios">
+        <div className="card-heading">
+          <div>
+            <span className="panel-eyebrow">Identidades</span>
+            <h2>Usuarios de la plataforma</h2>
+          </div>
+          <span>
+            {userDirectory.pagination.total}{" "}
+            {userDirectory.pagination.total === 1 ? "registro" : "registros"}
+          </span>
+        </div>
+        <p className="operational-note">
+          Deshabilitar bloquea el ingreso y cierra todas las sesiones activas. No elimina el
+          historial ni las membresías empresariales.
+        </p>
+        <form className="tenant-directory-filters" action="/panel/desarrollador#usuarios">
+          <label>
+            <span>Buscar usuario</span>
+            <input
+              defaultValue={userSearch}
+              maxLength={80}
+              name="usuario"
+              placeholder="Nombre, usuario o correo"
+              type="search"
+            />
+          </label>
+          <label>
+            <span>Estado</span>
+            <select defaultValue={userStatus ?? ""} name="estadoUsuario">
+              <option value="">Todos</option>
+              <option value="active">Activo</option>
+              <option value="disabled">Deshabilitado</option>
+            </select>
+          </label>
+          <div className="tenant-directory-filter-actions">
+            <button type="submit">Filtrar</button>
+            {userSearch || userStatus ? <a href="/panel/desarrollador#usuarios">Limpiar</a> : null}
+          </div>
+        </form>
+        {userDirectory.users.length ? (
+          <div className="tenant-table-wrap">
+            <table className="tenant-table">
+              <thead>
+                <tr>
+                  <th>Usuario</th>
+                  <th>Estado</th>
+                  <th>Membresías</th>
+                  <th>Sesiones</th>
+                  <th>Última actividad</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {userDirectory.users.map((user) => (
+                  <tr key={user.id}>
+                    <td data-label="Usuario">
+                      <strong>{user.displayName}</strong>
+                      <small>
+                        @{user.username} · {user.email}
+                      </small>
+                    </td>
+                    <td data-label="Estado">
+                      <span
+                        className={`status status-${user.status === "active" ? "active" : "archived"}`}
+                      >
+                        {user.status === "active" ? "Activo" : "Deshabilitado"}
+                      </span>
+                    </td>
+                    <td data-label="Membresías">{user.activeMemberships}</td>
+                    <td data-label="Sesiones">{user.activeSessions}</td>
+                    <td data-label="Última actividad">
+                      {user.lastSeenAt
+                        ? new Intl.DateTimeFormat("es-CO", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                            timeZone: "America/Bogota",
+                          }).format(new Date(user.lastSeenAt))
+                        : "Nunca"}
+                    </td>
+                    <td data-label="Acción">
+                      {user.platformRole === "developer" ? (
+                        <span className="table-muted">Cuenta protegida</span>
+                      ) : (
+                        <UserStatusControl status={user.status} userId={user.id} />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="empty-state">
+            <span aria-hidden="true">◇</span>
+            <h3>No encontramos usuarios</h3>
+            <p>Prueba con otro nombre, usuario, correo o estado.</p>
+          </div>
+        )}
+        {userDirectory.pagination.totalPages > 1 ? (
+          <nav className="tenant-directory-pagination" aria-label="Páginas de usuarios">
+            {userDirectory.pagination.page > 1 ? (
+              <a
+                href={userDirectoryHref(userDirectory.pagination.page - 1, userSearch, userStatus)}
+              >
+                Anterior
+              </a>
+            ) : (
+              <span aria-disabled="true">Anterior</span>
+            )}
+            <strong>
+              Página {userDirectory.pagination.page} de {userDirectory.pagination.totalPages}
+            </strong>
+            {userDirectory.pagination.page < userDirectory.pagination.totalPages ? (
+              <a
+                href={userDirectoryHref(userDirectory.pagination.page + 1, userSearch, userStatus)}
+              >
+                Siguiente
+              </a>
+            ) : (
+              <span aria-disabled="true">Siguiente</span>
+            )}
+          </nav>
+        ) : null}
+      </section>
 
       <section className="dashboard-card activity-card" id="actividad">
         <div className="card-heading">

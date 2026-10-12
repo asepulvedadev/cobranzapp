@@ -28,6 +28,13 @@ describe("ActivityFeed", () => {
             actorUsername: "desarrollador",
             happenedAt: "2026-10-11T12:02:00.000Z",
           },
+          {
+            id: "user-status-event",
+            action: "user.status_changed",
+            actorDisplayName: "Desarrollador",
+            actorUsername: "desarrollador",
+            happenedAt: "2026-10-11T12:03:00.000Z",
+          },
         ]}
       />,
     );
@@ -35,5 +42,6 @@ describe("ActivityFeed", () => {
     expect(html).toContain("Cambió el estado de una sede");
     expect(html).toContain("Cambió el estado de un equipo");
     expect(html).toContain("Actualizó la capacidad de empleados");
+    expect(html).toContain("Cambió el acceso de un usuario");
   });
 });

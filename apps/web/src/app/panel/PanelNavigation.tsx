@@ -62,6 +62,7 @@ export function PanelNavigation({
     ? [
         { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },
         { href: "/panel/desarrollador#empresas", label: "Empresas", icon: Buildings },
+        { href: "/panel/desarrollador#usuarios", label: "Usuarios", icon: UsersThree },
         { href: "/panel/desarrollador#actividad", label: "Actividad", icon: Pulse },
         { href: "/panel/seguridad", label: "Seguridad", icon: ShieldCheck },
       ]

@@ -125,6 +125,10 @@ html:has(.panel-shell) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.panel-mobile-nav.panel-nav-count-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .panel-mobile-nav a {
   display: flex;
   min-width: 0;
@@ -280,6 +284,7 @@ html:has(.panel-shell) {
 }
 
 #empresas,
+#usuarios,
 #actividad,
 #equipo,
 #configuracion {
@@ -674,6 +679,10 @@ html:has(.panel-shell) {
 
 .tenant-table td small {
   color: var(--panel-muted);
+}
+
+.user-directory-card .tenant-table td:first-child small {
+  overflow-wrap: anywhere;
 }
 
 .table-action {
