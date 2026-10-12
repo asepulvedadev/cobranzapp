@@ -36,6 +36,16 @@ describe("OpenAPI contract", () => {
       "updateTenantTeamStatus",
     );
     expect(
+      document.paths["/v1/tenants/{tenantId}/verification-network/query"].post.operationId,
+    ).toBe("queryVerificationNetwork");
+    expect(
+      document.paths["/v1/tenants/{tenantId}/verification-network/corrections"].post.operationId,
+    ).toBe("openVerificationNetworkCorrection");
+    expect(
+      document.paths["/v1/tenants/{tenantId}/verification-network/consents/{consentId}"].delete
+        .operationId,
+    ).toBe("revokeVerificationNetworkConsent");
+    expect(
       document.paths["/v1/tenants/{tenantId}/teams/{teamId}/members/{userId}"].put.operationId,
     ).toBe("addTenantTeamMember");
     expect(

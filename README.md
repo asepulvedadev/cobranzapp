@@ -19,6 +19,7 @@ Plataforma móvil y multiempresa para gestionar créditos y cobranzas de prestam
 | [Tecnologías](docs/stack.md) | Bibliotecas y entornos propuestos, alternativas y restricciones de compatibilidad |
 | [Modelo PostgreSQL](docs/database.md) | Tablas lógicas, relaciones, claves de aislamiento, restricciones e índices |
 | [Operaciones](docs/operations.md) | Vinculación, expediente y documentos del cliente, rutas de campo, supervisión y riesgo |
+| [Red de verificación compartida](docs/verification-network.md) | Consentimiento, consulta mínima, correcciones, foto de perfil designada y perfiles operativos |
 | [Sincronización sin conexión](docs/offline-sync.md) | Cola de captura, conciliación, conflictos, recuperación del dispositivo y autoridad del servidor |
 | [Seguridad](docs/security.md) | Aislamiento entre empresas, acceso limitado, autenticación y protección de dispositivos y documentos |
 | [Cumplimiento en Colombia](docs/compliance.md) | Revisión de tasas y cargos, límites de contacto y visita, derechos del cliente y condiciones de salida |

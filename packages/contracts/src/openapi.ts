@@ -50,6 +50,14 @@ import {
   tenantSettingsResponseSchema,
   tenantSettingsUpdateRequestSchema,
   tenantTeamResponseSchema,
+  verificationNetworkAssertionRequestSchema,
+  verificationNetworkAssertionResponseSchema,
+  verificationNetworkConsentRequestSchema,
+  verificationNetworkConsentSchema,
+  verificationNetworkCorrectionRequestSchema,
+  verificationNetworkCorrectionResponseSchema,
+  verificationNetworkQueryRequestSchema,
+  verificationNetworkQueryResponseSchema,
 } from "./index.js";
 
 type OpenApiSchema = Record<string, unknown>;
@@ -112,6 +120,14 @@ const documentedSchemas = {
   TenantSettingsResponse: tenantSettingsResponseSchema,
   TenantSettingsUpdateRequest: tenantSettingsUpdateRequestSchema,
   TenantTeamResponse: tenantTeamResponseSchema,
+  VerificationNetworkAssertionRequest: verificationNetworkAssertionRequestSchema,
+  VerificationNetworkAssertionResponse: verificationNetworkAssertionResponseSchema,
+  VerificationNetworkConsentRequest: verificationNetworkConsentRequestSchema,
+  VerificationNetworkConsent: verificationNetworkConsentSchema,
+  VerificationNetworkCorrectionRequest: verificationNetworkCorrectionRequestSchema,
+  VerificationNetworkCorrectionResponse: verificationNetworkCorrectionResponseSchema,
+  VerificationNetworkQueryRequest: verificationNetworkQueryRequestSchema,
+  VerificationNetworkQueryResponse: verificationNetworkQueryResponseSchema,
   OrganizationStatusUpdateRequest: organizationStatusUpdateRequestSchema,
   ReauthenticationRequest: reauthenticationRequestSchema,
   ReauthenticationResponse: reauthenticationResponseSchema,
@@ -730,6 +746,157 @@ export function createOpenApiDocument(version: string) {
               "Confirmación reciente de contraseña requerida.",
               schemaReference("ApiError"),
             ),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/verification-network/consents": {
+        post: {
+          tags: ["Empresas"],
+          operationId: "grantVerificationNetworkConsent",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("VerificationNetworkConsentRequest")),
+          },
+          responses: {
+            "201": response(
+              "Consentimiento registrado; el token debe entregarse a la persona titular.",
+              {
+                type: "object",
+                properties: { consent: schemaReference("VerificationNetworkConsent") },
+              },
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "428": response("Reautenticación requerida.", schemaReference("ApiError")),
+            "503": response("La red está deshabilitada.", schemaReference("ApiError")),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/verification-network/consents/{consentId}": {
+        delete: {
+          tags: ["Empresas"],
+          operationId: "revokeVerificationNetworkConsent",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "consentId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "204": response("Consentimiento revocado."),
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("El consentimiento no existe.", schemaReference("ApiError")),
+            "428": response("Reautenticación requerida.", schemaReference("ApiError")),
+            "503": response("La red está deshabilitada.", schemaReference("ApiError")),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/verification-network/query": {
+        post: {
+          tags: ["Empresas"],
+          operationId: "queryVerificationNetwork",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("VerificationNetworkQueryRequest")),
+          },
+          responses: {
+            "200": response(
+              "Resultado mínimo y explicable.",
+              schemaReference("VerificationNetworkQueryResponse"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "503": response("La red está deshabilitada.", schemaReference("ApiError")),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/verification-network/assertions": {
+        post: {
+          tags: ["Empresas"],
+          operationId: "publishVerificationNetworkAssertion",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("VerificationNetworkAssertionRequest")),
+          },
+          responses: {
+            "201": response("Observación publicada con consentimiento y vencimiento.", {
+              type: "object",
+              properties: { assertion: schemaReference("VerificationNetworkAssertionResponse") },
+            }),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "409": response("Falta consentimiento vigente.", schemaReference("ApiError")),
+            "428": response("Reautenticación requerida.", schemaReference("ApiError")),
+            "503": response("La red está deshabilitada.", schemaReference("ApiError")),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/verification-network/corrections": {
+        post: {
+          tags: ["Empresas"],
+          operationId: "openVerificationNetworkCorrection",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("VerificationNetworkCorrectionRequest")),
+          },
+          responses: {
+            "201": response("Solicitud de corrección abierta.", {
+              type: "object",
+              properties: { correction: schemaReference("VerificationNetworkCorrectionResponse") },
+            }),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "503": response("La red está deshabilitada.", schemaReference("ApiError")),
           },
         },
       },

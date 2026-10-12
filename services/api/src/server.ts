@@ -7,6 +7,7 @@ import { createResendContactMailer } from "./contact/resend.js";
 import { createPostgresPlatformService } from "./platform/postgres-platform-service.js";
 import { createPostgresSupportAccessService } from "./support-access/postgres-support-access-service.js";
 import { createPostgresTenancyService } from "./tenancy/postgres-tenancy-service.js";
+import { createPostgresVerificationNetworkService } from "./verification-network/postgres-verification-network-service.js";
 
 const config = loadConfig();
 const pool = new pg.Pool({
@@ -37,6 +38,10 @@ const app = buildApp({
   sessionTtlHours: config.SESSION_TTL_HOURS,
   supportAccessService: createPostgresSupportAccessService(pool),
   tenancyService: createPostgresTenancyService(pool, config.PUBLIC_WEB_URL),
+  verificationNetworkService: createPostgresVerificationNetworkService(
+    pool,
+    config.VERIFICATION_NETWORK_HMAC_KEY,
+  ),
   version: process.env.APP_VERSION ?? "development",
 });
 

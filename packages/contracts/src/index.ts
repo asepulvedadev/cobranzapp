@@ -482,6 +482,86 @@ export const revokedSessionsResponseSchema = z.object({
   revoked: z.number().int().nonnegative(),
 });
 
+export const verificationNetworkPurposeSchema = z.enum([
+  "credit_evaluation",
+  "portfolio_management",
+  "customer_request",
+]);
+
+const verificationIdentityFields = {
+  country: z.string().trim().length(2).toUpperCase(),
+  documentType: z.string().trim().min(2).max(30),
+  documentNumber: z.string().trim().min(4).max(32),
+};
+
+export const verificationNetworkConsentRequestSchema = z.object({
+  ...verificationIdentityFields,
+  purpose: verificationNetworkPurposeSchema,
+  policyVersion: z.string().trim().min(1).max(40),
+  evidenceRef: z.string().trim().min(1).max(240),
+  expiresAt: z.iso.datetime(),
+});
+
+export const verificationNetworkConsentSchema = z.object({
+  id: z.uuid(),
+  expiresAt: z.iso.datetime(),
+  policyVersion: z.string().min(1),
+  purpose: verificationNetworkPurposeSchema,
+  consentToken: z.string().min(40),
+});
+
+export const verificationNetworkQueryRequestSchema = z.object({
+  ...verificationIdentityFields,
+  consentToken: z.string().min(40).max(120),
+  purpose: verificationNetworkPurposeSchema,
+});
+
+export const verificationNetworkQueryResponseSchema = z.object({
+  result: z.enum(["not_found", "no_observation", "reported", "disputed", "no_consent"]),
+  categories: z.array(z.enum(["late_payment", "payment_default"])),
+  activeObservations: z.number().int().nonnegative(),
+  lastUpdatedAt: z.iso.datetime().nullable(),
+  correctionAvailable: z.boolean(),
+});
+
+export const verificationNetworkAssertionRequestSchema = z.object({
+  ...verificationIdentityFields,
+  consentToken: z.string().min(40).max(120),
+  category: z.enum(["late_payment", "payment_default"]),
+  observedFrom: z.iso.datetime(),
+  observedTo: z.iso.datetime().nullable(),
+  evidenceRef: z.string().trim().min(1).max(240),
+  expiresAt: z.iso.datetime(),
+});
+
+export const verificationNetworkAssertionResponseSchema = z.object({
+  id: z.uuid(),
+  category: z.enum(["late_payment", "payment_default"]),
+  status: z.literal("active"),
+  expiresAt: z.iso.datetime(),
+});
+
+export const verificationNetworkCorrectionRequestSchema = z.object({
+  ...verificationIdentityFields,
+  consentToken: z.string().min(40).max(120),
+  assertionId: z.uuid().nullable(),
+  message: z.string().trim().min(10).max(1000),
+});
+
+export const verificationNetworkCorrectionResponseSchema = z.object({
+  id: z.uuid(),
+  status: z.literal("open"),
+});
+
+export const tenantMemberProfileRequestSchema = z.object({
+  phone: z.string().trim().min(7).max(30).nullable(),
+  homeAddress: z.string().trim().min(3).max(240).nullable(),
+  workAddress: z.string().trim().min(3).max(240).nullable(),
+  profilePhotoObjectKey: z.string().trim().min(1).max(500).nullable(),
+  bloodType: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]).nullable(),
+  bloodTypeConsentVersion: z.string().trim().min(1).max(40).nullable(),
+});
+
 export type ServiceStatus = z.infer<typeof serviceStatusSchema>;
 export type ApiError = z.infer<typeof apiErrorSchema>;
 export type TenantRole = z.infer<typeof tenantRoleSchema>;
@@ -528,3 +608,25 @@ export type TenantInvitationRequest = z.infer<typeof tenantInvitationRequestSche
 export type MfaStatus = z.infer<typeof mfaStatusSchema>;
 export type ReauthenticationRequest = z.infer<typeof reauthenticationRequestSchema>;
 export type ChangePasswordRequest = z.infer<typeof changePasswordRequestSchema>;
+export type VerificationNetworkPurpose = z.infer<typeof verificationNetworkPurposeSchema>;
+export type VerificationNetworkConsentRequest = z.infer<
+  typeof verificationNetworkConsentRequestSchema
+>;
+export type VerificationNetworkConsent = z.infer<typeof verificationNetworkConsentSchema>;
+export type VerificationNetworkQueryRequest = z.infer<typeof verificationNetworkQueryRequestSchema>;
+export type VerificationNetworkQueryResponse = z.infer<
+  typeof verificationNetworkQueryResponseSchema
+>;
+export type VerificationNetworkAssertionRequest = z.infer<
+  typeof verificationNetworkAssertionRequestSchema
+>;
+export type VerificationNetworkAssertionResponse = z.infer<
+  typeof verificationNetworkAssertionResponseSchema
+>;
+export type VerificationNetworkCorrectionRequest = z.infer<
+  typeof verificationNetworkCorrectionRequestSchema
+>;
+export type VerificationNetworkCorrectionResponse = z.infer<
+  typeof verificationNetworkCorrectionResponseSchema
+>;
+export type TenantMemberProfileRequest = z.infer<typeof tenantMemberProfileRequestSchema>;

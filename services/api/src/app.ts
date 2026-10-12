@@ -18,6 +18,10 @@ import {
   tenantInvitationRequestSchema,
   tenantMemberUpdateRequestSchema,
   tenantSettingsUpdateRequestSchema,
+  verificationNetworkAssertionRequestSchema,
+  verificationNetworkConsentRequestSchema,
+  verificationNetworkCorrectionRequestSchema,
+  verificationNetworkQueryRequestSchema,
 } from "@cobranzapp/contracts";
 import { createOpenApiDocument } from "@cobranzapp/contracts/openapi";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
@@ -30,6 +34,7 @@ import { registerContactRoutes } from "./contact/routes.js";
 import type { PlatformService } from "./platform/types.js";
 import type { SupportAccessService } from "./support-access/types.js";
 import type { TenancyService } from "./tenancy/types.js";
+import type { VerificationNetworkService } from "./verification-network/types.js";
 
 const sessionCookieName = "cobranzapp_session";
 const mfaChallengeCookieName = "cobranzapp_mfa_challenge";
@@ -45,6 +50,11 @@ const tenantTeamMemberParamsSchema = z.object({
 });
 const tenantBranchParamsSchema = z.object({ tenantId: z.uuid(), branchId: z.uuid() });
 const tenantTeamParamsSchema = z.object({ tenantId: z.uuid(), teamId: z.uuid() });
+const verificationNetworkParamsSchema = z.object({ tenantId: z.uuid() });
+const verificationNetworkConsentParamsSchema = z.object({
+  tenantId: z.uuid(),
+  consentId: z.uuid(),
+});
 const sessionIdParamsSchema = z.object({ sessionId: z.uuid() });
 const platformUserParamsSchema = z.object({ userId: z.uuid() });
 const invitationTokenParamsSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{40,60}$/) });
@@ -73,6 +83,7 @@ export interface AppDependencies {
   sessionTtlHours?: number;
   supportAccessService: SupportAccessService;
   tenancyService: TenancyService;
+  verificationNetworkService?: VerificationNetworkService;
   version: string;
 }
 
@@ -1214,6 +1225,321 @@ export function buildApp(dependencies: AppDependencies) {
         request.id,
       );
     return overview;
+  });
+
+  function tenantMembershipForSession(session: { user: AuthenticatedUser }, tenantId: string) {
+    return session.user.memberships.find((item) => item.tenantId === tenantId);
+  }
+
+  function verificationNetworkUnavailable(request: FastifyRequest, reply: FastifyReply) {
+    return sendError(
+      reply,
+      503,
+      "VERIFICATION_NETWORK_DISABLED",
+      "La red de verificación está pendiente de habilitar la política de datos y su clave operativa.",
+      request.id,
+    );
+  }
+
+  app.post("/v1/tenants/:tenantId/verification-network/consents", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = verificationNetworkParamsSchema.safeParse(request.params);
+    const body = verificationNetworkConsentRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_VERIFICATION_CONSENT",
+        "Revisa la autorización.",
+        request.id,
+      );
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "No tienes permiso para registrar autorizaciones.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    if (!dependencies.verificationNetworkService)
+      return verificationNetworkUnavailable(request, reply);
+    try {
+      const result = await dependencies.verificationNetworkService.createConsent(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        { ...body.data, requestId: request.id },
+      );
+      if (result.status === "disabled") return verificationNetworkUnavailable(request, reply);
+      if (result.status !== "ok") {
+        return sendError(
+          reply,
+          404,
+          "VERIFICATION_CONSENT_NOT_FOUND",
+          "No fue posible registrar el consentimiento.",
+          request.id,
+        );
+      }
+      return reply.code(201).send({ consent: result.value });
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("INVALID_DOCUMENT_")) {
+        return sendError(
+          reply,
+          400,
+          "INVALID_DOCUMENT_IDENTITY",
+          "Los datos de identificación no son válidos.",
+          request.id,
+        );
+      }
+      throw error;
+    }
+  });
+
+  app.delete(
+    "/v1/tenants/:tenantId/verification-network/consents/:consentId",
+    async (request, reply) => {
+      if (!requireAllowedOrigin(request, reply)) return;
+      const session = await requireUser(request, reply);
+      if (!session) return;
+      const params = verificationNetworkConsentParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return sendError(
+          reply,
+          404,
+          "VERIFICATION_CONSENT_NOT_FOUND",
+          "El consentimiento no existe.",
+          request.id,
+        );
+      }
+      const membership = tenantMembershipForSession(session, params.data.tenantId);
+      if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "Solo propietario o supervisor puede revocar un consentimiento.",
+          request.id,
+        );
+      }
+      if (!(await requireRecentReauthentication(session, request, reply))) return;
+      if (!dependencies.verificationNetworkService)
+        return verificationNetworkUnavailable(request, reply);
+      const result = await dependencies.verificationNetworkService.revokeConsent(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.consentId,
+        request.id,
+      );
+      if (result.status === "disabled") return verificationNetworkUnavailable(request, reply);
+      if (result.status !== "ok")
+        return sendError(
+          reply,
+          404,
+          "VERIFICATION_CONSENT_NOT_FOUND",
+          "El consentimiento no existe o ya fue revocado.",
+          request.id,
+        );
+      return reply.code(204).send();
+    },
+  );
+
+  app.post("/v1/tenants/:tenantId/verification-network/query", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = verificationNetworkParamsSchema.safeParse(request.params);
+    const body = verificationNetworkQueryRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_VERIFICATION_QUERY",
+        "Revisa la consulta y el consentimiento.",
+        request.id,
+      );
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership)
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a esta empresa.", request.id);
+    if (!dependencies.verificationNetworkService)
+      return verificationNetworkUnavailable(request, reply);
+    try {
+      const result = await dependencies.verificationNetworkService.query(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        { ...body.data, requestId: request.id },
+      );
+      if (result.status === "disabled") return verificationNetworkUnavailable(request, reply);
+      if (result.status !== "ok")
+        return sendError(
+          reply,
+          403,
+          "CONSENT_REQUIRED",
+          "El consentimiento no es válido.",
+          request.id,
+        );
+      return reply.send(result.value);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("INVALID_DOCUMENT_")) {
+        return sendError(
+          reply,
+          400,
+          "INVALID_DOCUMENT_IDENTITY",
+          "Los datos de identificación no son válidos.",
+          request.id,
+        );
+      }
+      throw error;
+    }
+  });
+
+  app.post("/v1/tenants/:tenantId/verification-network/assertions", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = verificationNetworkParamsSchema.safeParse(request.params);
+    const body = verificationNetworkAssertionRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_VERIFICATION_ASSERTION",
+        "Revisa el evento verificable.",
+        request.id,
+      );
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo propietario o supervisor puede publicar una observación.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    if (!dependencies.verificationNetworkService)
+      return verificationNetworkUnavailable(request, reply);
+    try {
+      const result = await dependencies.verificationNetworkService.publishAssertion(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        { ...body.data, requestId: request.id },
+      );
+      if (result.status === "disabled") return verificationNetworkUnavailable(request, reply);
+      if (result.status === "not_found")
+        return sendError(
+          reply,
+          404,
+          "VERIFICATION_ASSERTION_NOT_FOUND",
+          "No fue posible publicar la observación.",
+          request.id,
+        );
+      if (result.status === "no_consent")
+        return sendError(
+          reply,
+          409,
+          "CONSENT_REQUIRED",
+          "La persona debe autorizar primero esta publicación.",
+          request.id,
+        );
+      return reply.code(201).send({ assertion: result.value });
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("INVALID_DOCUMENT_")) {
+        return sendError(
+          reply,
+          400,
+          "INVALID_DOCUMENT_IDENTITY",
+          "Los datos de identificación no son válidos.",
+          request.id,
+        );
+      }
+      throw error;
+    }
+  });
+
+  app.post("/v1/tenants/:tenantId/verification-network/corrections", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = verificationNetworkParamsSchema.safeParse(request.params);
+    const body = verificationNetworkCorrectionRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_VERIFICATION_CORRECTION",
+        "Describe la corrección con al menos 10 caracteres.",
+        request.id,
+      );
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership)
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a esta empresa.", request.id);
+    if (!dependencies.verificationNetworkService)
+      return verificationNetworkUnavailable(request, reply);
+    try {
+      const result = await dependencies.verificationNetworkService.createCorrection(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        { ...body.data, requestId: request.id },
+      );
+      if (result.status === "disabled") return verificationNetworkUnavailable(request, reply);
+      if (result.status === "not_found")
+        return sendError(
+          reply,
+          404,
+          "VERIFICATION_CORRECTION_NOT_FOUND",
+          "No fue posible abrir la corrección.",
+          request.id,
+        );
+      if (result.status === "no_consent")
+        return sendError(
+          reply,
+          403,
+          "CONSENT_REQUIRED",
+          "El token de consentimiento no es válido.",
+          request.id,
+        );
+      return reply.code(201).send({ correction: result.value });
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("INVALID_DOCUMENT_")) {
+        return sendError(
+          reply,
+          400,
+          "INVALID_DOCUMENT_IDENTITY",
+          "Los datos de identificación no son válidos.",
+          request.id,
+        );
+      }
+      throw error;
+    }
   });
 
   app.get("/v1/tenants/:tenantId/support-access", async (request, reply) => {

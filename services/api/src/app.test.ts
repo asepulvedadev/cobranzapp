@@ -1443,4 +1443,28 @@ describe("tenant onboarding", () => {
       error: { code: "PLATFORM_APPROVAL_REQUIRED" },
     });
   });
+
+  it("does not expose shared verification before the operational key is configured", async () => {
+    const deps = dependencies({ authService: { authenticate: vi.fn(async () => tenantOwner) } });
+    const app = buildApp(deps);
+    apps.push(app);
+    const tenantId = tenantOwner.memberships[0]?.tenantId;
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/tenants/${tenantId}/verification-network/query`,
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: {
+        country: "CO",
+        documentType: "CC",
+        documentNumber: "12345678",
+        consentToken: "a".repeat(40),
+        purpose: "credit_evaluation",
+      },
+    });
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({ error: { code: "VERIFICATION_NETWORK_DISABLED" } });
+  });
 });

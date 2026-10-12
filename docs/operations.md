@@ -57,11 +57,11 @@ Transferred-payment screenshots are evidence, not proof of settlement. Payment c
 - Supervisors review missing visits, pending events, cash discrepancies, reversal requests, and unusual operational patterns.
 - Optional location capture at an action requires appropriate permissions and purpose; no continuous tracking by default.
 
-### Internal risk registry (requested “blacklist”)
+### Shared verification network (replacement for “blacklist”)
 
-Use a private, tenant-local registry: `Observation → Under review → Restricted / Dismissed → Resolved / Expired`. Store factual reason category, evidence reference, author, reviewer, effective date, review deadline, dispute status, and resolution.
+The product now has a consent-gated foundation for a shared verification network. It returns only minimal categories and counts, records every query, requires evidence and expiry for each observation, and supports a correction request. It never shares documents, balances, addresses, photos or the reporting company name.
 
-Being overdue does not automatically create a permanent restriction. A reviewed restriction may block new origination under approved policy, but never suppress existing payment acceptance or access to correction procedures. No cross-tenant lookup, shared identity reputation, unsupported criminal labels, or automatic unreviewed restrictions.
+The network is disabled until the Colombian privacy policy, participant agreements, retention schedule and correction procedure are approved. A reported late/default event is not an automatic denial, does not block existing payments, and cannot be the sole credit decision factor. The tenant-local review lifecycle remains `Observation → Under review → Restricted / Dismissed → Resolved / Expired` for operational decisions inside the company.
 
 ## Document capture and manual identity review — no AI
 

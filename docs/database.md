@@ -45,6 +45,8 @@ Global identity records are not readable by arbitrary tenants; expose only allow
 
 Identity uniqueness is tenant-local over normalized country/type/number HMAC for active identities; changes are reviewed. Keep document review evidence minimal; do not duplicate full document content in metadata.
 
+The consent-gated shared verification foundation is implemented in migration `0016_verification_network_foundation.sql`. It keeps a global keyed identity reference separate from tenant consents, minimal expiring assertions, query audit events and correction requests. It does not replace the future `borrowers` tables or authorize a credit-bureau integration. `tenant_member_profiles` stores only private profile metadata; `profile_photo_object_key` is an opaque private-storage reference, never a public URL, and `blood_type` is optional sensitive data with a separate consent marker.
+
 ### Lending and accounting
 
 | Table | Important fields / relationships |

@@ -16,7 +16,7 @@ Build a narrow operational pilot first: one approved Colombian loan product, mul
 | Architecture | TypeScript modular monolith; separate web, mobile, API, worker, identity, PostgreSQL, and object-storage boundaries |
 | Deployment | Immutable containers on a production VPS; Caddy ingress; private service networks; encrypted offsite backups |
 | Release strategy | Internal environment → staging → controlled pilot → stabilization → production expansion |
-| Pilot boundary | One country, currency, approved loan product, and reviewed operating policy; no AI, payment custody, credit bureau, or public blacklist |
+| Pilot boundary | One country, currency, approved loan product, and reviewed operating policy; no AI, payment custody, credit bureau, or unconsented/public blacklist |
 
 The calendar is a forecast, not a commitment. A smaller team should reduce parallel work rather than weaken testing or financial controls; expect roughly 32–40 weeks with two full-time engineers.
 

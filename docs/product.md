@@ -55,7 +55,7 @@ This is discovery evidence, not confirmation that the rate, charge, calendar or 
 | Loan terms and balances calculated manually | Disputes, errors, unclear principal versus interest | Versioned loan terms, schedules, allocations, and ledger |
 | Collections depend on collector reports | Delayed visibility and missing cash | Traceable collection events and daily cash reconciliation |
 | Routes and supervision organized informally | Missed visits and unclear responsibility | Daily route assignments and supervisor exception queues |
-| Risk records consist of informal blacklists | Incorrect restrictions and privacy exposure | Tenant-local risk registry with evidence and review |
+| Risk records consist of informal blacklists | Incorrect restrictions and privacy exposure | Consent-gated shared verification network plus tenant-local review with evidence and correction |
 | Decisions rely on total collections alone | Principal recovery mistaken for profit | Defined portfolio, cash, delinquency, and profitability metrics |
 
 **Only paying customer:** The tenant owner. Supervisors, collectors, and end customers use
@@ -84,7 +84,7 @@ A business subscription for operational control, not a percentage of borrower pa
 
 | Release | Included | Explicitly deferred |
 |---|---|---|
-| First operational pilot | Tenant onboarding, the four approved roles, branding/settings, customer dossier, manual document capture, one approved loan model, schedules, collections/receipts, route lists, cash reconciliation, internal risk registry, core dashboards, customer receipt view, audit trail | Automated credit approval, external credit bureau reporting, public/shared blacklist, native desktop apps |
+| First operational pilot | Tenant onboarding, the four approved roles, branding/settings, customer dossier, manual document capture, one approved loan model, schedules, collections/receipts, route lists, cash reconciliation, consent-gated verification network, core dashboards, customer receipt view, audit trail | Automated credit approval, external credit bureau reporting, unconsented reputation sharing, native desktop apps |
 | Field reliability and automation | Offline capture/reconciliation if validated as essential, manual document review, optional validated non-model barcode parsing, map provider integration, controlled notifications, imports, richer supervisor workflows | Guaranteed background sync, continuous employee tracking, fully autonomous collection |
 | Deep analytics and systematization | Cohorts, trend reports, explicit exception thresholds, deterministic scenarios, scheduled reports and task workflows | AI, machine learning, automatic loan denial, unrestricted rule execution |
 | Expansion after evidence | Payment integrations, borrower portal, advanced routing, multiple approved loan products, dedicated tenant infrastructure | Banking/custody or capital marketplace without separate approval |

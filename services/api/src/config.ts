@@ -7,6 +7,7 @@ const configSchema = z.object({
   ALLOWED_WEB_ORIGINS: z.string().default("http://localhost:3000"),
   SESSION_TTL_HOURS: z.coerce.number().int().positive().max(168).default(8),
   MFA_ENCRYPTION_KEY: z.string().min(43).max(44),
+  VERIFICATION_NETWORK_HMAC_KEY: z.string().min(32).optional(),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PUBLIC_WEB_URL: z.url().default("http://localhost:3000"),
