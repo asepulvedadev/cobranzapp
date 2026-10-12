@@ -20,11 +20,14 @@ import { MobileApi, MobileApiError } from "./src/api";
 
 type Screen =
   | { kind: "loading" }
-  | { kind: "signed_out" }
+  | { kind: "signed_out"; notice?: string }
   | { kind: "mfa" }
   | { kind: "authenticated"; user: CurrentUser };
 
-const roleLabels: Record<TenantOverview["actorRole"], string> = {
+const roleLabels: Record<
+  CurrentUser["memberships"][number]["role"] | TenantOverview["actorRole"],
+  string
+> = {
   owner: "Propietario",
   supervisor: "Supervisor",
   collector: "Cobrador",
@@ -62,10 +65,12 @@ function PrimaryButton({
 
 function LoginScreen({
   api,
+  notice,
   onMfaRequired,
   onAuthenticated,
 }: {
   api: MobileApi;
+  notice?: string;
   onMfaRequired: () => void;
   onAuthenticated: (user: CurrentUser) => void;
 }) {
@@ -101,6 +106,7 @@ function LoginScreen({
           Ingresa con tu usuario o correo para continuar al espacio de trabajo.
         </Text>
         <View style={styles.formCard}>
+          {notice ? <Text style={styles.notice}>{notice}</Text> : null}
           <Text style={styles.label}>Usuario o correo</Text>
           <TextInput
             autoCapitalize="none"
@@ -135,6 +141,99 @@ function LoginScreen({
         </View>
         <Text style={styles.disclaimer}>
           Tus datos viajan por una conexión segura. Nunca compartas tu contraseña.
+        </Text>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function ChangePasswordScreen({ api, onComplete }: { api: MobileApi; onComplete: () => void }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (newPassword.length < 12) {
+      setMessage("La nueva contraseña debe tener al menos 12 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmation) {
+      setMessage("La confirmación no coincide con la nueva contraseña.");
+      return;
+    }
+    setBusy(true);
+    setMessage("");
+    try {
+      await api.changePassword(currentPassword, newPassword);
+      onComplete();
+    } catch (error) {
+      setMessage(errorText(error, "No fue posible actualizar la contraseña."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <StatusBar style="light" />
+      <ScrollView contentContainerStyle={styles.loginScroll} keyboardShouldPersistTaps="handled">
+        <View style={styles.brandMark}>
+          <Text style={styles.brandMarkText}>c</Text>
+        </View>
+        <Text style={styles.eyebrow}>PRIMER INGRESO</Text>
+        <Text style={styles.heroTitle}>Protege tu cuenta antes de continuar.</Text>
+        <Text style={styles.body}>
+          La contraseña inicial es temporal. Actualízala para habilitar tu operación en cobranzapp.
+        </Text>
+        <View style={styles.formCard}>
+          <Text style={styles.label}>Contraseña actual</Text>
+          <TextInput
+            autoCapitalize="none"
+            autoComplete="current-password"
+            onChangeText={setCurrentPassword}
+            placeholder="Contraseña temporal"
+            placeholderTextColor="#8b948e"
+            secureTextEntry
+            style={styles.input}
+            value={currentPassword}
+          />
+          <Text style={styles.label}>Nueva contraseña</Text>
+          <TextInput
+            autoCapitalize="none"
+            autoComplete="new-password"
+            onChangeText={setNewPassword}
+            placeholder="Mínimo 12 caracteres"
+            placeholderTextColor="#8b948e"
+            secureTextEntry
+            style={styles.input}
+            value={newPassword}
+          />
+          <Text style={styles.label}>Confirma la nueva contraseña</Text>
+          <TextInput
+            autoCapitalize="none"
+            autoComplete="new-password"
+            onChangeText={setConfirmation}
+            placeholder="Repite la nueva contraseña"
+            placeholderTextColor="#8b948e"
+            secureTextEntry
+            style={styles.input}
+            value={confirmation}
+          />
+          {message ? (
+            <Text accessibilityRole="alert" style={styles.error}>
+              {message}
+            </Text>
+          ) : null}
+          <PrimaryButton
+            disabled={busy || !currentPassword || !newPassword || !confirmation}
+            label={busy ? "Actualizando…" : "Actualizar contraseña"}
+            onPress={() => void submit()}
+          />
+        </View>
+        <Text style={styles.disclaimer}>
+          Después de actualizarla tendrás que iniciar sesión de nuevo.
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -385,7 +484,7 @@ function AuthenticatedHome({
                 >
                   <View>
                     <Text style={styles.listTitle}>{membership.tenantName}</Text>
-                    <Text style={styles.muted}>{membership.role}</Text>
+                    <Text style={styles.muted}>{roleLabels[membership.role]}</Text>
                   </View>
                   <Text style={styles.radio}>{membership.tenantId === tenantId ? "●" : "○"}</Text>
                 </Pressable>
@@ -436,6 +535,7 @@ export default function App() {
     return (
       <LoginScreen
         api={api}
+        notice={screen.notice}
         onAuthenticated={(user) => setScreen({ kind: "authenticated", user })}
         onMfaRequired={() => setScreen({ kind: "mfa" })}
       />
@@ -444,6 +544,19 @@ export default function App() {
   if (screen.kind === "mfa") {
     return (
       <MfaScreen api={api} onAuthenticated={(user) => setScreen({ kind: "authenticated", user })} />
+    );
+  }
+  if (screen.kind === "authenticated" && screen.user.mustChangePassword) {
+    return (
+      <ChangePasswordScreen
+        api={api}
+        onComplete={() =>
+          setScreen({
+            kind: "signed_out",
+            notice: "Contraseña actualizada. Inicia sesión nuevamente.",
+          })
+        }
+      />
     );
   }
   return (
@@ -528,6 +641,14 @@ const styles = StyleSheet.create({
   primaryButtonDim: { opacity: 0.45 },
   primaryButtonText: { color: "#151817", fontWeight: "800", fontSize: 16 },
   error: { color: "#ff9d93", fontSize: 14, lineHeight: 20 },
+  notice: {
+    color: "#cde8d4",
+    fontSize: 14,
+    lineHeight: 20,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "#1c2a22",
+  },
   disclaimer: {
     color: "#77817a",
     textAlign: "center",

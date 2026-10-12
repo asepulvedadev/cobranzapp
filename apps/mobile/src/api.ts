@@ -2,6 +2,7 @@ import {
   authenticatedResponseSchema,
   type CurrentUser,
   currentUserSchema,
+  messageResponseSchema,
   mfaLoginRequiredResponseSchema,
   type PlatformOverview,
   type PlatformSystemStatus,
@@ -112,6 +113,22 @@ export class MobileApi {
     this.challengeCookie = null;
     await SecureStore.setItemAsync(sessionStorageKey, this.sessionCookie);
     return body.user;
+  }
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    const response = await this.request("/v1/auth/change-password", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible actualizar la contraseña."),
+        response.status,
+      );
+    }
+    messageResponseSchema.parse(await response.json());
+    await this.clearSession();
   }
 
   async me() {
