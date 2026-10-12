@@ -447,6 +447,12 @@ describe("health endpoints", () => {
     const response = await app.inject({ method: "GET", url: "/health" });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ service: "api", status: "ok", version: "test" });
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    expect(response.headers["x-frame-options"]).toBe("DENY");
+    expect(response.headers["referrer-policy"]).toBe("no-referrer");
+    expect(response.headers["strict-transport-security"]).toBe(
+      "max-age=31536000; includeSubDomains",
+    );
   });
 
   it("reports readiness failure when PostgreSQL is unavailable", async () => {

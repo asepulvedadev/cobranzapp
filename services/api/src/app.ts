@@ -165,6 +165,17 @@ export function buildApp(dependencies: AppDependencies) {
   const sessionMaxAgeSeconds = (dependencies.sessionTtlHours ?? 8) * 60 * 60;
   const reauthenticationWindowMinutes = 10;
 
+  app.addHook("onSend", async (_request, reply, payload) => {
+    reply.header("x-content-type-options", "nosniff");
+    reply.header("x-frame-options", "DENY");
+    reply.header("referrer-policy", "no-referrer");
+    reply.header("permissions-policy", "camera=(), microphone=(), geolocation=()");
+    if (secureCookies) {
+      reply.header("strict-transport-security", "max-age=31536000; includeSubDomains");
+    }
+    return payload;
+  });
+
   function requireAllowedOrigin(request: FastifyRequest, reply: FastifyReply) {
     const origin = request.headers.origin;
     if (!origin || !allowedOrigins.has(origin)) {
