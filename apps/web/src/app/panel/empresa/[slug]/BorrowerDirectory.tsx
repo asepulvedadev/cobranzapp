@@ -24,10 +24,14 @@ export function BorrowerDirectory({
   tenantId,
   directory,
   canReview,
+  search,
+  tenantSlug,
 }: {
   tenantId: string;
   directory: BorrowerDirectoryData;
   canReview: boolean;
+  search: string;
+  tenantSlug: string;
 }) {
   const router = useRouter();
   const sensitiveFetch = useSensitiveFetch();
@@ -105,6 +109,22 @@ export function BorrowerDirectory({
           La búsqueda muestra el nombre y los últimos cuatro dígitos. Nunca se expone el número
           completo.
         </p>
+        <form className="tenant-directory-filters" action={`/panel/empresa/${tenantSlug}#clientes`}>
+          <label>
+            <span>Buscar cliente</span>
+            <input
+              defaultValue={search}
+              maxLength={80}
+              name="cliente"
+              placeholder="Nombre o últimos dígitos"
+              type="search"
+            />
+          </label>
+          <div className="tenant-directory-filter-actions">
+            <button type="submit">Buscar</button>
+            {search ? <a href={`/panel/empresa/${tenantSlug}#clientes`}>Limpiar</a> : null}
+          </div>
+        </form>
         {directory.borrowers.length ? (
           <div className="tenant-table-wrap">
             <table className="tenant-table borrower-table">
@@ -194,6 +214,37 @@ export function BorrowerDirectory({
             <p>Registra el primer cliente con sus datos de contacto y consentimiento.</p>
           </div>
         )}
+        {directory.pagination.totalPages > 1 ? (
+          <nav className="tenant-directory-pagination" aria-label="Páginas de clientes">
+            {directory.pagination.page > 1 ? (
+              <a
+                href={`/panel/empresa/${tenantSlug}?${new URLSearchParams({
+                  ...(search ? { cliente: search } : {}),
+                  paginaCliente: String(directory.pagination.page - 1),
+                })}#clientes`}
+              >
+                Anterior
+              </a>
+            ) : (
+              <span aria-disabled="true">Anterior</span>
+            )}
+            <strong>
+              Página {directory.pagination.page} de {directory.pagination.totalPages}
+            </strong>
+            {directory.pagination.page < directory.pagination.totalPages ? (
+              <a
+                href={`/panel/empresa/${tenantSlug}?${new URLSearchParams({
+                  ...(search ? { cliente: search } : {}),
+                  paginaCliente: String(directory.pagination.page + 1),
+                })}#clientes`}
+              >
+                Siguiente
+              </a>
+            ) : (
+              <span aria-disabled="true">Siguiente</span>
+            )}
+          </nav>
+        ) : null}
       </section>
 
       <section className="dashboard-card borrower-create-card">

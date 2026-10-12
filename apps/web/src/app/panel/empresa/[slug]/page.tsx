@@ -60,8 +60,25 @@ const memberStatusClasses = {
   revoked: "archived",
 };
 
-export default async function TenantDashboard({ params }: { params: Promise<{ slug: string }> }) {
+function firstQueryValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function TenantDashboard({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ cliente?: string | string[]; paginaCliente?: string | string[] }>;
+}) {
   const { slug } = await params;
+  const query = await searchParams;
+  const borrowerSearch = (firstQueryValue(query.cliente) ?? "").trim().slice(0, 80);
+  const requestedBorrowerPage = Number(firstQueryValue(query.paginaCliente));
+  const borrowerPage =
+    Number.isInteger(requestedBorrowerPage) && requestedBorrowerPage > 0
+      ? requestedBorrowerPage
+      : 1;
   const userResponse = await serverApi("/v1/auth/me");
   if (!userResponse.ok) redirect("/ingresar");
   const { user } = (await userResponse.json()) as { user: CurrentUser };
@@ -87,8 +104,10 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
     ({ profile: memberProfile } = (await profileResponse.json()) as {
       profile: TenantMemberProfile;
     });
+    const borrowerQuery = new URLSearchParams({ page: String(borrowerPage), pageSize: "20" });
+    if (borrowerSearch) borrowerQuery.set("q", borrowerSearch);
     const borrowersResponse = await serverApi(
-      `/v1/tenants/${membership.tenantId}/borrowers?page=1&pageSize=20`,
+      `/v1/tenants/${membership.tenantId}/borrowers?${borrowerQuery}`,
     );
     if (borrowersResponse.ok) {
       borrowerDirectory = (await borrowersResponse.json()) as BorrowerDirectory;
@@ -382,6 +401,8 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
           <BorrowerDirectoryView
             canReview={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
             directory={borrowerDirectory}
+            search={borrowerSearch}
+            tenantSlug={slug}
             tenantId={overview.tenant.id}
           />
         </section>
