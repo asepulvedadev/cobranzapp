@@ -8,6 +8,9 @@ describe("OpenAPI contract", () => {
     expect(document.openapi).toBe("3.1.0");
     expect(document.info.version).toBe("test-sha");
     expect(document.paths["/v1/auth/login"].post.responses["202"]).toBeDefined();
+    expect(document.paths["/v1/tenants/{tenantId}/overview"].get.operationId).toBe(
+      "getTenantOverview",
+    );
     expect(document.paths["/v1/platform/overview"].get.operationId).toBe("getPlatformOverview");
     expect(document.paths["/v1/platform/system-status"].get.operationId).toBe(
       "getPlatformSystemStatus",

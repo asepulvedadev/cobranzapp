@@ -38,6 +38,7 @@ import {
   securityActivityResponseSchema,
   securityActivitySchema,
   serviceStatusSchema,
+  tenantOverviewSchema,
 } from "./index.js";
 
 type OpenApiSchema = Record<string, unknown>;
@@ -89,6 +90,7 @@ const documentedSchemas = {
   PlatformUserDirectoryQuery: platformUserDirectoryQuerySchema,
   PlatformUserStatusUpdateRequest: platformUserStatusUpdateRequestSchema,
   PlatformUserStatusUpdateResponse: platformUserStatusUpdateResponseSchema,
+  TenantOverview: tenantOverviewSchema,
   ReauthenticationRequest: reauthenticationRequestSchema,
   ReauthenticationResponse: reauthenticationResponseSchema,
   SecurityActivity: securityActivitySchema,
@@ -116,6 +118,7 @@ export function createOpenApiDocument(version: string) {
       { name: "Estado", description: "Salud y disponibilidad del servicio." },
       { name: "Autenticación", description: "Sesiones web, MFA y seguridad de la cuenta." },
       { name: "Plataforma", description: "Operaciones exclusivas del desarrollador." },
+      { name: "Empresas", description: "Lecturas autenticadas del espacio empresarial." },
     ],
     paths: {
       "/health": {
@@ -308,6 +311,30 @@ export function createOpenApiDocument(version: string) {
           responses: {
             "204": response("Sesión cerrada."),
             "403": errorResponses["403"],
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/overview": {
+        get: {
+          tags: ["Empresas"],
+          operationId: "getTenantOverview",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": response(
+              "Espacio empresarial visible para el rol actual.",
+              schemaReference("TenantOverview"),
+            ),
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("La empresa no está disponible.", schemaReference("ApiError")),
           },
         },
       },

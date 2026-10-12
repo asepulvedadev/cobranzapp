@@ -7,6 +7,7 @@ import {
   platformTenantDirectoryQuerySchema,
   platformTenantStatusUpdateRequestSchema,
   platformUserDirectoryQuerySchema,
+  tenantOverviewSchema,
 } from "./index.js";
 
 describe("shared API contracts", () => {
@@ -90,5 +91,44 @@ describe("shared API contracts", () => {
     expect(platformTenantStatusUpdateRequestSchema.safeParse({ status: "draft" }).success).toBe(
       false,
     );
+  });
+
+  it("keeps tenant overview scope and branding fields explicit", () => {
+    const result = tenantOverviewSchema.safeParse({
+      tenant: {
+        id: "03d87dd0-dfc6-4948-bef1-a04f06b61ca6",
+        slug: "empresa-ejemplo",
+        displayName: "Empresa Ejemplo",
+        status: "active",
+        locale: "es-CO",
+        timezone: "America/Bogota",
+        currency: "COP",
+        membershipPlan: "pro",
+      },
+      actorRole: "owner",
+      metrics: {
+        members: 1,
+        branches: 1,
+        teams: 1,
+        pendingInvitations: 0,
+        activeEmployeeSeats: 0,
+      },
+      membershipEntitlement: null,
+      settings: {
+        primaryColor: "#111111",
+        accentColor: "#FBBF24",
+        contactEmail: "operaciones@example.com",
+        contactPhone: null,
+        address: null,
+        version: 1,
+      },
+      settingsHistory: [],
+      members: [],
+      branches: [],
+      teams: [],
+      pendingInvitations: [],
+      activity: [],
+    });
+    expect(result.success).toBe(true);
   });
 });

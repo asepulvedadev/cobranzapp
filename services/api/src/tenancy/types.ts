@@ -1,3 +1,4 @@
+import type { TenantOverview as SharedTenantOverview } from "@cobranzapp/contracts";
 import type { PlatformRole, TenantRole } from "../auth/types.js";
 
 export type TenantActor = {
@@ -16,87 +17,7 @@ export type InvitationPreview = {
   accountExists: boolean;
 };
 
-export type TenantOverview = {
-  tenant: {
-    id: string;
-    slug: string;
-    displayName: string;
-    status: "draft" | "active" | "suspended" | "archived";
-    locale: string;
-    timezone: string;
-    currency: string;
-    membershipPlan: "pro" | "ultra" | null;
-  };
-  actorRole: TenantRole | "support";
-  metrics: {
-    members: number;
-    branches: number;
-    teams: number;
-    pendingInvitations: number;
-    activeEmployeeSeats: number;
-  };
-  membershipEntitlement: {
-    catalogVersion: number;
-    version: number;
-    includedEmployeeSeats: number;
-    additionalEmployeeSeats: number;
-    employeeSeatLimit: number;
-    availableEmployeeSeats: number;
-    clientLimit: number;
-    prioritySupport: boolean;
-  } | null;
-  settings: {
-    primaryColor: string;
-    accentColor: string;
-    contactEmail: string | null;
-    contactPhone: string | null;
-    address: string | null;
-    version: number;
-  };
-  settingsHistory: Array<{
-    version: number;
-    primaryColor: string;
-    accentColor: string;
-    contactEmail: string | null;
-    changedByDisplayName: string;
-    changedAt: string;
-  }>;
-  members: Array<{
-    userId: string;
-    displayName: string;
-    email: string;
-    username: string;
-    role: TenantRole;
-    status: "invited" | "active" | "suspended" | "revoked";
-  }>;
-  branches: Array<{
-    id: string;
-    code: string;
-    displayName: string;
-    status: "active" | "inactive";
-  }>;
-  teams: Array<{
-    id: string;
-    branchId: string | null;
-    branchName: string | null;
-    displayName: string;
-    status: "active" | "inactive";
-    memberIds: string[];
-  }>;
-  pendingInvitations: Array<{
-    id: string;
-    email: string;
-    role: TenantRole;
-    expiresAt: string;
-  }>;
-  activity: Array<{
-    id: string;
-    action: string;
-    actorDisplayName: string | null;
-    actorUsername: string | null;
-    happenedAt: string;
-  }>;
-};
+export type TenantOverview = SharedTenantOverview;
 
 export type ManagedMember = TenantOverview["members"][number];
 

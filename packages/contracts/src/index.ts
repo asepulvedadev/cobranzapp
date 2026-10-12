@@ -284,6 +284,100 @@ export const platformSupportAccessResponseSchema = z.object({
   access: z.array(supportAccessRecordSchema),
 });
 
+export const tenantSettingsSchema = z.object({
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  contactEmail: z.email().nullable(),
+  contactPhone: z.string().min(1).max(30).nullable(),
+  address: z.string().min(1).max(240).nullable(),
+  version: z.number().int().positive(),
+});
+
+export const tenantMemberStatusSchema = z.enum(["invited", "active", "suspended", "revoked"]);
+export const organizationStatusSchema = z.enum(["active", "inactive"]);
+
+export const tenantMemberSchema = z.object({
+  userId: z.uuid(),
+  displayName: z.string().min(1),
+  email: z.email(),
+  username: z.string().min(1),
+  role: tenantRoleSchema,
+  status: tenantMemberStatusSchema,
+});
+
+export const tenantBranchSchema = z.object({
+  id: z.uuid(),
+  code: z.string().min(1),
+  displayName: z.string().min(1),
+  status: organizationStatusSchema,
+});
+
+export const tenantTeamSchema = z.object({
+  id: z.uuid(),
+  branchId: z.uuid().nullable(),
+  branchName: z.string().nullable(),
+  displayName: z.string().min(1),
+  status: organizationStatusSchema,
+  memberIds: z.array(z.uuid()),
+});
+
+export const tenantSettingsHistoryEntrySchema = z.object({
+  version: z.number().int().positive(),
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  contactEmail: z.email().nullable(),
+  changedByDisplayName: z.string().min(1),
+  changedAt: z.iso.datetime(),
+});
+
+export const tenantInvitationSchema = z.object({
+  id: z.uuid(),
+  email: z.email(),
+  role: tenantRoleSchema,
+  expiresAt: z.iso.datetime(),
+});
+
+export const tenantAuditActivitySchema = z.object({
+  id: z.uuid(),
+  action: z.string().min(1),
+  actorDisplayName: z.string().nullable(),
+  actorUsername: z.string().nullable(),
+  happenedAt: z.iso.datetime(),
+});
+
+export const tenantOverviewSchema = z.object({
+  tenant: z.object({
+    id: z.uuid(),
+    slug: z.string().min(1),
+    displayName: z.string().min(1),
+    status: platformTenantStatusSchema,
+    locale: z.string().min(2),
+    timezone: z.string().min(1),
+    currency: z.string().length(3),
+    membershipPlan: membershipPlanSchema.nullable(),
+  }),
+  actorRole: z.union([tenantRoleSchema, z.literal("support")]),
+  metrics: z.object({
+    members: z.number().int().nonnegative(),
+    branches: z.number().int().nonnegative(),
+    teams: z.number().int().nonnegative(),
+    pendingInvitations: z.number().int().nonnegative(),
+    activeEmployeeSeats: z.number().int().nonnegative(),
+  }),
+  membershipEntitlement: membershipEntitlementSchema
+    .extend({ availableEmployeeSeats: z.number().int().nonnegative() })
+    .nullable(),
+  settings: tenantSettingsSchema,
+  settingsHistory: z.array(tenantSettingsHistoryEntrySchema),
+  members: z.array(tenantMemberSchema),
+  branches: z.array(tenantBranchSchema),
+  teams: z.array(tenantTeamSchema),
+  pendingInvitations: z.array(tenantInvitationSchema),
+  activity: z.array(tenantAuditActivitySchema),
+});
+
+export const tenantOverviewResponseSchema = z.object({ overview: tenantOverviewSchema });
+
 export const mfaStatusSchema = z.object({
   enabled: z.boolean(),
   setupPending: z.boolean(),
@@ -371,6 +465,7 @@ export type PlatformUserStatusUpdateRequest = z.infer<typeof platformUserStatusU
 export type PlatformSystemStatus = z.infer<typeof platformSystemStatusSchema>;
 export type SupportAccessStatus = z.infer<typeof supportAccessStatusSchema>;
 export type SupportAccessRecord = z.infer<typeof supportAccessRecordSchema>;
+export type TenantOverview = z.infer<typeof tenantOverviewSchema>;
 export type MfaStatus = z.infer<typeof mfaStatusSchema>;
 export type ReauthenticationRequest = z.infer<typeof reauthenticationRequestSchema>;
 export type ChangePasswordRequest = z.infer<typeof changePasswordRequestSchema>;
