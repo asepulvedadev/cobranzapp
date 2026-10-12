@@ -1,0 +1,4 @@
+interface:
+  display_name: "cobranzapp Resend"
+  short_description: "Manage cobranzapp contact email safely"
+  default_prompt: "Use $cobranzapp-resend to verify and operate contact email for cobranzapp without exposing credentials."
