@@ -5,6 +5,7 @@ export type CurrentUser = {
   displayName: string;
   platformRole: "developer" | null;
   mustChangePassword: boolean;
+  mfaEnabled: boolean;
   memberships: Array<{
     tenantId: string;
     tenantName: string;

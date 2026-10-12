@@ -1,5 +1,6 @@
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { generateMfaToken } from "../auth/mfa.js";
 import { hashPassword } from "../auth/password.js";
 import { createPostgresAuthService } from "../auth/postgres-auth-service.js";
 import { createPostgresPlatformService } from "../platform/postgres-platform-service.js";
@@ -83,7 +84,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
   });
 
   it("authenticates with username and email and isolates tenant rows", async () => {
-    const auth = createPostgresAuthService(runtimePool, 8);
+    const auth = createPostgresAuthService(runtimePool, 8, Buffer.alloc(32, 7));
     const byUsername = await auth.login(`developer-${suffix}`, password, {
       requestId: `login-username-${suffix}`,
     });
@@ -161,11 +162,53 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     await expect(auth.authenticate(byEmail?.token ?? "")).resolves.toMatchObject({
       id: developerId,
     });
-
+    const enrollment = await auth.beginMfaEnrollment(developerId, `mfa-start-${suffix}`);
+    expect(enrollment).toMatchObject({
+      status: "created",
+      secret: expect.any(String),
+      uri: expect.stringContaining("otpauth://totp/"),
+    });
+    if (enrollment.status !== "created") throw new Error("MFA enrollment was not created");
+    const confirmation = await auth.confirmMfaEnrollment(
+      developerId,
+      byEmail?.token ?? "",
+      generateMfaToken(enrollment.secret),
+      `mfa-enable-${suffix}`,
+    );
+    expect(confirmation).toMatchObject({
+      status: "enabled",
+      recoveryCodes: expect.arrayContaining([expect.stringMatching(/^[A-F0-9-]+$/)]),
+    });
+    if (confirmation.status !== "enabled") throw new Error("MFA enrollment was not confirmed");
+    await expect(auth.getMfaStatus(developerId)).resolves.toMatchObject({
+      enabled: true,
+      setupPending: false,
+    });
+    await expect(auth.authenticate(byEmail?.token ?? "")).resolves.toMatchObject({
+      id: developerId,
+      mfaEnabled: true,
+    });
+    const recoveryCodes = await ownerPool.query<{ count: string }>(
+      "SELECT count(*) AS count FROM auth_mfa_recovery_codes WHERE user_id = $1 AND used_at IS NULL",
+      [developerId],
+    );
+    expect(Number(recoveryCodes.rows[0]?.count)).toBe(8);
+    const secondEnrollment = await auth.beginMfaEnrollment(
+      developerId,
+      `mfa-already-enabled-${suffix}`,
+    );
+    expect(secondEnrollment).toEqual({ status: "already_enabled" });
+    const enabledResult = await auth.confirmMfaEnrollment(
+      developerId,
+      byEmail?.token ?? "",
+      "000000",
+      `mfa-already-confirmed-${suffix}`,
+    );
+    expect(enabledResult).toEqual({ status: "already_enabled" });
     const platform = createPostgresPlatformService(runtimePool);
     const supportAccess = createPostgresSupportAccessService(runtimePool);
     await expect(platform.systemStatus(developerId)).resolves.toMatchObject({
-      schemaVersion: "0013_membership_entitlements.sql",
+      schemaVersion: "0014_totp_mfa_credentials.sql",
       jobs: {
         status: expect.stringMatching(/^(operational|attention)$/),
         due: expect.any(Number),

@@ -8,6 +8,7 @@ export type AuthenticatedUser = {
   displayName: string;
   platformRole: PlatformRole;
   mustChangePassword: boolean;
+  mfaEnabled: boolean;
   memberships: Array<{
     tenantId: string;
     tenantName: string;
@@ -36,6 +37,24 @@ export type SecurityActivity = {
   action: string;
   happenedAt: string;
 };
+
+export type MfaStatus = {
+  enabled: boolean;
+  setupPending: boolean;
+  setupExpiresAt: string | null;
+};
+
+export type MfaEnrollmentResult =
+  | { status: "created"; secret: string; uri: string; expiresAt: string }
+  | { status: "already_enabled" }
+  | { status: "not_found" };
+
+export type MfaConfirmationResult =
+  | { status: "enabled"; recoveryCodes: string[]; revokedSessions: number }
+  | { status: "already_enabled" }
+  | { status: "invalid" }
+  | { status: "expired" }
+  | { status: "not_found" };
 
 export interface AuthService {
   login(
@@ -67,4 +86,12 @@ export interface AuthService {
     requestId: string,
   ): Promise<"revoked" | "current" | "not_found">;
   revokeOtherSessions(userId: string, currentToken: string, requestId: string): Promise<number>;
+  getMfaStatus(userId: string): Promise<MfaStatus>;
+  beginMfaEnrollment(userId: string, requestId: string): Promise<MfaEnrollmentResult>;
+  confirmMfaEnrollment(
+    userId: string,
+    currentToken: string,
+    code: string,
+    requestId: string,
+  ): Promise<MfaConfirmationResult>;
 }

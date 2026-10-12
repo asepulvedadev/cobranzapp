@@ -12,6 +12,7 @@ const developer: AuthenticatedUser = {
   displayName: "Desarrollador",
   platformRole: "developer",
   mustChangePassword: true,
+  mfaEnabled: false,
   memberships: [],
 };
 
@@ -23,6 +24,7 @@ const tenantOwner: AuthenticatedUser = {
   displayName: "Propietario",
   platformRole: null,
   mustChangePassword: false,
+  mfaEnabled: false,
   memberships: [
     {
       tenantId: "5c58269f-ce16-4250-82e2-c0c16621b0fb",
@@ -87,6 +89,22 @@ function dependencies(overrides?: {
     ]),
     revokeSession: vi.fn(async () => "revoked"),
     revokeOtherSessions: vi.fn(async () => 2),
+    getMfaStatus: vi.fn(async () => ({
+      enabled: false,
+      setupPending: false,
+      setupExpiresAt: null,
+    })),
+    beginMfaEnrollment: vi.fn(async () => ({
+      status: "created",
+      secret: "JBSWY3DPEHPK3PXP",
+      uri: "otpauth://totp/cobranzapp:test",
+      expiresAt: "2026-10-11T00:10:00.000Z",
+    })),
+    confirmMfaEnrollment: vi.fn(async () => ({
+      status: "enabled",
+      recoveryCodes: ["ABCDE-ABCDE-ABCDE-ABCDE"],
+      revokedSessions: 1,
+    })),
     ...overrides?.authService,
   };
   const platformService: PlatformService = {

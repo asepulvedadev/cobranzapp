@@ -1,5 +1,14 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
+import {
+  createMfaSecret,
+  createMfaUri,
+  createRecoveryCodes,
+  decryptMfaSecret,
+  encryptMfaSecret,
+  hashRecoveryCode,
+  verifyMfaToken,
+} from "./mfa.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import type {
   AccountSession,
@@ -17,6 +26,7 @@ type UserRow = {
   password_hash: string;
   platform_role: "developer" | null;
   must_change_password: boolean;
+  mfa_enabled_at: Date | null;
 };
 
 function hashToken(token: string) {
@@ -29,7 +39,8 @@ function hashIp(ipAddress?: string) {
 
 async function loadUser(client: PoolClient, userId: string): Promise<AuthenticatedUser | null> {
   const userResult = await client.query<UserRow>(
-    `SELECT id, username, email, display_name, password_hash, platform_role, must_change_password
+    `SELECT id, username, email, display_name, password_hash, platform_role, must_change_password,
+            mfa_enabled_at
        FROM users
       WHERE id = $1 AND status = 'active'`,
     [userId],
@@ -62,6 +73,7 @@ async function loadUser(client: PoolClient, userId: string): Promise<Authenticat
     displayName: row.display_name,
     platformRole: row.platform_role,
     mustChangePassword: row.must_change_password,
+    mfaEnabled: row.mfa_enabled_at !== null,
     memberships: membershipResult.rows.map((membership) => ({
       tenantId: membership.tenant_id,
       tenantName: membership.display_name,
@@ -71,14 +83,26 @@ async function loadUser(client: PoolClient, userId: string): Promise<Authenticat
   };
 }
 
-export function createPostgresAuthService(pool: Pool, sessionTtlHours: number): AuthService {
+type MfaCredentialRow = {
+  mfa_secret_encrypted: string | null;
+  mfa_enabled_at: Date | null;
+  mfa_setup_expires_at: Date | null;
+  mfa_last_used_counter: string | null;
+};
+
+export function createPostgresAuthService(
+  pool: Pool,
+  sessionTtlHours: number,
+  mfaEncryptionKey: Buffer,
+): AuthService {
   return {
     async login(identifier, password, metadata) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
         const result = await client.query<UserRow>(
-          `SELECT id, username, email, display_name, password_hash, platform_role, must_change_password
+          `SELECT id, username, email, display_name, password_hash, platform_role, must_change_password,
+                  mfa_enabled_at
              FROM users
             WHERE status = 'active'
               AND (username = lower($1) OR email = lower($1))
@@ -426,6 +450,170 @@ export function createPostgresAuthService(pool: Pool, sessionTtlHours: number): 
         }
         await client.query("COMMIT");
         return result.rowCount ?? 0;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async getMfaStatus(userId) {
+      const result = await pool.query<{
+        mfa_enabled_at: Date | null;
+        mfa_setup_expires_at: Date | null;
+      }>(
+        `SELECT mfa_enabled_at, mfa_setup_expires_at
+           FROM users
+          WHERE id = $1 AND status = 'active'`,
+        [userId],
+      );
+      const user = result.rows[0];
+      return {
+        enabled: user?.mfa_enabled_at !== null && user?.mfa_enabled_at !== undefined,
+        setupPending:
+          user?.mfa_enabled_at === null &&
+          user.mfa_setup_expires_at !== null &&
+          user.mfa_setup_expires_at > new Date(),
+        setupExpiresAt: user?.mfa_setup_expires_at?.toISOString() ?? null,
+      };
+    },
+
+    async beginMfaEnrollment(userId, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const current = await client.query<{
+          email: string;
+          mfa_enabled_at: Date | null;
+        }>(
+          `SELECT email, mfa_enabled_at
+             FROM users
+            WHERE id = $1 AND status = 'active'
+            FOR UPDATE`,
+          [userId],
+        );
+        const user = current.rows[0];
+        if (!user) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } as const;
+        }
+        if (user.mfa_enabled_at) {
+          await client.query("ROLLBACK");
+          return { status: "already_enabled" } as const;
+        }
+        const secret = createMfaSecret();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+        await client.query("SELECT set_config('app.user_id', $1, true)", [userId]);
+        await client.query(
+          `UPDATE users
+              SET mfa_secret_encrypted = $2,
+                  mfa_setup_expires_at = $3,
+                  mfa_last_used_counter = NULL,
+                  updated_at = now()
+            WHERE id = $1`,
+          [userId, encryptMfaSecret(secret, mfaEncryptionKey), expiresAt],
+        );
+        await client.query("DELETE FROM auth_mfa_recovery_codes WHERE user_id = $1", [userId]);
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id)
+           VALUES (NULL, $1, 'auth.mfa_setup_started', 'user', $1, $2)`,
+          [userId, requestId],
+        );
+        await client.query("COMMIT");
+        return {
+          status: "created",
+          secret,
+          uri: createMfaUri(user.email, secret),
+          expiresAt: expiresAt.toISOString(),
+        } as const;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async confirmMfaEnrollment(userId, currentToken, code, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const current = await client.query<MfaCredentialRow>(
+          `SELECT mfa_secret_encrypted, mfa_enabled_at, mfa_setup_expires_at,
+                  mfa_last_used_counter
+             FROM users
+            WHERE id = $1 AND status = 'active'
+            FOR UPDATE`,
+          [userId],
+        );
+        const credential = current.rows[0];
+        if (!credential) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } as const;
+        }
+        if (credential.mfa_enabled_at) {
+          await client.query("ROLLBACK");
+          return { status: "already_enabled" } as const;
+        }
+        if (
+          !credential.mfa_secret_encrypted ||
+          !credential.mfa_setup_expires_at ||
+          credential.mfa_setup_expires_at <= new Date()
+        ) {
+          await client.query("ROLLBACK");
+          return { status: "expired" } as const;
+        }
+        const counter = verifyMfaToken(
+          decryptMfaSecret(credential.mfa_secret_encrypted, mfaEncryptionKey),
+          code,
+          null,
+        );
+        if (counter === null) {
+          await client.query("ROLLBACK");
+          return { status: "invalid" } as const;
+        }
+        const recoveryCodes = createRecoveryCodes();
+        await client.query("SELECT set_config('app.user_id', $1, true)", [userId]);
+        await client.query(
+          `UPDATE users
+              SET mfa_enabled_at = now(),
+                  mfa_setup_expires_at = NULL,
+                  mfa_last_used_counter = $2,
+                  updated_at = now()
+            WHERE id = $1`,
+          [userId, counter],
+        );
+        for (const recoveryCode of recoveryCodes) {
+          await client.query(
+            `INSERT INTO auth_mfa_recovery_codes (user_id, code_hash)
+             VALUES ($1, $2)`,
+            [userId, hashRecoveryCode(recoveryCode)],
+          );
+        }
+        const revoked = await client.query(
+          `UPDATE auth_sessions
+              SET revoked_at = now()
+            WHERE user_id = $1 AND token_hash <> $2
+              AND revoked_at IS NULL AND expires_at > now()`,
+          [userId, hashToken(currentToken)],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES (
+             NULL, $1, 'auth.mfa_enabled', 'user', $1, $2,
+             jsonb_build_object('revokedSessions', $3::integer)
+           )`,
+          [userId, requestId, revoked.rowCount ?? 0],
+        );
+        await client.query("COMMIT");
+        return {
+          status: "enabled",
+          recoveryCodes,
+          revokedSessions: revoked.rowCount ?? 0,
+        } as const;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

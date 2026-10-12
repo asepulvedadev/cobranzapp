@@ -1,5 +1,6 @@
 import pg from "pg";
 import { buildApp } from "./app.js";
+import { parseMfaEncryptionKey } from "./auth/mfa.js";
 import { createPostgresAuthService } from "./auth/postgres-auth-service.js";
 import { loadConfig, parseAllowedOrigins } from "./config.js";
 import { createPostgresPlatformService } from "./platform/postgres-platform-service.js";
@@ -15,7 +16,11 @@ const pool = new pg.Pool({
 
 const app = buildApp({
   allowedWebOrigins: parseAllowedOrigins(config.ALLOWED_WEB_ORIGINS),
-  authService: createPostgresAuthService(pool, config.SESSION_TTL_HOURS),
+  authService: createPostgresAuthService(
+    pool,
+    config.SESSION_TTL_HOURS,
+    parseMfaEncryptionKey(config.MFA_ENCRYPTION_KEY),
+  ),
   checkDatabase: async () => {
     await pool.query("SELECT 1");
   },
