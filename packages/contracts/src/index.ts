@@ -613,6 +613,9 @@ export const tenantMemberProfileResponseSchema = z.object({
 
 export const routeStatusSchema = z.enum(["draft", "active", "archived"]);
 export const routeAddressKindSchema = z.enum(["home", "work"]);
+export const routeStatusUpdateRequestSchema = z.object({
+  status: z.enum(["active", "archived"]),
+});
 export const routeCreateRequestSchema = z.object({
   name: z.string().trim().min(2).max(120),
   description: z.string().trim().max(240).nullable(),
@@ -950,6 +953,7 @@ export type TenantMemberEmergencyContact = z.infer<typeof tenantMemberEmergencyC
 export type TenantMemberProfile = z.infer<typeof tenantMemberProfileSchema>;
 export type RouteStatus = z.infer<typeof routeStatusSchema>;
 export type RouteAddressKind = z.infer<typeof routeAddressKindSchema>;
+export type RouteStatusUpdateRequest = z.infer<typeof routeStatusUpdateRequestSchema>;
 export type RouteCreateRequest = z.infer<typeof routeCreateRequestSchema>;
 export type RouteStopCreateRequest = z.infer<typeof routeStopCreateRequestSchema>;
 export type RouteStop = z.infer<typeof routeStopSchema>;

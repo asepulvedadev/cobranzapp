@@ -11,6 +11,7 @@ import {
   platformTenantDirectoryQuerySchema,
   platformTenantStatusUpdateRequestSchema,
   platformUserDirectoryQuerySchema,
+  routeStatusUpdateRequestSchema,
   tenantMemberProfileRequestSchema,
   tenantOverviewSchema,
   tenantSettingsUpdateRequestSchema,
@@ -186,6 +187,16 @@ describe("shared API contracts", () => {
     expect(platformTenantStatusUpdateRequestSchema.safeParse({ status: "draft" }).success).toBe(
       false,
     );
+  });
+
+  it("limits route status changes to activation and archival", () => {
+    expect(routeStatusUpdateRequestSchema.parse({ status: "active" })).toEqual({
+      status: "active",
+    });
+    expect(routeStatusUpdateRequestSchema.parse({ status: "archived" })).toEqual({
+      status: "archived",
+    });
+    expect(routeStatusUpdateRequestSchema.safeParse({ status: "draft" }).success).toBe(false);
   });
 
   it("keeps tenant overview scope and branding fields explicit", () => {

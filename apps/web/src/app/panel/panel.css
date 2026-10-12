@@ -1870,6 +1870,30 @@ html:has(.panel-shell) {
   overflow-wrap: anywhere;
 }
 
+.route-board-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.route-board-actions .button-link {
+  width: fit-content;
+  min-height: 32px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #7a5700;
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+.route-board-actions .button-link:disabled {
+  color: #9ba3a8;
+  cursor: not-allowed;
+}
+
 .route-board-forms {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

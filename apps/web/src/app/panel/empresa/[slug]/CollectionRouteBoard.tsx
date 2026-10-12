@@ -100,6 +100,33 @@ export function CollectionRouteBoard({
     router.refresh();
   }
 
+  async function updateStatus(route: Route, status: "active" | "archived") {
+    setIsBusy(true);
+    setMessage("");
+    setIsError(false);
+    const response = await sensitiveFetch(`/api/v1/tenants/${tenantId}/routes/${route.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status }),
+    }).catch(() => null);
+    if (!response?.ok) {
+      setMessage(
+        await errorMessage(
+          response,
+          status === "active"
+            ? "No fue posible activar la ruta."
+            : "No fue posible archivar la ruta.",
+        ),
+      );
+      setIsError(true);
+      setIsBusy(false);
+      return;
+    }
+    setMessage(status === "active" ? "Ruta activada." : "Ruta archivada.");
+    setIsBusy(false);
+    router.refresh();
+  }
+
   return (
     <section className="dashboard-card route-board-card" id="rutas">
       <div className="card-heading">
@@ -147,6 +174,35 @@ export function CollectionRouteBoard({
               ) : (
                 <p className="structure-empty">Aún no hay clientes en esta ruta.</p>
               )}
+              {canManage ? (
+                <div className="route-board-actions">
+                  {route.status === "draft" ? (
+                    <button
+                      className="button-link"
+                      disabled={isBusy || route.stops.length === 0}
+                      onClick={() => void updateStatus(route, "active")}
+                      title={
+                        route.stops.length === 0
+                          ? "Agrega al menos una parada para activar la ruta."
+                          : undefined
+                      }
+                      type="button"
+                    >
+                      Activar ruta
+                    </button>
+                  ) : null}
+                  {route.status === "active" ? (
+                    <button
+                      className="button-link"
+                      disabled={isBusy}
+                      onClick={() => void updateStatus(route, "archived")}
+                      type="button"
+                    >
+                      Archivar ruta
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </article>
           ))}
         </div>

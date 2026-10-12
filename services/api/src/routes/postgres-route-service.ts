@@ -1,4 +1,9 @@
-import type { Route, RouteCreateRequest, RouteStopCreateRequest } from "@cobranzapp/contracts";
+import type {
+  Route,
+  RouteCreateRequest,
+  RouteStatusUpdateRequest,
+  RouteStopCreateRequest,
+} from "@cobranzapp/contracts";
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
 import type { RouteResult, RouteService, RouteStopResult } from "./types.js";
@@ -207,6 +212,66 @@ export function createPostgresRouteService(pool: Pool): RouteService {
         const updated = await loadRoute(client, tenantId, routeId);
         if (!updated) return { status: "not_found" };
         return { status: "updated", route: updated };
+      });
+    },
+
+    async updateStatus(
+      actor,
+      tenantId,
+      routeId,
+      input: RouteStatusUpdateRequest & { requestId: string },
+    ) {
+      if (!canManage(actor)) return { status: "forbidden" };
+      return withTransaction(actor, tenantId, async (client) => {
+        const currentResult = await client.query<{
+          id: string;
+          status: Route["status"];
+        }>(
+          `SELECT id, status
+             FROM collection_routes
+            WHERE tenant_id = $1 AND id = $2
+            FOR UPDATE`,
+          [tenantId, routeId],
+        );
+        const current = currentResult.rows[0];
+        if (!current) return { status: "not_found" };
+
+        if (input.status === "active" && current.status === "draft") {
+          const countResult = await client.query<{ count: string }>(
+            `SELECT count(*) AS count
+               FROM collection_route_stops
+              WHERE tenant_id = $1 AND route_id = $2`,
+            [tenantId, routeId],
+          );
+          if (Number(countResult.rows[0]?.count ?? 0) === 0) {
+            return { status: "invalid_transition", reason: "empty_route" };
+          }
+        }
+
+        const transitionAllowed =
+          current.status === input.status ||
+          (current.status === "draft" && input.status === "active") ||
+          (current.status === "active" && input.status === "archived");
+        if (!transitionAllowed) {
+          return { status: "invalid_transition", reason: "invalid_transition" };
+        }
+        if (current.status !== input.status) {
+          await client.query(
+            `UPDATE collection_routes
+                SET status = $3, updated_at = now()
+              WHERE tenant_id = $1 AND id = $2`,
+            [tenantId, routeId, input.status],
+          );
+          await client.query(
+            `INSERT INTO audit_events (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+             VALUES ($1, $2, 'collection_route.status_changed', 'collection_route', $3, $4,
+                     jsonb_build_object('from', $5::text, 'to', $6::text))`,
+            [tenantId, actor.userId, routeId, input.requestId, current.status, input.status],
+          );
+        }
+        const route = await loadRoute(client, tenantId, routeId);
+        if (!route) return { status: "not_found" };
+        return { status: "updated", route };
       });
     },
   };
