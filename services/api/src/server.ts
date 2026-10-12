@@ -8,6 +8,7 @@ import { loadConfig, parseAllowedOrigins } from "./config.js";
 import { createResendContactMailer } from "./contact/resend.js";
 import { createPostgresCreditService } from "./credit/postgres-credit-service.js";
 import { createPostgresPlatformService } from "./platform/postgres-platform-service.js";
+import { createPostgresRouteService } from "./routes/postgres-route-service.js";
 import { createPostgresSupportAccessService } from "./support-access/postgres-support-access-service.js";
 import { createPostgresTenancyService } from "./tenancy/postgres-tenancy-service.js";
 import { createPostgresVerificationNetworkService } from "./verification-network/postgres-verification-network-service.js";
@@ -32,6 +33,7 @@ const app = buildApp({
     ? createPostgresBorrowerService(pool, config.BORROWER_IDENTITY_KEY)
     : undefined,
   creditService: createPostgresCreditService(pool),
+  routeService: createPostgresRouteService(pool),
   documentStorage: config.BORROWER_IDENTITY_KEY
     ? createLocalBorrowerDocumentStorage(config.BORROWER_DOCUMENTS_ROOT)
     : undefined,

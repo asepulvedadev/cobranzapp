@@ -51,6 +51,10 @@ import {
   platformUserStatusUpdateResponseSchema,
   reauthenticationRequestSchema,
   reauthenticationResponseSchema,
+  routeCreateRequestSchema,
+  routeDirectorySchema,
+  routeResponseSchema,
+  routeStopCreateRequestSchema,
   securityActivityResponseSchema,
   securityActivitySchema,
   serviceStatusSchema,
@@ -161,6 +165,10 @@ const documentedSchemas = {
   OrganizationStatusUpdateRequest: organizationStatusUpdateRequestSchema,
   ReauthenticationRequest: reauthenticationRequestSchema,
   ReauthenticationResponse: reauthenticationResponseSchema,
+  RouteCreateRequest: routeCreateRequestSchema,
+  RouteDirectory: routeDirectorySchema,
+  RouteResponse: routeResponseSchema,
+  RouteStopCreateRequest: routeStopCreateRequestSchema,
   SecurityActivity: securityActivitySchema,
   ServiceStatus: serviceStatusSchema,
 } as const;
@@ -666,6 +674,86 @@ export function createOpenApiDocument(version: string) {
               "La configuración cambió en otra sesión y debe actualizarse.",
               schemaReference("ApiError"),
             ),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/routes": {
+        get: {
+          tags: ["Empresas"],
+          operationId: "listCollectionRoutes",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": response("Rutas de cobranza de la empresa.", schemaReference("RouteDirectory")),
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "428": response("Confirmación reciente requerida.", schemaReference("ApiError")),
+          },
+        },
+        post: {
+          tags: ["Empresas"],
+          operationId: "createCollectionRoute",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("RouteCreateRequest")),
+          },
+          responses: {
+            "201": response("Ruta creada como borrador.", schemaReference("RouteResponse")),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "409": response("El nombre de la ruta ya existe.", schemaReference("ApiError")),
+            "428": response("Confirmación reciente requerida.", schemaReference("ApiError")),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/routes/{routeId}/stops": {
+        post: {
+          tags: ["Empresas"],
+          operationId: "addCollectionRouteStop",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "routeId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("RouteStopCreateRequest")),
+          },
+          responses: {
+            "200": response("Parada agregada a la ruta.", schemaReference("RouteResponse")),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("La ruta o el cliente no existe.", schemaReference("ApiError")),
+            "409": response("El cliente ya está en la ruta.", schemaReference("ApiError")),
+            "428": response("Confirmación reciente requerida.", schemaReference("ApiError")),
           },
         },
       },

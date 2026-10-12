@@ -19,6 +19,8 @@ import {
   platformUserDirectoryQuerySchema,
   platformUserStatusUpdateRequestSchema,
   reauthenticationRequestSchema,
+  routeCreateRequestSchema,
+  routeStopCreateRequestSchema,
   type ServiceStatus,
   tenantInvitationRequestSchema,
   tenantMemberProfileRequestSchema,
@@ -43,6 +45,7 @@ import type { ContactMailer } from "./contact/resend.js";
 import { registerContactRoutes } from "./contact/routes.js";
 import type { CreditService } from "./credit/types.js";
 import type { PlatformService } from "./platform/types.js";
+import type { RouteService } from "./routes/types.js";
 import type { SupportAccessService } from "./support-access/types.js";
 import type { TenancyService } from "./tenancy/types.js";
 import type { VerificationNetworkService } from "./verification-network/types.js";
@@ -55,6 +58,7 @@ const tenantLoanApplicationParamsSchema = z.object({
   tenantId: z.uuid(),
   applicationId: z.uuid(),
 });
+const tenantRouteParamsSchema = z.object({ tenantId: z.uuid(), routeId: z.uuid() });
 const tenantInvitationParamsSchema = z.object({ tenantId: z.uuid(), invitationId: z.uuid() });
 const tenantMemberParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
 const tenantMemberProfileParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
@@ -94,6 +98,7 @@ const supportAccessReviewSchema = z.object({ action: z.enum(["approve", "deny", 
 export interface AppDependencies {
   borrowerService?: BorrowerService;
   creditService?: CreditService;
+  routeService?: RouteService;
   documentStorage?: BorrowerDocumentStorage;
   contactMailer?: ContactMailer;
   allowedWebOrigins?: string[];
@@ -1540,6 +1545,193 @@ export function buildApp(dependencies: AppDependencies) {
       }
       throw error;
     }
+  });
+
+  app.get("/v1/tenants/:tenantId/routes", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (!membership || !["owner", "supervisor", "collector"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "No puedes consultar las rutas de cobranza.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    if (!dependencies.routeService) {
+      return sendError(
+        reply,
+        503,
+        "ROUTES_UNAVAILABLE",
+        "Las rutas todavía no están configuradas.",
+        request.id,
+      );
+    }
+    const routes = await dependencies.routeService.list(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+    );
+    return reply.send({ routes });
+  });
+
+  app.post("/v1/tenants/:tenantId/routes", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = routeCreateRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_ROUTE",
+        "Revisa el nombre y la sucursal de la ruta.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo propietarios y supervisores pueden crear rutas.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    if (!dependencies.routeService) {
+      return sendError(
+        reply,
+        503,
+        "ROUTES_UNAVAILABLE",
+        "Las rutas todavía no están configuradas.",
+        request.id,
+      );
+    }
+    const result = await dependencies.routeService.create(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      { ...body.data, requestId: request.id },
+    );
+    if (result.status === "duplicate") {
+      return sendError(
+        reply,
+        409,
+        "ROUTE_DUPLICATE",
+        "Ya existe una ruta con ese nombre.",
+        request.id,
+      );
+    }
+    if (result.status === "forbidden") {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo propietarios y supervisores pueden crear rutas.",
+        request.id,
+      );
+    }
+    return reply.code(201).send({ route: result.route });
+  });
+
+  app.post("/v1/tenants/:tenantId/routes/:routeId/stops", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantRouteParamsSchema.safeParse(request.params);
+    const body = routeStopCreateRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_ROUTE_STOP",
+        "Revisa el cliente, la dirección y la posición.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo propietarios y supervisores pueden editar rutas.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    if (!dependencies.routeService) {
+      return sendError(
+        reply,
+        503,
+        "ROUTES_UNAVAILABLE",
+        "Las rutas todavía no están configuradas.",
+        request.id,
+      );
+    }
+    const result = await dependencies.routeService.addStop(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.routeId,
+      { ...body.data, requestId: request.id },
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "ROUTE_NOT_FOUND", "La ruta no existe.", request.id);
+    }
+    if (result.status === "borrower_not_found") {
+      return sendError(
+        reply,
+        404,
+        "BORROWER_NOT_FOUND",
+        "El cliente no existe o no está activo.",
+        request.id,
+      );
+    }
+    if (result.status === "duplicate_stop") {
+      return sendError(
+        reply,
+        409,
+        "ROUTE_STOP_DUPLICATE",
+        "El cliente ya está en esta ruta.",
+        request.id,
+      );
+    }
+    if (result.status === "forbidden") {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo propietarios y supervisores pueden editar rutas.",
+        request.id,
+      );
+    }
+    return reply.send({ route: result.route });
   });
 
   function canManageBorrowers(role: AuthenticatedUser["memberships"][number]["role"] | undefined) {

@@ -611,6 +611,40 @@ export const tenantMemberProfileResponseSchema = z.object({
   profile: tenantMemberProfileSchema,
 });
 
+export const routeStatusSchema = z.enum(["draft", "active", "archived"]);
+export const routeAddressKindSchema = z.enum(["home", "work"]);
+export const routeCreateRequestSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  description: z.string().trim().max(240).nullable(),
+  branchId: z.uuid().nullable(),
+});
+export const routeStopCreateRequestSchema = z.object({
+  borrowerId: z.uuid(),
+  addressKind: routeAddressKindSchema,
+  position: z.number().int().positive(),
+});
+export const routeStopSchema = z.object({
+  id: z.uuid(),
+  borrowerId: z.uuid(),
+  borrowerName: z.string().min(2),
+  addressKind: routeAddressKindSchema,
+  address: z.string().min(3),
+  position: z.number().int().positive(),
+});
+export const routeSchema = z.object({
+  id: z.uuid(),
+  name: z.string().min(2),
+  description: z.string().nullable(),
+  status: routeStatusSchema,
+  branchId: z.uuid().nullable(),
+  branchName: z.string().nullable(),
+  stops: z.array(routeStopSchema).max(500),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+export const routeDirectorySchema = z.object({ routes: z.array(routeSchema) });
+export const routeResponseSchema = z.object({ route: routeSchema });
+
 export const loanProductStatusSchema = z.enum(["draft", "under_review", "approved", "retired"]);
 export const loanProductFrequencySchema = z.enum(["daily", "weekly", "fortnightly", "monthly"]);
 export const loanProductRateBasisSchema = z.enum([
@@ -914,6 +948,13 @@ export type VerificationNetworkCorrectionResponse = z.infer<
 export type TenantMemberProfileRequest = z.infer<typeof tenantMemberProfileRequestSchema>;
 export type TenantMemberEmergencyContact = z.infer<typeof tenantMemberEmergencyContactSchema>;
 export type TenantMemberProfile = z.infer<typeof tenantMemberProfileSchema>;
+export type RouteStatus = z.infer<typeof routeStatusSchema>;
+export type RouteAddressKind = z.infer<typeof routeAddressKindSchema>;
+export type RouteCreateRequest = z.infer<typeof routeCreateRequestSchema>;
+export type RouteStopCreateRequest = z.infer<typeof routeStopCreateRequestSchema>;
+export type RouteStop = z.infer<typeof routeStopSchema>;
+export type Route = z.infer<typeof routeSchema>;
+export type RouteDirectory = z.infer<typeof routeDirectorySchema>;
 export type LoanProductStatus = z.infer<typeof loanProductStatusSchema>;
 export type LoanProductFrequency = z.infer<typeof loanProductFrequencySchema>;
 export type LoanProductRateBasis = z.infer<typeof loanProductRateBasisSchema>;
