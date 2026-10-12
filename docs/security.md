@@ -54,9 +54,23 @@ requires recent password confirmation, immediately revokes every active session 
 global audit event without credentials or session tokens. Developer identities are protected from
 this general-purpose control to prevent accidental platform lockout.
 
-This is an interim first-party identity baseline, not completion of the identity roadmap. OIDC with
-PKCE for mobile, MFA for privileged roles, approved support access, and an independent security
-review remain required before the corresponding launch gate can pass.
+Users can enroll TOTP verification from the security screen. Setup and removal require password
+confirmation when the latest credential proof is older than ten minutes. TOTP secrets are encrypted
+with AES-256-GCM using the deployment key in `MFA_ENCRYPTION_KEY`; recovery codes are stored only as
+one-way hashes and work once. Password login for an enrolled account creates a five-minute challenge
+instead of a session. The challenge allows at most five failed attempts, accepts either a current
+TOTP code or a recovery code, prevents TOTP replay, and creates the authenticated session only after
+successful verification. Enabling MFA revokes the account's other sessions and records the security
+event. Recovery codes are displayed once for immediate download and are never returned again.
+
+The production MFA encryption key must be a base64-encoded 32-byte secret kept outside source
+control. Losing this key makes enrolled TOTP secrets unusable; rotation therefore requires a
+documented re-enrollment or key-rewrapping procedure before the old key is removed.
+
+This is an interim first-party identity baseline, not completion of the identity roadmap. Mandatory
+MFA enrollment policy for privileged roles is not enforced yet. OIDC with PKCE for mobile, approved
+support access, key-rotation operations, and an independent security review remain required before
+the corresponding launch gate can pass.
 
 Successful sign-in, sign-out, password change, reauthentication, individual remote-session
 revocation, and bulk session revocation create account-scoped audit events with the request

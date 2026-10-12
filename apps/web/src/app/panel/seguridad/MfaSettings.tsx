@@ -104,8 +104,10 @@ export function MfaSettings({ initialStatus }: { initialStatus: MfaStatus }) {
     const link = document.createElement("a");
     link.href = url;
     link.download = "cobranzapp-codigos-recuperacion.txt";
+    document.body.append(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   return (
@@ -193,6 +195,13 @@ export function MfaSettings({ initialStatus }: { initialStatus: MfaStatus }) {
           <button onClick={downloadRecoveryCodes} type="button">
             Descargar códigos
           </button>
+          <button
+            className="mfa-recovery-confirm"
+            onClick={() => setRecoveryCodes([])}
+            type="button"
+          >
+            Ya guardé los códigos
+          </button>
         </div>
       ) : null}
 
@@ -216,7 +225,10 @@ export function MfaSettings({ initialStatus }: { initialStatus: MfaStatus }) {
       ) : null}
 
       {message ? (
-        <p className={`mfa-message${isError ? " form-message-error" : ""}`} role="status">
+        <p
+          className={`mfa-message${isError ? " form-message-error" : ""}`}
+          role={isError ? "alert" : "status"}
+        >
           {message}
         </p>
       ) : null}

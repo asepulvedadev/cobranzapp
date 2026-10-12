@@ -2554,6 +2554,12 @@ html:has(.panel-shell) {
   background: #16643f;
 }
 
+.mfa-recovery button.mfa-recovery-confirm {
+  border-color: #8cc7a8;
+  background: transparent;
+  color: #0b5135;
+}
+
 .mfa-disable-form {
   padding-top: 16px;
   border-top: 1px solid var(--panel-line);
