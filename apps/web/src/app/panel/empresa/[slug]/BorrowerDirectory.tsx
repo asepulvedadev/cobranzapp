@@ -29,6 +29,7 @@ export function BorrowerDirectory({
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [includeSecondContact, setIncludeSecondContact] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,6 +57,15 @@ export function BorrowerDirectory({
             relationship: String(form.get("contactRelationship") ?? "").trim(),
             phone: String(form.get("contactPhone") ?? "").trim(),
           },
+          ...(includeSecondContact
+            ? [
+                {
+                  fullName: String(form.get("secondContactName") ?? "").trim(),
+                  relationship: String(form.get("secondContactRelationship") ?? "").trim(),
+                  phone: String(form.get("secondContactPhone") ?? "").trim(),
+                },
+              ]
+            : []),
         ],
         documents: [],
       }),
@@ -68,6 +78,7 @@ export function BorrowerDirectory({
       return;
     }
     event.currentTarget.reset();
+    setIncludeSecondContact(false);
     setMessage(
       "Cliente creado. Completa sus documentos privados antes de usarlo en una operación.",
     );
@@ -204,6 +215,40 @@ export function BorrowerDirectory({
               maxLength={30}
               type="tel"
             />
+            <label className="checkbox-row">
+              <input
+                checked={includeSecondContact}
+                onChange={(event) => setIncludeSecondContact(event.target.checked)}
+                type="checkbox"
+              />
+              <span>Agregar un segundo contacto</span>
+            </label>
+            {includeSecondContact ? (
+              <>
+                <input
+                  aria-label="Nombre del segundo contacto"
+                  name="secondContactName"
+                  placeholder="Segundo contacto · nombre completo"
+                  required
+                  maxLength={120}
+                />
+                <input
+                  aria-label="Relación del segundo contacto"
+                  name="secondContactRelationship"
+                  placeholder="Segundo contacto · relación"
+                  required
+                  maxLength={80}
+                />
+                <input
+                  aria-label="Celular del segundo contacto"
+                  name="secondContactPhone"
+                  placeholder="Segundo contacto · celular"
+                  required
+                  maxLength={30}
+                  type="tel"
+                />
+              </>
+            ) : null}
           </fieldset>
           <label htmlFor="borrower-consent">Referencia de consentimiento</label>
           <input

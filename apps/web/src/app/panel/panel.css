@@ -3887,6 +3887,19 @@ html:has(.panel-shell) {
   font-weight: 700;
 }
 
+.borrower-contact-fieldset .checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--panel-ink-muted);
+  font-size: 12px;
+}
+
+.borrower-contact-fieldset .checkbox-row input {
+  width: auto;
+  accent-color: var(--tenant-brand-primary, var(--panel-accent));
+}
+
 .borrower-table .status-manual_pending {
   background: #fff5dd;
   color: #8b5b00;
