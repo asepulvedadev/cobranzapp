@@ -12,12 +12,14 @@ import {
   tenantOverviewSchema,
 } from "@cobranzapp/contracts";
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 
 const sessionStorageKey = "cobranzapp.mobile.session";
 const apiBaseUrl = (process.env.EXPO_PUBLIC_API_URL ?? "https://cobranzaap.tech").replace(
   /\/$/,
   "",
 );
+const usesBrowserCookies = Platform.OS === "web";
 
 function cookieValue(setCookie: string | null, name: string) {
   const match = setCookie?.match(new RegExp(`(?:^|,\\s*)${name}=([^;,]+)`));
@@ -56,10 +58,14 @@ export class MobileApi {
   private async request(path: string, init: RequestInit = {}) {
     const headers = new Headers(init.headers);
     headers.set("accept", "application/json");
-    headers.set("origin", apiBaseUrl);
+    if (!usesBrowserCookies) headers.set("origin", apiBaseUrl);
     const cookie = this.sessionCookie ?? this.challengeCookie;
-    if (cookie) headers.set("cookie", cookie);
-    const response = await fetch(`${apiBaseUrl}/api${path}`, { ...init, headers });
+    if (!usesBrowserCookies && cookie) headers.set("cookie", cookie);
+    const response = await fetch(`${apiBaseUrl}/api${path}`, {
+      ...init,
+      credentials: usesBrowserCookies ? "include" : init.credentials,
+      headers,
+    });
     if (response.status === 401 && path !== "/v1/auth/login") await this.clearSession();
     return response;
   }
@@ -76,7 +82,7 @@ export class MobileApi {
         response.headers.get("set-cookie"),
         "cobranzapp_mfa_challenge",
       );
-      if (!body.mfaRequired || !this.challengeCookie) {
+      if (!body.mfaRequired || (!usesBrowserCookies && !this.challengeCookie)) {
         throw new MobileApiError("Respuesta de verificación inválida.", 502);
       }
       return { kind: "mfa_required" };
@@ -89,9 +95,11 @@ export class MobileApi {
     }
     const body = authenticatedResponseSchema.parse(await response.json());
     this.sessionCookie = cookieValue(response.headers.get("set-cookie"), "cobranzapp_session");
-    if (!this.sessionCookie) throw new MobileApiError("La sesión no pudo guardarse.", 502);
+    if (!usesBrowserCookies && !this.sessionCookie) {
+      throw new MobileApiError("La sesión no pudo guardarse.", 502);
+    }
     this.challengeCookie = null;
-    await SecureStore.setItemAsync(sessionStorageKey, this.sessionCookie);
+    if (this.sessionCookie) await SecureStore.setItemAsync(sessionStorageKey, this.sessionCookie);
     return { kind: "authenticated", user: body.user };
   }
 
@@ -109,9 +117,11 @@ export class MobileApi {
     }
     const body = authenticatedResponseSchema.parse(await response.json());
     this.sessionCookie = cookieValue(response.headers.get("set-cookie"), "cobranzapp_session");
-    if (!this.sessionCookie) throw new MobileApiError("La sesión no pudo guardarse.", 502);
+    if (!usesBrowserCookies && !this.sessionCookie) {
+      throw new MobileApiError("La sesión no pudo guardarse.", 502);
+    }
     this.challengeCookie = null;
-    await SecureStore.setItemAsync(sessionStorageKey, this.sessionCookie);
+    if (this.sessionCookie) await SecureStore.setItemAsync(sessionStorageKey, this.sessionCookie);
     return body.user;
   }
 
@@ -172,7 +182,7 @@ export class MobileApi {
   }
 
   async logout() {
-    if (this.sessionCookie)
+    if (this.sessionCookie || usesBrowserCookies)
       await this.request("/v1/auth/logout", { method: "POST" }).catch(() => undefined);
     await this.clearSession();
   }
