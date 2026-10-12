@@ -10,6 +10,7 @@ import {
   type PlatformSystemStatus,
   platformOverviewSchema,
   platformSystemStatusSchema,
+  reauthenticationResponseSchema,
   type TenantOverview,
   tenantOverviewSchema,
 } from "@cobranzapp/contracts";
@@ -141,6 +142,21 @@ export class MobileApi {
     }
     messageResponseSchema.parse(await response.json());
     await this.clearSession();
+  }
+
+  async reauthenticate(password: string) {
+    const response = await this.request("/v1/auth/reauthenticate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible confirmar tu identidad."),
+        response.status,
+      );
+    }
+    return reauthenticationResponseSchema.parse(await response.json());
   }
 
   async me() {

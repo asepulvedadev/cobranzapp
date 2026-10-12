@@ -509,6 +509,10 @@ function AuthenticatedHome({
   const [platform, setPlatform] = useState<PlatformOverview | null>(null);
   const [system, setSystem] = useState<PlatformSystemStatus | null>(null);
   const [message, setMessage] = useState("");
+  const [reauthPassword, setReauthPassword] = useState("");
+  const [reauthenticating, setReauthenticating] = useState(false);
+  const [needsReauthentication, setNeedsReauthentication] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [directorySearch, setDirectorySearch] = useState("");
   const [directoryPage, setDirectoryPage] = useState(1);
   const selectedMembershipRole = user.memberships.find(
@@ -517,6 +521,7 @@ function AuthenticatedHome({
 
   useEffect(() => {
     let mounted = true;
+    if (reloadKey > 0) setNeedsReauthentication(false);
     const canReadBorrowers = selectedMembershipRole
       ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
       : false;
@@ -535,13 +540,42 @@ function AuthenticatedHome({
         setTenant(tenantResult);
         setDirectory(borrowerResult);
       })
-      .catch(
-        (error) => mounted && setMessage(errorText(error, "No fue posible cargar el espacio.")),
-      );
+      .catch((error) => {
+        if (!mounted) return;
+        if (error instanceof MobileApiError && error.status === 428) {
+          setNeedsReauthentication(true);
+          setMessage("Confirma tu contraseña para consultar los clientes.");
+          return;
+        }
+        setMessage(errorText(error, "No fue posible cargar el espacio."));
+      });
     return () => {
       mounted = false;
     };
-  }, [api, directoryPage, directorySearch, selectedMembershipRole, tenantId, user.platformRole]);
+  }, [
+    api,
+    directoryPage,
+    directorySearch,
+    reloadKey,
+    selectedMembershipRole,
+    tenantId,
+    user.platformRole,
+  ]);
+
+  async function submitReauthentication() {
+    setReauthenticating(true);
+    setMessage("");
+    try {
+      await api.reauthenticate(reauthPassword);
+      setReauthPassword("");
+      setNeedsReauthentication(false);
+      setReloadKey((current) => current + 1);
+    } catch (error) {
+      setMessage(errorText(error, "No fue posible confirmar tu identidad."));
+    } finally {
+      setReauthenticating(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -568,6 +602,30 @@ function AuthenticatedHome({
           <Text accessibilityRole="alert" style={styles.error}>
             {message}
           </Text>
+        ) : null}
+        {needsReauthentication ? (
+          <View style={styles.reauthCard}>
+            <Text style={styles.cardTitle}>Confirma tu identidad</Text>
+            <Text style={styles.muted}>
+              Esta consulta protegida requiere tu contraseña actual. La confirmación dura 10
+              minutos.
+            </Text>
+            <TextInput
+              autoCapitalize="none"
+              autoComplete="current-password"
+              onChangeText={setReauthPassword}
+              placeholder="Contraseña actual"
+              placeholderTextColor="#8b948e"
+              secureTextEntry
+              style={styles.input}
+              value={reauthPassword}
+            />
+            <PrimaryButton
+              disabled={reauthenticating || reauthPassword.length < 12}
+              label={reauthenticating ? "Confirmando…" : "Confirmar y continuar"}
+              onPress={() => void submitReauthentication()}
+            />
+          </View>
         ) : null}
         {user.platformRole === "developer" && platform ? (
           <DeveloperHome overview={platform} system={system} />
@@ -863,6 +921,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#775f20",
     gap: 4,
+  },
+  reauthCard: {
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: "#2b2515",
+    borderWidth: 1,
+    borderColor: "#775f20",
+    gap: 8,
   },
   workspacePicker: { gap: 8, marginTop: 6 },
   workspaceOption: {
