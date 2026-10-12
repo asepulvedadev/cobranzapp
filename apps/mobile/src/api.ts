@@ -18,6 +18,12 @@ import {
   routeDirectorySchema,
   type TenantOverview,
   tenantOverviewSchema,
+  type VerificationNetworkConsentRequest,
+  type VerificationNetworkCorrectionRequest,
+  type VerificationNetworkQueryRequest,
+  verificationNetworkConsentSchema,
+  verificationNetworkCorrectionResponseSchema,
+  verificationNetworkQueryResponseSchema,
 } from "@cobranzapp/contracts";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
@@ -272,6 +278,57 @@ export class MobileApi {
       );
     }
     return borrowerDocumentResponseSchema.parse(await response.json()).document;
+  }
+
+  async createVerificationConsent(tenantId: string, input: VerificationNetworkConsentRequest) {
+    const response = await this.request(`/v1/tenants/${tenantId}/verification-network/consents`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible registrar el consentimiento."),
+        response.status,
+      );
+    }
+    return verificationNetworkConsentSchema.parse((await response.json()).consent);
+  }
+
+  async queryVerificationNetwork(tenantId: string, input: VerificationNetworkQueryRequest) {
+    const response = await this.request(`/v1/tenants/${tenantId}/verification-network/query`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible consultar la red compartida."),
+        response.status,
+      );
+    }
+    return verificationNetworkQueryResponseSchema.parse(await response.json());
+  }
+
+  async createVerificationCorrection(
+    tenantId: string,
+    input: VerificationNetworkCorrectionRequest,
+  ) {
+    const response = await this.request(
+      `/v1/tenants/${tenantId}/verification-network/corrections`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    );
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible abrir la corrección."),
+        response.status,
+      );
+    }
+    return verificationNetworkCorrectionResponseSchema.parse((await response.json()).correction);
   }
 
   async routeDirectory(tenantId: string): Promise<RouteDirectory> {

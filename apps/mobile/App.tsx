@@ -21,6 +21,7 @@ import {
 } from "react-native";
 import { MobileApi, MobileApiError } from "./src/api";
 import { BorrowerCreateForm } from "./src/BorrowerCreateForm";
+import { VerificationNetworkCard } from "./src/VerificationNetworkCard";
 
 type Screen =
   | { kind: "loading" }
@@ -429,6 +430,14 @@ function TenantHome({
         <BorrowerCreateForm
           api={api}
           onCreated={onBorrowerCreated}
+          onNeedsReauthentication={onNeedsReauthentication}
+          tenantId={overview.tenant.id}
+        />
+      ) : null}
+      {overview.actorRole !== "customer" && overview.actorRole !== "support" ? (
+        <VerificationNetworkCard
+          api={api}
+          canPublish={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
           onNeedsReauthentication={onNeedsReauthentication}
           tenantId={overview.tenant.id}
         />
