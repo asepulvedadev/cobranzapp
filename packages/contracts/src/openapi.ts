@@ -80,6 +80,9 @@ import {
   tenantSettingsResponseSchema,
   tenantSettingsUpdateRequestSchema,
   tenantTeamResponseSchema,
+  userProfileResponseSchema,
+  userProfileSchema,
+  userProfileUpdateRequestSchema,
   verificationNetworkAssertionRequestSchema,
   verificationNetworkAssertionResponseSchema,
   verificationNetworkConsentRequestSchema,
@@ -174,6 +177,9 @@ const documentedSchemas = {
   TenantSettingsResponse: tenantSettingsResponseSchema,
   TenantSettingsUpdateRequest: tenantSettingsUpdateRequestSchema,
   TenantTeamResponse: tenantTeamResponseSchema,
+  UserProfile: userProfileSchema,
+  UserProfileResponse: userProfileResponseSchema,
+  UserProfileUpdateRequest: userProfileUpdateRequestSchema,
   VerificationNetworkAssertionRequest: verificationNetworkAssertionRequestSchema,
   VerificationNetworkAssertionResponse: verificationNetworkAssertionResponseSchema,
   VerificationNetworkConsentRequest: verificationNetworkConsentRequestSchema,
@@ -308,6 +314,66 @@ export function createOpenApiDocument(version: string) {
             "401": errorResponses["401"],
             "403": errorResponses["403"],
             "409": response("El nombre de empresa ya está en uso.", schemaReference("ApiError")),
+          },
+        },
+      },
+      "/v1/account/profile": {
+        get: {
+          tags: ["Cuenta"],
+          operationId: "getAccountProfile",
+          security: sessionSecurity,
+          responses: {
+            "200": response("Perfil personal.", schemaReference("UserProfileResponse")),
+            "401": errorResponses["401"],
+          },
+        },
+        put: {
+          tags: ["Cuenta"],
+          operationId: "updateAccountProfile",
+          security: sessionSecurity,
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("UserProfileUpdateRequest")),
+          },
+          responses: {
+            "200": response("Perfil actualizado.", schemaReference("UserProfileResponse")),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "428": response("Reautenticación requerida.", schemaReference("ApiError")),
+          },
+        },
+      },
+      "/v1/account/profile-photo": {
+        get: {
+          tags: ["Cuenta"],
+          operationId: "getAccountProfilePhoto",
+          security: sessionSecurity,
+          responses: {
+            "200": { description: "Foto de perfil." },
+            "404": response("No hay foto de perfil.", schemaReference("ApiError")),
+          },
+        },
+        post: {
+          tags: ["Cuenta"],
+          operationId: "uploadAccountProfilePhoto",
+          security: sessionSecurity,
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  properties: { file: { type: "string", format: "binary" } },
+                  required: ["file"],
+                },
+              },
+            },
+          },
+          responses: {
+            "200": response("Foto de perfil actualizada.", schemaReference("UserProfileResponse")),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "428": response("Reautenticación requerida.", schemaReference("ApiError")),
           },
         },
       },

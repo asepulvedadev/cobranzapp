@@ -6,6 +6,7 @@ import {
   Pulse,
   ShieldCheck,
   SlidersHorizontal,
+  UserCircle,
   UsersThree,
 } from "@phosphor-icons/react";
 import Link from "next/link";
@@ -51,11 +52,15 @@ export function PanelNavigation({
   if (!isDeveloper && !currentMembership) {
     const onboardingItems: NavigationItem[] = [
       { href: "/panel/onboarding", label: "Crear empresa", icon: Buildings },
+      { href: "/panel/perfil", label: "Mi perfil", icon: UserCircle },
       { href: "/panel/seguridad", label: "Seguridad", icon: ShieldCheck },
     ];
     function onboardingNavigation(className: string) {
       return (
-        <nav aria-label="Navegación del panel" className={`${className} panel-nav-count-2`}>
+        <nav
+          aria-label="Navegación del panel"
+          className={`${className} panel-nav-count-${onboardingItems.length}`}
+        >
           {onboardingItems.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href;
@@ -88,6 +93,7 @@ export function PanelNavigation({
     },
     { href: "/panel/onboarding", label: "Nueva empresa", icon: Buildings },
     { href: "/panel/seguridad", label: "Seguridad", icon: ShieldCheck },
+    { href: "/panel/perfil", label: "Mi perfil", icon: UserCircle },
   ];
   const items: NavigationItem[] = isDeveloper
     ? [
@@ -96,12 +102,14 @@ export function PanelNavigation({
         { href: "/panel/desarrollador#usuarios", label: "Usuarios", icon: UsersThree },
         { href: "/panel/desarrollador#actividad", label: "Actividad", icon: Pulse },
         { href: "/panel/seguridad", label: "Seguridad", icon: ShieldCheck },
+        { href: "/panel/perfil", label: "Mi perfil", icon: UserCircle },
       ]
     : currentMembership?.role === "customer"
       ? [
           { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },
           { href: `${effectiveDashboardHref}/clientes`, label: "Clientes", icon: Buildings },
           { href: "/panel/seguridad", label: "Seguridad", icon: ShieldCheck },
+          { href: "/panel/perfil", label: "Mi perfil", icon: UserCircle },
         ]
       : standardTenantItems;
 

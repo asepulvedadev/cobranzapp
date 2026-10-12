@@ -19,6 +19,8 @@ import type {
   TenantDirectory,
   TenantStatus,
   TenantStatusUpdateResult,
+  UserProfile,
+  UserProfileUpdateResult,
 } from "./types.js";
 
 function normalizeCompanyCode(code: string) {
@@ -134,6 +136,30 @@ type PlatformUserRow = {
   created_at: Date;
 };
 
+type UserProfileRow = {
+  id: string;
+  username: string;
+  email: string;
+  display_name: string;
+  profile_phone: string | null;
+  profile_home_address: string | null;
+  profile_work_address: string | null;
+  profile_photo_object_key: string | null;
+};
+
+function mapUserProfile(row: UserProfileRow): UserProfile {
+  return {
+    userId: row.id,
+    username: row.username,
+    email: row.email,
+    displayName: row.display_name,
+    phone: row.profile_phone,
+    homeAddress: row.profile_home_address,
+    workAddress: row.profile_work_address,
+    profilePhotoObjectKey: row.profile_photo_object_key,
+  };
+}
+
 type PlatformAuditActivityRow = {
   id: string;
   action: string;
@@ -186,6 +212,92 @@ function tenantSlugSeed(displayName: string) {
 
 export function createPostgresPlatformService(pool: Pool): PlatformService {
   return {
+    async getUserProfile(userId) {
+      const result = await pool.query<UserProfileRow>(
+        `SELECT id, username, email, display_name, profile_phone,
+                profile_home_address, profile_work_address, profile_photo_object_key
+           FROM users WHERE id = $1 AND status = 'active'`,
+        [userId],
+      );
+      return result.rows[0] ? mapUserProfile(result.rows[0]) : null;
+    },
+
+    async updateUserProfile(actorUserId, userId, input, requestId) {
+      if (actorUserId !== userId) return { status: "forbidden" } satisfies UserProfileUpdateResult;
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("SELECT set_config('app.user_id', $1, true)", [actorUserId]);
+        const result = await client.query<UserProfileRow>(
+          `UPDATE users
+              SET display_name = $2, profile_phone = $3, profile_home_address = $4,
+                  profile_work_address = $5, updated_at = now()
+            WHERE id = $1 AND status = 'active'
+            RETURNING id, username, email, display_name, profile_phone,
+                      profile_home_address, profile_work_address, profile_photo_object_key`,
+          [userId, input.displayName, input.phone, input.homeAddress, input.workAddress],
+        );
+        const row = result.rows[0];
+        if (!row) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies UserProfileUpdateResult;
+        }
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES (NULL, $1, 'user.profile_updated', 'user_profile', $2, $3, '{}'::jsonb)`,
+          [actorUserId, userId, requestId],
+        );
+        await client.query("COMMIT");
+        return {
+          status: "updated",
+          profile: mapUserProfile(row),
+        } satisfies UserProfileUpdateResult;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async setUserProfilePhoto(actorUserId, userId, objectKey, requestId) {
+      if (actorUserId !== userId) return { status: "forbidden" } satisfies UserProfileUpdateResult;
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("SELECT set_config('app.user_id', $1, true)", [actorUserId]);
+        const result = await client.query<UserProfileRow>(
+          `UPDATE users SET profile_photo_object_key = $2, updated_at = now()
+            WHERE id = $1 AND status = 'active'
+            RETURNING id, username, email, display_name, profile_phone,
+                      profile_home_address, profile_work_address, profile_photo_object_key`,
+          [userId, objectKey],
+        );
+        const row = result.rows[0];
+        if (!row) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies UserProfileUpdateResult;
+        }
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES (NULL, $1, 'user.profile_photo_updated', 'user_profile', $2, $3, '{}'::jsonb)`,
+          [actorUserId, userId, requestId],
+        );
+        await client.query("COMMIT");
+        return {
+          status: "updated",
+          profile: mapUserProfile(row),
+        } satisfies UserProfileUpdateResult;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
     async systemStatus(actorUserId) {
       const client = await pool.connect();
       try {

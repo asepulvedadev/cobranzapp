@@ -33,6 +33,7 @@ import {
   tenantMemberProfileRequestSchema,
   tenantMemberUpdateRequestSchema,
   tenantSettingsUpdateRequestSchema,
+  userProfileUpdateRequestSchema,
   verificationNetworkAssertionRequestSchema,
   verificationNetworkConsentRequestSchema,
   verificationNetworkCorrectionRequestSchema,
@@ -421,6 +422,182 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session) return;
     return { user: session.user };
+  });
+
+  app.get("/v1/account/profile", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const getUserProfile = dependencies.platformService.getUserProfile;
+    if (!getUserProfile) {
+      return sendError(
+        reply,
+        501,
+        "PROFILE_UNAVAILABLE",
+        "El perfil todavía no está habilitado.",
+        request.id,
+      );
+    }
+    const profile = await getUserProfile(session.user.id);
+    if (!profile)
+      return sendError(reply, 404, "PROFILE_NOT_FOUND", "El perfil no existe.", request.id);
+    return reply.send({ profile });
+  });
+
+  app.put("/v1/account/profile", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const body = userProfileUpdateRequestSchema.safeParse(request.body);
+    const updateUserProfile = dependencies.platformService.updateUserProfile;
+    if (!body.success || !updateUserProfile) {
+      return sendError(reply, 400, "INVALID_PROFILE", "Revisa los datos personales.", request.id);
+    }
+    const result = await updateUserProfile(session.user.id, session.user.id, body.data, request.id);
+    if (result.status === "forbidden")
+      return sendError(reply, 403, "SCOPE_DENIED", "No puedes actualizar este perfil.", request.id);
+    if (result.status === "not_found")
+      return sendError(reply, 404, "PROFILE_NOT_FOUND", "El perfil no existe.", request.id);
+    return reply.send({ profile: result.profile });
+  });
+
+  app.get("/v1/account/profile-photo", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const getUserProfile = dependencies.platformService.getUserProfile;
+    const storage = dependencies.documentStorage;
+    if (!getUserProfile || !storage)
+      return sendError(
+        reply,
+        503,
+        "PROFILE_PHOTO_UNAVAILABLE",
+        "La foto todavía no está configurada.",
+        request.id,
+      );
+    const profile = await getUserProfile(session.user.id);
+    const objectKey = profile?.profilePhotoObjectKey;
+    if (!objectKey?.startsWith(`users/${session.user.id}/profile/`)) {
+      return sendError(reply, 404, "PROFILE_PHOTO_NOT_FOUND", "No hay foto de perfil.", request.id);
+    }
+    const stored = await storage.read(objectKey);
+    if (!stored)
+      return sendError(reply, 404, "PROFILE_PHOTO_NOT_FOUND", "No hay foto de perfil.", request.id);
+    return reply
+      .type(stored.mediaType)
+      .header("cache-control", "private, no-store")
+      .send(stored.bytes);
+  });
+
+  app.post("/v1/account/profile-photo", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const setUserProfilePhoto = dependencies.platformService.setUserProfilePhoto;
+    const storage = dependencies.documentStorage;
+    if (!setUserProfilePhoto || !storage)
+      return sendError(
+        reply,
+        503,
+        "PROFILE_PHOTO_UNAVAILABLE",
+        "La carga privada de fotos todavía no está configurada.",
+        request.id,
+      );
+    let mediaType = "";
+    let fileBytes: Buffer | null = null;
+    try {
+      for await (const part of request.parts()) {
+        if (part.type !== "file") continue;
+        if (fileBytes)
+          return sendError(
+            reply,
+            400,
+            "TOO_MANY_PROFILE_PHOTOS",
+            "Solo puedes cargar una foto por vez.",
+            request.id,
+          );
+        mediaType = part.mimetype;
+        fileBytes = await part.toBuffer();
+      }
+    } catch (error) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === "FST_REQ_FILE_TOO_LARGE"
+      ) {
+        return sendError(
+          reply,
+          413,
+          "PROFILE_PHOTO_TOO_LARGE",
+          "La foto supera el límite de 10 MB.",
+          request.id,
+        );
+      }
+      throw error;
+    }
+    if (!fileBytes || !mediaType)
+      return sendError(
+        reply,
+        400,
+        "PROFILE_PHOTO_REQUIRED",
+        "Debes seleccionar una foto.",
+        request.id,
+      );
+    try {
+      const stored = await storage.quarantineUserProfile({
+        userId: session.user.id,
+        mediaType,
+        bytes: fileBytes,
+      });
+      const result = await setUserProfilePhoto(
+        session.user.id,
+        session.user.id,
+        stored.objectKey,
+        request.id,
+      );
+      if (result.status !== "updated")
+        await storage.remove(stored.objectKey).catch(() => undefined);
+      if (result.status === "not_found")
+        return sendError(reply, 404, "PROFILE_NOT_FOUND", "El perfil no existe.", request.id);
+      if (result.status === "forbidden")
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "No puedes actualizar este perfil.",
+          request.id,
+        );
+      return reply.send({ profile: result.profile });
+    } catch (error) {
+      if (error instanceof Error) {
+        const messages: Record<string, [number, string, string]> = {
+          UNSUPPORTED_DOCUMENT_TYPE: [
+            400,
+            "UNSUPPORTED_PROFILE_PHOTO_TYPE",
+            "El formato no está permitido.",
+          ],
+          DOCUMENT_SIZE_INVALID: [
+            400,
+            "PROFILE_PHOTO_SIZE_INVALID",
+            "La foto está vacía o supera 10 MB.",
+          ],
+          DOCUMENT_CONTENT_INVALID: [
+            400,
+            "PROFILE_PHOTO_CONTENT_INVALID",
+            "El contenido no coincide con su formato.",
+          ],
+          PROFILE_PHOTO_TYPE_INVALID: [
+            400,
+            "PROFILE_PHOTO_TYPE_INVALID",
+            "La foto debe ser una imagen.",
+          ],
+        };
+        const mapped = messages[error.message];
+        if (mapped) return sendError(reply, mapped[0], mapped[1], mapped[2], request.id);
+      }
+      throw error;
+    }
   });
 
   app.post("/v1/account/tenants", async (request, reply) => {

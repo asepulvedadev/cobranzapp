@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const maxDocumentSize = 10_485_760;
@@ -39,12 +39,25 @@ export type QuarantineMemberIdentityInput = {
   bytes: Buffer;
 };
 
+export type QuarantineUserProfileInput = {
+  userId: string;
+  mediaType: string;
+  bytes: Buffer;
+};
+
+export type StoredDocument = {
+  bytes: Buffer;
+  mediaType: string;
+};
+
 export interface BorrowerDocumentStorage {
   quarantine(input: QuarantineDocumentInput): Promise<QuarantinedDocument>;
   quarantineMemberProfile(input: QuarantineMemberProfileInput): Promise<QuarantinedDocument>;
   quarantineMemberIdentityDocument(
     input: QuarantineMemberIdentityInput,
   ): Promise<QuarantinedDocument>;
+  quarantineUserProfile(input: QuarantineUserProfileInput): Promise<QuarantinedDocument>;
+  read(objectKey: string): Promise<StoredDocument | null>;
   remove(objectKey: string): Promise<void>;
 }
 
@@ -61,6 +74,14 @@ function hasMagic(bytes: Buffer, mediaType: string) {
     );
   }
   return false;
+}
+
+function detectMediaType(bytes: Buffer) {
+  if (hasMagic(bytes, "image/jpeg")) return "image/jpeg";
+  if (hasMagic(bytes, "image/png")) return "image/png";
+  if (hasMagic(bytes, "image/webp")) return "image/webp";
+  if (hasMagic(bytes, "application/pdf")) return "application/pdf";
+  return "application/octet-stream";
 }
 
 function safeObjectPath(root: string, objectKey: string) {
@@ -124,6 +145,21 @@ export function createLocalBorrowerDocumentStorage(root: string): BorrowerDocume
     async quarantineMemberIdentityDocument(input) {
       const objectKey = `tenant/${input.tenantId}/members/${input.userId}/identity/${input.side}-${randomUUID()}.bin`;
       return validateAndWrite(input.bytes, input.mediaType, objectKey);
+    },
+
+    async quarantineUserProfile(input) {
+      const objectKey = `users/${input.userId}/profile/${randomUUID()}.bin`;
+      return validateAndWrite(input.bytes, input.mediaType, objectKey, false);
+    },
+
+    async read(objectKey) {
+      const bytes = await readFile(safeObjectPath(root, objectKey)).catch((error: unknown) => {
+        if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+          return null;
+        }
+        throw error;
+      });
+      return bytes ? { bytes, mediaType: detectMediaType(bytes) } : null;
     },
 
     async remove(objectKey) {

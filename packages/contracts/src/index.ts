@@ -42,6 +42,26 @@ export const loginRequestSchema = z.object({
 
 export const authenticatedResponseSchema = z.object({ user: currentUserSchema });
 
+export const userProfileSchema = z.object({
+  userId: z.uuid(),
+  username: z.string().min(1),
+  email: z.email(),
+  displayName: z.string().min(1),
+  phone: z.string().max(30).nullable(),
+  homeAddress: z.string().max(240).nullable(),
+  workAddress: z.string().max(240).nullable(),
+  profilePhotoObjectKey: z.string().nullable(),
+});
+
+export const userProfileResponseSchema = z.object({ profile: userProfileSchema });
+
+export const userProfileUpdateRequestSchema = z.object({
+  displayName: z.string().trim().min(2).max(100),
+  phone: z.string().trim().max(30).nullable(),
+  homeAddress: z.string().trim().max(240).nullable(),
+  workAddress: z.string().trim().max(240).nullable(),
+});
+
 export const mfaLoginRequiredResponseSchema = z.object({
   mfaRequired: z.literal(true),
   expiresAt: z.iso.datetime(),
@@ -988,6 +1008,8 @@ export type ApiError = z.infer<typeof apiErrorSchema>;
 export type TenantRole = z.infer<typeof tenantRoleSchema>;
 export type TenantMembership = z.infer<typeof tenantMembershipSchema>;
 export type CurrentUser = z.infer<typeof currentUserSchema>;
+export type UserProfile = z.infer<typeof userProfileSchema>;
+export type UserProfileUpdateRequest = z.infer<typeof userProfileUpdateRequestSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type AuthenticatedResponse = z.infer<typeof authenticatedResponseSchema>;
 export type MfaLoginRequiredResponse = z.infer<typeof mfaLoginRequiredResponseSchema>;

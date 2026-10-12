@@ -9,6 +9,8 @@ import type {
   PlatformUser,
   PlatformUserDirectory,
   PlatformUserStatus,
+  UserProfile,
+  UserProfileUpdateRequest,
 } from "@cobranzapp/contracts";
 
 export type {
@@ -21,6 +23,7 @@ export type {
   PlatformUser,
   PlatformUserDirectory,
   PlatformUserStatus,
+  UserProfile,
 } from "@cobranzapp/contracts";
 
 export type TenantStatus = PlatformTenantStatus;
@@ -71,6 +74,11 @@ export type PlatformDatabaseStatus = {
   checkedAt: string;
 };
 
+export type UserProfileUpdateResult =
+  | { status: "updated"; profile: UserProfile }
+  | { status: "forbidden" }
+  | { status: "not_found" };
+
 export type TenantStatusUpdateResult =
   | {
       status: "updated";
@@ -99,6 +107,19 @@ export type MembershipEntitlementUpdateResult =
   | { status: "not_found" };
 
 export interface PlatformService {
+  getUserProfile?(userId: string): Promise<UserProfile | null>;
+  updateUserProfile?(
+    actorUserId: string,
+    userId: string,
+    input: UserProfileUpdateRequest,
+    requestId: string,
+  ): Promise<UserProfileUpdateResult>;
+  setUserProfilePhoto?(
+    actorUserId: string,
+    userId: string,
+    objectKey: string,
+    requestId: string,
+  ): Promise<UserProfileUpdateResult>;
   overview(actorUserId: string): Promise<PlatformOverview>;
   listActivity(
     actorUserId: string,
