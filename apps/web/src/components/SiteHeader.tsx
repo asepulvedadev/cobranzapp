@@ -1,3 +1,4 @@
+import { SignInIcon } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import { Brand } from "./Brand";
 
@@ -26,12 +27,9 @@ export function SiteHeader() {
           Planes
         </Link>
         <div className="nav-actions">
-          <Link className="nav-login" href="/ingresar">
-            Ingresar
+          <Link className="nav-login" href="/ingresar" aria-label="Ingresar" title="Ingresar">
+            <SignInIcon size={24} weight="bold" aria-hidden="true" focusable="false" />
           </Link>
-          <a className="button button-small" href="/contacto?source=demo">
-            Solicitar demostración
-          </a>
         </div>
         <details className="mobile-menu">
           <summary aria-label="Abrir menú">
@@ -44,8 +42,6 @@ export function SiteHeader() {
                 {link.label}
               </Link>
             ))}
-            <Link href="/ingresar">Ingresar al sistema</Link>
-            <a href="/contacto?source=demo">Solicitar demostración</a>
           </div>
         </details>
       </nav>

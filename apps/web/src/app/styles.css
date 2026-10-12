@@ -118,8 +118,7 @@ select {
   gap: 24px;
 }
 
-.nav-links a,
-.nav-login {
+.nav-links a {
   color: var(--muted);
   font-size: 14px;
   font-weight: 650;
@@ -127,9 +126,29 @@ select {
   transition: color 700ms var(--ease);
 }
 
-.nav-links a:hover,
-.nav-login:hover {
+.nav-links a:hover {
   color: var(--ink);
+}
+
+.nav-login {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--dark);
+  color: var(--light);
+  text-decoration: none;
+  transition:
+    background 700ms var(--ease),
+    color 700ms var(--ease);
+}
+
+.nav-login:hover {
+  background: var(--yellow);
+  color: var(--dark);
 }
 
 .button {
@@ -1942,10 +1961,12 @@ select {
   }
   .nav-shell {
     min-height: 52px;
+    gap: 8px;
     padding: 4px 4px 4px 12px;
   }
   .nav-actions {
-    display: none;
+    display: flex;
+    flex-shrink: 0;
   }
   .mobile-menu {
     display: block;
@@ -2550,6 +2571,15 @@ select {
     font-size: 14px;
     font-weight: 750;
     text-decoration: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .nav-plans-shortcut {
+    display: none;
+  }
+  .nav-actions {
+    margin-left: auto;
   }
 }
 
