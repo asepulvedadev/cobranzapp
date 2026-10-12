@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -519,6 +520,7 @@ function AuthenticatedHome({
   const [reauthenticating, setReauthenticating] = useState(false);
   const [needsReauthentication, setNeedsReauthentication] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const [directorySearch, setDirectorySearch] = useState("");
   const [directoryPage, setDirectoryPage] = useState(1);
   const selectedMembershipRole = user.memberships.find(
@@ -554,6 +556,9 @@ function AuthenticatedHome({
           return;
         }
         setMessage(errorText(error, "No fue posible cargar el espacio."));
+      })
+      .finally(() => {
+        if (mounted) setRefreshing(false);
       });
     return () => {
       mounted = false;
@@ -583,10 +588,25 @@ function AuthenticatedHome({
     }
   }
 
+  function refreshWorkspace() {
+    setRefreshing(true);
+    setReloadKey((current) => current + 1);
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar style="light" />
-      <ScrollView contentContainerStyle={styles.homeScroll}>
+      <ScrollView
+        contentContainerStyle={styles.homeScroll}
+        refreshControl={
+          <RefreshControl
+            colors={["#fbbf24"]}
+            onRefresh={refreshWorkspace}
+            refreshing={refreshing}
+            tintColor="#fbbf24"
+          />
+        }
+      >
         <View style={styles.topbar}>
           <View>
             <Text style={styles.brand}>cobranzapp</Text>
