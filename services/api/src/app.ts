@@ -28,11 +28,14 @@ import {
   verificationNetworkQueryRequestSchema,
 } from "@cobranzapp/contracts";
 import { createOpenApiDocument } from "@cobranzapp/contracts/openapi";
+import multipart from "@fastify/multipart";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import QRCode from "qrcode";
 import { z } from "zod";
 import { LoginRateLimiter } from "./auth/login-rate-limiter.js";
 import type { AuthenticatedUser, AuthService } from "./auth/types.js";
+import type { BorrowerDocumentStorage } from "./borrowers/document-storage.js";
+import { borrowerDocumentUploadLimits } from "./borrowers/document-storage.js";
 import type { BorrowerService } from "./borrowers/types.js";
 import type { ContactMailer } from "./contact/resend.js";
 import { registerContactRoutes } from "./contact/routes.js";
@@ -82,6 +85,7 @@ const supportAccessReviewSchema = z.object({ action: z.enum(["approve", "deny", 
 
 export interface AppDependencies {
   borrowerService?: BorrowerService;
+  documentStorage?: BorrowerDocumentStorage;
   contactMailer?: ContactMailer;
   allowedWebOrigins?: string[];
   authService: AuthService;
@@ -140,6 +144,7 @@ export function buildApp(dependencies: AppDependencies) {
     trustProxy: true,
     requestIdHeader: "x-request-id",
   });
+  app.register(multipart, { limits: borrowerDocumentUploadLimits });
   const allowedOrigins = new Set(dependencies.allowedWebOrigins ?? ["http://localhost:3000"]);
   registerContactRoutes(app, {
     allowedOrigins: [...allowedOrigins],
@@ -1457,6 +1462,184 @@ export function buildApp(dependencies: AppDependencies) {
     if (!borrower)
       return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
     return reply.send({ borrower });
+  });
+
+  app.post("/v1/tenants/:tenantId/borrowers/:borrowerId/documents", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantBorrowerParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !canManageBorrowers(membership.role)) {
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a este cliente.", request.id);
+    }
+    if (!dependencies.borrowerService || !dependencies.documentStorage) {
+      return sendError(
+        reply,
+        503,
+        "BORROWER_DOCUMENT_STORAGE_UNAVAILABLE",
+        "La carga privada de documentos todavía no está configurada.",
+        request.id,
+      );
+    }
+
+    let categoryValue = "";
+    let sideValue = "";
+    let mediaType = "";
+    let fileBytes: Buffer | null = null;
+    try {
+      for await (const part of request.parts()) {
+        if (part.type === "file") {
+          if (fileBytes) {
+            return sendError(
+              reply,
+              400,
+              "TOO_MANY_DOCUMENT_FILES",
+              "Solo puedes cargar un archivo por vez.",
+              request.id,
+            );
+          }
+          mediaType = part.mimetype;
+          fileBytes = await part.toBuffer();
+        } else if (part.fieldname === "category") {
+          categoryValue = String(part.value);
+        } else if (part.fieldname === "side") {
+          sideValue = String(part.value);
+        }
+      }
+    } catch (error) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === "FST_REQ_FILE_TOO_LARGE"
+      ) {
+        return sendError(
+          reply,
+          413,
+          "DOCUMENT_TOO_LARGE",
+          "El documento supera el límite de 10 MB.",
+          request.id,
+        );
+      }
+      throw error;
+    }
+    const category =
+      categoryValue === "identity" || categoryValue === "profile_photo" ? categoryValue : null;
+    const side = sideValue === "front" || sideValue === "back" ? sideValue : null;
+    if (!category || (category === "identity" && !side) || (category === "profile_photo" && side)) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_DOCUMENT_CATEGORY",
+        "Indica si es frente, reverso o foto de perfil.",
+        request.id,
+      );
+    }
+    if (!fileBytes || !mediaType) {
+      return sendError(
+        reply,
+        400,
+        "DOCUMENT_REQUIRED",
+        "Debes seleccionar un archivo.",
+        request.id,
+      );
+    }
+    try {
+      const stored = await dependencies.documentStorage.quarantine({
+        tenantId: params.data.tenantId,
+        borrowerId: params.data.borrowerId,
+        category,
+        side,
+        mediaType,
+        bytes: fileBytes,
+      });
+      const result = await dependencies.borrowerService.addDocument(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.borrowerId,
+        { ...stored, category, side, requestId: request.id },
+      );
+      if (result.status !== "created") {
+        await dependencies.documentStorage.remove(stored.objectKey).catch(() => undefined);
+      }
+      if (result.status === "not_found") {
+        return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
+      }
+      if (result.status === "forbidden") {
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "No puedes cargar este documento.",
+          request.id,
+        );
+      }
+      if (result.status === "invalid_object_key") {
+        return sendError(
+          reply,
+          400,
+          "INVALID_DOCUMENT_OBJECT_KEY",
+          "La ruta privada no es válida.",
+          request.id,
+        );
+      }
+      if (result.status === "duplicate") {
+        return sendError(
+          reply,
+          409,
+          "DOCUMENT_ALREADY_EXISTS",
+          "Ya existe un documento para esa cara del expediente.",
+          request.id,
+        );
+      }
+      return reply.code(201).send({ document: result.document });
+    } catch (error) {
+      if (error instanceof Error) {
+        const messages: Record<string, [number, string, string]> = {
+          UNSUPPORTED_DOCUMENT_TYPE: [
+            400,
+            "UNSUPPORTED_DOCUMENT_TYPE",
+            "El formato no está permitido.",
+          ],
+          DOCUMENT_SIZE_INVALID: [
+            400,
+            "DOCUMENT_SIZE_INVALID",
+            "El archivo está vacío o supera 10 MB.",
+          ],
+          DOCUMENT_CONTENT_INVALID: [
+            400,
+            "DOCUMENT_CONTENT_INVALID",
+            "El contenido no coincide con su formato.",
+          ],
+          PROFILE_PHOTO_TYPE_INVALID: [
+            400,
+            "PROFILE_PHOTO_TYPE_INVALID",
+            "La foto de perfil debe ser una imagen.",
+          ],
+          PROFILE_PHOTO_SIDE_INVALID: [
+            400,
+            "PROFILE_PHOTO_SIDE_INVALID",
+            "La foto de perfil no tiene cara documental.",
+          ],
+          IDENTITY_DOCUMENT_SIDE_REQUIRED: [
+            400,
+            "IDENTITY_DOCUMENT_SIDE_REQUIRED",
+            "El documento requiere frente o reverso.",
+          ],
+        };
+        const mapped = messages[error.message];
+        if (mapped) return sendError(reply, mapped[0], mapped[1], mapped[2], request.id);
+      }
+      throw error;
+    }
   });
 
   app.post("/v1/tenants/:tenantId/borrowers", async (request, reply) => {

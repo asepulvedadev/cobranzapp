@@ -7,6 +7,7 @@ import {
   borrowerCreateRequestSchema,
   borrowerDirectoryQuerySchema,
   borrowerDirectorySchema,
+  borrowerDocumentResponseSchema,
   borrowerResponseSchema,
   borrowerReviewRequestSchema,
   borrowerReviewResponseSchema,
@@ -129,6 +130,7 @@ const documentedSchemas = {
   BorrowerCreateRequest: borrowerCreateRequestSchema,
   BorrowerDirectory: borrowerDirectorySchema,
   BorrowerDirectoryQuery: borrowerDirectoryQuerySchema,
+  BorrowerDocumentResponse: borrowerDocumentResponseSchema,
   BorrowerResponse: borrowerResponseSchema,
   BorrowerReviewRequest: borrowerReviewRequestSchema,
   BorrowerReviewResponse: borrowerReviewResponseSchema,
@@ -914,6 +916,56 @@ export function createOpenApiDocument(version: string) {
             "403": errorResponses["403"],
             "404": response("El cliente no existe.", schemaReference("ApiError")),
             "503": response("El módulo no está habilitado.", schemaReference("ApiError")),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/borrowers/{borrowerId}/documents": {
+        post: {
+          tags: ["Clientes"],
+          operationId: "uploadBorrowerDocument",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "borrowerId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "multipart/form-data": {
+                schema: {
+                  type: "object",
+                  required: ["file", "category"],
+                  properties: {
+                    file: { type: "string", format: "binary" },
+                    category: { type: "string", enum: ["identity", "profile_photo"] },
+                    side: { type: "string", nullable: true, enum: ["front", "back", null] },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": response(
+              "Documento enviado a cuarentena privada.",
+              schemaReference("BorrowerDocumentResponse"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("El cliente no existe.", schemaReference("ApiError")),
+            "409": response("Ya existe un documento para esa cara.", schemaReference("ApiError")),
+            "413": response("El documento supera el límite.", schemaReference("ApiError")),
+            "503": response("El almacenamiento no está habilitado.", schemaReference("ApiError")),
           },
         },
       },

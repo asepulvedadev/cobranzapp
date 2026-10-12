@@ -701,6 +701,7 @@ export const borrowerSchema = z.object({
 });
 
 export const borrowerResponseSchema = z.object({ borrower: borrowerSchema });
+export const borrowerDocumentResponseSchema = z.object({ document: borrowerDocumentSchema });
 export const borrowerReviewRequestSchema = z
   .object({
     decision: z.enum(["reviewed", "rejected"]),
@@ -814,5 +815,6 @@ export type TenantMemberProfile = z.infer<typeof tenantMemberProfileSchema>;
 export type BorrowerDocument = z.infer<typeof borrowerDocumentSchema>;
 export type BorrowerCreateRequest = z.infer<typeof borrowerCreateRequestSchema>;
 export type BorrowerReviewRequest = z.infer<typeof borrowerReviewRequestSchema>;
+export type BorrowerDocumentResponse = z.infer<typeof borrowerDocumentResponseSchema>;
 export type Borrower = z.infer<typeof borrowerSchema>;
 export type BorrowerDirectory = z.infer<typeof borrowerDirectorySchema>;

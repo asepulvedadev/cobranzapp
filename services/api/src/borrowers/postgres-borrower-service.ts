@@ -10,6 +10,8 @@ import {
 import type {
   BorrowerCreateInput,
   BorrowerCreateResult,
+  BorrowerDocumentInput,
+  BorrowerDocumentResult,
   BorrowerReviewInput,
   BorrowerReviewResult,
   BorrowerService,
@@ -406,6 +408,95 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
         );
         const updated = await loadBorrower(client, tenantId, borrowerId);
         return updated ? { status: "updated", borrower: updated } : { status: "not_found" };
+      });
+    },
+
+    async addDocument(
+      actor,
+      tenantId,
+      borrowerId,
+      input: BorrowerDocumentInput,
+    ): Promise<BorrowerDocumentResult> {
+      if (!actor.tenantRole || !["owner", "supervisor", "collector"].includes(actor.tenantRole)) {
+        return { status: "forbidden" };
+      }
+      const expectedPrefix = `tenant/${tenantId}/borrowers/${borrowerId}/quarantine/`;
+      if (!input.objectKey.startsWith(expectedPrefix)) return { status: "invalid_object_key" };
+      return withTransaction(actor, tenantId, async (client) => {
+        const borrower = await client.query<{ id: string }>(
+          `SELECT id FROM borrowers WHERE tenant_id = $1 AND id = $2`,
+          [tenantId, borrowerId],
+        );
+        if (!borrower.rows[0]) return { status: "not_found" };
+        try {
+          const inserted = await client.query<{
+            id: string;
+            category: Borrower["documents"][number]["category"];
+            side: Borrower["documents"][number]["side"];
+            object_key: string;
+            media_type: string;
+            size_bytes: number;
+            sha256: string;
+            scan_status: Borrower["documents"][number]["scanStatus"];
+            created_at: Date;
+          }>(
+            `INSERT INTO borrower_documents
+               (tenant_id, borrower_id, category, side, object_key, media_type, size_bytes, sha256, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, lower($8), $9)
+             RETURNING id, category, side, object_key, media_type, size_bytes, sha256, scan_status, created_at`,
+            [
+              tenantId,
+              borrowerId,
+              input.category,
+              input.side,
+              input.objectKey,
+              input.mediaType,
+              input.sizeBytes,
+              input.sha256,
+              actor.userId,
+            ],
+          );
+          const row = inserted.rows[0];
+          if (!row) return { status: "not_found" };
+          if (input.category === "profile_photo") {
+            await client.query(
+              `UPDATE borrowers SET profile_photo_object_key = $3, updated_at = now()
+                 WHERE tenant_id = $1 AND id = $2`,
+              [tenantId, borrowerId, input.objectKey],
+            );
+          }
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+             VALUES ($1, $2, 'borrower.document_quarantined', 'borrower_document', $3, $4, $5::jsonb)`,
+            [
+              tenantId,
+              actor.userId,
+              row.id,
+              input.requestId,
+              JSON.stringify({ category: input.category, side: input.side, scanStatus: "pending" }),
+            ],
+          );
+          return {
+            status: "created",
+            document: {
+              id: row.id,
+              category: row.category,
+              side: row.side,
+              objectKey: row.object_key,
+              mediaType: row.media_type,
+              sizeBytes: row.size_bytes,
+              sha256: row.sha256,
+              scanStatus: row.scan_status,
+              createdAt: row.created_at.toISOString(),
+            },
+          };
+        } catch (error) {
+          if (error && typeof error === "object" && "code" in error && error.code === "23505") {
+            return { status: "duplicate" };
+          }
+          throw error;
+        }
       });
     },
   };

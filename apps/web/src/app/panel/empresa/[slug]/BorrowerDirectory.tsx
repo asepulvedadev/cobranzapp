@@ -4,6 +4,7 @@ import type { Borrower, BorrowerDirectory as BorrowerDirectoryData } from "@cobr
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
+import { BorrowerDocumentUpload } from "./BorrowerDocumentUpload";
 import { BorrowerReviewControl } from "./BorrowerReviewControl";
 
 function statusLabel(status: Borrower["identity"]["verificationState"]) {
@@ -97,6 +98,7 @@ export function BorrowerDirectory({
                   <th>Documento</th>
                   <th>Contacto</th>
                   <th>Estado de identidad</th>
+                  <th>Documentos</th>
                   <th>Revisión</th>
                 </tr>
               </thead>
@@ -119,6 +121,9 @@ export function BorrowerDirectory({
                       <span className={`status status-${borrower.identity.verificationState}`}>
                         {statusLabel(borrower.identity.verificationState)}
                       </span>
+                    </td>
+                    <td data-label="Documentos">
+                      <BorrowerDocumentUpload borrowerId={borrower.id} tenantId={tenantId} />
                     </td>
                     <td data-label="Revisión">
                       <BorrowerReviewControl

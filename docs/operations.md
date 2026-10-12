@@ -86,6 +86,12 @@ identidad como revisada; si falta un documento aceptado, la API rechaza la aprob
 el estado pendiente. Un rechazo requiere una nota de al menos diez caracteres y también queda
 auditado. La revisión no equivale a una certificación de autenticidad.
 
+La carga de documentos ya pasa por un endpoint multipart con límite de 10 MB, validación de tipo
+declarado contra los bytes iniciales, clave opaca por tenant/cliente y permisos de archivo
+restringidos. El archivo se escribe en cuarentena privada con estado `pending`; no se entrega una
+URL pública ni se permite reutilizar una ruta arbitraria. La integración de antivirus externo y la
+copia off-site/versionada siguen siendo un requisito operativo antes de almacenar datos reales.
+
 ### Shared verification network (replacement for “blacklist”)
 
 The product now has a consent-gated foundation for a shared verification network. It returns only minimal categories and counts, records every query, requires evidence and expiry for each observation, and supports a correction request. It never shares documents, balances, addresses, photos or the reporting company name.

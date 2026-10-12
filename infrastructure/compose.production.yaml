@@ -35,11 +35,14 @@ services:
       ALLOWED_WEB_ORIGINS: ${ALLOWED_WEB_ORIGINS}
       SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-8}
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL}
+      BORROWER_DOCUMENTS_ROOT: /var/lib/cobranzapp/documents
     depends_on:
       postgres:
         condition: service_healthy
     ports:
       - "127.0.0.1:18200:3001"
+    volumes:
+      - documents_data:/var/lib/cobranzapp/documents
     networks: [frontend, backend]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
@@ -96,3 +99,4 @@ networks:
 
 volumes:
   postgres_data:
+  documents_data:
