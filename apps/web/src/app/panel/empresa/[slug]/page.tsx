@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import type { CSSProperties } from "react";
 import type {
+  BorrowerDirectory,
   CurrentUser,
   SupportAccessRecord,
   TenantMemberProfile,
@@ -10,6 +11,7 @@ import type {
 import { serverApi } from "../../../../lib/server-api";
 import { ActivityFeed } from "../../ActivityFeed";
 import { InviteUserForm } from "../../InviteUserForm";
+import { BorrowerDirectory as BorrowerDirectoryView } from "./BorrowerDirectory";
 import { CustomerWorkspace } from "./CustomerWorkspace";
 import { MemberAccessControl } from "./MemberAccessControl";
 import { MemberProfileForm } from "./MemberProfileForm";
@@ -67,6 +69,7 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
   const overview = (await response.json()) as TenantOverview;
   const canSeeTeam = overview.actorRole === "owner" || overview.actorRole === "supervisor";
   let memberProfile: TenantMemberProfile | null = null;
+  let borrowerDirectory: BorrowerDirectory | null = null;
   if (overview.actorRole !== "customer" && overview.actorRole !== "support") {
     const profileResponse = await serverApi(
       `/v1/tenants/${membership.tenantId}/members/${user.id}/profile`,
@@ -75,6 +78,12 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
     ({ profile: memberProfile } = (await profileResponse.json()) as {
       profile: TenantMemberProfile;
     });
+    const borrowersResponse = await serverApi(
+      `/v1/tenants/${membership.tenantId}/borrowers?page=1&pageSize=20`,
+    );
+    if (borrowersResponse.ok) {
+      borrowerDirectory = (await borrowersResponse.json()) as BorrowerDirectory;
+    }
   }
   let supportAccess: SupportAccessRecord[] = [];
   if (overview.actorRole === "owner") {
@@ -250,6 +259,20 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
           </aside>
         )}
       </div>
+
+      {borrowerDirectory ? (
+        <section className="dashboard-card borrower-directory-card" id="clientes">
+          <BorrowerDirectoryView directory={borrowerDirectory} tenantId={overview.tenant.id} />
+        </section>
+      ) : (
+        <section className="dashboard-card borrower-directory-card" id="clientes">
+          <span className="panel-eyebrow">Cartera</span>
+          <h2>Clientes</h2>
+          <p className="operational-note">
+            El módulo de clientes está pendiente de configurar su clave privada de protección.
+          </p>
+        </section>
+      )}
 
       <section className="workspace-configuration" id="configuracion">
         <div className="dashboard-card settings-card">

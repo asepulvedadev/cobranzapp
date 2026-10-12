@@ -2,6 +2,7 @@ import pg from "pg";
 import { buildApp } from "./app.js";
 import { parseMfaEncryptionKey } from "./auth/mfa.js";
 import { createPostgresAuthService } from "./auth/postgres-auth-service.js";
+import { createPostgresBorrowerService } from "./borrowers/postgres-borrower-service.js";
 import { loadConfig, parseAllowedOrigins } from "./config.js";
 import { createResendContactMailer } from "./contact/resend.js";
 import { createPostgresPlatformService } from "./platform/postgres-platform-service.js";
@@ -25,6 +26,9 @@ const app = buildApp({
       })
     : undefined,
   allowedWebOrigins: parseAllowedOrigins(config.ALLOWED_WEB_ORIGINS),
+  borrowerService: config.BORROWER_IDENTITY_KEY
+    ? createPostgresBorrowerService(pool, config.BORROWER_IDENTITY_KEY)
+    : undefined,
   authService: createPostgresAuthService(
     pool,
     config.SESSION_TTL_HOURS,

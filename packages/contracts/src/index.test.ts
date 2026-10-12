@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  borrowerCreateRequestSchema,
   createBranchRequestSchema,
   createPlatformTenantRequestSchema,
   currentUserSchema,
@@ -94,6 +95,33 @@ describe("shared API contracts", () => {
       tenantMemberProfileRequestSchema.safeParse({
         ...base,
         bloodTypeConsentVersion: "staff-profile-v1",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("keeps borrower identity masked and requires an emergency contact", () => {
+    const base = {
+      fullName: "Cliente Ejemplo",
+      country: "CO",
+      documentType: "CC",
+      documentNumber: "1234567890",
+      phone: "+57 300 111 2233",
+      homeAddress: "Calle 1 # 2-3",
+      workAddress: "Carrera 4 # 5-6",
+      profilePhotoObjectKey: null,
+      consentVersion: "borrower-dossier-v1",
+      consentEvidenceRef: "form-001",
+      documents: [],
+    };
+    expect(borrowerCreateRequestSchema.safeParse({ ...base, emergencyContacts: [] }).success).toBe(
+      false,
+    );
+    expect(
+      borrowerCreateRequestSchema.safeParse({
+        ...base,
+        emergencyContacts: [
+          { fullName: "Contacto", relationship: "Hermano", phone: "+57 300 444 5566" },
+        ],
       }).success,
     ).toBe(true);
   });

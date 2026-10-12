@@ -70,6 +70,16 @@ su alcance; cada cambio genera auditoría sin registrar los valores sensibles en
 evento. La carga real de imágenes permanece detrás del almacenamiento privado aprobado y no se
 aceptan rutas de objetos arbitrarias.
 
+### Captura inicial de clientes
+
+La consola empresarial ya incluye una captura rápida de clientes con nombre legal, tipo y número
+de documento, celular, direcciones de casa/trabajo, un contacto de emergencia y referencia de
+consentimiento. El número se cifra en reposo y se busca mediante HMAC con alcance de tenant; las
+respuestas solo muestran los últimos cuatro dígitos. Los documentos de frente/reverso y la foto de
+perfil se registran como referencias opacas de almacenamiento privado y permanecen pendientes de
+la siguiente etapa de carga, cuarentena y revisión manual. Esta etapa no hace OCR ni afirma
+autenticidad documental.
+
 ### Shared verification network (replacement for “blacklist”)
 
 The product now has a consent-gated foundation for a shared verification network. It returns only minimal categories and counts, records every query, requires evidence and expiry for each observation, and supports a correction request. It never shares documents, balances, addresses, photos or the reporting company name.

@@ -23,6 +23,12 @@ describe("OpenAPI contract", () => {
     expect(document.paths["/v1/tenants/{tenantId}/members/{userId}/profile"].put.operationId).toBe(
       "updateTenantMemberProfile",
     );
+    expect(document.paths["/v1/tenants/{tenantId}/borrowers"].get.operationId).toBe(
+      "listBorrowers",
+    );
+    expect(document.paths["/v1/tenants/{tenantId}/borrowers"].post.operationId).toBe(
+      "createBorrower",
+    );
     expect(document.paths["/v1/tenants/{tenantId}/settings"].patch.operationId).toBe(
       "updateTenantSettings",
     );

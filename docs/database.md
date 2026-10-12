@@ -47,6 +47,8 @@ Identity uniqueness is tenant-local over normalized country/type/number HMAC for
 
 The consent-gated shared verification foundation is implemented in migration `0016_verification_network_foundation.sql`. It keeps a global keyed identity reference separate from tenant consents, minimal expiring assertions, query audit events and correction requests. It does not replace the future `borrowers` tables or authorize a credit-bureau integration. `tenant_member_profiles` stores only private profile metadata; `profile_photo_object_key` is an opaque private-storage reference, never a public URL, and `blood_type` is optional sensitive data with a separate consent marker.
 
+Migration `0017_borrower_dossier_foundation.sql` now adds the first tenant-scoped borrower dossier slice. It stores legal name, required contact addresses, consent evidence, a tenant-keyed HMAC plus encrypted document number, masked last four digits, emergency contacts and private document metadata. API responses never return the full document number. The migration deliberately stores opaque object keys and `pending` scan state; the private upload/quarantine adapter and document review workflow must be completed before treating a dossier as identity-reviewed.
+
 ### Lending and accounting
 
 | Table | Important fields / relationships |

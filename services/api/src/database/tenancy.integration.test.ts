@@ -276,7 +276,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     const platform = createPostgresPlatformService(runtimePool);
     const supportAccess = createPostgresSupportAccessService(runtimePool);
     await expect(platform.systemStatus(developerId)).resolves.toMatchObject({
-      schemaVersion: "0016_verification_network_foundation.sql",
+      schemaVersion: "0017_borrower_dossier_foundation.sql",
       jobs: {
         status: expect.stringMatching(/^(operational|attention)$/),
         due: expect.any(Number),

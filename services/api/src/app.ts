@@ -1,4 +1,6 @@
 import {
+  borrowerCreateRequestSchema,
+  borrowerDirectoryQuerySchema,
   changePasswordRequestSchema,
   createBranchRequestSchema,
   createPlatformTenantRequestSchema,
@@ -30,6 +32,7 @@ import QRCode from "qrcode";
 import { z } from "zod";
 import { LoginRateLimiter } from "./auth/login-rate-limiter.js";
 import type { AuthenticatedUser, AuthService } from "./auth/types.js";
+import type { BorrowerService } from "./borrowers/types.js";
 import type { ContactMailer } from "./contact/resend.js";
 import { registerContactRoutes } from "./contact/routes.js";
 import type { PlatformService } from "./platform/types.js";
@@ -52,6 +55,7 @@ const tenantTeamMemberParamsSchema = z.object({
 });
 const tenantBranchParamsSchema = z.object({ tenantId: z.uuid(), branchId: z.uuid() });
 const tenantTeamParamsSchema = z.object({ tenantId: z.uuid(), teamId: z.uuid() });
+const tenantBorrowerParamsSchema = z.object({ tenantId: z.uuid(), borrowerId: z.uuid() });
 const verificationNetworkParamsSchema = z.object({ tenantId: z.uuid() });
 const verificationNetworkConsentParamsSchema = z.object({
   tenantId: z.uuid(),
@@ -76,6 +80,7 @@ const supportAccessRequestSchema = z.object({
 const supportAccessReviewSchema = z.object({ action: z.enum(["approve", "deny", "revoke"]) });
 
 export interface AppDependencies {
+  borrowerService?: BorrowerService;
   contactMailer?: ContactMailer;
   allowedWebOrigins?: string[];
   authService: AuthService;
@@ -1362,6 +1367,179 @@ export function buildApp(dependencies: AppDependencies) {
           "El integrante no existe.",
           request.id,
         );
+    }
+  });
+
+  function canManageBorrowers(role: AuthenticatedUser["memberships"][number]["role"] | undefined) {
+    return role === "owner" || role === "supervisor" || role === "collector";
+  }
+
+  app.get("/v1/tenants/:tenantId/borrowers", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const query = borrowerDirectoryQuerySchema.safeParse(request.query);
+    if (!params.success || !query.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_BORROWER_QUERY",
+        "Revisa los filtros de clientes.",
+        request.id,
+      );
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !canManageBorrowers(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "No tienes acceso al directorio de clientes.",
+        request.id,
+      );
+    }
+    if (!dependencies.borrowerService) {
+      return sendError(
+        reply,
+        503,
+        "BORROWER_DOSSIER_UNAVAILABLE",
+        "El módulo de clientes requiere configurar su clave de protección.",
+        request.id,
+      );
+    }
+    const directory = await dependencies.borrowerService.list(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      {
+        search: query.data.q?.trim() || null,
+        page: query.data.page,
+        pageSize: query.data.pageSize,
+      },
+    );
+    return reply.send(directory);
+  });
+
+  app.get("/v1/tenants/:tenantId/borrowers/:borrowerId", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantBorrowerParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !canManageBorrowers(membership.role)) {
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a este cliente.", request.id);
+    }
+    if (!dependencies.borrowerService) {
+      return sendError(
+        reply,
+        503,
+        "BORROWER_DOSSIER_UNAVAILABLE",
+        "El módulo de clientes requiere configurar su clave de protección.",
+        request.id,
+      );
+    }
+    const borrower = await dependencies.borrowerService.get(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.borrowerId,
+    );
+    if (!borrower)
+      return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
+    return reply.send({ borrower });
+  });
+
+  app.post("/v1/tenants/:tenantId/borrowers", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = borrowerCreateRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_BORROWER",
+        "Revisa los datos obligatorios del cliente y sus contactos.",
+        request.id,
+      );
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !canManageBorrowers(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "No tienes permiso para crear clientes.",
+        request.id,
+      );
+    }
+    if (!dependencies.borrowerService) {
+      return sendError(
+        reply,
+        503,
+        "BORROWER_DOSSIER_UNAVAILABLE",
+        "El módulo de clientes requiere configurar su clave de protección.",
+        request.id,
+      );
+    }
+    try {
+      const result = await dependencies.borrowerService.create(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        { ...body.data, requestId: request.id },
+      );
+      if (result.status === "duplicate_identity") {
+        return sendError(
+          reply,
+          409,
+          "BORROWER_DUPLICATE_IDENTITY",
+          "Ya existe un cliente activo con ese documento en esta empresa.",
+          request.id,
+        );
+      }
+      if (result.status === "invalid_object_key") {
+        return sendError(
+          reply,
+          400,
+          "INVALID_BORROWER_OBJECT_KEY",
+          "Los documentos deben provenir del almacenamiento privado del cliente.",
+          request.id,
+        );
+      }
+      if (result.status === "not_found") {
+        return sendError(
+          reply,
+          404,
+          "BORROWER_NOT_FOUND",
+          "No fue posible crear el cliente.",
+          request.id,
+        );
+      }
+      return reply.code(201).send({ borrower: result.borrower });
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("INVALID_DOCUMENT_")) {
+        return sendError(
+          reply,
+          400,
+          "INVALID_BORROWER_IDENTITY",
+          "El número de documento no tiene un formato válido.",
+          request.id,
+        );
+      }
+      throw error;
     }
   });
 

@@ -3630,3 +3630,76 @@ html:has(.panel-shell) {
     transform: none;
   }
 }
+
+.borrower-directory-card {
+  margin-top: 24px;
+}
+
+.borrower-directory-grid {
+  display: grid;
+  gap: 22px;
+}
+
+.borrower-list,
+.borrower-create-card {
+  min-width: 0;
+}
+
+.borrower-create-card {
+  background: linear-gradient(145deg, #fff 0%, #f7fbf8 100%);
+}
+
+.borrower-form-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+}
+
+.borrower-form-row label {
+  display: grid;
+  gap: 7px;
+}
+
+.borrower-contact-fieldset {
+  display: grid;
+  gap: 9px;
+  margin: 6px 0;
+  padding: 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: 14px;
+}
+
+.borrower-contact-fieldset legend {
+  padding-inline: 5px;
+  color: var(--panel-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.borrower-table .status-manual_pending {
+  background: #fff5dd;
+  color: #8b5b00;
+}
+
+.borrower-table .status-reviewed {
+  background: #e6f5ed;
+  color: #176b43;
+}
+
+.borrower-table .status-rejected {
+  background: #fdeaea;
+  color: #a63a3a;
+}
+
+@media (min-width: 900px) {
+  .borrower-directory-grid {
+    grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.8fr);
+    align-items: start;
+  }
+}
+
+@media (max-width: 580px) {
+  .borrower-form-row {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,5 +1,8 @@
 export type {
   AccountSession,
+  Borrower,
+  BorrowerCreateRequest,
+  BorrowerDirectory,
   CurrentUser,
   MembershipEntitlement,
   MembershipPlan,

@@ -611,6 +611,111 @@ export const tenantMemberProfileResponseSchema = z.object({
   profile: tenantMemberProfileSchema,
 });
 
+export const borrowerDocumentSideSchema = z.enum(["front", "back"]);
+export const borrowerDocumentSchema = z.object({
+  id: z.uuid(),
+  category: z.enum(["identity", "profile_photo"]),
+  side: borrowerDocumentSideSchema.nullable(),
+  objectKey: z.string().min(1),
+  mediaType: z.string().min(3),
+  sizeBytes: z.number().int().positive(),
+  sha256: z.string().length(64),
+  scanStatus: z.enum(["pending", "accepted", "rejected"]),
+  createdAt: z.iso.datetime(),
+});
+
+export const borrowerEmergencyContactInputSchema = z.object({
+  fullName: z.string().trim().min(2).max(120),
+  relationship: z.string().trim().min(2).max(80),
+  phone: z.string().trim().min(7).max(30),
+});
+
+export const borrowerDocumentInputSchema = z.object({
+  category: z.enum(["identity", "profile_photo"]),
+  side: borrowerDocumentSideSchema.nullable(),
+  objectKey: z.string().trim().min(1).max(500),
+  mediaType: z.string().trim().min(3).max(120),
+  sizeBytes: z.number().int().positive().max(10_485_760),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/i),
+});
+
+export const borrowerCreateRequestSchema = z
+  .object({
+    fullName: z.string().trim().min(2).max(160),
+    country: z.string().trim().length(2).toUpperCase(),
+    documentType: z.string().trim().min(2).max(30),
+    documentNumber: z.string().trim().min(4).max(32),
+    phone: z.string().trim().min(7).max(30),
+    homeAddress: z.string().trim().min(3).max(240),
+    workAddress: z.string().trim().min(3).max(240),
+    profilePhotoObjectKey: z.string().trim().min(1).max(500).nullable(),
+    consentVersion: z.string().trim().min(1).max(40),
+    consentEvidenceRef: z.string().trim().min(1).max(240),
+    emergencyContacts: z.array(borrowerEmergencyContactInputSchema).min(1).max(2),
+    documents: z.array(borrowerDocumentInputSchema).max(3),
+  })
+  .superRefine((value, context) => {
+    const identityDocuments = value.documents.filter(
+      (document) => document.category === "identity",
+    );
+    const sides = new Set(identityDocuments.map((document) => document.side));
+    if (identityDocuments.length > 0 && (!sides.has("front") || !sides.has("back"))) {
+      context.addIssue({
+        code: "custom",
+        path: ["documents"],
+        message: "Los documentos de identidad deben incluir frente y reverso.",
+      });
+    }
+    if (
+      value.profilePhotoObjectKey &&
+      !value.documents.some((document) => document.category === "profile_photo")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["documents"],
+        message: "La foto de perfil debe registrarse también como documento privado.",
+      });
+    }
+  });
+
+export const borrowerIdentitySchema = z.object({
+  country: z.string().length(2),
+  documentType: z.string().min(2),
+  documentLast4: z.string().min(2).max(4),
+  verificationState: z.enum(["manual_pending", "reviewed", "rejected"]),
+});
+
+export const borrowerSchema = z.object({
+  id: z.uuid(),
+  fullName: z.string().min(2),
+  status: z.enum(["active", "archived"]),
+  phone: z.string().min(7),
+  homeAddress: z.string().min(3),
+  workAddress: z.string().min(3),
+  profilePhotoObjectKey: z.string().nullable(),
+  consentVersion: z.string().min(1),
+  identity: borrowerIdentitySchema,
+  emergencyContacts: z.array(borrowerEmergencyContactInputSchema.extend({ id: z.uuid() })).max(2),
+  documents: z.array(borrowerDocumentSchema).max(3),
+  createdAt: z.iso.datetime(),
+});
+
+export const borrowerResponseSchema = z.object({ borrower: borrowerSchema });
+export const borrowerDirectoryQuerySchema = z.object({
+  q: z.string().trim().max(80).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+});
+export const borrowerDirectorySchema = z.object({
+  borrowers: z.array(borrowerSchema),
+  pagination: z.object({
+    page: z.number().int().positive(),
+    pageSize: z.number().int().positive(),
+    total: z.number().int().nonnegative(),
+    totalPages: z.number().int().positive(),
+  }),
+});
+
 export type ServiceStatus = z.infer<typeof serviceStatusSchema>;
 export type ApiError = z.infer<typeof apiErrorSchema>;
 export type TenantRole = z.infer<typeof tenantRoleSchema>;
@@ -681,3 +786,7 @@ export type VerificationNetworkCorrectionResponse = z.infer<
 export type TenantMemberProfileRequest = z.infer<typeof tenantMemberProfileRequestSchema>;
 export type TenantMemberEmergencyContact = z.infer<typeof tenantMemberEmergencyContactSchema>;
 export type TenantMemberProfile = z.infer<typeof tenantMemberProfileSchema>;
+export type BorrowerDocument = z.infer<typeof borrowerDocumentSchema>;
+export type BorrowerCreateRequest = z.infer<typeof borrowerCreateRequestSchema>;
+export type Borrower = z.infer<typeof borrowerSchema>;
+export type BorrowerDirectory = z.infer<typeof borrowerDirectorySchema>;
