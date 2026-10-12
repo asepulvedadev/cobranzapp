@@ -105,6 +105,7 @@ function dependencies(overrides?: {
       recoveryCodes: ["ABCDE-ABCDE-ABCDE-ABCDE"],
       revokedSessions: 1,
     })),
+    disableMfa: vi.fn(async () => ({ status: "disabled", revokedSessions: 1 })),
     ...overrides?.authService,
   };
   const platformService: PlatformService = {
@@ -498,6 +499,104 @@ describe("authentication", () => {
       activity: [{ action: "auth.login_succeeded" }],
     });
     expect(deps.authService.listSecurityActivity).toHaveBeenCalledWith(developer.id);
+  });
+
+  it("exposes the current MFA status without caching it", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/auth/mfa",
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({
+      mfa: { enabled: false, setupPending: false, setupExpiresAt: null },
+    });
+    expect(deps.authService.getMfaStatus).toHaveBeenCalledWith(developer.id);
+  });
+
+  it("starts and confirms TOTP enrollment after recent reauthentication", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const headers = {
+      cookie: "cobranzapp_session=session-token",
+      origin: "https://cobranzaap.tech",
+    };
+    const setup = await app.inject({ method: "POST", url: "/v1/auth/mfa/setup", headers });
+    expect(setup.statusCode).toBe(201);
+    expect(setup.headers["cache-control"]).toBe("no-store");
+    expect(setup.json()).toMatchObject({
+      enrollment: {
+        secret: "JBSWY3DPEHPK3PXP",
+        qrDataUrl: expect.stringMatching(/^data:image\/png;base64,/),
+      },
+    });
+    expect(setup.json().enrollment).not.toHaveProperty("uri");
+
+    const enabled = await app.inject({
+      method: "POST",
+      url: "/v1/auth/mfa/enable",
+      headers,
+      payload: { code: "123456" },
+    });
+    expect(enabled.statusCode).toBe(200);
+    expect(enabled.json()).toEqual({
+      mfa: { enabled: true },
+      recoveryCodes: ["ABCDE-ABCDE-ABCDE-ABCDE"],
+      revokedSessions: 1,
+    });
+    expect(deps.authService.confirmMfaEnrollment).toHaveBeenCalledWith(
+      developer.id,
+      "session-token",
+      "123456",
+      expect.any(String),
+    );
+  });
+
+  it("disables MFA with a current authentication or recovery code", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/auth/mfa",
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { code: "ABCDE-ABCDE-ABCDE-ABCDE" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ mfa: { enabled: false }, revokedSessions: 1 });
+    expect(deps.authService.disableMfa).toHaveBeenCalledWith(
+      developer.id,
+      "session-token",
+      "ABCDE-ABCDE-ABCDE-ABCDE",
+      expect.any(String),
+    );
+  });
+
+  it("requires recent reauthentication before changing MFA", async () => {
+    const deps = dependencies({
+      authService: { isRecentlyReauthenticated: vi.fn(async () => false) },
+    });
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/auth/mfa/setup",
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+    });
+    expect(response.statusCode).toBe(428);
+    expect(response.json()).toMatchObject({ error: { code: "REAUTHENTICATION_REQUIRED" } });
+    expect(deps.authService.beginMfaEnrollment).not.toHaveBeenCalled();
   });
 
   it("audits logout and password changes with the request correlation id", async () => {

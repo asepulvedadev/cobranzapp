@@ -14,6 +14,7 @@ import type {
   AccountSession,
   AuthenticatedUser,
   AuthService,
+  MfaDisableResult,
   SecurityActivity,
   TenantRole,
 } from "./types.js";
@@ -89,6 +90,36 @@ type MfaCredentialRow = {
   mfa_setup_expires_at: Date | null;
   mfa_last_used_counter: string | null;
 };
+
+async function verifyAndConsumeMfaCode(
+  client: PoolClient,
+  userId: string,
+  credential: MfaCredentialRow,
+  code: string,
+  key: Buffer,
+) {
+  if (!credential.mfa_secret_encrypted || !credential.mfa_enabled_at) return false;
+  if (/^\d{6}$/.test(code)) {
+    const counter = verifyMfaToken(
+      decryptMfaSecret(credential.mfa_secret_encrypted, key),
+      code,
+      credential.mfa_last_used_counter === null ? null : Number(credential.mfa_last_used_counter),
+    );
+    if (counter === null) return false;
+    await client.query("UPDATE users SET mfa_last_used_counter = $2 WHERE id = $1", [
+      userId,
+      counter,
+    ]);
+    return true;
+  }
+  const recovered = await client.query(
+    `UPDATE auth_mfa_recovery_codes
+        SET used_at = now()
+      WHERE user_id = $1 AND code_hash = $2 AND used_at IS NULL`,
+    [userId, hashRecoveryCode(code)],
+  );
+  return Boolean(recovered.rowCount);
+}
 
 export function createPostgresAuthService(
   pool: Pool,
@@ -614,6 +645,72 @@ export function createPostgresAuthService(
           recoveryCodes,
           revokedSessions: revoked.rowCount ?? 0,
         } as const;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async disableMfa(userId, currentToken, code, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const current = await client.query<MfaCredentialRow>(
+          `SELECT mfa_secret_encrypted, mfa_enabled_at, mfa_setup_expires_at,
+                  mfa_last_used_counter
+             FROM users
+            WHERE id = $1 AND status = 'active'
+            FOR UPDATE`,
+          [userId],
+        );
+        const credential = current.rows[0];
+        if (!credential) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies MfaDisableResult;
+        }
+        if (!credential.mfa_enabled_at) {
+          await client.query("ROLLBACK");
+          return { status: "not_enabled" } satisfies MfaDisableResult;
+        }
+        if (!(await verifyAndConsumeMfaCode(client, userId, credential, code, mfaEncryptionKey))) {
+          await client.query("ROLLBACK");
+          return { status: "invalid" } satisfies MfaDisableResult;
+        }
+        await client.query("SELECT set_config('app.user_id', $1, true)", [userId]);
+        await client.query(
+          `UPDATE users
+              SET mfa_secret_encrypted = NULL,
+                  mfa_setup_expires_at = NULL,
+                  mfa_enabled_at = NULL,
+                  mfa_last_used_counter = NULL,
+                  updated_at = now()
+            WHERE id = $1`,
+          [userId],
+        );
+        await client.query("DELETE FROM auth_mfa_recovery_codes WHERE user_id = $1", [userId]);
+        const revoked = await client.query(
+          `UPDATE auth_sessions
+              SET revoked_at = now()
+            WHERE user_id = $1 AND token_hash <> $2
+              AND revoked_at IS NULL AND expires_at > now()`,
+          [userId, hashToken(currentToken)],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES (
+             NULL, $1, 'auth.mfa_disabled', 'user', $1, $2,
+             jsonb_build_object('revokedSessions', $3::integer)
+           )`,
+          [userId, requestId, revoked.rowCount ?? 0],
+        );
+        await client.query("COMMIT");
+        return {
+          status: "disabled",
+          revokedSessions: revoked.rowCount ?? 0,
+        } satisfies MfaDisableResult;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

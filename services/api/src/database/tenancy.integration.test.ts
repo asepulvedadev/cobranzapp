@@ -205,6 +205,26 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       `mfa-already-confirmed-${suffix}`,
     );
     expect(enabledResult).toEqual({ status: "already_enabled" });
+    await expect(
+      auth.disableMfa(
+        developerId,
+        byEmail?.token ?? "",
+        "not-a-recovery-code",
+        `mfa-bad-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "invalid" });
+    const disabled = await auth.disableMfa(
+      developerId,
+      byEmail?.token ?? "",
+      confirmation.recoveryCodes[0] ?? "",
+      `mfa-disable-${suffix}`,
+    );
+    expect(disabled).toMatchObject({ status: "disabled" });
+    await expect(auth.getMfaStatus(developerId)).resolves.toMatchObject({ enabled: false });
+    await expect(auth.authenticate(byEmail?.token ?? "")).resolves.toMatchObject({
+      id: developerId,
+      mfaEnabled: false,
+    });
     const platform = createPostgresPlatformService(runtimePool);
     const supportAccess = createPostgresSupportAccessService(runtimePool);
     await expect(platform.systemStatus(developerId)).resolves.toMatchObject({

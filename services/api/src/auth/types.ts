@@ -56,6 +56,12 @@ export type MfaConfirmationResult =
   | { status: "expired" }
   | { status: "not_found" };
 
+export type MfaDisableResult =
+  | { status: "disabled"; revokedSessions: number }
+  | { status: "invalid" }
+  | { status: "not_enabled" }
+  | { status: "not_found" };
+
 export interface AuthService {
   login(
     identifier: string,
@@ -94,4 +100,10 @@ export interface AuthService {
     code: string,
     requestId: string,
   ): Promise<MfaConfirmationResult>;
+  disableMfa(
+    userId: string,
+    currentToken: string,
+    code: string,
+    requestId: string,
+  ): Promise<MfaDisableResult>;
 }

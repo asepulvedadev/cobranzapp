@@ -1,5 +1,6 @@
 import type { ServiceStatus } from "@cobranzapp/contracts";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
+import QRCode from "qrcode";
 import { z } from "zod";
 import { LoginRateLimiter } from "./auth/login-rate-limiter.js";
 import type { AuthenticatedUser, AuthService } from "./auth/types.js";
@@ -22,6 +23,7 @@ const passwordSchema = z
     path: ["newPassword"],
   });
 const reauthenticationSchema = z.object({ password: z.string().min(12).max(256) });
+const mfaCodeSchema = z.object({ code: z.string().trim().min(6).max(32) });
 const tenantSchema = z.object({
   displayName: z.string().trim().min(2).max(120),
   slug: z
@@ -345,6 +347,151 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session) return;
     return { activity: await dependencies.authService.listSecurityActivity(session.user.id) };
+  });
+
+  app.get("/v1/auth/mfa", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    reply.header("cache-control", "no-store");
+    return { mfa: await dependencies.authService.getMfaStatus(session.user.id) };
+  });
+
+  app.post("/v1/auth/mfa/setup", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !(await requireRecentReauthentication(session, request, reply))) return;
+    const result = await dependencies.authService.beginMfaEnrollment(session.user.id, request.id);
+    if (result.status === "already_enabled") {
+      return sendError(
+        reply,
+        409,
+        "MFA_ALREADY_ENABLED",
+        "La verificación en dos pasos ya está activa.",
+        request.id,
+      );
+    }
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "USER_NOT_FOUND", "El usuario no existe.", request.id);
+    }
+    const qrDataUrl = await QRCode.toDataURL(result.uri, {
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 240,
+    });
+    reply.header("cache-control", "no-store");
+    return reply.code(201).send({
+      enrollment: {
+        secret: result.secret,
+        qrDataUrl,
+        expiresAt: result.expiresAt,
+      },
+    });
+  });
+
+  app.post("/v1/auth/mfa/enable", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !(await requireRecentReauthentication(session, request, reply))) return;
+    const parsed = mfaCodeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return sendError(
+        reply,
+        400,
+        "MFA_CODE_INVALID",
+        "Escribe el código de seis dígitos.",
+        request.id,
+      );
+    }
+    const result = await dependencies.authService.confirmMfaEnrollment(
+      session.user.id,
+      session.token,
+      parsed.data.code,
+      request.id,
+    );
+    if (result.status === "invalid") {
+      return sendError(
+        reply,
+        400,
+        "MFA_CODE_INVALID",
+        "El código no es válido o ya fue utilizado.",
+        request.id,
+      );
+    }
+    if (result.status === "expired") {
+      return sendError(
+        reply,
+        410,
+        "MFA_SETUP_EXPIRED",
+        "La configuración venció. Iníciala nuevamente.",
+        request.id,
+      );
+    }
+    if (result.status === "already_enabled") {
+      return sendError(
+        reply,
+        409,
+        "MFA_ALREADY_ENABLED",
+        "La verificación en dos pasos ya está activa.",
+        request.id,
+      );
+    }
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "USER_NOT_FOUND", "El usuario no existe.", request.id);
+    }
+    reply.header("cache-control", "no-store");
+    return reply.send({
+      mfa: { enabled: true },
+      recoveryCodes: result.recoveryCodes,
+      revokedSessions: result.revokedSessions,
+    });
+  });
+
+  app.delete("/v1/auth/mfa", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !(await requireRecentReauthentication(session, request, reply))) return;
+    const parsed = mfaCodeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return sendError(
+        reply,
+        400,
+        "MFA_CODE_INVALID",
+        "Escribe un código válido de autenticación o recuperación.",
+        request.id,
+      );
+    }
+    const result = await dependencies.authService.disableMfa(
+      session.user.id,
+      session.token,
+      parsed.data.code,
+      request.id,
+    );
+    if (result.status === "invalid") {
+      return sendError(
+        reply,
+        400,
+        "MFA_CODE_INVALID",
+        "El código no es válido o ya fue utilizado.",
+        request.id,
+      );
+    }
+    if (result.status === "not_enabled") {
+      return sendError(
+        reply,
+        409,
+        "MFA_NOT_ENABLED",
+        "La verificación en dos pasos no está activa.",
+        request.id,
+      );
+    }
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "USER_NOT_FOUND", "El usuario no existe.", request.id);
+    }
+    reply.header("cache-control", "no-store");
+    return reply.send({
+      mfa: { enabled: false },
+      revokedSessions: result.revokedSessions,
+    });
   });
 
   app.delete("/v1/auth/sessions/:sessionId", async (request, reply) => {
