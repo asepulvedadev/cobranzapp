@@ -146,7 +146,7 @@ export interface PlatformService {
   ): Promise<PlatformOverview["tenants"][number]>;
   createTenantForOwner?(
     actorUserId: string,
-    input: { code: string; displayName: string; requestId: string },
+    input: { code?: string; displayName: string; requestId: string },
   ): Promise<
     | {
         status: "created";
@@ -157,6 +157,7 @@ export interface PlatformService {
       }
     | { status: "invalid_code" }
     | { status: "expired_code" }
+    | { status: "no_subscription" }
   >;
   createOwnerAccount?(
     actorUserId: string,

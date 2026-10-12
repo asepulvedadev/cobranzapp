@@ -132,6 +132,8 @@ type PlatformUserRow = {
   platform_role: "developer" | null;
   status: "active" | "disabled";
   active_memberships: string;
+  subscription_count: string;
+  available_subscriptions: string;
   membership_plan: MembershipPlan | null;
   membership_activated_at: Date | null;
   active_sessions: string;
@@ -196,6 +198,8 @@ function mapPlatformUser(user: PlatformUserRow): PlatformUserDirectory["users"][
     platformRole: user.platform_role,
     status: user.status,
     activeMemberships: Number(user.active_memberships),
+    subscriptionCount: Number(user.subscription_count),
+    availableSubscriptions: Number(user.available_subscriptions),
     membershipPlan: user.membership_plan,
     membershipActivatedAt: user.membership_activated_at?.toISOString() ?? null,
     activeSessions: Number(user.active_sessions),
@@ -600,6 +604,15 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
                     SELECT count(*) FROM tenant_memberships membership
                      WHERE membership.user_id = app_user.id AND membership.status = 'active'
                   ) AS active_memberships,
+                  (
+                    SELECT count(*) FROM user_memberships subscription
+                     WHERE subscription.user_id = app_user.id AND subscription.status = 'active'
+                  ) AS subscription_count,
+                  (
+                    SELECT count(*) FROM user_memberships subscription
+                     WHERE subscription.user_id = app_user.id
+                       AND subscription.status = 'active' AND subscription.consumed_at IS NULL
+                  ) AS available_subscriptions,
                   active_membership.membership_plan,
                   active_membership.activated_at AS membership_activated_at,
                   (
@@ -612,9 +625,13 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
                      WHERE session.user_id = app_user.id
                   ) AS last_seen_at
              FROM users app_user
-             LEFT JOIN user_memberships active_membership
-               ON active_membership.user_id = app_user.id
-              AND active_membership.status = 'active'
+             LEFT JOIN LATERAL (
+               SELECT membership_plan, activated_at
+                 FROM user_memberships
+                WHERE user_id = app_user.id AND status = 'active'
+                ORDER BY activated_at DESC
+                LIMIT 1
+             ) active_membership ON true
             WHERE ${filter}
             ORDER BY app_user.created_at DESC, app_user.id DESC
             LIMIT $3 OFFSET $4`,
@@ -754,6 +771,8 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             platformRole: null,
             status: user.status,
             activeMemberships: 0,
+            subscriptionCount: 0,
+            availableSubscriptions: 0,
             membershipPlan: null,
             membershipActivatedAt: null,
             activeSessions: 0,
@@ -834,32 +853,60 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
         await client.query("BEGIN");
         await client.query("SELECT set_config('app.user_id', $1, true)", [actorUserId]);
         await client.query("SELECT set_config('app.platform_role', '', true)");
-        const codeResult = await client.query<{
-          id: string;
-          owner_user_id: string;
-          membership_plan: MembershipPlan;
-          expires_at: Date;
-        }>(
-          `SELECT id, owner_user_id, membership_plan, expires_at
-             FROM company_creation_codes
-            WHERE code_hash = $1
-              AND owner_user_id = $2
-              AND status = 'issued'
-            FOR UPDATE`,
-          [companyCodeHash(input.code), actorUserId],
-        );
-        const code = codeResult.rows[0];
-        if (!code) {
-          await client.query("ROLLBACK");
-          return { status: "invalid_code" as const };
+
+        let membershipPlan: MembershipPlan;
+        let creationCodeId: string | null = null;
+        let subscriptionId: string | null = null;
+        if (input.code) {
+          const codeResult = await client.query<{
+            id: string;
+            membership_plan: MembershipPlan;
+            expires_at: Date;
+          }>(
+            `SELECT id, membership_plan, expires_at
+               FROM company_creation_codes
+              WHERE code_hash = $1
+                AND owner_user_id = $2
+                AND status = 'issued'
+              FOR UPDATE`,
+            [companyCodeHash(input.code), actorUserId],
+          );
+          const code = codeResult.rows[0];
+          if (!code) {
+            await client.query("ROLLBACK");
+            return { status: "invalid_code" as const };
+          }
+          if (code.expires_at <= new Date()) {
+            await client.query(
+              `UPDATE company_creation_codes SET status = 'revoked' WHERE id = $1`,
+              [code.id],
+            );
+            await client.query("COMMIT");
+            return { status: "expired_code" as const };
+          }
+          membershipPlan = code.membership_plan;
+          creationCodeId = code.id;
+        } else {
+          const subscriptionResult = await client.query<{
+            id: string;
+            membership_plan: MembershipPlan;
+          }>(
+            `SELECT id, membership_plan
+               FROM user_memberships
+              WHERE user_id = $1 AND status = 'active' AND consumed_at IS NULL
+              ORDER BY activated_at ASC, id ASC
+              FOR UPDATE`,
+            [actorUserId],
+          );
+          const subscription = subscriptionResult.rows[0];
+          if (!subscription) {
+            await client.query("ROLLBACK");
+            return { status: "no_subscription" as const };
+          }
+          membershipPlan = subscription.membership_plan;
+          subscriptionId = subscription.id;
         }
-        if (code.expires_at <= new Date()) {
-          await client.query(`UPDATE company_creation_codes SET status = 'revoked' WHERE id = $1`, [
-            code.id,
-          ]);
-          await client.query("COMMIT");
-          return { status: "expired_code" as const };
-        }
+
         const base = tenantSlugSeed(input.displayName);
         await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))", [base]);
         let slug = base;
@@ -876,7 +923,7 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           `INSERT INTO tenants (slug, display_name, membership_plan, created_by)
            VALUES ($1, $2, $3, $4)
            RETURNING id, display_name, slug`,
-          [slug, input.displayName, code.membership_plan, actorUserId],
+          [slug, input.displayName, membershipPlan, actorUserId],
         );
         const tenant = tenantResult.rows[0];
         if (!tenant) throw new Error("Owner tenant insert did not return a record");
@@ -894,7 +941,7 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
         await insertEntitlementVersion(client, {
           actorUserId,
           additionalEmployeeSeats: 0,
-          membershipPlan: code.membership_plan,
+          membershipPlan,
           requestId: input.requestId,
           tenantId: tenant.id,
           version: 1,
@@ -917,15 +964,34 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
         await client.query(
           `INSERT INTO audit_events (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
            VALUES ($1, $2, 'tenant.created_by_owner', 'tenant', $1, $3,
-                   jsonb_build_object('slug', $4::text, 'membershipPlan', $5::text, 'creationCodeId', $6::text))`,
-          [tenant.id, actorUserId, input.requestId, tenant.slug, code.membership_plan, code.id],
+                   jsonb_build_object('slug', $4::text, 'membershipPlan', $5::text,
+                     'creationCodeId', $6::text, 'subscriptionId', $7::text))`,
+          [
+            tenant.id,
+            actorUserId,
+            input.requestId,
+            tenant.slug,
+            membershipPlan,
+            creationCodeId,
+            subscriptionId,
+          ],
         );
-        await client.query(
-          `UPDATE company_creation_codes
-              SET status = 'redeemed', redeemed_at = now(), redeemed_tenant_id = $2
-            WHERE id = $1`,
-          [code.id, tenant.id],
-        );
+        if (creationCodeId) {
+          await client.query(
+            `UPDATE company_creation_codes
+                SET status = 'redeemed', redeemed_at = now(), redeemed_tenant_id = $2
+              WHERE id = $1`,
+            [creationCodeId, tenant.id],
+          );
+        }
+        if (subscriptionId) {
+          await client.query(
+            `UPDATE user_memberships
+                SET consumed_at = now(), consumed_tenant_id = $2, updated_at = now()
+              WHERE id = $1 AND status = 'active' AND consumed_at IS NULL`,
+            [subscriptionId, tenant.id],
+          );
+        }
         await client.query("COMMIT");
         return {
           status: "created" as const,
@@ -1376,41 +1442,14 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           await client.query("ROLLBACK");
           return { status: "protected" } satisfies PlatformUserMembershipUpdateResult;
         }
-        const currentResult = await client.query<{ id: string; membership_plan: MembershipPlan }>(
-          `SELECT id, membership_plan
-             FROM user_memberships
-            WHERE user_id = $1 AND status = 'active'
-            FOR UPDATE`,
-          [userId],
-        );
-        const current = currentResult.rows[0];
-        if (current?.membership_plan === input.membershipPlan) {
-          const activated = await client.query<{ activated_at: Date }>(
-            "SELECT activated_at FROM user_memberships WHERE id = $1",
-            [current.id],
-          );
-          await client.query("COMMIT");
-          return {
-            status: "updated",
-            membershipPlan: current.membership_plan,
-            activatedAt: activated.rows[0]?.activated_at.toISOString() ?? new Date().toISOString(),
-          } satisfies PlatformUserMembershipUpdateResult;
-        }
-        if (current) {
-          await client.query(
-            `UPDATE user_memberships
-                SET status = 'suspended', deactivated_at = now(), updated_at = now()
-              WHERE id = $1`,
-            [current.id],
-          );
-        }
         const inserted = await client.query<{
+          id: string;
           membership_plan: MembershipPlan;
           activated_at: Date;
         }>(
           `INSERT INTO user_memberships (user_id, membership_plan, assigned_by)
            VALUES ($1, $2, $3)
-           RETURNING membership_plan, activated_at`,
+           RETURNING id, membership_plan, activated_at`,
           [userId, input.membershipPlan, actorUserId],
         );
         const membership = inserted.rows[0];

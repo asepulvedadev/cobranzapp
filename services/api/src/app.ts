@@ -610,7 +610,7 @@ export function buildApp(dependencies: AppDependencies) {
         reply,
         403,
         "PLATFORM_ACCOUNT_ONLY",
-        "Las empresas se crean con un código de suscripción asignado a su propietario.",
+        "Las empresas se crean desde una cuenta de propietario.",
         request.id,
       );
     }
@@ -620,7 +620,7 @@ export function buildApp(dependencies: AppDependencies) {
         reply,
         400,
         "INVALID_COMPANY_ONBOARDING",
-        "Revisa el código, el nombre y la contraseña de confirmación.",
+        "Revisa el nombre y la contraseña de confirmación.",
         request.id,
       );
     }
@@ -660,6 +660,15 @@ export function buildApp(dependencies: AppDependencies) {
           410,
           "COMPANY_CODE_EXPIRED",
           "El código de empresa venció. Solicita uno nuevo.",
+          request.id,
+        );
+      }
+      if (tenant.status === "no_subscription") {
+        return sendError(
+          reply,
+          403,
+          "SUBSCRIPTION_REQUIRED",
+          "Tu cuenta no tiene una suscripción disponible. Solicita al desarrollador que active una.",
           request.id,
         );
       }

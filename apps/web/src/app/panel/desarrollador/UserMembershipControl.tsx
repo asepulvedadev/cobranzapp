@@ -58,12 +58,8 @@ export function UserMembershipControl({
             </option>
           ))}
         </select>
-        <button
-          disabled={disabled || isSubmitting || selectedPlan === membershipPlan}
-          onClick={activate}
-          type="button"
-        >
-          {isSubmitting ? "Guardando…" : membershipPlan ? "Cambiar" : "Activar"}
+        <button disabled={disabled || isSubmitting} onClick={activate} type="button">
+          {isSubmitting ? "Guardando…" : membershipPlan ? "Activar otra" : "Activar"}
         </button>
       </div>
       {membershipActivatedAt ? (

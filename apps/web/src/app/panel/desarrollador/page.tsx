@@ -10,7 +10,6 @@ import type {
 } from "../../../lib/platform";
 import { serverApi } from "../../../lib/server-api";
 import { ActivityFeed, activityActionLabel } from "../ActivityFeed";
-import { IssueCompanyCodeForm } from "./IssueCompanyCodeForm";
 import { RegisterOwnerForm } from "./RegisterOwnerForm";
 import { SupportAccessControl } from "./SupportAccessControl";
 import { TenantMembershipPlanControl } from "./TenantMembershipPlanControl";
@@ -154,9 +153,6 @@ export default async function DeveloperDashboard({
   const overview = (await response.json()) as PlatformOverview;
   const directory = (await directoryResponse.json()) as TenantDirectory;
   const userDirectory = (await userDirectoryResponse.json()) as PlatformUserDirectory;
-  const ownerUsers = userDirectory.users.filter(
-    (user) => user.platformRole === null && user.status === "active",
-  );
   const activityDirectory = (await activityDirectoryResponse.json()) as PlatformActivityDirectory;
   const { access } = (await supportResponse.json()) as { access: SupportAccessRecord[] };
   const system = (await systemResponse.json()) as PlatformSystemStatus;
@@ -395,21 +391,14 @@ export default async function DeveloperDashboard({
           <aside className="dashboard-card create-card">
             <div className="card-heading">
               <div>
-                <span className="panel-eyebrow">Suscripción confirmada</span>
-                <h2>Emitir código de empresa</h2>
+                <span className="panel-eyebrow">Suscripciones</span>
+                <h2>Activa desde Usuarios</h2>
               </div>
             </div>
             <p>
-              Emite un código por empresa pagada. El propietario lo usa una sola vez para crear su
-              espacio.
+              Abre la sección Usuarios y activa Pro o Ultra directamente sobre el propietario. Cada
+              activación queda disponible para crear una empresa adicional.
             </p>
-            <IssueCompanyCodeForm
-              owners={ownerUsers.map((user) => ({
-                id: user.id,
-                displayName: user.displayName,
-                email: user.email,
-              }))}
-            />
           </aside>
         </div>
       </div>

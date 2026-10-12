@@ -19,8 +19,8 @@ export default async function CompanyOnboardingPage() {
           <span className="panel-eyebrow">Nuevo espacio</span>
           <h1>Crea tu empresa</h1>
           <p>
-            Usa el código de suscripción que te entregó cobranzapp. Una misma cuenta puede
-            administrar varias empresas, cada una con su propio código.
+            Tu suscripción ya está asociada a tu cuenta. Cada suscripción disponible permite crear
+            una empresa y una misma cuenta puede administrar varias.
           </p>
         </div>
       </header>

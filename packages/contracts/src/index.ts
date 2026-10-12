@@ -208,7 +208,8 @@ export const createOwnerTenantRequestSchema = z.object({
     .string()
     .trim()
     .toUpperCase()
-    .regex(/^CZA-[A-Z0-9]{4}(?:-[A-Z0-9]{4}){2}$/),
+    .regex(/^CZA-[A-Z0-9]{4}(?:-[A-Z0-9]{4}){2}$/)
+    .optional(),
   password: z.string().min(12).max(256),
 });
 
@@ -278,6 +279,8 @@ export const platformUserSchema = z.object({
   platformRole: z.literal("developer").nullable(),
   status: platformUserStatusSchema,
   activeMemberships: z.number().int().nonnegative(),
+  subscriptionCount: z.number().int().nonnegative(),
+  availableSubscriptions: z.number().int().nonnegative(),
   membershipPlan: membershipPlanSchema.nullable(),
   membershipActivatedAt: z.iso.datetime().nullable(),
   activeSessions: z.number().int().nonnegative(),
