@@ -1,0 +1,111 @@
+import type { Metadata } from "next";
+import type { TenantMemberProfile } from "../../../../../lib/platform";
+import { serverApi } from "../../../../../lib/server-api";
+import { InviteUserForm } from "../../../InviteUserForm";
+import { MemberAccessControl } from "../MemberAccessControl";
+import { MemberProfileDirectory } from "../MemberProfileDirectory";
+import { PendingInvitationList } from "../PendingInvitationList";
+import { loadTenantContext } from "../tenant-context";
+
+export const metadata: Metadata = { title: "Equipo" };
+
+export default async function TeamPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const { user, overview } = await loadTenantContext(slug);
+  const canManage = overview.actorRole === "owner" || overview.actorRole === "supervisor";
+  const profiles = canManage
+    ? (
+        await Promise.all(
+          overview.members
+            .filter((member) => ["owner", "supervisor", "collector"].includes(member.role))
+            .map(async (member) => {
+              const response = await serverApi(
+                `/v1/tenants/${overview.tenant.id}/members/${member.userId}/profile`,
+              );
+              if (!response.ok) return null;
+              const body = (await response.json()) as { profile: TenantMemberProfile };
+              return body.profile;
+            }),
+        )
+      ).filter((profile): profile is TenantMemberProfile => profile !== null)
+    : [];
+
+  return (
+    <div className="dashboard-page tenant-subpage">
+      <header className="dashboard-header">
+        <div>
+          <span className="panel-eyebrow">{overview.tenant.displayName}</span>
+          <h1>Equipo de trabajo</h1>
+          <p>Administra accesos, roles y datos operativos desde una vista independiente.</p>
+        </div>
+      </header>
+      <div className="dashboard-columns">
+        <section className="dashboard-card tenant-card">
+          <div className="card-heading">
+            <div>
+              <span className="panel-eyebrow">Accesos</span>
+              <h2>{overview.members.length} integrantes</h2>
+            </div>
+          </div>
+          {canManage ? (
+            <div className="tenant-table-wrap">
+              <table className="tenant-table">
+                <thead>
+                  <tr>
+                    <th>Persona</th>
+                    <th>Rol</th>
+                    <th>Estado</th>
+                    <th>Administrar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {overview.members.map((member) => (
+                    <tr key={member.userId}>
+                      <td data-label="Persona">
+                        <strong>{member.displayName}</strong>
+                        <small>{member.email}</small>
+                      </td>
+                      <td data-label="Rol">{member.role}</td>
+                      <td data-label="Estado">
+                        <span className={`status status-${member.status}`}>{member.status}</span>
+                      </td>
+                      <td data-label="Administrar">
+                        {member.userId === user.id ? (
+                          "Tu acceso"
+                        ) : (
+                          <MemberAccessControl member={member} tenantId={overview.tenant.id} />
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="operational-note">Tu rol no permite administrar el directorio.</p>
+          )}
+        </section>
+        {overview.actorRole === "owner" ? (
+          <aside className="dashboard-card create-card">
+            <div className="card-heading">
+              <div>
+                <span className="panel-eyebrow">Equipo</span>
+                <h2>Agregar persona</h2>
+              </div>
+            </div>
+            <p>Elige el rol mínimo necesario. El acceso se activa desde un enlace individual.</p>
+            <InviteUserForm
+              allowedRoles={["supervisor", "collector", "customer"]}
+              tenantId={overview.tenant.id}
+            />
+            <PendingInvitationList
+              invitations={overview.pendingInvitations}
+              tenantId={overview.tenant.id}
+            />
+          </aside>
+        ) : null}
+      </div>
+      {canManage ? <MemberProfileDirectory members={overview.members} profiles={profiles} /> : null}
+    </div>
+  );
+}

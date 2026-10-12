@@ -4,6 +4,7 @@ import {
   borrowerReviewRequestSchema,
   changePasswordRequestSchema,
   createBranchRequestSchema,
+  createOwnerTenantRequestSchema,
   createPlatformTenantRequestSchema,
   createTeamRequestSchema,
   financialSchedulePreviewRequestSchema,
@@ -418,6 +419,64 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session) return;
     return { user: session.user };
+  });
+
+  app.post("/v1/account/tenants", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    if (session.user.platformRole === "developer") {
+      return sendError(
+        reply,
+        403,
+        "PLATFORM_ACCOUNT_ONLY",
+        "Las cuentas de plataforma crean empresas desde la consola de desarrollador.",
+        request.id,
+      );
+    }
+    const body = createOwnerTenantRequestSchema.safeParse(request.body);
+    if (!body.success || !dependencies.platformService.createTenantForOwner) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_COMPANY_ONBOARDING",
+        "Revisa el nombre y la contraseña de confirmación.",
+        request.id,
+      );
+    }
+    const reauthenticated = await dependencies.authService.reauthenticate(
+      session.user.id,
+      session.token,
+      body.data.password,
+      request.id,
+    );
+    if (!reauthenticated) {
+      return sendError(
+        reply,
+        401,
+        "REAUTHENTICATION_FAILED",
+        "La contraseña de confirmación no es válida.",
+        request.id,
+      );
+    }
+    try {
+      const tenant = await dependencies.platformService.createTenantForOwner(session.user.id, {
+        displayName: body.data.displayName,
+        requestId: request.id,
+      });
+      return reply.code(201).send({ tenant });
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "23505") {
+        return sendError(
+          reply,
+          409,
+          "COMPANY_NAME_UNAVAILABLE",
+          "Ese nombre de empresa ya está en uso. Elige otro.",
+          request.id,
+        );
+      }
+      throw error;
+    }
   });
 
   app.get("/v1/auth/sessions", async (request, reply) => {

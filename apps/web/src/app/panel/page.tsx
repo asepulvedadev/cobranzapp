@@ -9,5 +9,5 @@ export default async function PanelPage() {
   if (user.platformRole === "developer") redirect("/panel/desarrollador");
   const membership = user.memberships[0];
   if (membership) redirect(`/panel/empresa/${membership.tenantSlug}`);
-  redirect("/ingresar?error=sin-empresa");
+  redirect("/panel/onboarding");
 }

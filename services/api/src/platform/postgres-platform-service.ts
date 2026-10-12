@@ -157,6 +157,17 @@ function mapPlatformUser(user: PlatformUserRow): PlatformUserDirectory["users"][
   };
 }
 
+function tenantSlugSeed(displayName: string) {
+  const seed = displayName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 54);
+  return seed || "empresa";
+}
+
 export function createPostgresPlatformService(pool: Pool): PlatformService {
   return {
     async systemStatus(actorUserId) {
@@ -559,6 +570,87 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             membershipPlan: true,
           },
           createdAt: tenant.created_at.toISOString(),
+        };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async createTenantForOwner(actorUserId, input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("SELECT set_config('app.user_id', $1, true)", [actorUserId]);
+        await client.query("SELECT set_config('app.platform_role', '', true)");
+        const base = tenantSlugSeed(input.displayName);
+        await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))", [base]);
+        let slug = base;
+        for (let suffix = 2; suffix < 1000; suffix += 1) {
+          const existing = await client.query("SELECT 1 FROM tenants WHERE slug = $1", [slug]);
+          if (!existing.rows[0]) break;
+          slug = `${base.slice(0, 63 - String(suffix).length - 1)}-${suffix}`;
+        }
+        const tenantResult = await client.query<{
+          id: string;
+          display_name: string;
+          slug: string;
+        }>(
+          `INSERT INTO tenants (slug, display_name, membership_plan, created_by)
+           VALUES ($1, $2, 'pro', $3)
+           RETURNING id, display_name, slug`,
+          [slug, input.displayName, actorUserId],
+        );
+        const tenant = tenantResult.rows[0];
+        if (!tenant) throw new Error("Owner tenant insert did not return a record");
+        await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenant.id]);
+        await client.query("SELECT set_config('app.tenant_role', 'owner', true)");
+        await client.query(
+          `INSERT INTO tenant_memberships (tenant_id, user_id, role, status, created_by)
+           VALUES ($1, $2, 'owner', 'active', $2)`,
+          [tenant.id, actorUserId],
+        );
+        await client.query(`INSERT INTO tenant_settings (tenant_id, updated_by) VALUES ($1, $2)`, [
+          tenant.id,
+          actorUserId,
+        ]);
+        await insertEntitlementVersion(client, {
+          actorUserId,
+          additionalEmployeeSeats: 0,
+          membershipPlan: "pro",
+          requestId: input.requestId,
+          tenantId: tenant.id,
+          version: 1,
+        });
+        await client.query(
+          `INSERT INTO tenant_setting_versions (
+             tenant_id, version, primary_color, accent_color, contact_email,
+             contact_phone, address, changed_by, changed_at
+           )
+           SELECT tenant_id, version, primary_color, accent_color, contact_email,
+                  contact_phone, address, updated_by, updated_at
+             FROM tenant_settings WHERE tenant_id = $1`,
+          [tenant.id],
+        );
+        await client.query(
+          `INSERT INTO branches (tenant_id, code, display_name, status, created_by)
+           VALUES ($1, 'principal', 'Sede principal', 'active', $2)`,
+          [tenant.id, actorUserId],
+        );
+        await client.query(
+          `INSERT INTO audit_events (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'tenant.created_by_owner', 'tenant', $1, $3,
+                   jsonb_build_object('slug', $4::text, 'membershipPlan', 'pro'))`,
+          [tenant.id, actorUserId, input.requestId, tenant.slug],
+        );
+        await client.query("COMMIT");
+        return {
+          tenantId: tenant.id,
+          tenantName: tenant.display_name,
+          tenantSlug: tenant.slug,
+          role: "owner" as const,
         };
       } catch (error) {
         await client.query("ROLLBACK");

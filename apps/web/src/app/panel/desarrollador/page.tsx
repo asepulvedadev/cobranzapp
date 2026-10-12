@@ -10,7 +10,6 @@ import type {
 } from "../../../lib/platform";
 import { serverApi } from "../../../lib/server-api";
 import { ActivityFeed, activityActionLabel } from "../ActivityFeed";
-import { InviteUserForm } from "../InviteUserForm";
 import { CreateTenantForm } from "./CreateTenantForm";
 import { SupportAccessControl } from "./SupportAccessControl";
 import { TenantMembershipPlanControl } from "./TenantMembershipPlanControl";
@@ -392,18 +391,13 @@ export default async function DeveloperDashboard({
             <div className="card-heading">
               <div>
                 <span className="panel-eyebrow">Acceso inicial</span>
-                <h2>Invitar propietario</h2>
+                <h2>Propietario autónomo</h2>
               </div>
             </div>
-            <p>Genera un enlace de activación individual con vigencia de 72 horas.</p>
-            <InviteUserForm
-              allowedRoles={["owner"]}
-              platform
-              tenants={overview.tenants.map((tenant) => ({
-                id: tenant.id,
-                displayName: tenant.displayName,
-              }))}
-            />
+            <p>
+              El propietario crea su empresa desde el primer ingreso y puede administrar varias
+              empresas con la misma cuenta.
+            </p>
           </aside>
         </div>
       </div>

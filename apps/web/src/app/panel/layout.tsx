@@ -22,9 +22,6 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   if (!response.ok) throw new Error("No fue posible validar la sesión");
   const { user } = (await response.json()) as { user: CurrentUser };
   const primaryMembership = user.memberships[0];
-  if (user.platformRole !== "developer" && !primaryMembership) {
-    redirect("/ingresar?error=perfil-no-habilitado");
-  }
   if (user.mustChangePassword) {
     return (
       <ReauthenticationProvider username={user.username}>
@@ -56,7 +53,9 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   const dashboardHref =
     user.platformRole === "developer"
       ? "/panel/desarrollador"
-      : `/panel/empresa/${primaryMembership?.tenantSlug}`;
+      : primaryMembership
+        ? `/panel/empresa/${primaryMembership.tenantSlug}`
+        : "/panel/onboarding";
 
   return (
     <ReauthenticationProvider username={user.username}>
@@ -64,7 +63,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
         <aside className="panel-sidebar">
           <Brand href={dashboardHref} light />
           <div className="panel-context">
-            <span>{user.platformRole === "developer" ? "Plataforma" : "Empresa"}</span>
+            <span>{user.platformRole === "developer" ? "Plataforma" : "Espacios"}</span>
             {user.platformRole === "developer" ? (
               <strong>Administración</strong>
             ) : user.memberships.length > 1 ? (
@@ -72,8 +71,10 @@ export default async function PanelLayout({ children }: { children: ReactNode })
                 className="workspace-switcher-desktop"
                 memberships={user.memberships}
               />
-            ) : (
+            ) : primaryMembership ? (
               <strong>{primaryMembership?.tenantName}</strong>
+            ) : (
+              <strong>Crear empresa</strong>
             )}
           </div>
           <PanelNavigation
@@ -93,7 +94,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
           </div>
         </aside>
         <main className="panel-main" id="contenido">
-          {user.platformRole !== "developer" ? (
+          {user.platformRole !== "developer" && user.memberships.length > 0 ? (
             <WorkspaceSwitcher
               className="workspace-switcher-mobile"
               memberships={user.memberships}

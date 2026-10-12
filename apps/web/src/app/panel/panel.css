@@ -178,6 +178,61 @@ html:has(.panel-shell) {
   padding: 16px 16px calc(92px + var(--panel-safe-bottom));
 }
 
+/* The password gate is intentionally a focused, independent surface: it has
+   no sidebar and should never inherit the desktop shell's two-column grid. */
+.initial-password-shell {
+  display: block;
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 8% 12%, rgba(251, 191, 36, 0.14), transparent 30%), var(--panel-bg);
+}
+
+.initial-password-shell .panel-main {
+  display: grid;
+  min-height: 100dvh;
+  align-items: center;
+  padding: clamp(28px, 6vw, 84px) clamp(18px, 7vw, 112px);
+}
+
+.initial-password-shell .dashboard-page {
+  display: grid;
+  width: min(100%, 1080px);
+  max-width: none;
+  margin: 0 auto;
+  gap: 28px;
+}
+
+.initial-password-shell .dashboard-header {
+  max-width: 560px;
+  padding: 0;
+}
+
+.initial-password-shell .dashboard-header h1 {
+  max-width: 10ch;
+  margin-top: 10px;
+  font-size: clamp(42px, 8vw, 76px);
+  line-height: 0.94;
+}
+
+.initial-password-shell .dashboard-header p {
+  max-width: 38ch;
+  font-size: 16px;
+}
+
+.initial-password-shell .security-card {
+  width: 100%;
+  max-width: none;
+  box-shadow: 0 24px 70px rgba(21, 24, 23, 0.1);
+}
+
+.initial-password-shell .card-heading {
+  padding: 22px 24px;
+}
+
+.initial-password-shell .password-form {
+  padding: 22px 24px 26px;
+}
+
 .workspace-switcher-mobile,
 .workspace-switcher-desktop {
   display: grid;
@@ -2266,6 +2321,121 @@ html:has(.panel-shell) {
   opacity: 0.55;
 }
 
+.tenant-subpage {
+  min-height: 100%;
+}
+
+.onboarding-page {
+  max-width: 860px;
+}
+
+.onboarding-card {
+  max-width: 680px;
+}
+
+.onboarding-company-form {
+  max-width: 520px;
+}
+
+.onboarding-user {
+  color: var(--muted-text, #a6a6a6);
+  font-size: 0.85rem;
+}
+
+.onboarding-banner {
+  align-items: center;
+  background: color-mix(in srgb, var(--tenant-brand-accent, #fbbf24) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tenant-brand-accent, #fbbf24) 38%, transparent);
+  border-radius: 14px;
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0.9rem 1rem;
+}
+
+.onboarding-banner span {
+  color: var(--muted-text, #a6a6a6);
+}
+
+.settings-summary {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+}
+
+.settings-summary div {
+  border-top: 1px solid var(--panel-border, rgb(255 255 255 / 0.12));
+  padding-top: 0.7rem;
+}
+
+.settings-summary dt {
+  color: var(--muted-text, #a6a6a6);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.settings-summary dd {
+  margin: 0.3rem 0 0;
+}
+
+.panel-modal {
+  background: var(--panel-surface, #1b1b1b);
+  border: 1px solid var(--panel-border, rgb(255 255 255 / 0.16));
+  border-radius: 18px;
+  color: inherit;
+  max-height: min(90dvh, 860px);
+  max-width: min(720px, calc(100vw - 2rem));
+  overflow: auto;
+  padding: 1.25rem;
+  width: 100%;
+}
+
+.panel-modal::backdrop {
+  background: rgb(0 0 0 / 0.68);
+  backdrop-filter: blur(4px);
+}
+
+.panel-modal-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.panel-modal-heading h2 {
+  margin: 0;
+}
+
+.modal-close {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--panel-border, rgb(255 255 255 / 0.16));
+  border-radius: 999px;
+  color: inherit;
+  display: inline-flex;
+  font-size: 1.3rem;
+  height: 2.5rem;
+  justify-content: center;
+  width: 2.5rem;
+}
+
+.panel-modal .member-profile-forms,
+.panel-modal .settings-form {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .settings-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-banner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .form-message-error {
   background: #fee2e2;
   color: #991b1b;
@@ -3616,6 +3786,24 @@ html:has(.panel-shell) {
 }
 
 @media (min-width: 761px) and (min-height: 620px) {
+  .initial-password-shell .panel-main {
+    padding: 56px clamp(40px, 7vw, 112px);
+  }
+
+  .initial-password-shell .dashboard-page {
+    grid-template-columns: minmax(0, 1fr) minmax(400px, 500px);
+    align-items: center;
+    gap: clamp(48px, 8vw, 132px);
+  }
+
+  .initial-password-shell .dashboard-header {
+    padding: 0;
+  }
+
+  .initial-password-shell .dashboard-header h1 {
+    font-size: clamp(56px, 5.2vw, 78px);
+  }
+
   #empresas,
   #actividad,
   #equipo,

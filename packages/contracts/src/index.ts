@@ -182,6 +182,15 @@ export const createPlatformTenantRequestSchema = z.object({
   membershipPlan: membershipPlanSchema,
 });
 
+export const createOwnerTenantRequestSchema = z.object({
+  displayName: z.string().trim().min(2).max(120),
+  password: z.string().min(12).max(256),
+});
+
+export const ownerTenantResponseSchema = z.object({
+  tenant: tenantMembershipSchema,
+});
+
 export const platformTenantResponseSchema = z.object({ tenant: platformTenantSchema });
 
 export const platformTenantStatusUpdateRequestSchema = z.object({

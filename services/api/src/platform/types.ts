@@ -112,6 +112,15 @@ export interface PlatformService {
       requestId: string;
     },
   ): Promise<PlatformOverview["tenants"][number]>;
+  createTenantForOwner?(
+    actorUserId: string,
+    input: { displayName: string; requestId: string },
+  ): Promise<{
+    tenantId: string;
+    tenantName: string;
+    tenantSlug: string;
+    role: "owner";
+  }>;
   updateMembershipPlan(
     actorUserId: string,
     tenantId: string,

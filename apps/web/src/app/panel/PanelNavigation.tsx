@@ -48,14 +48,45 @@ export function PanelNavigation({
     };
   }, []);
 
+  if (!isDeveloper && !currentMembership) {
+    const onboardingItems: NavigationItem[] = [
+      { href: "/panel/onboarding", label: "Crear empresa", icon: Buildings },
+      { href: "/panel/seguridad", label: "Seguridad", icon: ShieldCheck },
+    ];
+    function onboardingNavigation(className: string) {
+      return (
+        <nav aria-label="Navegación del panel" className={`${className} panel-nav-count-2`}>
+          {onboardingItems.map((item) => {
+            const Icon = item.icon;
+            const active = pathname === item.href;
+            return (
+              <Link aria-current={active ? "page" : undefined} href={item.href} key={item.href}>
+                <Icon aria-hidden="true" size={22} weight={active ? "fill" : "regular"} />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      );
+    }
+    return (
+      <>
+        {onboardingNavigation("panel-nav panel-nav-desktop")}
+        {onboardingNavigation("panel-mobile-nav")}
+      </>
+    );
+  }
+
   const standardTenantItems: NavigationItem[] = [
     { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },
-    { href: `${effectiveDashboardHref}#equipo`, label: "Equipo", icon: UsersThree },
+    { href: `${effectiveDashboardHref}/equipo`, label: "Equipo", icon: UsersThree },
+    { href: `${effectiveDashboardHref}/clientes`, label: "Clientes", icon: Buildings },
     {
-      href: `${effectiveDashboardHref}#configuracion`,
+      href: `${effectiveDashboardHref}/configuracion`,
       label: "Configurar",
       icon: SlidersHorizontal,
     },
+    { href: "/panel/onboarding", label: "Nueva empresa", icon: Buildings },
     { href: "/panel/seguridad", label: "Seguridad", icon: ShieldCheck },
   ];
   const items: NavigationItem[] = isDeveloper
@@ -69,15 +100,15 @@ export function PanelNavigation({
     : currentMembership?.role === "customer"
       ? [
           { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },
+          { href: `${effectiveDashboardHref}/clientes`, label: "Clientes", icon: Buildings },
           { href: "/panel/seguridad", label: "Seguridad", icon: ShieldCheck },
         ]
       : standardTenantItems;
 
   function isActive(href: string) {
     const [path, itemHash = ""] = href.split("#");
-    if (path !== pathname) return false;
-    if (itemHash) return hash === `#${itemHash}`;
-    return hash === "";
+    if (itemHash) return path === pathname && hash === `#${itemHash}`;
+    return path === pathname;
   }
 
   function navigation(className: string) {
