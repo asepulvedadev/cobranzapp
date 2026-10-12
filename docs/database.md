@@ -53,7 +53,7 @@ Migration `0017_borrower_dossier_foundation.sql` now adds the first tenant-scope
 Migration `0019_loan_product_catalog.sql` adds a tenant-scoped, draft-only product catalog with typed COP bounds, term frequency, rate basis and compliance state. It does not authorize approval, loan origination, schedule calculation or disbursement; those remain separate Phase 4 gates.
 Migration `0020_loan_application_drafts.sql` adds controlled tenant-scoped application drafts. It validates borrower/product ownership through composite foreign keys, enforces product amount and term bounds, and records a redacted audit event. Submission, approval, schedule calculation, disbursement and payments remain separate gates.
 
-Migration `0021_collection_routes.sql` adds tenant-scoped route templates and ordered borrower stops. Routes are draftable operational planning records only; they do not authorize payment capture, cash handling, offline operation or geolocation tracking.
+Migration `0021_collection_routes.sql` adds tenant-scoped route templates and ordered borrower stops. Managers can move a route through the controlled `draft → active → archived` lifecycle; activation requires at least one stop and every transition is audited. Routes remain operational planning records only; they do not authorize payment capture, cash handling, offline operation or geolocation tracking.
 Product review currently supports only the auditable `draft → under_review` transition when a
 normative reference is present. Approval remains disabled until legal, accounting and calendar
 evidence is accepted.
