@@ -11,6 +11,7 @@ import { PendingInvitationList } from "./PendingInvitationList";
 import { SettingsVersionHistory } from "./SettingsVersionHistory";
 import { SupportAccessReview } from "./SupportAccessReview";
 import { TeamAssignmentManager } from "./TeamAssignmentManager";
+import { WorkspaceMembershipSummary } from "./WorkspaceMembershipSummary";
 import { CreateBranchForm, CreateTeamForm, WorkspaceSettingsForm } from "./WorkspaceOperations";
 
 export const metadata: Metadata = { title: "Espacio empresarial" };
@@ -91,6 +92,8 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
           {statusLabels[overview.tenant.status]}
         </span>
       </header>
+
+      {overview.actorRole === "owner" ? <WorkspaceMembershipSummary overview={overview} /> : null}
 
       {overview.actorRole === "collector" ? (
         <section aria-label="Alcance asignado" className="metric-grid tenant-metrics">

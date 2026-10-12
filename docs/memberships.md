@@ -95,7 +95,7 @@ These are design requirements, not implemented controls in the landing update. S
 ## Implementation and verification boundaries
 
 - Public catalog: `apps/web/src/data/memberships.ts`; base prices, included seats, the COP 20,000 recurring employee add-on and customer limits are tested and reused in landing cards and pricing FAQ. `calculateMembershipMonthlyPrice` is a commercial estimate, not a billing or entitlement enforcement service.
-- Platform assignment: every newly created tenant records `pro` or `ultra`. The developer can correct that assignment with recent password confirmation, and each change is audited with its previous value, next value and catalog version. A plan is required before activating a new tenant.
+- Platform assignment: every newly created tenant records `pro` or `ultra`. The developer can correct that assignment with recent password confirmation, and each change is audited with its previous value, next value and catalog version. A plan is required before activating a new tenant. Tenant owners can see the assigned plan, included staff capacity, customer limit, support level and activation checklist in their workspace.
 - Assignment is commercial metadata only. It does not charge the tenant, buy additional seats, enforce customer limits, determine taxes, prorate a cycle or represent payment status.
 - Public presentation: `PricingSection`, navigation and footer links, a visible pricing entry point, per-plan enquiry links and a separate setup-fee block.
 - This delivery does not implement database subscription cycles, quota enforcement, billing or live lending authorization. Do not infer that assigning a plan enabled those features.

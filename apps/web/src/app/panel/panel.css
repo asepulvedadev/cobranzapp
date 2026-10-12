@@ -2518,6 +2518,117 @@ html:has(.panel-shell) {
   padding-top: 18px;
 }
 
+.workspace-membership-summary {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.membership-plan-card,
+.onboarding-progress-card {
+  padding: 18px 16px;
+}
+
+.membership-plan-card > div:first-child,
+.onboarding-progress-card header > div {
+  display: grid;
+  gap: 5px;
+}
+
+.membership-plan-card h2,
+.membership-plan-card p,
+.onboarding-progress-card h2 {
+  margin: 0;
+}
+
+.membership-plan-card h2,
+.onboarding-progress-card h2 {
+  font-size: 20px;
+  letter-spacing: -0.025em;
+}
+
+.membership-plan-card p,
+.membership-plan-card > small {
+  color: var(--panel-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.membership-plan-card dl {
+  display: grid;
+  gap: 1px;
+  margin: 16px 0;
+  overflow: hidden;
+  border: 1px solid var(--panel-line);
+  border-radius: 9px;
+  background: var(--panel-line);
+}
+
+.membership-plan-card dl > div {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.membership-plan-card dt {
+  color: var(--panel-muted);
+  font-size: 11px;
+}
+
+.membership-plan-card dd {
+  margin: 0;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.onboarding-progress-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.onboarding-progress-card header > strong {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff4c7;
+  font-size: 13px;
+}
+
+.onboarding-progress-card ul {
+  display: grid;
+  gap: 11px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.onboarding-progress-card li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--panel-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.onboarding-progress-card li svg {
+  flex: 0 0 auto;
+}
+
+.onboarding-progress-card li.is-complete {
+  color: var(--panel-green);
+}
+
 @media (min-width: 700px) {
   .system-status-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2588,6 +2699,17 @@ html:has(.panel-shell) {
     align-items: center;
     justify-content: space-between;
     gap: 24px;
+  }
+
+  .workspace-membership-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .membership-plan-card,
+  .onboarding-progress-card {
+    padding: 22px;
   }
 
   .security-banner div {

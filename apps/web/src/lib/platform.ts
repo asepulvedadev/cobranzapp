@@ -50,6 +50,8 @@ export type SupportAccessRecord = {
   expiresAt: string | null;
 };
 
+export type MembershipPlan = "pro" | "ultra";
+
 export type PlatformOverview = {
   metrics: {
     tenants: number;
@@ -62,7 +64,7 @@ export type PlatformOverview = {
     slug: string;
     displayName: string;
     status: "draft" | "active" | "suspended" | "archived";
-    membershipPlan: "pro" | "ultra" | null;
+    membershipPlan: MembershipPlan | null;
     members: number;
     readiness: {
       activeOwner: boolean;
@@ -123,9 +125,16 @@ export type TenantOverview = {
     locale: string;
     timezone: string;
     currency: string;
+    membershipPlan: MembershipPlan | null;
   };
   actorRole: "owner" | "supervisor" | "collector" | "customer" | "support";
-  metrics: { members: number; branches: number; teams: number; pendingInvitations: number };
+  metrics: {
+    members: number;
+    branches: number;
+    teams: number;
+    pendingInvitations: number;
+    activeEmployeeSeats: number;
+  };
   settings: {
     primaryColor: string;
     accentColor: string;

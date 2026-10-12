@@ -12,9 +12,16 @@ const overview: TenantOverview = {
     locale: "es-CO",
     timezone: "America/Bogota",
     currency: "COP",
+    membershipPlan: "pro",
   },
   actorRole: "customer",
-  metrics: { members: 0, branches: 0, teams: 0, pendingInvitations: 0 },
+  metrics: {
+    members: 0,
+    branches: 0,
+    teams: 0,
+    pendingInvitations: 0,
+    activeEmployeeSeats: 0,
+  },
   settings: {
     primaryColor: "#171717",
     accentColor: "#FBBF24",
