@@ -360,10 +360,18 @@ function DeveloperHome({
 function TenantHome({
   overview,
   directory,
+  directorySearch,
+  onDirectoryPageChange,
+  onDirectorySearch,
 }: {
   overview: TenantOverview;
   directory: BorrowerDirectory | null;
+  directorySearch: string;
+  onDirectoryPageChange: (page: number) => void;
+  onDirectorySearch: (search: string) => void;
 }) {
+  const [searchInput, setSearchInput] = useState(directorySearch);
+  useEffect(() => setSearchInput(directorySearch), [directorySearch]);
   const metrics = [
     ["Integrantes", overview.metrics.members],
     ["Sedes", overview.metrics.branches],
@@ -374,15 +382,11 @@ function TenantHome({
       ? [
           [
             "Identidades pendientes",
-            directory.borrowers.filter(
-              (borrower) => borrower.identity.verificationState === "manual_pending",
-            ).length,
+            directory.identitySummary.pending,
           ] as const,
           [
             "Identidades revisadas",
-            directory.borrowers.filter(
-              (borrower) => borrower.identity.verificationState === "reviewed",
-            ).length,
+            directory.identitySummary.reviewed,
           ] as const,
         ]
       : []),
@@ -426,7 +430,31 @@ function TenantHome({
       ))}
       {directory ? (
         <>
-          <Text style={styles.cardTitle}>Clientes recientes</Text>
+          <View style={styles.directoryHeading}>
+            <Text style={styles.cardTitle}>Clientes</Text>
+            <Text style={styles.muted}>
+              Página {directory.pagination.page} de {directory.pagination.totalPages}
+            </Text>
+          </View>
+          <View style={styles.directorySearch}>
+            <TextInput
+              accessibilityLabel="Buscar clientes"
+              onChangeText={setSearchInput}
+              onSubmitEditing={() => onDirectorySearch(searchInput)}
+              placeholder="Nombre o últimos 4 de cédula"
+              placeholderTextColor="#77817a"
+              returnKeyType="search"
+              style={styles.input}
+              value={searchInput}
+            />
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onDirectorySearch(searchInput)}
+              style={styles.secondaryButton}
+            >
+              <Text style={styles.secondaryButtonText}>Buscar</Text>
+            </Pressable>
+          </View>
           {directory.borrowers.slice(0, 5).map((borrower) => (
             <View key={borrower.id} style={styles.listRow}>
               <View style={styles.avatar}>
@@ -445,6 +473,26 @@ function TenantHome({
           ))}
           {!directory.borrowers.length ? (
             <Text style={styles.muted}>Aún no hay clientes registrados.</Text>
+          ) : null}
+          {directory.pagination.totalPages > 1 ? (
+            <View style={styles.paginationRow}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={directory.pagination.page <= 1}
+                onPress={() => onDirectoryPageChange(directory.pagination.page - 1)}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryButtonText}>Anterior</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={directory.pagination.page >= directory.pagination.totalPages}
+                onPress={() => onDirectoryPageChange(directory.pagination.page + 1)}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryButtonText}>Siguiente</Text>
+              </Pressable>
+            </View>
           ) : null}
         </>
       ) : null}
@@ -467,6 +515,8 @@ function AuthenticatedHome({
   const [platform, setPlatform] = useState<PlatformOverview | null>(null);
   const [system, setSystem] = useState<PlatformSystemStatus | null>(null);
   const [message, setMessage] = useState("");
+  const [directorySearch, setDirectorySearch] = useState("");
+  const [directoryPage, setDirectoryPage] = useState(1);
   const selectedMembershipRole = user.memberships.find(
     (membership) => membership.tenantId === tenantId,
   )?.role;
@@ -480,7 +530,9 @@ function AuthenticatedHome({
       user.platformRole === "developer" ? api.platformOverview() : Promise.resolve(null),
       user.platformRole === "developer" ? api.systemStatus() : Promise.resolve(null),
       tenantId ? api.tenantOverview(tenantId) : Promise.resolve(null),
-      tenantId && canReadBorrowers ? api.borrowerDirectory(tenantId) : Promise.resolve(null),
+      tenantId && canReadBorrowers
+        ? api.borrowerDirectory(tenantId, { search: directorySearch, page: directoryPage })
+        : Promise.resolve(null),
     ])
       .then(([platformResult, systemResult, tenantResult, borrowerResult]) => {
         if (!mounted) return;
@@ -495,7 +547,7 @@ function AuthenticatedHome({
     return () => {
       mounted = false;
     };
-  }, [api, selectedMembershipRole, tenantId, user.platformRole]);
+  }, [api, directoryPage, directorySearch, selectedMembershipRole, tenantId, user.platformRole]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -533,7 +585,11 @@ function AuthenticatedHome({
               {user.memberships.map((membership) => (
                 <Pressable
                   key={membership.tenantId}
-                  onPress={() => setTenantId(membership.tenantId)}
+                  onPress={() => {
+                    setTenantId(membership.tenantId);
+                    setDirectorySearch("");
+                    setDirectoryPage(1);
+                  }}
                   style={[
                     styles.workspaceOption,
                     membership.tenantId === tenantId && styles.workspaceOptionActive,
@@ -548,7 +604,16 @@ function AuthenticatedHome({
               ))}
             </View>
             {tenant ? (
-              <TenantHome directory={directory} overview={tenant} />
+              <TenantHome
+                directory={directory}
+                directorySearch={directorySearch}
+                onDirectoryPageChange={setDirectoryPage}
+                onDirectorySearch={(search) => {
+                  setDirectorySearch(search);
+                  setDirectoryPage(1);
+                }}
+                overview={tenant}
+              />
             ) : (
               <ActivityIndicator color="#fbbf24" />
             )}
@@ -701,6 +766,16 @@ const styles = StyleSheet.create({
   },
   primaryButtonDim: { opacity: 0.45 },
   primaryButtonText: { color: "#151817", fontWeight: "800", fontSize: 16 },
+  secondaryButton: {
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#48514b",
+    paddingHorizontal: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  secondaryButtonText: { color: "#f6f7f5", fontWeight: "700", fontSize: 14 },
   error: { color: "#ff9d93", fontSize: 14, lineHeight: 20 },
   notice: {
     color: "#cde8d4",
@@ -779,6 +854,14 @@ const styles = StyleSheet.create({
   listCopy: { flex: 1, gap: 2 },
   listTitle: { color: "#eef2ee", fontWeight: "700", fontSize: 15 },
   chevron: { color: "#8d978f", fontSize: 26 },
+  directoryHeading: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  directorySearch: { gap: 8 },
+  paginationRow: { flexDirection: "row", justifyContent: "space-between", gap: 8, marginTop: 4 },
   warning: {
     padding: 14,
     borderRadius: 16,

@@ -168,6 +168,28 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
         const total = Number(count.rows[0]?.total ?? 0);
         const totalPages = Math.max(1, Math.ceil(total / query.pageSize));
         const page = Math.min(query.page, totalPages);
+        const summaryRows = await client.query<{
+          verification_state: Borrower["identity"]["verificationState"];
+          total: string;
+        }>(
+          `SELECT identity.verification_state, count(*) AS total
+             FROM borrowers borrower
+             JOIN borrower_identities identity
+               ON identity.tenant_id = borrower.tenant_id AND identity.borrower_id = borrower.id
+            WHERE borrower.tenant_id = $2 AND (${filter})
+            GROUP BY identity.verification_state`,
+          [query.search, tenantId],
+        );
+        const identitySummary = { pending: 0, reviewed: 0, rejected: 0 };
+        for (const row of summaryRows.rows) {
+          const key =
+            row.verification_state === "manual_pending"
+              ? "pending"
+              : row.verification_state === "reviewed"
+                ? "reviewed"
+                : "rejected";
+          identitySummary[key] = Number(row.total);
+        }
         const rows = await client.query<BorrowerRow>(
           `SELECT borrower.id, borrower.full_name, borrower.status,
                   borrower.phone, borrower.home_address, borrower.work_address,
@@ -188,6 +210,7 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
         return {
           borrowers: borrowers.filter((borrower): borrower is Borrower => borrower !== null),
           pagination: { page, pageSize: query.pageSize, total, totalPages },
+          identitySummary,
         };
       });
     },

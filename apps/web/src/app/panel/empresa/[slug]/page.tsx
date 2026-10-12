@@ -248,24 +248,12 @@ export default async function TenantDashboard({
           </article>
           <article>
             <span>Identidades pendientes</span>
-            <strong>
-              {
-                borrowerDirectory.borrowers.filter(
-                  (borrower) => borrower.identity.verificationState === "manual_pending",
-                ).length
-              }
-            </strong>
+            <strong>{borrowerDirectory.identitySummary.pending}</strong>
             <small>Requieren revisión humana</small>
           </article>
           <article>
             <span>Identidades revisadas</span>
-            <strong>
-              {
-                borrowerDirectory.borrowers.filter(
-                  (borrower) => borrower.identity.verificationState === "reviewed",
-                ).length
-              }
-            </strong>
+            <strong>{borrowerDirectory.identitySummary.reviewed}</strong>
             <small>Con evidencia documental completa</small>
           </article>
           {loanApplications ? (

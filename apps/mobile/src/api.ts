@@ -183,8 +183,16 @@ export class MobileApi {
     return tenantOverviewSchema.parse((await response.json()).overview);
   }
 
-  async borrowerDirectory(tenantId: string): Promise<BorrowerDirectory> {
-    const response = await this.request(`/v1/tenants/${tenantId}/borrowers?page=1&pageSize=20`);
+  async borrowerDirectory(
+    tenantId: string,
+    options: { search?: string; page?: number; pageSize?: number } = {},
+  ): Promise<BorrowerDirectory> {
+    const query = new URLSearchParams({
+      page: String(options.page ?? 1),
+      pageSize: String(options.pageSize ?? 20),
+    });
+    if (options.search?.trim()) query.set("q", options.search.trim());
+    const response = await this.request(`/v1/tenants/${tenantId}/borrowers?${query}`);
     if (!response.ok)
       throw new MobileApiError(
         await apiError(response, "No fue posible cargar los clientes."),
