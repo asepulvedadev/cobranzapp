@@ -176,6 +176,55 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       },
       checkedAt: expect.any(String),
     });
+    await expect(
+      platform.listUsers(developerId, {
+        search: `member-${suffix}`,
+        status: "active",
+        page: 1,
+        pageSize: 10,
+      }),
+    ).resolves.toMatchObject({
+      users: [
+        {
+          id: memberId,
+          username: `member-${suffix}`,
+          status: "active",
+          platformRole: null,
+        },
+      ],
+      pagination: { page: 1, pageSize: 10, total: 1, totalPages: 1 },
+    });
+    const memberSession = await auth.login(`member-${suffix}`, password, {
+      requestId: `member-login-${suffix}`,
+    });
+    await expect(
+      platform.updateUserStatus(developerId, memberId, "disabled", `disable-member-${suffix}`),
+    ).resolves.toMatchObject({ status: "updated", userStatus: "disabled", revokedSessions: 1 });
+    await expect(auth.authenticate(memberSession?.token ?? "")).resolves.toBeNull();
+    await expect(
+      auth.login(`member-${suffix}`, password, { requestId: `disabled-login-${suffix}` }),
+    ).resolves.toBeNull();
+    await expect(
+      platform.updateUserStatus(developerId, developerId, "disabled", `disable-self-${suffix}`),
+    ).resolves.toEqual({ status: "protected" });
+    await expect(
+      platform.updateUserStatus(developerId, memberId, "active", `enable-member-${suffix}`),
+    ).resolves.toMatchObject({ status: "updated", userStatus: "active" });
+    await expect(
+      auth.login(`member-${suffix}`, password, { requestId: `enabled-login-${suffix}` }),
+    ).resolves.toMatchObject({ user: { id: memberId } });
+    expect(
+      (
+        await ownerPool.query<{ metadata: { from: string; to: string } }>(
+          `SELECT metadata
+             FROM audit_events
+            WHERE target_id = $1 AND action = 'user.status_changed'
+            ORDER BY happened_at DESC
+            LIMIT 1`,
+          [memberId],
+        )
+      ).rows[0]?.metadata,
+    ).toMatchObject({ from: "disabled", to: "active" });
     const tenant = await platform.createTenant(developerId, {
       displayName: "Tenant Integration",
       slug,

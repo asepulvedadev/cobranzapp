@@ -49,6 +49,11 @@ or membership reactivation. A tenant-scoped transaction advisory lock prevents c
 acceptances from exceeding the versioned entitlement; a narrowly scoped database function returns
 only the active employee count needed for that check.
 
+The developer console also provides a paginated identity directory. Disabling a tenant identity
+requires recent password confirmation, immediately revokes every active session and records a
+global audit event without credentials or session tokens. Developer identities are protected from
+this general-purpose control to prevent accidental platform lockout.
+
 This is an interim first-party identity baseline, not completion of the identity roadmap. OIDC with
 PKCE for mobile, MFA for privileged roles, approved support access, and an independent security
 review remain required before the corresponding launch gate can pass.

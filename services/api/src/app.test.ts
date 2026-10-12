@@ -112,6 +112,10 @@ function dependencies(overrides?: {
       tenants: [],
       pagination: { page: query.page, pageSize: query.pageSize, total: 0, totalPages: 1 },
     })),
+    listUsers: vi.fn(async (_actor, query) => ({
+      users: [],
+      pagination: { page: query.page, pageSize: query.pageSize, total: 0, totalPages: 1 },
+    })),
     createTenant: vi.fn(async (_actor, input) => ({
       id: "5c58269f-ce16-4250-82e2-c0c16621b0fb",
       displayName: input.displayName,
@@ -169,6 +173,11 @@ function dependencies(overrides?: {
         },
         createdAt: "2026-10-11T00:00:00.000Z",
       },
+    })),
+    updateUserStatus: vi.fn(async (_actor, _userId, status) => ({
+      status: "updated",
+      userStatus: status,
+      revokedSessions: status === "disabled" ? 1 : 0,
     })),
   };
   const tenancyService: TenancyService = {
@@ -613,6 +622,66 @@ describe("developer platform", () => {
     expect(response.statusCode).toBe(403);
     expect(response.json()).toMatchObject({ error: { code: "DEVELOPER_REQUIRED" } });
     expect(deps.platformService.listTenants).not.toHaveBeenCalled();
+  });
+
+  it("filters and paginates the user directory for the developer", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/platform/users?q=ana&status=active&page=3&pageSize=10",
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(deps.platformService.listUsers).toHaveBeenCalledWith(developer.id, {
+      search: "ana",
+      status: "active",
+      page: 3,
+      pageSize: 10,
+    });
+  });
+
+  it("disables a user and revokes sessions after recent reauthentication", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const userId = "164bf50a-2098-4acc-a250-6ad21df83e40";
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/v1/platform/users/${userId}/status`,
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { status: "disabled" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: "disabled", revokedSessions: 1 });
+    expect(deps.platformService.updateUserStatus).toHaveBeenCalledWith(
+      developer.id,
+      userId,
+      "disabled",
+      expect.any(String),
+    );
+  });
+
+  it("does not let the general directory disable a protected developer account", async () => {
+    const deps = dependencies();
+    vi.mocked(deps.platformService.updateUserStatus).mockResolvedValue({ status: "protected" });
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/v1/platform/users/${developer.id}/status`,
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { status: "disabled" },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ error: { code: "USER_PROTECTED" } });
   });
 
   it("creates a draft tenant", async () => {

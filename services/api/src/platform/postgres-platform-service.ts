@@ -10,6 +10,8 @@ import type {
   MembershipPlanUpdateResult,
   PlatformOverview,
   PlatformService,
+  PlatformUserDirectory,
+  PlatformUserStatusUpdateResult,
   TenantDirectory,
   TenantStatus,
   TenantStatusUpdateResult,
@@ -99,6 +101,34 @@ function mapTenant(tenant: TenantRow): PlatformOverview["tenants"][number] {
       membershipPlan: tenant.membership_plan !== null,
     },
     createdAt: tenant.created_at.toISOString(),
+  };
+}
+
+type PlatformUserRow = {
+  id: string;
+  username: string;
+  email: string;
+  display_name: string;
+  platform_role: "developer" | null;
+  status: "active" | "disabled";
+  active_memberships: string;
+  active_sessions: string;
+  last_seen_at: Date | null;
+  created_at: Date;
+};
+
+function mapPlatformUser(user: PlatformUserRow): PlatformUserDirectory["users"][number] {
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    displayName: user.display_name,
+    platformRole: user.platform_role,
+    status: user.status,
+    activeMemberships: Number(user.active_memberships),
+    activeSessions: Number(user.active_sessions),
+    lastSeenAt: user.last_seen_at?.toISOString() ?? null,
+    createdAt: user.created_at.toISOString(),
   };
 }
 
@@ -324,6 +354,60 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             totalPages,
           },
         } satisfies TenantDirectory;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async listUsers(actorUserId, query) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setPlatformContext(client, actorUserId);
+        const filter = `($1::text IS NULL OR app_user.display_name ILIKE '%' || $1 || '%'
+                         OR app_user.username::text ILIKE '%' || $1 || '%'
+                         OR app_user.email::text ILIKE '%' || $1 || '%')
+                        AND ($2::text IS NULL OR app_user.status = $2)`;
+        const countResult = await client.query<{ total: string }>(
+          `SELECT count(*) AS total
+             FROM users app_user
+            WHERE ${filter}`,
+          [query.search, query.status],
+        );
+        const total = Number(countResult.rows[0]?.total ?? 0);
+        const totalPages = Math.max(1, Math.ceil(total / query.pageSize));
+        const page = Math.min(query.page, totalPages);
+        const offset = (page - 1) * query.pageSize;
+        const result = await client.query<PlatformUserRow>(
+          `SELECT app_user.id, app_user.username, app_user.email, app_user.display_name,
+                  app_user.platform_role, app_user.status, app_user.created_at,
+                  (
+                    SELECT count(*) FROM tenant_memberships membership
+                     WHERE membership.user_id = app_user.id AND membership.status = 'active'
+                  ) AS active_memberships,
+                  (
+                    SELECT count(*) FROM auth_sessions session
+                     WHERE session.user_id = app_user.id
+                       AND session.revoked_at IS NULL AND session.expires_at > now()
+                  ) AS active_sessions,
+                  (
+                    SELECT max(session.last_seen_at) FROM auth_sessions session
+                     WHERE session.user_id = app_user.id
+                  ) AS last_seen_at
+             FROM users app_user
+            WHERE ${filter}
+            ORDER BY app_user.created_at DESC, app_user.id DESC
+            LIMIT $3 OFFSET $4`,
+          [query.search, query.status, query.pageSize, offset],
+        );
+        await client.query("COMMIT");
+        return {
+          users: result.rows.map(mapPlatformUser),
+          pagination: { page, pageSize: query.pageSize, total, totalPages },
+        } satisfies PlatformUserDirectory;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -758,6 +842,71 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             createdAt: tenant.created_at.toISOString(),
           },
         } satisfies TenantStatusUpdateResult;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async updateUserStatus(actorUserId, userId, targetStatus, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setPlatformContext(client, actorUserId);
+        const current = await client.query<{
+          id: string;
+          platform_role: "developer" | null;
+          status: "active" | "disabled";
+        }>("SELECT id, platform_role, status FROM users WHERE id = $1 FOR UPDATE", [userId]);
+        const user = current.rows[0];
+        if (!user) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies PlatformUserStatusUpdateResult;
+        }
+        if (user.id === actorUserId || user.platform_role === "developer") {
+          await client.query("ROLLBACK");
+          return { status: "protected" } satisfies PlatformUserStatusUpdateResult;
+        }
+
+        let revokedSessions = 0;
+        if (user.status !== targetStatus) {
+          await client.query(
+            `UPDATE users
+                SET status = $2, updated_at = now()
+              WHERE id = $1`,
+            [userId, targetStatus],
+          );
+          if (targetStatus === "disabled") {
+            const revoked = await client.query(
+              `UPDATE auth_sessions
+                  SET revoked_at = now()
+                WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()`,
+              [userId],
+            );
+            revokedSessions = revoked.rowCount ?? 0;
+          }
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+             VALUES (
+               NULL, $1, 'user.status_changed', 'user', $2, $3,
+               jsonb_build_object(
+                 'from', $4::text,
+                 'to', $5::text,
+                 'revokedSessions', $6::integer
+               )
+             )`,
+            [actorUserId, userId, requestId, user.status, targetStatus, revokedSessions],
+          );
+        }
+        await client.query("COMMIT");
+        return {
+          status: "updated",
+          userStatus: targetStatus,
+          revokedSessions,
+        } satisfies PlatformUserStatusUpdateResult;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

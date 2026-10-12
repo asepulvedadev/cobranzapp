@@ -56,6 +56,14 @@ const tenantDirectoryQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(100_000).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
 });
+const platformUserParamsSchema = z.object({ userId: z.uuid() });
+const platformUserStatusSchema = z.object({ status: z.enum(["active", "disabled"]) });
+const platformUserDirectoryQuerySchema = z.object({
+  q: z.string().trim().max(80).optional(),
+  status: z.enum(["active", "disabled"]).optional(),
+  page: z.coerce.number().int().min(1).max(100_000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+});
 const invitationTokenParamsSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{40,60}$/) });
 const invitationSchema = z.object({
   email: z.email().transform((value) => value.toLowerCase()),
@@ -494,6 +502,67 @@ export function buildApp(dependencies: AppDependencies) {
       status: parsed.data.status ?? null,
       page: parsed.data.page,
       pageSize: parsed.data.pageSize,
+    });
+  });
+
+  app.get("/v1/platform/users", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const parsed = platformUserDirectoryQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_USER_FILTERS",
+        "Revisa los filtros del directorio de usuarios.",
+        request.id,
+      );
+    }
+    return dependencies.platformService.listUsers(session.user.id, {
+      search: parsed.data.q || null,
+      status: parsed.data.status ?? null,
+      page: parsed.data.page,
+      pageSize: parsed.data.pageSize,
+    });
+  });
+
+  app.patch("/v1/platform/users/:userId/status", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const params = platformUserParamsSchema.safeParse(request.params);
+    const body = platformUserStatusSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_USER_STATUS",
+        "El estado solicitado no es válido.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const result = await dependencies.platformService.updateUserStatus(
+      session.user.id,
+      params.data.userId,
+      body.data.status,
+      request.id,
+    );
+    if (result.status === "protected") {
+      return sendError(
+        reply,
+        409,
+        "USER_PROTECTED",
+        "Las cuentas de desarrollo se administran fuera del directorio general.",
+        request.id,
+      );
+    }
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "USER_NOT_FOUND", "El usuario no existe.", request.id);
+    }
+    return reply.send({
+      status: result.userStatus,
+      revokedSessions: result.revokedSessions,
     });
   });
 

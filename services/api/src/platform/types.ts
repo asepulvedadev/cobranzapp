@@ -55,6 +55,45 @@ export type TenantDirectory = {
   };
 };
 
+export type PlatformUserStatus = "active" | "disabled";
+
+export type PlatformUserDirectoryQuery = {
+  search: string | null;
+  status: PlatformUserStatus | null;
+  page: number;
+  pageSize: number;
+};
+
+export type PlatformUserDirectory = {
+  users: Array<{
+    id: string;
+    username: string;
+    email: string;
+    displayName: string;
+    platformRole: "developer" | null;
+    status: PlatformUserStatus;
+    activeMemberships: number;
+    activeSessions: number;
+    lastSeenAt: string | null;
+    createdAt: string;
+  }>;
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+export type PlatformUserStatusUpdateResult =
+  | {
+      status: "updated";
+      userStatus: PlatformUserStatus;
+      revokedSessions: number;
+    }
+  | { status: "protected" }
+  | { status: "not_found" };
+
 export type PlatformDatabaseStatus = {
   schemaVersion: string | null;
   jobs: {
@@ -99,6 +138,7 @@ export type MembershipEntitlementUpdateResult =
 export interface PlatformService {
   overview(actorUserId: string): Promise<PlatformOverview>;
   listTenants(actorUserId: string, query: TenantDirectoryQuery): Promise<TenantDirectory>;
+  listUsers(actorUserId: string, query: PlatformUserDirectoryQuery): Promise<PlatformUserDirectory>;
   systemStatus(actorUserId: string): Promise<PlatformDatabaseStatus>;
   createTenant(
     actorUserId: string,
@@ -127,4 +167,10 @@ export interface PlatformService {
     status: Exclude<TenantStatus, "draft">,
     requestId: string,
   ): Promise<TenantStatusUpdateResult>;
+  updateUserStatus(
+    actorUserId: string,
+    userId: string,
+    status: PlatformUserStatus,
+    requestId: string,
+  ): Promise<PlatformUserStatusUpdateResult>;
 }
