@@ -15,6 +15,11 @@ mail provider, not Resend.
    Build the API first. The browser never receives the key.
 3. Production uses `/srv/cobranzapp/.env.resend` (mode `0600`) as an API-only
    Compose env file. Use `infrastructure/resend.env.example` as a template.
+   The VPS deployment script uses `/srv/cobranzapp/compose.yaml` and does not
+   synchronize repository Compose changes. Apply the API-only `.env.resend`
+   entry to that live file before deployment, preserving other service settings.
+   Updating the repository YAML alone leaves the mailer unconfigured. The live
+   entry has been applied and the API recreated with its existing release image.
 4. Check the domain:
    `python3 .agents/skills/cobranzapp-resend/scripts/resend.py status`.
 5. Explicitly authorize a test send:
@@ -89,3 +94,12 @@ Official references: [sending](https://resend.com/docs/api-reference/emails/send
   reused the same UUID, and acceptance displayed the confirmation. Desktop
   and mobile layouts were inspected. Production acceptance is checked again
   after CI deployment; no mock is retained in application code.
+- The first production submission correctly returned 503 because the live
+  Compose file had not loaded the secret file. The API-only env-file entry was
+  applied on the VPS, with a config backup and healthy API restart. No database,
+  worker, nginx, DNS or other VPS application was changed.
+
+- After the live configuration repair, the production mobile form returned HTTP
+  202, showed its success message, retained exactly two visible inputs and had
+  no horizontal overflow. Resend reported the resulting notification as
+  `delivered` to the configured institutional recipient.
