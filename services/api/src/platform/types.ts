@@ -1,60 +1,31 @@
-import type { MembershipEntitlement, MembershipPlan } from "../memberships/catalog.js";
+import type {
+  MembershipEntitlement,
+  MembershipPlan,
+  PlatformActivityDirectory,
+  PlatformOverview,
+  PlatformTenantDirectory,
+  PlatformTenantStatus,
+  PlatformUserDirectory,
+  PlatformUserStatus,
+} from "@cobranzapp/contracts";
 
-export type { MembershipEntitlement, MembershipPlan } from "../memberships/catalog.js";
+export type {
+  MembershipEntitlement,
+  MembershipPlan,
+  PlatformActivityDirectory,
+  PlatformAuditActivity,
+  PlatformOverview,
+  PlatformUserDirectory,
+  PlatformUserStatus,
+} from "@cobranzapp/contracts";
 
-export type PlatformOverview = {
-  metrics: {
-    tenants: number;
-    activeTenants: number;
-    users: number;
-    activeMemberships: number;
-  };
-  tenants: Array<{
-    id: string;
-    slug: string;
-    displayName: string;
-    status: "draft" | "active" | "suspended" | "archived";
-    membershipPlan: MembershipPlan | null;
-    membershipEntitlement: MembershipEntitlement | null;
-    members: number;
-    readiness: {
-      activeOwner: boolean;
-      activeBranch: boolean;
-      contactEmail: boolean;
-      membershipPlan: boolean;
-    };
-    createdAt: string;
-  }>;
-  activity: Array<{
-    id: string;
-    action: string;
-    actorDisplayName: string | null;
-    actorUsername: string | null;
-    tenantId: string | null;
-    tenantName: string | null;
-    happenedAt: string;
-  }>;
-};
-
-export type TenantStatus = PlatformOverview["tenants"][number]["status"];
-export type PlatformAuditActivity = PlatformOverview["activity"][number];
+export type TenantStatus = PlatformTenantStatus;
 
 export type PlatformActivityDirectoryQuery = {
   search: string | null;
   action: string | null;
   page: number;
   pageSize: number;
-};
-
-export type PlatformActivityDirectory = {
-  activity: PlatformAuditActivity[];
-  availableActions: string[];
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
 };
 
 export type TenantDirectoryQuery = {
@@ -64,44 +35,13 @@ export type TenantDirectoryQuery = {
   pageSize: number;
 };
 
-export type TenantDirectory = {
-  tenants: PlatformOverview["tenants"];
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
-};
-
-export type PlatformUserStatus = "active" | "disabled";
+export type TenantDirectory = PlatformTenantDirectory;
 
 export type PlatformUserDirectoryQuery = {
   search: string | null;
   status: PlatformUserStatus | null;
   page: number;
   pageSize: number;
-};
-
-export type PlatformUserDirectory = {
-  users: Array<{
-    id: string;
-    username: string;
-    email: string;
-    displayName: string;
-    platformRole: "developer" | null;
-    status: PlatformUserStatus;
-    activeMemberships: number;
-    activeSessions: number;
-    lastSeenAt: string | null;
-    createdAt: string;
-  }>;
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
 };
 
 export type PlatformUserStatusUpdateResult =

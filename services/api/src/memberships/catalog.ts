@@ -1,14 +1,6 @@
-export type MembershipPlan = "pro" | "ultra";
+import type { MembershipEntitlement, MembershipPlan } from "@cobranzapp/contracts";
 
-export type MembershipEntitlement = {
-  catalogVersion: number;
-  version: number;
-  includedEmployeeSeats: number;
-  additionalEmployeeSeats: number;
-  employeeSeatLimit: number;
-  clientLimit: number;
-  prioritySupport: boolean;
-};
+export type { MembershipEntitlement, MembershipPlan } from "@cobranzapp/contracts";
 
 export const membershipCatalogVersion = 1;
 

@@ -1,20 +1,7 @@
+import type { SupportAccessRecord } from "@cobranzapp/contracts";
 import type { TenantActor } from "../tenancy/types.js";
 
-export type SupportAccessStatus = "pending" | "active" | "denied" | "revoked" | "expired";
-
-export type SupportAccessRecord = {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  requestedByDisplayName: string;
-  purpose: string;
-  requestedDurationMinutes: number;
-  status: SupportAccessStatus;
-  requestedAt: string;
-  reviewedByDisplayName: string | null;
-  reviewedAt: string | null;
-  expiresAt: string | null;
-};
+export type { SupportAccessRecord, SupportAccessStatus } from "@cobranzapp/contracts";
 
 export type SupportAccessRequestResult =
   | { status: "created"; access: SupportAccessRecord }

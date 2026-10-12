@@ -1,9 +1,18 @@
+import type { MembershipEntitlement, MembershipPlan } from "@cobranzapp/contracts";
+
 export type {
   AccountSession,
   CurrentUser,
+  MembershipEntitlement,
+  MembershipPlan,
   MfaStatus,
   PlatformActivityDirectory,
+  PlatformOverview,
+  PlatformSystemStatus,
+  PlatformTenantDirectory as TenantDirectory,
+  PlatformUserDirectory,
   SecurityActivity,
+  SupportAccessRecord,
 } from "@cobranzapp/contracts";
 
 export type AuditActivity = {
@@ -12,108 +21,6 @@ export type AuditActivity = {
   actorDisplayName: string | null;
   actorUsername: string | null;
   happenedAt: string;
-};
-
-export type SupportAccessRecord = {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  requestedByDisplayName: string;
-  purpose: string;
-  requestedDurationMinutes: number;
-  status: "pending" | "active" | "denied" | "revoked" | "expired";
-  requestedAt: string;
-  reviewedByDisplayName: string | null;
-  reviewedAt: string | null;
-  expiresAt: string | null;
-};
-
-export type MembershipPlan = "pro" | "ultra";
-export type MembershipEntitlement = {
-  catalogVersion: number;
-  version: number;
-  includedEmployeeSeats: number;
-  additionalEmployeeSeats: number;
-  employeeSeatLimit: number;
-  clientLimit: number;
-  prioritySupport: boolean;
-};
-
-export type PlatformOverview = {
-  metrics: {
-    tenants: number;
-    activeTenants: number;
-    users: number;
-    activeMemberships: number;
-  };
-  tenants: Array<{
-    id: string;
-    slug: string;
-    displayName: string;
-    status: "draft" | "active" | "suspended" | "archived";
-    membershipPlan: MembershipPlan | null;
-    membershipEntitlement: MembershipEntitlement | null;
-    members: number;
-    readiness: {
-      activeOwner: boolean;
-      activeBranch: boolean;
-      contactEmail: boolean;
-      membershipPlan: boolean;
-    };
-    createdAt: string;
-  }>;
-  activity: Array<
-    AuditActivity & {
-      tenantId: string | null;
-      tenantName: string | null;
-    }
-  >;
-};
-
-export type TenantDirectory = {
-  tenants: PlatformOverview["tenants"];
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
-};
-
-export type PlatformUserDirectory = {
-  users: Array<{
-    id: string;
-    username: string;
-    email: string;
-    displayName: string;
-    platformRole: "developer" | null;
-    status: "active" | "disabled";
-    activeMemberships: number;
-    activeSessions: number;
-    lastSeenAt: string | null;
-    createdAt: string;
-  }>;
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
-};
-
-export type PlatformSystemStatus = {
-  api: { status: "operational"; version: string };
-  database: { status: "operational"; schemaVersion: string | null };
-  jobs: {
-    status: "operational" | "attention";
-    due: number;
-    scheduled: number;
-    processing: number;
-    dead: number;
-    expiredLeases: number;
-    oldestDueAt: string | null;
-  };
-  checkedAt: string;
 };
 
 export type InvitationPreview = {
