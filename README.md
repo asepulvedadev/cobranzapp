@@ -26,6 +26,7 @@ Plataforma móvil y multiempresa para gestionar créditos y cobranzas de prestam
 | [Analítica y automatización](docs/analytics-automation.md) | Métricas deterministas, informes, escenarios, reglas programadas y auditoría de ejecución |
 | [Despliegue en VPS](docs/deployment.md) | Alojamiento, lanzamientos, migraciones, monitoreo, copias de seguridad y recuperación |
 | [Plan de desarrollo](docs/development-plan.md) | Fases, unidades de trabajo, controles de calidad, lanzamiento en VPS y finalización del piloto |
+| [Estado de implementación](docs/implementation-status.md) | Entregas verificadas, límites actuales y bloques protegidos |
 | [Manual de operaciones](docs/operations-runbook.md) | Repositorio, CI/CD, VPS, verificaciones de salud, copias de seguridad e incidentes |
 | [Dominio y correo](docs/domain-email-setup.md) | Registros DNS, Hostinger Email y activación TLS |
 | [Hoja de ruta](docs/roadmap.md) | Decisiones pendientes, evidencia, riesgos y autorización de construcción |
