@@ -449,7 +449,7 @@ function TenantHome({
               <Text style={styles.secondaryButtonText}>Buscar</Text>
             </Pressable>
           </View>
-          {directory.borrowers.slice(0, 5).map((borrower) => (
+          {directory.borrowers.map((borrower) => (
             <View key={borrower.id} style={styles.listRow}>
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>{borrower.fullName.slice(0, 1).toUpperCase()}</Text>
