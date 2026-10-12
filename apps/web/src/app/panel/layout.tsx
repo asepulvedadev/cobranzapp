@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { Brand } from "../../components/Brand";
@@ -8,6 +7,7 @@ import { serverApi } from "../../lib/server-api";
 import { LogoutButton } from "./LogoutButton";
 import { PanelNavigation } from "./PanelNavigation";
 import { ReauthenticationProvider } from "./ReauthenticationProvider";
+import { PasswordForm } from "./seguridad/PasswordForm";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import "./panel.css";
 
@@ -24,6 +24,34 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   const primaryMembership = user.memberships[0];
   if (user.platformRole !== "developer" && !primaryMembership) {
     redirect("/ingresar?error=perfil-no-habilitado");
+  }
+  if (user.mustChangePassword) {
+    return (
+      <ReauthenticationProvider username={user.username}>
+        <div className="panel-shell initial-password-shell">
+          <main className="panel-main" id="contenido">
+            <div className="dashboard-page narrow-page">
+              <header className="dashboard-header">
+                <div>
+                  <span className="panel-eyebrow">Primer ingreso</span>
+                  <h1>Protege tu cuenta</h1>
+                  <p>Actualiza la contraseña inicial antes de acceder a datos operativos.</p>
+                </div>
+              </header>
+              <section className="dashboard-card security-card">
+                <div className="card-heading">
+                  <div>
+                    <span className="panel-eyebrow">Credenciales</span>
+                    <h2>Cambiar contraseña inicial</h2>
+                  </div>
+                </div>
+                <PasswordForm />
+              </section>
+            </div>
+          </main>
+        </div>
+      </ReauthenticationProvider>
+    );
   }
   const dashboardHref =
     user.platformRole === "developer"
@@ -70,15 +98,6 @@ export default async function PanelLayout({ children }: { children: ReactNode })
               className="workspace-switcher-mobile"
               memberships={user.memberships}
             />
-          ) : null}
-          {user.mustChangePassword ? (
-            <div className="security-banner" role="status">
-              <div>
-                <strong>Protege tu cuenta</strong>
-                <span>Cambia la contraseña inicial antes de continuar con datos reales.</span>
-              </div>
-              <Link href="/panel/seguridad">Cambiar contraseña</Link>
-            </div>
           ) : null}
           {children}
         </main>
