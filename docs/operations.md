@@ -73,12 +73,12 @@ aceptan rutas de objetos arbitrarias.
 ### Captura inicial de clientes
 
 La consola empresarial ya incluye una captura rápida de clientes con nombre legal, tipo y número
-de documento, celular, direcciones de casa/trabajo, un contacto de emergencia y referencia de
-consentimiento. El número se cifra en reposo y se busca mediante HMAC con alcance de tenant; las
-respuestas solo muestran los últimos cuatro dígitos. Los documentos de frente/reverso y la foto de
-perfil se registran como referencias opacas de almacenamiento privado y permanecen pendientes de
-la siguiente etapa de carga, cuarentena y revisión manual. Esta etapa no hace OCR ni afirma
-autenticidad documental.
+de documento, celular, direcciones de casa/trabajo, uno o dos contactos de emergencia, referencia
+de consentimiento y los archivos de frente, reverso y foto designada de perfil. El número se cifra
+en reposo y se busca mediante HMAC con alcance de tenant; las respuestas solo muestran los últimos
+cuatro dígitos. La captura crea primero el expediente y luego carga cada archivo al prefijo privado
+del cliente; si una carga falla, la ficha queda disponible para reintento y nunca se presenta como
+identidad revisada. Esta etapa no hace OCR ni afirma autenticidad documental.
 
 La revisión manual ya cuenta con un historial append-only por cliente. Propietario o supervisor
 deben confirmar por separado el nombre, frente, reverso y foto designada antes de marcar la
