@@ -56,6 +56,12 @@ events; it never stores or displays the submitted password, raw IP address, or s
 Unsuccessful login identifiers are deliberately excluded from this audit stream to avoid turning
 the audit table into an unbounded store of attacker-controlled personal data.
 
+Organization visibility is also role scoped in PostgreSQL. Owners and supervisors can inspect the
+tenant organization, collectors can read only teams assigned to their user and the branches that
+contain those teams, and customers cannot read branches, teams, team membership or organization
+counts. The API returns zeroed internal metrics for collectors and customers rather than exposing
+tenant-wide counts that their role does not need.
+
 ### Implemented worker-security baseline
 
 The API and background worker use different PostgreSQL login roles. The API role can insert

@@ -13,6 +13,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
   const suffix = Date.now().toString(36);
   const developerId = crypto.randomUUID();
   const memberId = crypto.randomUUID();
+  const customerId = crypto.randomUUID();
   const slug = `tenant-${suffix}`;
   const secondSlug = `tenant-secondary-${suffix}`;
   const password = "integration-password-123";
@@ -27,7 +28,8 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     await ownerPool.query(
       `INSERT INTO users (id, username, email, display_name, password_hash, platform_role, must_change_password)
        VALUES ($1, $2, $3, 'Integration Developer', $4, 'developer', false),
-              ($5, $6, $7, 'Integration Member', $4, NULL, false)`,
+              ($5, $6, $7, 'Integration Member', $4, NULL, false),
+              ($8, $9, $10, 'Integration Customer', $4, NULL, false)`,
       [
         developerId,
         `developer-${suffix}`,
@@ -36,6 +38,9 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
         memberId,
         `member-${suffix}`,
         `member-${suffix}@example.com`,
+        customerId,
+        `customer-${suffix}`,
+        `customer-${suffix}@example.com`,
       ],
     );
   });
@@ -48,7 +53,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
              OR actor_user_id = ANY($2::uuid[])`,
         [
           [slug, secondSlug],
-          [developerId, memberId],
+          [developerId, memberId, customerId],
         ],
       );
       await ownerPool.query(
@@ -59,10 +64,10 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
         [slug, secondSlug],
       ]);
       await ownerPool.query("DELETE FROM auth_sessions WHERE user_id = ANY($1::uuid[])", [
-        [developerId, memberId],
+        [developerId, memberId, customerId],
       ]);
       await ownerPool.query("DELETE FROM users WHERE id = ANY($1::uuid[])", [
-        [developerId, memberId],
+        [developerId, memberId, customerId],
       ]);
       await ownerPool.query(
         "DELETE FROM audit_events WHERE actor_user_id IN (SELECT id FROM users WHERE username = $1)",
@@ -157,7 +162,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     const platform = createPostgresPlatformService(runtimePool);
     const supportAccess = createPostgresSupportAccessService(runtimePool);
     await expect(platform.systemStatus(developerId)).resolves.toMatchObject({
-      schemaVersion: "0009_support_access_expiry_outbox.sql",
+      schemaVersion: "0010_role_scoped_organization_visibility.sql",
       jobs: {
         status: expect.stringMatching(/^(operational|attention)$/),
         due: expect.any(Number),
@@ -453,8 +458,9 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     );
     await ownerPool.query(
       `INSERT INTO tenant_memberships (tenant_id, user_id, role, created_by)
-       VALUES ($1, $2, 'collector', $3)`,
-      [tenant.id, memberId, developerId],
+       VALUES ($1, $2, 'collector', $4),
+              ($1, $3, 'customer', $4)`,
+      [tenant.id, memberId, customerId, developerId],
     );
     const memberLogin = await auth.login(`member-${suffix}`, password, {
       requestId: `login-member-${suffix}`,
@@ -535,9 +541,55 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
         `team-member-${suffix}`,
       ),
     ).resolves.toEqual({ status: "updated" });
+    const unassignedBranch = await tenancy.createBranch(ownerActor, tenant.id, {
+      code: "sur",
+      displayName: "Sede Sur",
+      requestId: `branch-unassigned-${suffix}`,
+    });
+    const unassignedTeam = await tenancy.createTeam(ownerActor, tenant.id, {
+      branchId: unassignedBranch?.id ?? null,
+      displayName: "Ruta Sur",
+      requestId: `team-unassigned-${suffix}`,
+    });
+    expect(unassignedTeam).toMatchObject({ displayName: "Ruta Sur", branchName: "Sede Sur" });
+    await expect(
+      tenancy.updateMember(ownerActor, tenant.id, memberId, {
+        role: "collector",
+        status: "active",
+        requestId: `member-collector-scope-${suffix}`,
+      }),
+    ).resolves.toMatchObject({ status: "updated", member: { role: "collector" } });
+
+    const collectorOverview = await tenancy.overview(
+      { userId: memberId, platformRole: null, tenantRole: "collector" },
+      tenant.id,
+    );
+    expect(collectorOverview?.metrics).toEqual({
+      members: 0,
+      branches: 1,
+      teams: 1,
+      pendingInvitations: 0,
+    });
+    expect(collectorOverview?.branches.map((item) => item.id)).toEqual([branch?.id]);
+    expect(collectorOverview?.teams.map((item) => item.id)).toEqual([team?.id]);
+    expect(collectorOverview?.teams[0]?.memberIds).toEqual([]);
+
+    const customerOverview = await tenancy.overview(
+      { userId: customerId, platformRole: null, tenantRole: "customer" },
+      tenant.id,
+    );
+    expect(customerOverview).toMatchObject({
+      actorRole: "customer",
+      metrics: { members: 0, branches: 0, teams: 0, pendingInvitations: 0 },
+      members: [],
+      branches: [],
+      teams: [],
+      pendingInvitations: [],
+      activity: [],
+    });
 
     const configuredOverview = await tenancy.overview(ownerActor, tenant.id);
-    expect(configuredOverview?.metrics).toMatchObject({ branches: 1, teams: 1 });
+    expect(configuredOverview?.metrics).toMatchObject({ branches: 2, teams: 2 });
     expect(configuredOverview?.settings.contactEmail).toBe(`operations-${suffix}@example.com`);
     expect(configuredOverview?.settingsHistory).toEqual([
       expect.objectContaining({

@@ -81,7 +81,7 @@ function dependencies(overrides?: {
   };
   const platformService: PlatformService = {
     systemStatus: vi.fn(async () => ({
-      schemaVersion: "0009_support_access_expiry_outbox.sql",
+      schemaVersion: "0010_role_scoped_organization_visibility.sql",
       jobs: {
         status: "operational",
         due: 0,
@@ -461,7 +461,7 @@ describe("developer platform", () => {
       api: { status: "operational", version: "test" },
       database: {
         status: "operational",
-        schemaVersion: "0009_support_access_expiry_outbox.sql",
+        schemaVersion: "0010_role_scoped_organization_visibility.sql",
       },
       jobs: {
         status: "operational",

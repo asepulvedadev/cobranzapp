@@ -370,6 +370,8 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           await client.query("ROLLBACK");
           return null;
         }
+        const maySeeOrganization =
+          isSupport || actor.tenantRole === "owner" || actor.tenantRole === "supervisor";
         const metrics = await client.query<{
           members: string;
           branches: string;
@@ -525,10 +527,10 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
           },
           actorRole: actor.tenantRole ?? "support",
           metrics: {
-            members: Number(counts?.members ?? 0),
+            members: maySeeOrganization ? Number(counts?.members ?? 0) : 0,
             branches: Number(counts?.branches ?? 0),
             teams: Number(counts?.teams ?? 0),
-            pendingInvitations: Number(counts?.pending_invitations ?? 0),
+            pendingInvitations: maySeeOrganization ? Number(counts?.pending_invitations ?? 0) : 0,
           },
           settings: {
             primaryColor: tenantSettings.primary_color,
