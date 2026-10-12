@@ -1625,6 +1625,71 @@ html:has(.panel-shell) {
   font-weight: 700;
 }
 
+.member-profile-form {
+  max-width: 720px;
+}
+
+.member-profile-fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: 9px;
+  background: #fafbfa;
+}
+
+.member-profile-fieldset legend {
+  padding: 0 4px;
+  color: var(--panel-dark);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.member-profile-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 3px;
+  color: var(--panel-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.member-profile-consent input {
+  width: 18px;
+  min-height: 18px;
+  margin: 0;
+  flex: 0 0 auto;
+  accent-color: var(--panel-green);
+}
+
+.member-profile-contact {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.member-profile-contact strong {
+  font-size: 12px;
+}
+
+.tenant-form .button-link {
+  width: fit-content;
+  min-height: 32px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #7a5700;
+  font-size: 12px;
+  text-decoration: underline;
+}
+
 .invitation-result {
   display: grid;
   gap: 8px;

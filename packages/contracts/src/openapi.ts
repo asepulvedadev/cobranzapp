@@ -44,6 +44,8 @@ import {
   tenantBranchResponseSchema,
   tenantInvitationCreatedResponseSchema,
   tenantInvitationRequestSchema,
+  tenantMemberProfileRequestSchema,
+  tenantMemberProfileResponseSchema,
   tenantMemberResponseSchema,
   tenantMemberUpdateRequestSchema,
   tenantOverviewSchema,
@@ -116,6 +118,8 @@ const documentedSchemas = {
   TenantInvitationCreatedResponse: tenantInvitationCreatedResponseSchema,
   TenantInvitationRequest: tenantInvitationRequestSchema,
   TenantMemberResponse: tenantMemberResponseSchema,
+  TenantMemberProfileRequest: tenantMemberProfileRequestSchema,
+  TenantMemberProfileResponse: tenantMemberProfileResponseSchema,
   TenantMemberUpdateRequest: tenantMemberUpdateRequestSchema,
   TenantSettingsResponse: tenantSettingsResponseSchema,
   TenantSettingsUpdateRequest: tenantSettingsUpdateRequestSchema,
@@ -483,6 +487,73 @@ export function createOpenApiDocument(version: string) {
               "El acceso está protegido, revocado o no hay cupos disponibles.",
               schemaReference("ApiError"),
             ),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/members/{userId}/profile": {
+        get: {
+          tags: ["Empresas"],
+          operationId: "getTenantMemberProfile",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": response(
+              "Ficha operativa del integrante.",
+              schemaReference("TenantMemberProfileResponse"),
+            ),
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("El integrante no existe.", schemaReference("ApiError")),
+          },
+        },
+        put: {
+          tags: ["Empresas"],
+          operationId: "updateTenantMemberProfile",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("TenantMemberProfileRequest")),
+          },
+          responses: {
+            "200": response(
+              "Ficha operativa actualizada.",
+              schemaReference("TenantMemberProfileResponse"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("El integrante no existe.", schemaReference("ApiError")),
             "428": response(
               "Confirmación reciente de contraseña requerida.",
               schemaReference("ApiError"),

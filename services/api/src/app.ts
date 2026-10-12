@@ -16,6 +16,7 @@ import {
   reauthenticationRequestSchema,
   type ServiceStatus,
   tenantInvitationRequestSchema,
+  tenantMemberProfileRequestSchema,
   tenantMemberUpdateRequestSchema,
   tenantSettingsUpdateRequestSchema,
   verificationNetworkAssertionRequestSchema,
@@ -41,6 +42,7 @@ const mfaChallengeCookieName = "cobranzapp_mfa_challenge";
 const tenantIdParamsSchema = z.object({ tenantId: z.uuid() });
 const tenantInvitationParamsSchema = z.object({ tenantId: z.uuid(), invitationId: z.uuid() });
 const tenantMemberParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
+const tenantMemberProfileParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
 const supportAccessParamsSchema = z.object({ accessId: z.uuid() });
 const tenantSupportAccessParamsSchema = z.object({ tenantId: z.uuid(), accessId: z.uuid() });
 const tenantTeamMemberParamsSchema = z.object({
@@ -1225,6 +1227,142 @@ export function buildApp(dependencies: AppDependencies) {
         request.id,
       );
     return overview;
+  });
+
+  app.get("/v1/tenants/:tenantId/members/:userId/profile", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantMemberProfileParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "MEMBER_PROFILE_NOT_FOUND", "El perfil no existe.", request.id);
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership) {
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a esta empresa.", request.id);
+    }
+    if (
+      params.data.userId !== session.user.id &&
+      !["owner", "supervisor"].includes(membership.role)
+    ) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo puedes consultar tu propia ficha operativa.",
+        request.id,
+      );
+    }
+    const getMemberProfile = dependencies.tenancyService.getMemberProfile;
+    if (!getMemberProfile) {
+      return sendError(
+        reply,
+        501,
+        "MEMBER_PROFILE_UNAVAILABLE",
+        "La ficha operativa todavía no está habilitada.",
+        request.id,
+      );
+    }
+    const profile = await getMemberProfile(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.userId,
+    );
+    if (!profile) {
+      return sendError(
+        reply,
+        404,
+        "MEMBER_PROFILE_NOT_FOUND",
+        "El integrante no existe.",
+        request.id,
+      );
+    }
+    return reply.send({ profile });
+  });
+
+  app.put("/v1/tenants/:tenantId/members/:userId/profile", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantMemberProfileParamsSchema.safeParse(request.params);
+    const body = tenantMemberProfileRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_MEMBER_PROFILE",
+        "Revisa los datos de la ficha operativa.",
+        request.id,
+      );
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership) {
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a esta empresa.", request.id);
+    }
+    if (
+      params.data.userId !== session.user.id &&
+      !["owner", "supervisor"].includes(membership.role)
+    ) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo propietario o supervisor puede actualizar otra ficha.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const updateMemberProfile = dependencies.tenancyService.updateMemberProfile;
+    if (!updateMemberProfile) {
+      return sendError(
+        reply,
+        501,
+        "MEMBER_PROFILE_UNAVAILABLE",
+        "La ficha operativa todavía no está habilitada.",
+        request.id,
+      );
+    }
+    const result = await updateMemberProfile(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.userId,
+      { ...body.data, requestId: request.id },
+    );
+    switch (result.status) {
+      case "updated":
+        return reply.send({ profile: result.profile });
+      case "invalid_photo_key":
+        return sendError(
+          reply,
+          400,
+          "INVALID_PROFILE_PHOTO_KEY",
+          "La foto debe provenir del almacenamiento privado de la empresa.",
+          request.id,
+        );
+      case "forbidden":
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "No puedes actualizar esta ficha.",
+          request.id,
+        );
+      default:
+        return sendError(
+          reply,
+          404,
+          "MEMBER_PROFILE_NOT_FOUND",
+          "El integrante no existe.",
+          request.id,
+        );
+    }
   });
 
   function tenantMembershipForSession(session: { user: AuthenticatedUser }, tenantId: string) {

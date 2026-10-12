@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import type { CSSProperties } from "react";
-import type { CurrentUser, SupportAccessRecord, TenantOverview } from "../../../../lib/platform";
+import type {
+  CurrentUser,
+  SupportAccessRecord,
+  TenantMemberProfile,
+  TenantOverview,
+} from "../../../../lib/platform";
 import { serverApi } from "../../../../lib/server-api";
 import { ActivityFeed } from "../../ActivityFeed";
 import { InviteUserForm } from "../../InviteUserForm";
 import { CustomerWorkspace } from "./CustomerWorkspace";
 import { MemberAccessControl } from "./MemberAccessControl";
+import { MemberProfileForm } from "./MemberProfileForm";
 import { OrganizationStatusButton } from "./OrganizationStatusButton";
 import { PendingInvitationList } from "./PendingInvitationList";
 import { SettingsVersionHistory } from "./SettingsVersionHistory";
@@ -60,6 +66,16 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
   if (!response.ok) throw new Error("No fue posible cargar la empresa");
   const overview = (await response.json()) as TenantOverview;
   const canSeeTeam = overview.actorRole === "owner" || overview.actorRole === "supervisor";
+  let memberProfile: TenantMemberProfile | null = null;
+  if (overview.actorRole !== "customer" && overview.actorRole !== "support") {
+    const profileResponse = await serverApi(
+      `/v1/tenants/${membership.tenantId}/members/${user.id}/profile`,
+    );
+    if (!profileResponse.ok) throw new Error("No fue posible cargar tu ficha operativa");
+    ({ profile: memberProfile } = (await profileResponse.json()) as {
+      profile: TenantMemberProfile;
+    });
+  }
   let supportAccess: SupportAccessRecord[] = [];
   if (overview.actorRole === "owner") {
     const supportResponse = await serverApi(`/v1/tenants/${membership.tenantId}/support-access`);
@@ -375,6 +391,18 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
             cualquier momento.
           </p>
           <SupportAccessReview access={supportAccess} tenantId={overview.tenant.id} />
+        </section>
+      ) : null}
+
+      {memberProfile ? (
+        <section className="dashboard-card activity-card" id="mi-ficha">
+          <div className="card-heading">
+            <div>
+              <span className="panel-eyebrow">Información del equipo</span>
+              <h2>Mi ficha operativa</h2>
+            </div>
+          </div>
+          <MemberProfileForm profile={memberProfile} tenantId={overview.tenant.id} />
         </section>
       ) : null}
 

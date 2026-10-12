@@ -8,6 +8,7 @@ import {
   platformTenantDirectoryQuerySchema,
   platformTenantStatusUpdateRequestSchema,
   platformUserDirectoryQuerySchema,
+  tenantMemberProfileRequestSchema,
   tenantOverviewSchema,
   tenantSettingsUpdateRequestSchema,
 } from "./index.js";
@@ -74,6 +75,25 @@ describe("shared API contracts", () => {
           oldestDueAt: null,
         },
         checkedAt: "2026-10-11T20:00:00.000Z",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires explicit consent when a staff blood type is captured", () => {
+    const base = {
+      phone: null,
+      homeAddress: null,
+      workAddress: null,
+      profilePhotoObjectKey: null,
+      bloodType: "O+" as const,
+      bloodTypeConsentVersion: null,
+      emergencyContacts: [],
+    };
+    expect(tenantMemberProfileRequestSchema.safeParse(base).success).toBe(false);
+    expect(
+      tenantMemberProfileRequestSchema.safeParse({
+        ...base,
+        bloodTypeConsentVersion: "staff-profile-v1",
       }).success,
     ).toBe(true);
   });

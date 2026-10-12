@@ -553,13 +553,62 @@ export const verificationNetworkCorrectionResponseSchema = z.object({
   status: z.literal("open"),
 });
 
-export const tenantMemberProfileRequestSchema = z.object({
-  phone: z.string().trim().min(7).max(30).nullable(),
-  homeAddress: z.string().trim().min(3).max(240).nullable(),
-  workAddress: z.string().trim().min(3).max(240).nullable(),
-  profilePhotoObjectKey: z.string().trim().min(1).max(500).nullable(),
+export const tenantMemberProfileRequestSchema = z
+  .object({
+    phone: z.string().trim().min(7).max(30).nullable(),
+    homeAddress: z.string().trim().min(3).max(240).nullable(),
+    workAddress: z.string().trim().min(3).max(240).nullable(),
+    profilePhotoObjectKey: z.string().trim().min(1).max(500).nullable(),
+    bloodType: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]).nullable(),
+    bloodTypeConsentVersion: z.string().trim().min(1).max(40).nullable(),
+    emergencyContacts: z
+      .array(
+        z.object({
+          fullName: z.string().trim().min(2).max(120),
+          relationship: z.string().trim().min(2).max(80),
+          phone: z.string().trim().min(7).max(30),
+        }),
+      )
+      .max(2),
+  })
+  .superRefine((value, context) => {
+    if (value.bloodType && !value.bloodTypeConsentVersion) {
+      context.addIssue({
+        code: "custom",
+        path: ["bloodTypeConsentVersion"],
+        message: "El consentimiento del tipo de sangre es obligatorio.",
+      });
+    }
+    if (!value.bloodType && value.bloodTypeConsentVersion) {
+      context.addIssue({
+        code: "custom",
+        path: ["bloodTypeConsentVersion"],
+        message: "No se puede registrar consentimiento sin tipo de sangre.",
+      });
+    }
+  });
+
+export const tenantMemberEmergencyContactSchema = z.object({
+  id: z.uuid(),
+  fullName: z.string().min(2),
+  relationship: z.string().min(2),
+  phone: z.string().min(7),
+});
+
+export const tenantMemberProfileSchema = z.object({
+  userId: z.uuid(),
+  phone: z.string().nullable(),
+  homeAddress: z.string().nullable(),
+  workAddress: z.string().nullable(),
+  profilePhotoObjectKey: z.string().nullable(),
   bloodType: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]).nullable(),
-  bloodTypeConsentVersion: z.string().trim().min(1).max(40).nullable(),
+  bloodTypeConsentVersion: z.string().nullable(),
+  bloodTypeConsentedAt: z.iso.datetime().nullable(),
+  emergencyContacts: z.array(tenantMemberEmergencyContactSchema).max(2),
+});
+
+export const tenantMemberProfileResponseSchema = z.object({
+  profile: tenantMemberProfileSchema,
 });
 
 export type ServiceStatus = z.infer<typeof serviceStatusSchema>;
@@ -630,3 +679,5 @@ export type VerificationNetworkCorrectionResponse = z.infer<
   typeof verificationNetworkCorrectionResponseSchema
 >;
 export type TenantMemberProfileRequest = z.infer<typeof tenantMemberProfileRequestSchema>;
+export type TenantMemberEmergencyContact = z.infer<typeof tenantMemberEmergencyContactSchema>;
+export type TenantMemberProfile = z.infer<typeof tenantMemberProfileSchema>;

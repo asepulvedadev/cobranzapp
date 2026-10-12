@@ -57,6 +57,19 @@ Transferred-payment screenshots are evidence, not proof of settlement. Payment c
 - Supervisors review missing visits, pending events, cash discrepancies, reversal requests, and unusual operational patterns.
 - Optional location capture at an action requires appropriate permissions and purpose; no continuous tracking by default.
 
+### Ficha operativa de supervisores y cobradores
+
+La primera ficha operativa ya está disponible dentro de cada empresa para que el integrante
+complete sus datos sin mezclar información entre tenants. Incluye celular, direcciones de casa y
+trabajo, hasta dos contactos de emergencia y una referencia opcional a una foto de perfil privada.
+La foto es una imagen designada por la persona; no es selfie, biometría ni prueba de identidad.
+
+El tipo de sangre es opcional, está separado del resto de la ficha y solo se guarda cuando existe
+una versión de consentimiento explícita. Propietarios y supervisores pueden revisar fichas según
+su alcance; cada cambio genera auditoría sin registrar los valores sensibles en los metadatos del
+evento. La carga real de imágenes permanece detrás del almacenamiento privado aprobado y no se
+aceptan rutas de objetos arbitrarias.
+
 ### Shared verification network (replacement for “blacklist”)
 
 The product now has a consent-gated foundation for a shared verification network. It returns only minimal categories and counts, records every query, requires evidence and expiry for each observation, and supports a correction request. It never shares documents, balances, addresses, photos or the reporting company name.

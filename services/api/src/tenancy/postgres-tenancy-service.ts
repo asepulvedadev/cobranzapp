@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import type { TenantMemberProfile } from "@cobranzapp/contracts";
 import type { Pool, PoolClient } from "pg";
 import { hashPassword } from "../auth/password.js";
 import type { TenantRole } from "../auth/types.js";
@@ -6,6 +7,7 @@ import { buildMembershipEntitlement, membershipCatalog } from "../memberships/ca
 import type {
   InvitationAcceptanceResult,
   InvitationPreview,
+  MemberProfileResult,
   TenancyService,
   TenantActor,
   TenantOverview,
@@ -30,6 +32,66 @@ async function setActorContext(client: PoolClient, actor: TenantActor, tenantId:
 
 async function lockTenantMembershipCapacity(client: PoolClient, tenantId: string) {
   await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))", [tenantId]);
+}
+
+async function loadMemberProfile(
+  client: Pick<PoolClient, "query">,
+  tenantId: string,
+  userId: string,
+): Promise<TenantMemberProfile | null> {
+  const member = await client.query<{
+    user_id: string;
+    phone: string | null;
+    home_address: string | null;
+    work_address: string | null;
+    profile_photo_object_key: string | null;
+    blood_type: TenantMemberProfile["bloodType"];
+    blood_type_consent_version: string | null;
+    blood_type_consented_at: Date | null;
+  }>(
+    `SELECT membership.user_id,
+            profile.phone, profile.home_address, profile.work_address,
+            profile.profile_photo_object_key, profile.blood_type,
+            profile.blood_type_consent_version, profile.blood_type_consented_at
+       FROM tenant_memberships membership
+       LEFT JOIN tenant_member_profiles profile
+         ON profile.tenant_id = membership.tenant_id AND profile.user_id = membership.user_id
+      WHERE membership.tenant_id = $1
+        AND membership.user_id = $2
+        AND membership.status <> 'revoked'`,
+    [tenantId, userId],
+  );
+  const row = member.rows[0];
+  if (!row) return null;
+
+  const contacts = await client.query<{
+    id: string;
+    full_name: string;
+    relationship: string;
+    phone: string;
+  }>(
+    `SELECT id, full_name, relationship, phone
+       FROM tenant_member_emergency_contacts
+      WHERE tenant_id = $1 AND user_id = $2
+      ORDER BY created_at ASC, id ASC`,
+    [tenantId, userId],
+  );
+  return {
+    userId: row.user_id,
+    phone: row.phone,
+    homeAddress: row.home_address,
+    workAddress: row.work_address,
+    profilePhotoObjectKey: row.profile_photo_object_key,
+    bloodType: row.blood_type,
+    bloodTypeConsentVersion: row.blood_type_consent_version,
+    bloodTypeConsentedAt: row.blood_type_consented_at?.toISOString() ?? null,
+    emergencyContacts: contacts.rows.map((contact) => ({
+      id: contact.id,
+      fullName: contact.full_name,
+      relationship: contact.relationship,
+      phone: contact.phone,
+    })),
+  };
 }
 
 async function loadInvitation(
@@ -1065,6 +1127,134 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
         }
         await client.query("COMMIT");
         return { status: "updated" };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async getMemberProfile(actor, tenantId, userId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setActorContext(client, actor, tenantId);
+        const profile = await loadMemberProfile(client, tenantId, userId);
+        await client.query("COMMIT");
+        return profile;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async updateMemberProfile(actor, tenantId, userId, input) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setActorContext(client, actor, tenantId);
+        const member = await client.query<{ role: TenantRole; status: string }>(
+          `SELECT role, status
+             FROM tenant_memberships
+            WHERE tenant_id = $1 AND user_id = $2
+            FOR UPDATE`,
+          [tenantId, userId],
+        );
+        const membership = member.rows[0];
+        if (!membership || membership.status === "revoked") {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies MemberProfileResult;
+        }
+        if (actor.userId !== userId && !["owner", "supervisor"].includes(actor.tenantRole ?? "")) {
+          await client.query("ROLLBACK");
+          return { status: "forbidden" } satisfies MemberProfileResult;
+        }
+        if (
+          actor.userId !== userId &&
+          actor.tenantRole === "supervisor" &&
+          membership.role === "owner"
+        ) {
+          await client.query("ROLLBACK");
+          return { status: "forbidden" } satisfies MemberProfileResult;
+        }
+        if (
+          input.profilePhotoObjectKey &&
+          !input.profilePhotoObjectKey.startsWith(`tenant/${tenantId}/members/${userId}/profile/`)
+        ) {
+          await client.query("ROLLBACK");
+          return { status: "invalid_photo_key" } satisfies MemberProfileResult;
+        }
+
+        await client.query(
+          `INSERT INTO tenant_member_profiles (
+             tenant_id, user_id, phone, home_address, work_address,
+             profile_photo_object_key, blood_type, blood_type_consent_version,
+             blood_type_consented_at
+           ) VALUES ($1, $2, $3::text, $4::text, $5::text, $6::text, $7::text, $8::text,
+                     CASE WHEN $7::text IS NULL THEN NULL ELSE now() END)
+           ON CONFLICT (tenant_id, user_id) DO UPDATE SET
+             phone = EXCLUDED.phone,
+             home_address = EXCLUDED.home_address,
+             work_address = EXCLUDED.work_address,
+             profile_photo_object_key = EXCLUDED.profile_photo_object_key,
+             blood_type = EXCLUDED.blood_type,
+             blood_type_consent_version = EXCLUDED.blood_type_consent_version,
+             blood_type_consented_at = EXCLUDED.blood_type_consented_at,
+             updated_at = now()`,
+          [
+            tenantId,
+            userId,
+            input.phone,
+            input.homeAddress,
+            input.workAddress,
+            input.profilePhotoObjectKey,
+            input.bloodType,
+            input.bloodTypeConsentVersion,
+          ],
+        );
+        await client.query(
+          "DELETE FROM tenant_member_emergency_contacts WHERE tenant_id = $1 AND user_id = $2",
+          [tenantId, userId],
+        );
+        for (const contact of input.emergencyContacts) {
+          await client.query(
+            `INSERT INTO tenant_member_emergency_contacts
+               (tenant_id, user_id, full_name, relationship, phone)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [tenantId, userId, contact.fullName, contact.relationship, contact.phone],
+          );
+        }
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'member.profile_updated', 'tenant_member_profile', $3, $4,
+                   $5::jsonb)`,
+          [
+            tenantId,
+            actor.userId,
+            userId,
+            input.requestId,
+            JSON.stringify({
+              targetUserId: userId,
+              hasPhone: input.phone !== null,
+              hasHomeAddress: input.homeAddress !== null,
+              hasWorkAddress: input.workAddress !== null,
+              hasProfilePhoto: input.profilePhotoObjectKey !== null,
+              bloodTypeProvided: input.bloodType !== null,
+              emergencyContactCount: input.emergencyContacts.length,
+            }),
+          ],
+        );
+        const profile = await loadMemberProfile(client, tenantId, userId);
+        if (!profile) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies MemberProfileResult;
+        }
+        await client.query("COMMIT");
+        return { status: "updated", profile } satisfies MemberProfileResult;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

@@ -568,6 +568,66 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       clientLimit: 200,
     });
 
+    if (!tenancy.getMemberProfile || !tenancy.updateMemberProfile) {
+      throw new Error("Member profile service is not available");
+    }
+    await expect(
+      tenancy.getMemberProfile(ownerActor, tenant.id, ownerLogin?.user.id ?? ""),
+    ).resolves.toMatchObject({
+      userId: ownerLogin?.user.id,
+      phone: null,
+      emergencyContacts: [],
+    });
+    const profileUpdate = await tenancy.updateMemberProfile(
+      ownerActor,
+      tenant.id,
+      ownerLogin?.user.id ?? "",
+      {
+        phone: "+57 300 111 2233",
+        homeAddress: "Calle 10 # 20-30, Cúcuta",
+        workAddress: "Carrera 5 # 6-7, Cúcuta",
+        profilePhotoObjectKey: null,
+        bloodType: "O+",
+        bloodTypeConsentVersion: "staff-profile-v1",
+        emergencyContacts: [
+          { fullName: "Contacto Principal", relationship: "Hermana", phone: "+57 300 444 5566" },
+        ],
+        requestId: `profile-update-${suffix}`,
+      },
+    );
+    expect(profileUpdate).toMatchObject({
+      status: "updated",
+      profile: {
+        phone: "+57 300 111 2233",
+        bloodType: "O+",
+        bloodTypeConsentVersion: "staff-profile-v1",
+        emergencyContacts: [{ fullName: "Contacto Principal", relationship: "Hermana" }],
+      },
+    });
+    await expect(
+      tenancy.updateMemberProfile(ownerActor, tenant.id, ownerLogin?.user.id ?? "", {
+        phone: null,
+        homeAddress: null,
+        workAddress: null,
+        profilePhotoObjectKey: `tenant/${tenant.id}/members/${ownerLogin?.user.id}/profile/photo.jpg`,
+        bloodType: null,
+        bloodTypeConsentVersion: null,
+        emergencyContacts: [],
+        requestId: `profile-photo-${suffix}`,
+      }),
+    ).resolves.toMatchObject({ status: "updated" });
+    expect(
+      (
+        await ownerPool.query<{ action: string }>(
+          `SELECT action
+             FROM audit_events
+            WHERE tenant_id = $1 AND action = 'member.profile_updated'
+              AND request_id = $2`,
+          [tenant.id, `profile-update-${suffix}`],
+        )
+      ).rows,
+    ).toHaveLength(1);
+
     await expect(
       platform.updateMembershipEntitlement(
         developerId,

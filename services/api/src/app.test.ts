@@ -1379,6 +1379,69 @@ describe("tenant onboarding", () => {
     );
   });
 
+  it("protects and updates the signed-in member operational profile", async () => {
+    const deps = dependencies({ authService: { authenticate: vi.fn(async () => tenantOwner) } });
+    const profile = {
+      userId: tenantOwner.id,
+      phone: null,
+      homeAddress: null,
+      workAddress: null,
+      profilePhotoObjectKey: null,
+      bloodType: null,
+      bloodTypeConsentVersion: null,
+      bloodTypeConsentedAt: null,
+      emergencyContacts: [],
+    } as const;
+    deps.tenancyService.getMemberProfile = vi.fn(async () => profile);
+    deps.tenancyService.updateMemberProfile = vi.fn(async (_actor, _tenantId, _userId, input) => ({
+      status: "updated" as const,
+      profile: {
+        ...profile,
+        phone: input.phone,
+        emergencyContacts: input.emergencyContacts.map((contact, index) => ({
+          ...contact,
+          id: `9ec06ada-07c8-42ba-b1f8-af0fc43c75e${index}`,
+        })),
+      },
+    }));
+    const app = buildApp(deps);
+    apps.push(app);
+    const tenantId = tenantOwner.memberships[0]?.tenantId;
+    const headers = {
+      cookie: "cobranzapp_session=session-token",
+      origin: "https://cobranzaap.tech",
+    };
+    const read = await app.inject({
+      method: "GET",
+      url: `/v1/tenants/${tenantId}/members/${tenantOwner.id}/profile`,
+      headers,
+    });
+    expect(read.statusCode).toBe(200);
+    expect(read.json()).toMatchObject({ profile: { userId: tenantOwner.id } });
+    const update = await app.inject({
+      method: "PUT",
+      url: `/v1/tenants/${tenantId}/members/${tenantOwner.id}/profile`,
+      headers,
+      payload: {
+        phone: "+57 300 111 2233",
+        homeAddress: null,
+        workAddress: null,
+        profilePhotoObjectKey: null,
+        bloodType: null,
+        bloodTypeConsentVersion: null,
+        emergencyContacts: [],
+      },
+    });
+    expect(update.statusCode).toBe(200);
+    expect(update.json()).toMatchObject({ profile: { phone: "+57 300 111 2233" } });
+    expect(deps.tenancyService.updateMemberProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantRole: "owner" }),
+      tenantId,
+      tenantOwner.id,
+      expect.objectContaining({ phone: "+57 300 111 2233" }),
+    );
+  });
+
   it("prevents an owner from activating an employee above capacity", async () => {
     const deps = dependencies({ authService: { authenticate: vi.fn(async () => tenantOwner) } });
     vi.mocked(deps.tenancyService.updateMember).mockResolvedValue({

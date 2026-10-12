@@ -3,6 +3,8 @@ import type {
   CreateTeamRequest,
   TenantOverview as SharedTenantOverview,
   TenantInvitationRequest,
+  TenantMemberProfile,
+  TenantMemberProfileRequest,
   TenantMemberUpdateRequest,
   TenantSettingsUpdateRequest,
 } from "@cobranzapp/contracts";
@@ -68,6 +70,12 @@ export type InvitationRevocationResult =
   | { status: "revoked" }
   | { status: "not_found" }
   | { status: "protected" };
+
+export type MemberProfileResult =
+  | { status: "updated"; profile: TenantMemberProfile }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "invalid_photo_key" };
 
 export interface TenancyService {
   createInvitation(
@@ -147,4 +155,15 @@ export interface TenancyService {
     userId: string,
     input: TenantMemberUpdateRequest & { requestId: string },
   ): Promise<MemberUpdateResult>;
+  getMemberProfile?(
+    actor: TenantActor,
+    tenantId: string,
+    userId: string,
+  ): Promise<TenantMemberProfile | null>;
+  updateMemberProfile?(
+    actor: TenantActor,
+    tenantId: string,
+    userId: string,
+    input: TenantMemberProfileRequest & { requestId: string },
+  ): Promise<MemberProfileResult>;
 }
