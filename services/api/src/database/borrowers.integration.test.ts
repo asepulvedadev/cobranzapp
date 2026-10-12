@@ -108,5 +108,32 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
         requestId: "borrower-create-duplicate-test",
       }),
     ).resolves.toEqual({ status: "duplicate_identity" });
+
+    const documentKeyPrefix = `tenant/${tenantId}/borrowers/${created.borrower.id}/documents`;
+    for (const document of [
+      ["identity", "front", `${documentKeyPrefix}/front`] as const,
+      ["identity", "back", `${documentKeyPrefix}/back`] as const,
+      ["profile_photo", null, `${documentKeyPrefix}/profile`] as const,
+    ]) {
+      await ownerPool.query(
+        `INSERT INTO borrower_documents
+           (tenant_id, borrower_id, category, side, object_key, media_type, size_bytes, sha256, scan_status, created_by)
+         VALUES ($1, $2, $3, $4, $5, 'image/jpeg', 1024, repeat('a', 64), 'accepted', $6)`,
+        [tenantId, created.borrower.id, document[0], document[1], document[2], developerId],
+      );
+    }
+    const reviewed = await service.review(actor, tenantId, created.borrower.id, {
+      decision: "reviewed",
+      notes: "La revisión manual coincide con la evidencia cargada.",
+      legalNameConfirmed: true,
+      identityFrontConfirmed: true,
+      identityBackConfirmed: true,
+      profilePhotoConfirmed: true,
+      requestId: "borrower-review-test",
+    });
+    expect(reviewed).toMatchObject({
+      status: "updated",
+      borrower: { identity: { verificationState: "reviewed" } },
+    });
   });
 });

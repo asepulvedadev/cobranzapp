@@ -263,7 +263,11 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
 
       {borrowerDirectory ? (
         <section className="dashboard-card borrower-directory-card" id="clientes">
-          <BorrowerDirectoryView directory={borrowerDirectory} tenantId={overview.tenant.id} />
+          <BorrowerDirectoryView
+            canReview={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
+            directory={borrowerDirectory}
+            tenantId={overview.tenant.id}
+          />
         </section>
       ) : (
         <section className="dashboard-card borrower-directory-card" id="clientes">

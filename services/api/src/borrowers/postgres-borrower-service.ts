@@ -7,7 +7,13 @@ import {
   encryptBorrowerDocumentNumber,
   normalizeBorrowerDocumentNumber,
 } from "./identity.js";
-import type { BorrowerCreateInput, BorrowerCreateResult, BorrowerService } from "./types.js";
+import type {
+  BorrowerCreateInput,
+  BorrowerCreateResult,
+  BorrowerReviewInput,
+  BorrowerReviewResult,
+  BorrowerService,
+} from "./types.js";
 
 type BorrowerRow = {
   id: string;
@@ -314,6 +320,93 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
           return { status: "duplicate_identity" };
         throw error;
       }
+    },
+
+    async review(
+      actor,
+      tenantId,
+      borrowerId,
+      input: BorrowerReviewInput,
+    ): Promise<BorrowerReviewResult> {
+      if (actor.tenantRole !== "owner" && actor.tenantRole !== "supervisor") {
+        return { status: "forbidden" };
+      }
+      return withTransaction(actor, tenantId, async (client) => {
+        const borrower = await client.query<{ id: string }>(
+          `SELECT id FROM borrowers WHERE tenant_id = $1 AND id = $2`,
+          [tenantId, borrowerId],
+        );
+        if (!borrower.rows[0]) return { status: "not_found" };
+
+        const acceptedDocuments = await client.query<{
+          identity_front: boolean;
+          identity_back: boolean;
+          profile_photo: boolean;
+        }>(
+          `SELECT
+             COALESCE(bool_or(category = 'identity' AND side = 'front' AND scan_status = 'accepted'), false) AS identity_front,
+             COALESCE(bool_or(category = 'identity' AND side = 'back' AND scan_status = 'accepted'), false) AS identity_back,
+             COALESCE(bool_or(category = 'profile_photo' AND scan_status = 'accepted'), false) AS profile_photo
+             FROM borrower_documents
+            WHERE tenant_id = $1 AND borrower_id = $2`,
+          [tenantId, borrowerId],
+        );
+        const accepted = acceptedDocuments.rows[0] ?? {
+          identity_front: false,
+          identity_back: false,
+          profile_photo: false,
+        };
+        const missing: Array<"identity_front" | "identity_back" | "profile_photo"> = [];
+        if (input.decision === "reviewed") {
+          if (!accepted.identity_front || !input.identityFrontConfirmed)
+            missing.push("identity_front");
+          if (!accepted.identity_back || !input.identityBackConfirmed)
+            missing.push("identity_back");
+          if (!accepted.profile_photo || !input.profilePhotoConfirmed)
+            missing.push("profile_photo");
+          if (missing.length) return { status: "missing_documents", missing };
+          if (!input.legalNameConfirmed) return { status: "missing_documents", missing: [] };
+        }
+
+        await client.query(
+          `UPDATE borrower_identities
+              SET verification_state = $3, updated_at = now()
+            WHERE tenant_id = $1 AND borrower_id = $2`,
+          [tenantId, borrowerId, input.decision],
+        );
+        await client.query(
+          `INSERT INTO borrower_identity_reviews
+             (tenant_id, borrower_id, reviewer_user_id, decision, notes, checklist)
+           VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+          [
+            tenantId,
+            borrowerId,
+            actor.userId,
+            input.decision,
+            input.notes,
+            JSON.stringify({
+              legalNameConfirmed: input.legalNameConfirmed,
+              identityFrontConfirmed: input.identityFrontConfirmed,
+              identityBackConfirmed: input.identityBackConfirmed,
+              profilePhotoConfirmed: input.profilePhotoConfirmed,
+            }),
+          ],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'borrower.identity_reviewed', 'borrower', $3, $4, $5::jsonb)`,
+          [
+            tenantId,
+            actor.userId,
+            borrowerId,
+            input.requestId,
+            JSON.stringify({ decision: input.decision }),
+          ],
+        );
+        const updated = await loadBorrower(client, tenantId, borrowerId);
+        return updated ? { status: "updated", borrower: updated } : { status: "not_found" };
+      });
     },
   };
 }

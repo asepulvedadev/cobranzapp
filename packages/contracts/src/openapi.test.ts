@@ -29,6 +29,9 @@ describe("OpenAPI contract", () => {
     expect(document.paths["/v1/tenants/{tenantId}/borrowers"].post.operationId).toBe(
       "createBorrower",
     );
+    expect(
+      document.paths["/v1/tenants/{tenantId}/borrowers/{borrowerId}/review"].patch.operationId,
+    ).toBe("reviewBorrowerIdentity");
     expect(document.paths["/v1/tenants/{tenantId}/settings"].patch.operationId).toBe(
       "updateTenantSettings",
     );

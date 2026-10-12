@@ -701,6 +701,31 @@ export const borrowerSchema = z.object({
 });
 
 export const borrowerResponseSchema = z.object({ borrower: borrowerSchema });
+export const borrowerReviewRequestSchema = z
+  .object({
+    decision: z.enum(["reviewed", "rejected"]),
+    notes: z.string().trim().min(10).max(500),
+    legalNameConfirmed: z.boolean(),
+    identityFrontConfirmed: z.boolean(),
+    identityBackConfirmed: z.boolean(),
+    profilePhotoConfirmed: z.boolean(),
+  })
+  .superRefine((value, context) => {
+    if (
+      value.decision === "reviewed" &&
+      (!value.legalNameConfirmed ||
+        !value.identityFrontConfirmed ||
+        !value.identityBackConfirmed ||
+        !value.profilePhotoConfirmed)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["decision"],
+        message: "La revisión aprobada debe confirmar nombre, frente, reverso y foto de perfil.",
+      });
+    }
+  });
+export const borrowerReviewResponseSchema = z.object({ borrower: borrowerSchema });
 export const borrowerDirectoryQuerySchema = z.object({
   q: z.string().trim().max(80).optional(),
   page: z.coerce.number().int().positive().default(1),
@@ -788,5 +813,6 @@ export type TenantMemberEmergencyContact = z.infer<typeof tenantMemberEmergencyC
 export type TenantMemberProfile = z.infer<typeof tenantMemberProfileSchema>;
 export type BorrowerDocument = z.infer<typeof borrowerDocumentSchema>;
 export type BorrowerCreateRequest = z.infer<typeof borrowerCreateRequestSchema>;
+export type BorrowerReviewRequest = z.infer<typeof borrowerReviewRequestSchema>;
 export type Borrower = z.infer<typeof borrowerSchema>;
 export type BorrowerDirectory = z.infer<typeof borrowerDirectorySchema>;

@@ -3691,6 +3691,86 @@ html:has(.panel-shell) {
   color: #a63a3a;
 }
 
+.borrower-review-control summary {
+  color: var(--panel-ink);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.borrower-review-body {
+  display: grid;
+  gap: 12px;
+  min-width: 250px;
+  padding-top: 12px;
+}
+
+.borrower-document-checklist {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.borrower-document-checklist li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--panel-ink);
+  font-size: 12px;
+}
+
+.borrower-document-checklist small {
+  color: var(--panel-muted);
+}
+
+.borrower-review-body form {
+  display: grid;
+  gap: 8px;
+}
+
+.review-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--panel-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.review-check input {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.borrower-review-body textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.borrower-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.borrower-review-actions button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--panel-ink);
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.borrower-review-actions .review-reject-button {
+  background: #a63a3a;
+}
+
 .verification-network-card {
   display: grid;
   gap: 18px;

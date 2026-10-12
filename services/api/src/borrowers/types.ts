@@ -1,4 +1,9 @@
-import type { Borrower, BorrowerCreateRequest, BorrowerDirectory } from "@cobranzapp/contracts";
+import type {
+  Borrower,
+  BorrowerCreateRequest,
+  BorrowerDirectory,
+  BorrowerReviewRequest,
+} from "@cobranzapp/contracts";
 import type { TenantActor } from "../tenancy/types.js";
 
 export type BorrowerDirectoryQuery = {
@@ -8,12 +13,22 @@ export type BorrowerDirectoryQuery = {
 };
 
 export type BorrowerCreateInput = BorrowerCreateRequest & { requestId: string };
+export type BorrowerReviewInput = BorrowerReviewRequest & { requestId: string };
 
 export type BorrowerCreateResult =
   | { status: "created"; borrower: Borrower }
   | { status: "duplicate_identity" }
   | { status: "invalid_object_key" }
   | { status: "not_found" };
+
+export type BorrowerReviewResult =
+  | { status: "updated"; borrower: Borrower }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | {
+      status: "missing_documents";
+      missing: Array<"identity_front" | "identity_back" | "profile_photo">;
+    };
 
 export interface BorrowerService {
   list(
@@ -27,4 +42,10 @@ export interface BorrowerService {
     tenantId: string,
     input: BorrowerCreateInput,
   ): Promise<BorrowerCreateResult>;
+  review(
+    actor: TenantActor,
+    tenantId: string,
+    borrowerId: string,
+    input: BorrowerReviewInput,
+  ): Promise<BorrowerReviewResult>;
 }

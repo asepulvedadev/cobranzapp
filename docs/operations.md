@@ -80,6 +80,12 @@ perfil se registran como referencias opacas de almacenamiento privado y permanec
 la siguiente etapa de carga, cuarentena y revisión manual. Esta etapa no hace OCR ni afirma
 autenticidad documental.
 
+La revisión manual ya cuenta con un historial append-only por cliente. Propietario o supervisor
+deben confirmar por separado el nombre, frente, reverso y foto designada antes de marcar la
+identidad como revisada; si falta un documento aceptado, la API rechaza la aprobación y conserva
+el estado pendiente. Un rechazo requiere una nota de al menos diez caracteres y también queda
+auditado. La revisión no equivale a una certificación de autenticidad.
+
 ### Shared verification network (replacement for “blacklist”)
 
 The product now has a consent-gated foundation for a shared verification network. It returns only minimal categories and counts, records every query, requires evidence and expiry for each observation, and supports a correction request. It never shares documents, balances, addresses, photos or the reporting company name.

@@ -1,6 +1,7 @@
 import {
   borrowerCreateRequestSchema,
   borrowerDirectoryQuerySchema,
+  borrowerReviewRequestSchema,
   changePasswordRequestSchema,
   createBranchRequestSchema,
   createPlatformTenantRequestSchema,
@@ -1398,6 +1399,7 @@ export function buildApp(dependencies: AppDependencies) {
         request.id,
       );
     }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
     if (!dependencies.borrowerService) {
       return sendError(
         reply,
@@ -1541,6 +1543,70 @@ export function buildApp(dependencies: AppDependencies) {
       }
       throw error;
     }
+  });
+
+  app.patch("/v1/tenants/:tenantId/borrowers/:borrowerId/review", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantBorrowerParamsSchema.safeParse(request.params);
+    const body = borrowerReviewRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_BORROWER_REVIEW",
+        "Revisa la decisión y la lista de comprobación.",
+        request.id,
+      );
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo propietario o supervisor puede revisar identidades.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    if (!dependencies.borrowerService) {
+      return sendError(
+        reply,
+        503,
+        "BORROWER_DOSSIER_UNAVAILABLE",
+        "El módulo de clientes requiere configurar su clave de protección.",
+        request.id,
+      );
+    }
+    const result = await dependencies.borrowerService.review(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.borrowerId,
+      { ...body.data, requestId: request.id },
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
+    }
+    if (result.status === "forbidden") {
+      return sendError(reply, 403, "SCOPE_DENIED", "No puedes revisar esta identidad.", request.id);
+    }
+    if (result.status === "missing_documents") {
+      return reply.code(409).send({
+        error: {
+          code: "BORROWER_DOCUMENTS_INCOMPLETE",
+          message: "La aprobación exige frente, reverso y foto de perfil aceptados.",
+          requestId: request.id,
+        },
+        missing: result.missing,
+      });
+    }
+    return reply.send({ borrower: result.borrower });
   });
 
   function tenantMembershipForSession(session: { user: AuthenticatedUser }, tenantId: string) {

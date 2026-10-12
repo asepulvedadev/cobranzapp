@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   borrowerCreateRequestSchema,
+  borrowerReviewRequestSchema,
   createBranchRequestSchema,
   createPlatformTenantRequestSchema,
   currentUserSchema,
@@ -122,6 +123,32 @@ describe("shared API contracts", () => {
         emergencyContacts: [
           { fullName: "Contacto", relationship: "Hermano", phone: "+57 300 444 5566" },
         ],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires the full checklist before approving a borrower identity", () => {
+    const review = {
+      decision: "reviewed" as const,
+      notes: "La evidencia coincide con la ficha manual.",
+      legalNameConfirmed: true,
+      identityFrontConfirmed: true,
+      identityBackConfirmed: true,
+      profilePhotoConfirmed: true,
+    };
+    expect(borrowerReviewRequestSchema.safeParse(review).success).toBe(true);
+    expect(
+      borrowerReviewRequestSchema.safeParse({ ...review, profilePhotoConfirmed: false }).success,
+    ).toBe(false);
+    expect(
+      borrowerReviewRequestSchema.safeParse({
+        ...review,
+        decision: "rejected",
+        notes: "No coincide el número con la evidencia.",
+        legalNameConfirmed: false,
+        identityFrontConfirmed: false,
+        identityBackConfirmed: false,
+        profilePhotoConfirmed: false,
       }).success,
     ).toBe(true);
   });
