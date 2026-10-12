@@ -106,6 +106,141 @@ export const platformActivityDirectorySchema = z.object({
   }),
 });
 
+export const membershipPlanSchema = z.enum(["pro", "ultra"]);
+
+export const membershipEntitlementSchema = z.object({
+  catalogVersion: z.number().int().positive(),
+  version: z.number().int().positive(),
+  includedEmployeeSeats: z.number().int().nonnegative(),
+  additionalEmployeeSeats: z.number().int().nonnegative(),
+  employeeSeatLimit: z.number().int().nonnegative(),
+  clientLimit: z.number().int().positive(),
+  prioritySupport: z.boolean(),
+});
+
+export const platformTenantStatusSchema = z.enum(["draft", "active", "suspended", "archived"]);
+
+export const platformTenantSchema = z.object({
+  id: z.uuid(),
+  slug: z.string().min(1),
+  displayName: z.string().min(1),
+  status: platformTenantStatusSchema,
+  membershipPlan: membershipPlanSchema.nullable(),
+  membershipEntitlement: membershipEntitlementSchema.nullable(),
+  members: z.number().int().nonnegative(),
+  readiness: z.object({
+    activeOwner: z.boolean(),
+    activeBranch: z.boolean(),
+    contactEmail: z.boolean(),
+    membershipPlan: z.boolean(),
+  }),
+  createdAt: z.iso.datetime(),
+});
+
+export const platformOverviewSchema = z.object({
+  metrics: z.object({
+    tenants: z.number().int().nonnegative(),
+    activeTenants: z.number().int().nonnegative(),
+    users: z.number().int().nonnegative(),
+    activeMemberships: z.number().int().nonnegative(),
+  }),
+  tenants: z.array(platformTenantSchema),
+  activity: z.array(platformAuditActivitySchema),
+});
+
+const pageQueryFields = {
+  page: z.coerce.number().int().min(1).max(100_000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+};
+
+export const platformTenantDirectoryQuerySchema = z.object({
+  q: z.string().trim().max(80).optional(),
+  status: platformTenantStatusSchema.optional(),
+  ...pageQueryFields,
+});
+
+export const platformPaginationSchema = z.object({
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  total: z.number().int().nonnegative(),
+  totalPages: z.number().int().positive(),
+});
+
+export const platformTenantDirectorySchema = z.object({
+  tenants: z.array(platformTenantSchema),
+  pagination: platformPaginationSchema,
+});
+
+export const platformUserStatusSchema = z.enum(["active", "disabled"]);
+
+export const platformUserSchema = z.object({
+  id: z.uuid(),
+  username: z.string().min(1),
+  email: z.email(),
+  displayName: z.string().min(1),
+  platformRole: z.literal("developer").nullable(),
+  status: platformUserStatusSchema,
+  activeMemberships: z.number().int().nonnegative(),
+  activeSessions: z.number().int().nonnegative(),
+  lastSeenAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+});
+
+export const platformUserDirectoryQuerySchema = z.object({
+  q: z.string().trim().max(80).optional(),
+  status: platformUserStatusSchema.optional(),
+  ...pageQueryFields,
+});
+
+export const platformUserDirectorySchema = z.object({
+  users: z.array(platformUserSchema),
+  pagination: platformPaginationSchema,
+});
+
+export const platformSystemStatusSchema = z.object({
+  api: z.object({ status: z.literal("operational"), version: z.string().min(1) }),
+  database: z.object({
+    status: z.literal("operational"),
+    schemaVersion: z.string().nullable(),
+  }),
+  jobs: z.object({
+    status: z.enum(["operational", "attention"]),
+    due: z.number().int().nonnegative(),
+    scheduled: z.number().int().nonnegative(),
+    processing: z.number().int().nonnegative(),
+    dead: z.number().int().nonnegative(),
+    expiredLeases: z.number().int().nonnegative(),
+    oldestDueAt: z.iso.datetime().nullable(),
+  }),
+  checkedAt: z.iso.datetime(),
+});
+
+export const supportAccessStatusSchema = z.enum([
+  "pending",
+  "active",
+  "denied",
+  "revoked",
+  "expired",
+]);
+
+export const supportAccessRecordSchema = z.object({
+  id: z.uuid(),
+  tenantId: z.uuid(),
+  tenantName: z.string().min(1),
+  requestedByDisplayName: z.string().min(1),
+  purpose: z.string().min(1),
+  requestedDurationMinutes: z.number().int().positive(),
+  status: supportAccessStatusSchema,
+  requestedAt: z.iso.datetime(),
+  reviewedByDisplayName: z.string().nullable(),
+  reviewedAt: z.iso.datetime().nullable(),
+  expiresAt: z.iso.datetime().nullable(),
+});
+
+export const platformSupportAccessResponseSchema = z.object({
+  access: z.array(supportAccessRecordSchema),
+});
+
 export const mfaStatusSchema = z.object({
   enabled: z.boolean(),
   setupPending: z.boolean(),
@@ -170,6 +305,18 @@ export type AccountSession = z.infer<typeof accountSessionSchema>;
 export type SecurityActivity = z.infer<typeof securityActivitySchema>;
 export type PlatformAuditActivity = z.infer<typeof platformAuditActivitySchema>;
 export type PlatformActivityDirectory = z.infer<typeof platformActivityDirectorySchema>;
+export type MembershipPlan = z.infer<typeof membershipPlanSchema>;
+export type MembershipEntitlement = z.infer<typeof membershipEntitlementSchema>;
+export type PlatformTenantStatus = z.infer<typeof platformTenantStatusSchema>;
+export type PlatformTenant = z.infer<typeof platformTenantSchema>;
+export type PlatformOverview = z.infer<typeof platformOverviewSchema>;
+export type PlatformTenantDirectory = z.infer<typeof platformTenantDirectorySchema>;
+export type PlatformUserStatus = z.infer<typeof platformUserStatusSchema>;
+export type PlatformUser = z.infer<typeof platformUserSchema>;
+export type PlatformUserDirectory = z.infer<typeof platformUserDirectorySchema>;
+export type PlatformSystemStatus = z.infer<typeof platformSystemStatusSchema>;
+export type SupportAccessStatus = z.infer<typeof supportAccessStatusSchema>;
+export type SupportAccessRecord = z.infer<typeof supportAccessRecordSchema>;
 export type MfaStatus = z.infer<typeof mfaStatusSchema>;
 export type ReauthenticationRequest = z.infer<typeof reauthenticationRequestSchema>;
 export type ChangePasswordRequest = z.infer<typeof changePasswordRequestSchema>;

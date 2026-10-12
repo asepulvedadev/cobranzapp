@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { currentUserSchema, loginRequestSchema } from "./index.js";
+import {
+  currentUserSchema,
+  loginRequestSchema,
+  platformSystemStatusSchema,
+  platformTenantDirectoryQuerySchema,
+  platformUserDirectoryQuerySchema,
+} from "./index.js";
 
 describe("shared API contracts", () => {
   it("accepts username or email identifiers without accepting short passwords", () => {
@@ -38,5 +44,32 @@ describe("shared API contracts", () => {
         ],
       }).memberships[0]?.role,
     ).toBe("owner");
+  });
+
+  it("normalizes developer directory pagination and rejects unknown states", () => {
+    expect(platformTenantDirectoryQuerySchema.parse({ page: "2" })).toMatchObject({
+      page: 2,
+      pageSize: 20,
+    });
+    expect(platformUserDirectoryQuerySchema.safeParse({ status: "archived" }).success).toBe(false);
+  });
+
+  it("requires complete operational status counts", () => {
+    expect(
+      platformSystemStatusSchema.safeParse({
+        api: { status: "operational", version: "test-sha" },
+        database: { status: "operational", schemaVersion: "0015_totp" },
+        jobs: {
+          status: "operational",
+          due: 0,
+          scheduled: 1,
+          processing: 0,
+          dead: 0,
+          expiredLeases: 0,
+          oldestDueAt: null,
+        },
+        checkedAt: "2026-10-11T20:00:00.000Z",
+      }).success,
+    ).toBe(true);
   });
 });

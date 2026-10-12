@@ -3,6 +3,9 @@ import {
   loginRequestSchema,
   mfaCodeRequestSchema,
   platformActivityQuerySchema,
+  platformTenantDirectoryQuerySchema,
+  platformUserDirectoryQuerySchema,
+  platformUserStatusSchema,
   reauthenticationRequestSchema,
   type ServiceStatus,
 } from "@cobranzapp/contracts";
@@ -46,20 +49,8 @@ const tenantMembershipPlanSchema = z.object({ membershipPlan: z.enum(["pro", "ul
 const tenantMembershipEntitlementSchema = z.object({
   additionalEmployeeSeats: z.number().int().min(0).max(1000),
 });
-const tenantDirectoryQuerySchema = z.object({
-  q: z.string().trim().max(80).optional(),
-  status: z.enum(["draft", "active", "suspended", "archived"]).optional(),
-  page: z.coerce.number().int().min(1).max(100_000).default(1),
-  pageSize: z.coerce.number().int().min(1).max(50).default(20),
-});
 const platformUserParamsSchema = z.object({ userId: z.uuid() });
-const platformUserStatusSchema = z.object({ status: z.enum(["active", "disabled"]) });
-const platformUserDirectoryQuerySchema = z.object({
-  q: z.string().trim().max(80).optional(),
-  status: z.enum(["active", "disabled"]).optional(),
-  page: z.coerce.number().int().min(1).max(100_000).default(1),
-  pageSize: z.coerce.number().int().min(1).max(50).default(20),
-});
+const platformUserStatusUpdateSchema = z.object({ status: platformUserStatusSchema });
 const invitationTokenParamsSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{40,60}$/) });
 const invitationSchema = z.object({
   email: z.email().transform((value) => value.toLowerCase()),
@@ -731,7 +722,7 @@ export function buildApp(dependencies: AppDependencies) {
   app.get("/v1/platform/tenants", async (request, reply) => {
     const session = await requireUser(request, reply);
     if (!session || !requireDeveloper(session.user, request, reply)) return;
-    const parsed = tenantDirectoryQuerySchema.safeParse(request.query);
+    const parsed = platformTenantDirectoryQuerySchema.safeParse(request.query);
     if (!parsed.success) {
       return sendError(
         reply,
@@ -775,7 +766,7 @@ export function buildApp(dependencies: AppDependencies) {
     const session = await requireUser(request, reply);
     if (!session || !requireDeveloper(session.user, request, reply)) return;
     const params = platformUserParamsSchema.safeParse(request.params);
-    const body = platformUserStatusSchema.safeParse(request.body);
+    const body = platformUserStatusUpdateSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       return sendError(
         reply,
