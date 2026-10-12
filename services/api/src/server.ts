@@ -6,6 +6,7 @@ import { createLocalBorrowerDocumentStorage } from "./borrowers/document-storage
 import { createPostgresBorrowerService } from "./borrowers/postgres-borrower-service.js";
 import { loadConfig, parseAllowedOrigins } from "./config.js";
 import { createResendContactMailer } from "./contact/resend.js";
+import { createPostgresCreditService } from "./credit/postgres-credit-service.js";
 import { createPostgresPlatformService } from "./platform/postgres-platform-service.js";
 import { createPostgresSupportAccessService } from "./support-access/postgres-support-access-service.js";
 import { createPostgresTenancyService } from "./tenancy/postgres-tenancy-service.js";
@@ -30,6 +31,7 @@ const app = buildApp({
   borrowerService: config.BORROWER_IDENTITY_KEY
     ? createPostgresBorrowerService(pool, config.BORROWER_IDENTITY_KEY)
     : undefined,
+  creditService: createPostgresCreditService(pool),
   documentStorage: config.BORROWER_IDENTITY_KEY
     ? createLocalBorrowerDocumentStorage(config.BORROWER_DOCUMENTS_ROOT)
     : undefined,

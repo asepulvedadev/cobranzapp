@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import type {
   BorrowerDirectory,
   CurrentUser,
+  LoanProduct,
   SupportAccessRecord,
   TenantMemberProfile,
   TenantOverview,
@@ -12,6 +13,7 @@ import { serverApi } from "../../../../lib/server-api";
 import { ActivityFeed } from "../../ActivityFeed";
 import { InviteUserForm } from "../../InviteUserForm";
 import { BorrowerDirectory as BorrowerDirectoryView } from "./BorrowerDirectory";
+import { CreditProductCatalog } from "./CreditProductCatalog";
 import { CustomerWorkspace } from "./CustomerWorkspace";
 import { MemberAccessControl } from "./MemberAccessControl";
 import { MemberProfileDirectory } from "./MemberProfileDirectory";
@@ -72,6 +74,7 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
   const canSeeTeam = overview.actorRole === "owner" || overview.actorRole === "supervisor";
   let memberProfile: TenantMemberProfile | null = null;
   let memberProfiles: TenantMemberProfile[] = [];
+  let loanProducts: LoanProduct[] | null = null;
   let borrowerDirectory: BorrowerDirectory | null = null;
   if (overview.actorRole !== "customer" && overview.actorRole !== "support") {
     const profileResponse = await serverApi(
@@ -104,6 +107,14 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
           }),
         )
       ).filter((profile): profile is TenantMemberProfile => profile !== null);
+    }
+    if (overview.actorRole === "owner" || overview.actorRole === "supervisor") {
+      const productsResponse = await serverApi(`/v1/tenants/${membership.tenantId}/loan-products`);
+      if (productsResponse.ok) {
+        ({ products: loanProducts } = (await productsResponse.json()) as {
+          products: LoanProduct[];
+        });
+      }
     }
   }
   let supportAccess: SupportAccessRecord[] = [];
@@ -283,6 +294,10 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
 
       {canSeeTeam ? (
         <MemberProfileDirectory members={overview.members} profiles={memberProfiles} />
+      ) : null}
+
+      {loanProducts ? (
+        <CreditProductCatalog products={loanProducts} tenantId={overview.tenant.id} />
       ) : null}
 
       {borrowerDirectory ? (

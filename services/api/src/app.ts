@@ -6,6 +6,7 @@ import {
   createBranchRequestSchema,
   createPlatformTenantRequestSchema,
   createTeamRequestSchema,
+  loanProductCreateRequestSchema,
   loginRequestSchema,
   mfaCodeRequestSchema,
   organizationStatusUpdateRequestSchema,
@@ -39,6 +40,7 @@ import { borrowerDocumentUploadLimits } from "./borrowers/document-storage.js";
 import type { BorrowerService } from "./borrowers/types.js";
 import type { ContactMailer } from "./contact/resend.js";
 import { registerContactRoutes } from "./contact/routes.js";
+import type { CreditService } from "./credit/types.js";
 import type { PlatformService } from "./platform/types.js";
 import type { SupportAccessService } from "./support-access/types.js";
 import type { TenancyService } from "./tenancy/types.js";
@@ -85,6 +87,7 @@ const supportAccessReviewSchema = z.object({ action: z.enum(["approve", "deny", 
 
 export interface AppDependencies {
   borrowerService?: BorrowerService;
+  creditService?: CreditService;
   documentStorage?: BorrowerDocumentStorage;
   contactMailer?: ContactMailer;
   allowedWebOrigins?: string[];
@@ -2511,6 +2514,112 @@ export function buildApp(dependencies: AppDependencies) {
       );
     }
     return reply.send({ member: result.member });
+  });
+
+  app.get("/v1/tenants/:tenantId/loan-products", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "TENANT_NOT_FOUND", "La empresa no existe.", request.id);
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "No puedes consultar productos de crédito.",
+        request.id,
+      );
+    }
+    if (!dependencies.creditService) {
+      return sendError(
+        reply,
+        503,
+        "CREDIT_CATALOG_UNAVAILABLE",
+        "El catálogo de crédito todavía no está configurado.",
+        request.id,
+      );
+    }
+    const products = await dependencies.creditService.listProducts(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+    );
+    return reply.send({ products });
+  });
+
+  app.post("/v1/tenants/:tenantId/loan-products", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = loanProductCreateRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_LOAN_PRODUCT",
+        "Revisa los parámetros del producto y los decimales.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "No puedes crear productos de crédito.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    if (!dependencies.creditService) {
+      return sendError(
+        reply,
+        503,
+        "CREDIT_CATALOG_UNAVAILABLE",
+        "El catálogo de crédito todavía no está configurado.",
+        request.id,
+      );
+    }
+    const result = await dependencies.creditService.createProduct(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      { ...body.data, requestId: request.id },
+    );
+    if (result.status === "forbidden") {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "No puedes crear productos de crédito.",
+        request.id,
+      );
+    }
+    if (result.status === "duplicate") {
+      return sendError(
+        reply,
+        409,
+        "LOAN_PRODUCT_DUPLICATE",
+        "Ya existe un producto con ese nombre en la empresa.",
+        request.id,
+      );
+    }
+    return reply.code(201).send({ product: result.product });
   });
 
   app.patch("/v1/tenants/:tenantId/settings", async (request, reply) => {

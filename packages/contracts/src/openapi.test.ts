@@ -38,6 +38,9 @@ describe("OpenAPI contract", () => {
     expect(
       document.paths["/v1/tenants/{tenantId}/members/{userId}/profile-photo"].post.operationId,
     ).toBe("uploadTenantMemberProfilePhoto");
+    expect(document.paths["/v1/tenants/{tenantId}/loan-products"].post.operationId).toBe(
+      "createLoanProductDraft",
+    );
     expect(document.paths["/v1/tenants/{tenantId}/settings"].patch.operationId).toBe(
       "updateTenantSettings",
     );

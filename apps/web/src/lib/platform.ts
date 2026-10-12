@@ -4,6 +4,7 @@ export type {
   BorrowerCreateRequest,
   BorrowerDirectory,
   CurrentUser,
+  LoanProduct,
   MembershipEntitlement,
   MembershipPlan,
   MfaStatus,

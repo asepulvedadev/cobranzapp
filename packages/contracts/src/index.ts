@@ -611,6 +611,62 @@ export const tenantMemberProfileResponseSchema = z.object({
   profile: tenantMemberProfileSchema,
 });
 
+export const loanProductStatusSchema = z.enum(["draft", "under_review", "approved", "retired"]);
+export const loanProductFrequencySchema = z.enum(["daily", "weekly", "fortnightly", "monthly"]);
+export const loanProductRateBasisSchema = z.enum([
+  "flat_total",
+  "periodic_simple",
+  "effective_annual",
+]);
+export const loanProductComplianceStatusSchema = z.enum(["pending", "approved", "expired"]);
+const decimalAmountSchema = z.string().regex(/^\d{1,12}(?:\.\d{1,2})?$/, "Monto decimal inválido.");
+const decimalRateSchema = z.string().regex(/^\d{1,4}(?:\.\d{1,8})?$/, "Tasa decimal inválida.");
+
+export const loanProductCreateRequestSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    principalMin: decimalAmountSchema,
+    principalMax: decimalAmountSchema,
+    termCount: z.number().int().min(1).max(365),
+    paymentFrequency: loanProductFrequencySchema,
+    rateBasis: loanProductRateBasisSchema,
+    nominalRate: decimalRateSchema,
+    documentationFeeRate: decimalRateSchema,
+    complianceSourceRef: z.string().trim().min(3).max(240).nullable(),
+  })
+  .superRefine((value, context) => {
+    if (Number(value.principalMax) < Number(value.principalMin)) {
+      context.addIssue({
+        code: "custom",
+        path: ["principalMax"],
+        message: "El máximo debe ser mayor o igual al mínimo.",
+      });
+    }
+  });
+
+export const loanProductSchema = z.object({
+  id: z.uuid(),
+  name: z.string().min(2),
+  status: loanProductStatusSchema,
+  currency: z.literal("COP"),
+  principalMin: decimalAmountSchema,
+  principalMax: decimalAmountSchema,
+  termCount: z.number().int().positive(),
+  paymentFrequency: loanProductFrequencySchema,
+  rateBasis: loanProductRateBasisSchema,
+  nominalRate: decimalRateSchema,
+  documentationFeeRate: decimalRateSchema,
+  complianceStatus: loanProductComplianceStatusSchema,
+  complianceSourceRef: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+
+export const loanProductDirectorySchema = z.object({
+  products: z.array(loanProductSchema),
+});
+export const loanProductResponseSchema = z.object({ product: loanProductSchema });
+
 export const borrowerDocumentSideSchema = z.enum(["front", "back"]);
 export const borrowerDocumentSchema = z.object({
   id: z.uuid(),
@@ -812,6 +868,13 @@ export type VerificationNetworkCorrectionResponse = z.infer<
 export type TenantMemberProfileRequest = z.infer<typeof tenantMemberProfileRequestSchema>;
 export type TenantMemberEmergencyContact = z.infer<typeof tenantMemberEmergencyContactSchema>;
 export type TenantMemberProfile = z.infer<typeof tenantMemberProfileSchema>;
+export type LoanProductStatus = z.infer<typeof loanProductStatusSchema>;
+export type LoanProductFrequency = z.infer<typeof loanProductFrequencySchema>;
+export type LoanProductRateBasis = z.infer<typeof loanProductRateBasisSchema>;
+export type LoanProductComplianceStatus = z.infer<typeof loanProductComplianceStatusSchema>;
+export type LoanProductCreateRequest = z.infer<typeof loanProductCreateRequestSchema>;
+export type LoanProduct = z.infer<typeof loanProductSchema>;
+export type LoanProductDirectory = z.infer<typeof loanProductDirectorySchema>;
 export type BorrowerDocument = z.infer<typeof borrowerDocumentSchema>;
 export type BorrowerCreateRequest = z.infer<typeof borrowerCreateRequestSchema>;
 export type BorrowerReviewRequest = z.infer<typeof borrowerReviewRequestSchema>;

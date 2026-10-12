@@ -42,12 +42,14 @@ Global identity records are not readable by arbitrary tenants; expose only allow
 | `borrower_notes` | Author, subject, visibility classification, factual operational note |
 | `risk_cases`, `risk_case_events` | Borrower, category, evidence, review deadline; immutable case decisions/disputes/resolutions |
 | `data_subject_requests` | Borrower, request type, deadline, reviewer, outcome and permitted retention exception |
+| `loan_products` | Tenant-scoped version seed, COP amount bounds, term/frequency/rate basis, compliance state and review evidence; draft-only until financial approval |
 
 Identity uniqueness is tenant-local over normalized country/type/number HMAC for active identities; changes are reviewed. Keep document review evidence minimal; do not duplicate full document content in metadata.
 
 The consent-gated shared verification foundation is implemented in migration `0016_verification_network_foundation.sql`. It keeps a global keyed identity reference separate from tenant consents, minimal expiring assertions, query audit events and correction requests. It does not replace the future `borrowers` tables or authorize a credit-bureau integration. `tenant_member_profiles` stores only private profile metadata; `profile_photo_object_key` is an opaque private-storage reference, never a public URL, and `blood_type` is optional sensitive data with a separate consent marker.
 
 Migration `0017_borrower_dossier_foundation.sql` now adds the first tenant-scoped borrower dossier slice. It stores legal name, required contact addresses, consent evidence, a tenant-keyed HMAC plus encrypted document number, masked last four digits, emergency contacts and private document metadata. API responses never return the full document number. Migration `0018_borrower_identity_reviews.sql` adds an append-only manual review history and keeps the current identity state on the borrower identity row. An approval requires accepted front, back and designated profile-photo objects plus explicit reviewer checklist confirmation. The current upload adapter writes opaque objects to a private VPS quarantine volume with `scan_status = pending`; staff profile photos use a separate tenant/member prefix and remain private. Antivirus scanning, off-site versioned storage and the promotion step remain operational gates before production approval.
+Migration `0019_loan_product_catalog.sql` adds a tenant-scoped, draft-only product catalog with typed COP bounds, term frequency, rate basis and compliance state. It does not authorize approval, loan origination, schedule calculation or disbursement; those remain separate Phase 4 gates.
 
 ### Lending and accounting
 

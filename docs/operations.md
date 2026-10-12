@@ -100,6 +100,14 @@ The product now has a consent-gated foundation for a shared verification network
 
 The network is disabled until the Colombian privacy policy, participant agreements, retention schedule and correction procedure are approved. A reported late/default event is not an automatic denial, does not block existing payments, and cannot be the sole credit decision factor. The tenant-local review lifecycle remains `Observation → Under review → Restricted / Dismissed → Resolved / Expired` for operational decisions inside the company.
 
+### Catálogo de crédito en preparación
+
+La consola de propietario y supervisor permite registrar productos de crédito como borradores con
+montos COP, plazo, frecuencia, base de tasa, cargo documental y referencia normativa. El estado
+queda en `draft` y la API no permite todavía aprobar, calcular cuotas, originar, desembolsar ni
+registrar pagos. Esto evita convertir una tasa o ejemplo comercial en una regla financiera vigente
+sin revisión legal, contable y de calendario.
+
 ## Document capture and manual identity review — no AI
 
 The latest instruction supersedes the earlier OCR/Hermes request. The baseline contains **no OCR/AI extraction**. Model-based OCR, such as the models documented for ML Kit, is excluded from a strict no-AI product. This is a conservative scope boundary, not a claim that all text recognition is AI. [ML Kit model deployment documentation](https://developers.google.com/ml-kit/vision/text-recognition/v2/android)

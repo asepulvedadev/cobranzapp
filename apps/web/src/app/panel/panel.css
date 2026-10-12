@@ -1711,6 +1711,76 @@ html:has(.panel-shell) {
   overflow-wrap: anywhere;
 }
 
+.credit-product-card {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+  background: linear-gradient(145deg, #fffdf8 0%, #f6fbf8 100%);
+}
+
+.credit-product-list {
+  display: grid;
+  gap: 10px;
+}
+
+.credit-product-item {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.credit-product-item-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.credit-product-item-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.credit-product-item-heading small {
+  color: var(--panel-muted);
+  font-size: 11px;
+}
+
+.credit-product-item dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.credit-product-item dt {
+  color: var(--panel-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.credit-product-item dd {
+  margin: 3px 0 0;
+  color: var(--panel-dark);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.credit-product-form {
+  max-width: 720px;
+}
+
+.credit-product-form h3 {
+  margin: 0;
+  color: var(--panel-ink);
+  font-size: 15px;
+}
+
 .member-profile-fieldset {
   display: grid;
   gap: 8px;
@@ -4024,5 +4094,9 @@ html:has(.panel-shell) {
   .member-profile-directory-grid,
   .member-profile-summary dl {
     grid-template-columns: 1fr;
+  }
+
+  .credit-product-item dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
