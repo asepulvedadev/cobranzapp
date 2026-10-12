@@ -241,6 +241,8 @@ html:has(.panel-shell) {
 .tenant-form button:focus-visible,
 .password-form input:focus,
 .password-form button:focus-visible,
+.mfa-settings input:focus,
+.mfa-settings button:focus-visible,
 .reauthentication-dialog input:focus,
 .reauthentication-dialog button:focus-visible {
   outline: 3px solid var(--panel-yellow);
@@ -2376,6 +2378,201 @@ html:has(.panel-shell) {
   color: var(--panel-muted);
   font-size: 13px;
   line-height: 1.5;
+}
+
+.mfa-settings {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.mfa-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.mfa-summary > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.mfa-summary strong {
+  font-size: 15px;
+}
+
+.mfa-summary p,
+.mfa-setup-step p,
+.mfa-recovery p {
+  margin: 0;
+  color: var(--panel-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mfa-primary-action,
+.mfa-code-form button,
+.mfa-recovery button,
+.mfa-disable-form button {
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--panel-dark);
+  border-radius: 8px;
+  background: var(--panel-dark);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+
+.mfa-primary-action {
+  width: 100%;
+}
+
+.mfa-settings button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.mfa-enrollment {
+  display: grid;
+  gap: 14px;
+  padding-top: 16px;
+  border-top: 1px solid var(--panel-line);
+}
+
+.mfa-setup-step {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.mfa-setup-step > span {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 8px;
+  background: #fff2bb;
+  color: #6d5100;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.mfa-setup-step > div {
+  display: grid;
+  gap: 3px;
+}
+
+.mfa-enrollment > img {
+  width: min(240px, 100%);
+  height: auto;
+  margin: 0 auto;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+}
+
+.mfa-secret {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f4f6f4;
+}
+
+.mfa-secret span,
+.mfa-code-form label,
+.mfa-disable-form label {
+  color: var(--panel-muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.mfa-secret code {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.mfa-code-form,
+.mfa-disable-form {
+  display: grid;
+  gap: 8px;
+}
+
+.mfa-code-form input,
+.mfa-disable-form input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid #c9d0ca;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--panel-dark);
+  font-size: 16px;
+}
+
+.mfa-code-form input {
+  font-family: var(--font-geist-mono), monospace;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.mfa-recovery {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #a7d8bd;
+  border-radius: 10px;
+  background: #edfbf4;
+}
+
+.mfa-recovery ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mfa-recovery li {
+  overflow-wrap: anywhere;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.mfa-recovery button {
+  border-color: #16643f;
+  background: #16643f;
+}
+
+.mfa-disable-form {
+  padding-top: 16px;
+  border-top: 1px solid var(--panel-line);
+}
+
+.mfa-disable-form button {
+  border-color: #fecaca;
+  background: #fff;
+  color: var(--panel-danger);
+}
+
+.mfa-message {
+  margin: 0;
+  padding: 10px;
+  border-radius: 7px;
+  background: #edfbf4;
+  color: #065f46;
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .session-manager {
