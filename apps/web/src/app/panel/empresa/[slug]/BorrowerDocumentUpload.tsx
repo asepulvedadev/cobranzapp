@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { useSensitiveFetch } from "../../ReauthenticationProvider";
 
 type DocumentCategory = "identity" | "profile_photo";
 type DocumentSide = "front" | "back" | "";
@@ -21,6 +22,7 @@ export function BorrowerDocumentUpload({
   borrowerId: string;
 }) {
   const router = useRouter();
+  const sensitiveFetch = useSensitiveFetch();
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
@@ -47,10 +49,13 @@ export function BorrowerDocumentUpload({
     body.append("file", file);
     body.append("category", category);
     if (side) body.append("side", side);
-    const response = await fetch(`/api/v1/tenants/${tenantId}/borrowers/${borrowerId}/documents`, {
-      method: "POST",
-      body,
-    }).catch(() => null);
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/borrowers/${borrowerId}/documents`,
+      {
+        method: "POST",
+        body,
+      },
+    ).catch(() => null);
     if (!response?.ok) {
       setMessage(await responseMessage(response, "No fue posible guardar el documento."));
       setIsError(true);

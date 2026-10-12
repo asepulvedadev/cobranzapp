@@ -1476,6 +1476,7 @@ export function buildApp(dependencies: AppDependencies) {
     if (!membership || !canManageBorrowers(membership.role)) {
       return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a este cliente.", request.id);
     }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
     if (!dependencies.borrowerService || !dependencies.documentStorage) {
       return sendError(
         reply,
