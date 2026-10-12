@@ -380,14 +380,8 @@ function TenantHome({
     ...(directory ? [["Clientes", directory.pagination.total] as const] : []),
     ...(directory
       ? [
-          [
-            "Identidades pendientes",
-            directory.identitySummary.pending,
-          ] as const,
-          [
-            "Identidades revisadas",
-            directory.identitySummary.reviewed,
-          ] as const,
+          ["Identidades pendientes", directory.identitySummary.pending] as const,
+          ["Identidades revisadas", directory.identitySummary.reviewed] as const,
         ]
       : []),
   ] as const;
