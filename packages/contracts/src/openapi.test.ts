@@ -13,7 +13,20 @@ describe("OpenAPI contract", () => {
       "getPlatformSystemStatus",
     );
     expect(document.paths["/v1/platform/tenants"].get.operationId).toBe("listPlatformTenants");
+    expect(document.paths["/v1/platform/tenants"].post.operationId).toBe("createPlatformTenant");
     expect(document.paths["/v1/platform/users"].get.operationId).toBe("listPlatformUsers");
+    expect(document.paths["/v1/platform/users/{userId}/status"].patch.operationId).toBe(
+      "updatePlatformUserStatus",
+    );
+    expect(document.paths["/v1/platform/tenants/{tenantId}/status"].patch.operationId).toBe(
+      "updatePlatformTenantStatus",
+    );
+    expect(
+      document.paths["/v1/platform/tenants/{tenantId}/membership-plan"].patch.operationId,
+    ).toBe("updatePlatformMembershipPlan");
+    expect(
+      document.paths["/v1/platform/tenants/{tenantId}/membership-entitlement"].patch.operationId,
+    ).toBe("updatePlatformMembershipEntitlement");
     expect(document.paths["/v1/platform/support-access"].get.operationId).toBe(
       "listPlatformSupportAccess",
     );

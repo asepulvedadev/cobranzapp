@@ -5,6 +5,7 @@ import {
   apiErrorSchema,
   authenticatedResponseSchema,
   changePasswordRequestSchema,
+  createPlatformTenantRequestSchema,
   currentUserSchema,
   loginRequestSchema,
   messageResponseSchema,
@@ -17,13 +18,21 @@ import {
   mfaStatusSchema,
   platformActivityDirectorySchema,
   platformActivityQuerySchema,
+  platformMembershipEntitlementUpdateRequestSchema,
+  platformMembershipEntitlementUpdateResponseSchema,
+  platformMembershipPlanUpdateRequestSchema,
+  platformMembershipPlanUpdateResponseSchema,
   platformOverviewSchema,
   platformSupportAccessResponseSchema,
   platformSystemStatusSchema,
   platformTenantDirectoryQuerySchema,
   platformTenantDirectorySchema,
+  platformTenantResponseSchema,
+  platformTenantStatusUpdateRequestSchema,
   platformUserDirectoryQuerySchema,
   platformUserDirectorySchema,
+  platformUserStatusUpdateRequestSchema,
+  platformUserStatusUpdateResponseSchema,
   reauthenticationRequestSchema,
   reauthenticationResponseSchema,
   securityActivityResponseSchema,
@@ -54,6 +63,7 @@ const documentedSchemas = {
   ApiError: apiErrorSchema,
   AuthenticatedResponse: authenticatedResponseSchema,
   ChangePasswordRequest: changePasswordRequestSchema,
+  CreatePlatformTenantRequest: createPlatformTenantRequestSchema,
   CurrentUser: currentUserSchema,
   LoginRequest: loginRequestSchema,
   MfaCodeRequest: mfaCodeRequestSchema,
@@ -64,13 +74,21 @@ const documentedSchemas = {
   MfaStatus: mfaStatusSchema,
   PlatformActivityDirectory: platformActivityDirectorySchema,
   PlatformActivityQuery: platformActivityQuerySchema,
+  PlatformMembershipEntitlementUpdateRequest: platformMembershipEntitlementUpdateRequestSchema,
+  PlatformMembershipEntitlementUpdateResponse: platformMembershipEntitlementUpdateResponseSchema,
+  PlatformMembershipPlanUpdateRequest: platformMembershipPlanUpdateRequestSchema,
+  PlatformMembershipPlanUpdateResponse: platformMembershipPlanUpdateResponseSchema,
   PlatformOverview: platformOverviewSchema,
   PlatformSupportAccessResponse: platformSupportAccessResponseSchema,
   PlatformSystemStatus: platformSystemStatusSchema,
   PlatformTenantDirectory: platformTenantDirectorySchema,
   PlatformTenantDirectoryQuery: platformTenantDirectoryQuerySchema,
+  PlatformTenantResponse: platformTenantResponseSchema,
+  PlatformTenantStatusUpdateRequest: platformTenantStatusUpdateRequestSchema,
   PlatformUserDirectory: platformUserDirectorySchema,
   PlatformUserDirectoryQuery: platformUserDirectoryQuerySchema,
+  PlatformUserStatusUpdateRequest: platformUserStatusUpdateRequestSchema,
+  PlatformUserStatusUpdateResponse: platformUserStatusUpdateResponseSchema,
   ReauthenticationRequest: reauthenticationRequestSchema,
   ReauthenticationResponse: reauthenticationResponseSchema,
   SecurityActivity: securityActivitySchema,
@@ -359,6 +377,28 @@ export function createOpenApiDocument(version: string) {
             "403": errorResponses["403"],
           },
         },
+        post: {
+          tags: ["Plataforma"],
+          operationId: "createPlatformTenant",
+          security: sessionSecurity,
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("CreatePlatformTenantRequest")),
+          },
+          responses: {
+            "201": response(
+              "Empresa creada en estado borrador.",
+              schemaReference("PlatformTenantResponse"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
       },
       "/v1/platform/users": {
         get: {
@@ -391,6 +431,151 @@ export function createOpenApiDocument(version: string) {
             "400": errorResponses["400"],
             "401": errorResponses["401"],
             "403": errorResponses["403"],
+          },
+        },
+      },
+      "/v1/platform/users/{userId}/status": {
+        patch: {
+          tags: ["Plataforma"],
+          operationId: "updatePlatformUserStatus",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "userId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("PlatformUserStatusUpdateRequest")),
+          },
+          responses: {
+            "200": response(
+              "Estado actualizado y sesiones revocadas cuando corresponde.",
+              schemaReference("PlatformUserStatusUpdateResponse"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("El usuario no existe.", schemaReference("ApiError")),
+            "409": response("La identidad está protegida.", schemaReference("ApiError")),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
+      },
+      "/v1/platform/tenants/{tenantId}/status": {
+        patch: {
+          tags: ["Plataforma"],
+          operationId: "updatePlatformTenantStatus",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("PlatformTenantStatusUpdateRequest")),
+          },
+          responses: {
+            "200": response(
+              "Estado empresarial actualizado.",
+              schemaReference("PlatformTenantResponse"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("La empresa no existe.", schemaReference("ApiError")),
+            "409": response(
+              "La transición no está permitida o faltan requisitos de activación.",
+              schemaReference("ApiError"),
+            ),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
+      },
+      "/v1/platform/tenants/{tenantId}/membership-plan": {
+        patch: {
+          tags: ["Plataforma"],
+          operationId: "updatePlatformMembershipPlan",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("PlatformMembershipPlanUpdateRequest")),
+          },
+          responses: {
+            "200": response(
+              "Plan y derechos comerciales actualizados.",
+              schemaReference("PlatformMembershipPlanUpdateResponse"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("La empresa no existe.", schemaReference("ApiError")),
+            "409": response(
+              "El plan no admite los empleados activos actuales.",
+              schemaReference("ApiError"),
+            ),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
+      },
+      "/v1/platform/tenants/{tenantId}/membership-entitlement": {
+        patch: {
+          tags: ["Plataforma"],
+          operationId: "updatePlatformMembershipEntitlement",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("PlatformMembershipEntitlementUpdateRequest")),
+          },
+          responses: {
+            "200": response(
+              "Capacidad adicional actualizada.",
+              schemaReference("PlatformMembershipEntitlementUpdateResponse"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("La empresa no existe.", schemaReference("ApiError")),
+            "409": response(
+              "Falta un plan o la capacidad no admite los empleados activos.",
+              schemaReference("ApiError"),
+            ),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
           },
         },
       },
