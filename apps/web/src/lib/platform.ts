@@ -14,6 +14,7 @@ export type {
   PlatformSystemStatus,
   PlatformTenantDirectory as TenantDirectory,
   PlatformUserDirectory,
+  Route,
   SecurityActivity,
   SupportAccessRecord,
   TenantMemberProfile,
