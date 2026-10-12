@@ -370,6 +370,22 @@ function TenantHome({
     ["Equipos", overview.metrics.teams],
     ["Invitaciones", overview.metrics.pendingInvitations],
     ...(directory ? [["Clientes", directory.pagination.total] as const] : []),
+    ...(directory
+      ? [
+          [
+            "Identidades pendientes",
+            directory.borrowers.filter(
+              (borrower) => borrower.identity.verificationState === "manual_pending",
+            ).length,
+          ] as const,
+          [
+            "Identidades revisadas",
+            directory.borrowers.filter(
+              (borrower) => borrower.identity.verificationState === "reviewed",
+            ).length,
+          ] as const,
+        ]
+      : []),
   ] as const;
   return (
     <View style={styles.stack}>
