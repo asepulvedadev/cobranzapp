@@ -797,6 +797,113 @@ export function createPostgresTenancyService(pool: Pool, publicWebUrl: string): 
       }
     },
 
+    async updateBranchStatus(actor, tenantId, branchId, status, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setActorContext(client, actor, tenantId);
+        const current = await client.query<{ status: "active" | "inactive" }>(
+          `SELECT status FROM branches
+            WHERE tenant_id = $1 AND id = $2
+            FOR UPDATE`,
+          [tenantId, branchId],
+        );
+        const branch = current.rows[0];
+        if (!branch) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" };
+        }
+        if (status === "inactive") {
+          const activeTeams = await client.query<{ exists: boolean }>(
+            `SELECT EXISTS (
+               SELECT 1 FROM teams
+                WHERE tenant_id = $1 AND branch_id = $2 AND status = 'active'
+             ) AS exists`,
+            [tenantId, branchId],
+          );
+          if (activeTeams.rows[0]?.exists) {
+            await client.query("ROLLBACK");
+            return { status: "has_active_teams" };
+          }
+        }
+        if (branch.status !== status) {
+          await client.query(
+            "UPDATE branches SET status = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2",
+            [tenantId, branchId, status],
+          );
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+             VALUES ($1, $2, 'branch.status_changed', 'branch', $3, $4,
+                     jsonb_build_object('from', $5::text, 'to', $6::text))`,
+            [tenantId, actor.userId, branchId, requestId, branch.status, status],
+          );
+        }
+        await client.query("COMMIT");
+        return { status: "updated", branchStatus: status };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async updateTeamStatus(actor, tenantId, teamId, status, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setActorContext(client, actor, tenantId);
+        const current = await client.query<{
+          branch_id: string | null;
+          status: "active" | "inactive";
+        }>(
+          `SELECT branch_id, status FROM teams
+            WHERE tenant_id = $1 AND id = $2
+            FOR UPDATE`,
+          [tenantId, teamId],
+        );
+        const team = current.rows[0];
+        if (!team) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" };
+        }
+        if (status === "active" && team.branch_id) {
+          const branch = await client.query<{ exists: boolean }>(
+            `SELECT EXISTS (
+               SELECT 1 FROM branches
+                WHERE tenant_id = $1 AND id = $2 AND status = 'active'
+             ) AS exists`,
+            [tenantId, team.branch_id],
+          );
+          if (!branch.rows[0]?.exists) {
+            await client.query("ROLLBACK");
+            return { status: "branch_inactive" };
+          }
+        }
+        if (team.status !== status) {
+          await client.query(
+            "UPDATE teams SET status = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2",
+            [tenantId, teamId, status],
+          );
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+             VALUES ($1, $2, 'team.status_changed', 'team', $3, $4,
+                     jsonb_build_object('from', $5::text, 'to', $6::text))`,
+            [tenantId, actor.userId, teamId, requestId, team.status, status],
+          );
+        }
+        await client.query("COMMIT");
+        return { status: "updated", teamStatus: status };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
     async addTeamMember(actor, tenantId, teamId, userId, requestId) {
       const client = await pool.connect();
       try {

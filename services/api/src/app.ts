@@ -42,6 +42,8 @@ const tenantTeamMemberParamsSchema = z.object({
   teamId: z.uuid(),
   userId: z.uuid(),
 });
+const tenantBranchParamsSchema = z.object({ tenantId: z.uuid(), branchId: z.uuid() });
+const tenantTeamParamsSchema = z.object({ tenantId: z.uuid(), teamId: z.uuid() });
 const sessionIdParamsSchema = z.object({ sessionId: z.uuid() });
 const tenantStatusSchema = z.object({ status: z.enum(["active", "suspended", "archived"]) });
 const tenantMembershipPlanSchema = z.object({ membershipPlan: z.enum(["pro", "ultra"]) });
@@ -92,6 +94,7 @@ const teamSchema = z.object({
   branchId: z.uuid().nullable(),
   displayName: z.string().trim().min(2).max(100),
 });
+const organizationStatusSchema = z.object({ status: z.enum(["active", "inactive"]) });
 const memberUpdateSchema = z.object({
   role: z.enum(["supervisor", "collector", "customer"]),
   status: z.enum(["active", "suspended", "revoked"]),
@@ -1271,6 +1274,114 @@ export function buildApp(dependencies: AppDependencies) {
         request.id,
       );
     return reply.code(201).send({ team });
+  });
+
+  app.patch("/v1/tenants/:tenantId/branches/:branchId/status", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantBranchParamsSchema.safeParse(request.params);
+    const body = organizationStatusSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_BRANCH_STATUS",
+        "Revisa la sede y su estado.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (membership?.role !== "owner" && membership?.role !== "supervisor") {
+      return sendError(
+        reply,
+        403,
+        "MANAGER_REQUIRED",
+        "Solo propietarios y supervisores pueden administrar sedes.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const result = await dependencies.tenancyService.updateBranchStatus(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.branchId,
+      body.data.status,
+      request.id,
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "BRANCH_NOT_FOUND", "La sede no existe.", request.id);
+    }
+    if (result.status === "has_active_teams") {
+      return sendError(
+        reply,
+        409,
+        "BRANCH_HAS_ACTIVE_TEAMS",
+        "Desactiva primero los equipos activos vinculados a esta sede.",
+        request.id,
+      );
+    }
+    return reply.send({ status: result.branchStatus });
+  });
+
+  app.patch("/v1/tenants/:tenantId/teams/:teamId/status", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantTeamParamsSchema.safeParse(request.params);
+    const body = organizationStatusSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_TEAM_STATUS",
+        "Revisa el equipo y su estado.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (membership?.role !== "owner" && membership?.role !== "supervisor") {
+      return sendError(
+        reply,
+        403,
+        "MANAGER_REQUIRED",
+        "Solo propietarios y supervisores pueden administrar equipos.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const result = await dependencies.tenancyService.updateTeamStatus(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.teamId,
+      body.data.status,
+      request.id,
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "TEAM_NOT_FOUND", "El equipo no existe.", request.id);
+    }
+    if (result.status === "branch_inactive") {
+      return sendError(
+        reply,
+        409,
+        "BRANCH_INACTIVE",
+        "Activa primero la sede vinculada a este equipo.",
+        request.id,
+      );
+    }
+    return reply.send({ status: result.teamStatus });
   });
 
   async function manageTeamMember(

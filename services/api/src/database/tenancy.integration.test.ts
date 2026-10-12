@@ -641,6 +641,60 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       tenant.id,
       team?.id,
     ]);
+    await expect(
+      tenancy.updateBranchStatus(
+        ownerActor,
+        tenant.id,
+        branch?.id ?? "",
+        "inactive",
+        `branch-blocked-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "has_active_teams" });
+    await expect(
+      tenancy.updateTeamStatus(
+        ownerActor,
+        tenant.id,
+        team?.id ?? "",
+        "inactive",
+        `team-inactive-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "updated", teamStatus: "inactive" });
+    await expect(
+      tenancy.updateBranchStatus(
+        ownerActor,
+        tenant.id,
+        branch?.id ?? "",
+        "inactive",
+        `branch-inactive-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "updated", branchStatus: "inactive" });
+    await expect(
+      tenancy.updateTeamStatus(
+        ownerActor,
+        tenant.id,
+        team?.id ?? "",
+        "active",
+        `team-blocked-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "branch_inactive" });
+    await expect(
+      tenancy.updateBranchStatus(
+        ownerActor,
+        tenant.id,
+        branch?.id ?? "",
+        "active",
+        `branch-active-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "updated", branchStatus: "active" });
+    await expect(
+      tenancy.updateTeamStatus(
+        ownerActor,
+        tenant.id,
+        team?.id ?? "",
+        "active",
+        `team-active-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "updated", teamStatus: "active" });
 
     const customerOverview = await tenancy.overview(
       { userId: customerId, platformRole: null, tenantRole: "customer" },
@@ -676,6 +730,12 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
         action: "team.member_assigned",
         actorUsername: invitedUsername,
       }),
+    );
+    expect(configuredOverview?.activity).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: "branch.status_changed" }),
+        expect.objectContaining({ action: "team.status_changed" }),
+      ]),
     );
     expect(
       (await platform.overview(developerId)).tenants.find((item) => item.id === tenant.id)

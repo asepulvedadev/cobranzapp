@@ -81,7 +81,7 @@ function dependencies(overrides?: {
   };
   const platformService: PlatformService = {
     systemStatus: vi.fn(async () => ({
-      schemaVersion: "0011_tenant_membership_plans.sql",
+      schemaVersion: "0012_inactive_organization_scope.sql",
       jobs: {
         status: "operational",
         due: 0,
@@ -217,6 +217,14 @@ function dependencies(overrides?: {
       displayName: input.displayName,
       status: "active",
       memberIds: [],
+    })),
+    updateBranchStatus: vi.fn(async (_actor, _tenantId, _branchId, status) => ({
+      status: "updated",
+      branchStatus: status,
+    })),
+    updateTeamStatus: vi.fn(async (_actor, _tenantId, _teamId, status) => ({
+      status: "updated",
+      teamStatus: status,
     })),
     addTeamMember: vi.fn(async () => ({ status: "updated" })),
     removeTeamMember: vi.fn(async () => ({ status: "updated" })),
@@ -484,7 +492,7 @@ describe("developer platform", () => {
       api: { status: "operational", version: "test" },
       database: {
         status: "operational",
-        schemaVersion: "0011_tenant_membership_plans.sql",
+        schemaVersion: "0012_inactive_organization_scope.sql",
       },
       jobs: {
         status: "operational",
@@ -859,6 +867,24 @@ describe("tenant onboarding", () => {
     expect(team.statusCode).toBe(201);
     expect(team.json()).toMatchObject({ team: { displayName: "Ruta Centro" } });
 
+    const teamStatus = await app.inject({
+      method: "PATCH",
+      url: `/v1/tenants/${tenantId}/teams/4ffec9ec-1e7a-4a25-93f7-6b57776ce8af/status`,
+      headers,
+      payload: { status: "inactive" },
+    });
+    expect(teamStatus.statusCode).toBe(200);
+    expect(teamStatus.json()).toEqual({ status: "inactive" });
+
+    const branchStatus = await app.inject({
+      method: "PATCH",
+      url: `/v1/tenants/${tenantId}/branches/9ec06ada-07c8-42ba-b1f8-af0fc43c75e4/status`,
+      headers,
+      payload: { status: "inactive" },
+    });
+    expect(branchStatus.statusCode).toBe(200);
+    expect(branchStatus.json()).toEqual({ status: "inactive" });
+
     const userId = "7727df33-e22e-4b17-9b4a-0e27f84b3da1";
     const teamId = "4ffec9ec-1e7a-4a25-93f7-6b57776ce8af";
     const assigned = await app.inject({
@@ -888,6 +914,28 @@ describe("tenant onboarding", () => {
       userId,
       expect.any(String),
     );
+  });
+
+  it("blocks a branch deactivation while it still has active teams", async () => {
+    const deps = dependencies({ authService: { authenticate: vi.fn(async () => tenantOwner) } });
+    vi.mocked(deps.tenancyService.updateBranchStatus).mockResolvedValue({
+      status: "has_active_teams",
+    });
+    const app = buildApp(deps);
+    apps.push(app);
+    const tenantId = tenantOwner.memberships[0]?.tenantId;
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/v1/tenants/${tenantId}/branches/9ec06ada-07c8-42ba-b1f8-af0fc43c75e4/status`,
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { status: "inactive" },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ error: { code: "BRANCH_HAS_ACTIVE_TEAMS" } });
   });
 
   it("lets an owner change a non-owner membership", async () => {
