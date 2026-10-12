@@ -68,6 +68,13 @@ function dependencies(overrides?: {
         current: true,
       },
     ]),
+    listSecurityActivity: vi.fn(async () => [
+      {
+        id: "c07dfc04-d8c5-48c6-a774-65a8d5e9cd33",
+        action: "auth.login_succeeded",
+        happenedAt: "2026-10-11T00:00:00.000Z",
+      },
+    ]),
     revokeSession: vi.fn(async () => "revoked"),
     revokeOtherSessions: vi.fn(async () => 2),
     ...overrides?.authService,
@@ -276,7 +283,7 @@ describe("authentication", () => {
     expect(deps.authService.login).toHaveBeenCalledWith(
       "dev@example.com",
       "correct-password",
-      expect.any(Object),
+      expect.objectContaining({ requestId: expect.any(String) }),
     );
     expect(response.headers["set-cookie"]).toContain("HttpOnly");
     expect(response.headers["set-cookie"]).toContain("SameSite=Strict");
@@ -370,6 +377,7 @@ describe("authentication", () => {
       developer.id,
       "0ecb798b-b0f6-4536-8a48-8ba09ca37cf0",
       "session-token",
+      expect.any(String),
     );
 
     const others = await app.inject({
@@ -379,6 +387,63 @@ describe("authentication", () => {
     });
     expect(others.statusCode).toBe(200);
     expect(others.json()).toEqual({ revoked: 2 });
+    expect(deps.authService.revokeOtherSessions).toHaveBeenCalledWith(
+      developer.id,
+      "session-token",
+      expect.any(String),
+    );
+  });
+
+  it("returns only the authenticated user's security activity", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/auth/security-activity",
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      activity: [{ action: "auth.login_succeeded" }],
+    });
+    expect(deps.authService.listSecurityActivity).toHaveBeenCalledWith(developer.id);
+  });
+
+  it("audits logout and password changes with the request correlation id", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const headers = {
+      cookie: "cobranzapp_session=session-token",
+      origin: "https://cobranzaap.tech",
+    };
+    const changed = await app.inject({
+      method: "POST",
+      url: "/v1/auth/change-password",
+      headers,
+      payload: {
+        currentPassword: "correct-password",
+        newPassword: "new-secure-password-123",
+        confirmation: "new-secure-password-123",
+      },
+    });
+    expect(changed.statusCode).toBe(200);
+    expect(deps.authService.changePassword).toHaveBeenCalledWith(
+      developer.id,
+      "correct-password",
+      "new-secure-password-123",
+      expect.any(String),
+    );
+    expect(changed.headers["set-cookie"]).toContain("Max-Age=0");
+
+    const loggedOut = await app.inject({
+      method: "POST",
+      url: "/v1/auth/logout",
+      headers,
+    });
+    expect(loggedOut.statusCode).toBe(204);
+    expect(deps.authService.logout).toHaveBeenCalledWith("session-token", expect.any(String));
   });
 });
 

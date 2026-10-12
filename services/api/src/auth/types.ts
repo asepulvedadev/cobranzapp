@@ -17,6 +17,7 @@ export type AuthenticatedUser = {
 };
 
 export type SessionMetadata = {
+  requestId: string;
   userAgent?: string;
   ipAddress?: string;
 };
@@ -30,6 +31,12 @@ export type AccountSession = {
   current: boolean;
 };
 
+export type SecurityActivity = {
+  id: string;
+  action: string;
+  happenedAt: string;
+};
+
 export interface AuthService {
   login(
     identifier: string,
@@ -37,7 +44,7 @@ export interface AuthService {
     metadata: SessionMetadata,
   ): Promise<{ token: string; user: AuthenticatedUser } | null>;
   authenticate(token: string): Promise<AuthenticatedUser | null>;
-  logout(token: string): Promise<void>;
+  logout(token: string, requestId: string): Promise<void>;
   reauthenticate(
     userId: string,
     token: string,
@@ -45,12 +52,19 @@ export interface AuthService {
     requestId: string,
   ): Promise<boolean>;
   isRecentlyReauthenticated(userId: string, token: string, withinMinutes: number): Promise<boolean>;
-  changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean>;
+  changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    requestId: string,
+  ): Promise<boolean>;
   listSessions(userId: string, currentToken: string): Promise<AccountSession[]>;
+  listSecurityActivity(userId: string): Promise<SecurityActivity[]>;
   revokeSession(
     userId: string,
     sessionId: string,
     currentToken: string,
+    requestId: string,
   ): Promise<"revoked" | "current" | "not_found">;
-  revokeOtherSessions(userId: string, currentToken: string): Promise<number>;
+  revokeOtherSessions(userId: string, currentToken: string, requestId: string): Promise<number>;
 }

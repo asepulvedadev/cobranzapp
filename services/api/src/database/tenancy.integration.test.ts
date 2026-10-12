@@ -76,11 +76,15 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
 
   it("authenticates with username and email and isolates tenant rows", async () => {
     const auth = createPostgresAuthService(runtimePool, 8);
-    const byUsername = await auth.login(`developer-${suffix}`, password, {});
+    const byUsername = await auth.login(`developer-${suffix}`, password, {
+      requestId: `login-username-${suffix}`,
+    });
     expect(byUsername?.user.platformRole).toBe("developer");
-    await auth.logout(byUsername?.token ?? "");
+    await auth.logout(byUsername?.token ?? "", `logout-${suffix}`);
 
-    const byEmail = await auth.login(`developer-${suffix}@example.com`, password, {});
+    const byEmail = await auth.login(`developer-${suffix}@example.com`, password, {
+      requestId: `login-email-${suffix}`,
+    });
     expect(byEmail?.user.id).toBe(developerId);
     await expect(
       auth.isRecentlyReauthenticated(developerId, byEmail?.token ?? "", 10),
@@ -104,6 +108,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       auth.isRecentlyReauthenticated(developerId, byEmail?.token ?? "", 10),
     ).resolves.toBe(true);
     const otherSession = await auth.login(`developer-${suffix}`, password, {
+      requestId: `login-other-${suffix}`,
       userAgent: "Integration Browser",
     });
     const sessions = await auth.listSessions(developerId, byEmail?.token ?? "");
@@ -112,15 +117,39 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     const currentSessionId = sessions.find((session) => session.current)?.id ?? "";
     const otherSessionId = sessions.find((session) => !session.current)?.id ?? "";
     await expect(
-      auth.revokeSession(developerId, currentSessionId, byEmail?.token ?? ""),
+      auth.revokeSession(
+        developerId,
+        currentSessionId,
+        byEmail?.token ?? "",
+        `revoke-current-${suffix}`,
+      ),
     ).resolves.toBe("current");
     await expect(
-      auth.revokeSession(developerId, otherSessionId, byEmail?.token ?? ""),
+      auth.revokeSession(
+        developerId,
+        otherSessionId,
+        byEmail?.token ?? "",
+        `revoke-other-${suffix}`,
+      ),
     ).resolves.toBe("revoked");
     await expect(auth.authenticate(otherSession?.token ?? "")).resolves.toBeNull();
-    const additionalSession = await auth.login(`developer-${suffix}`, password, {});
-    await expect(auth.revokeOtherSessions(developerId, byEmail?.token ?? "")).resolves.toBe(1);
+    const additionalSession = await auth.login(`developer-${suffix}`, password, {
+      requestId: `login-additional-${suffix}`,
+    });
+    await expect(
+      auth.revokeOtherSessions(developerId, byEmail?.token ?? "", `revoke-others-${suffix}`),
+    ).resolves.toBe(1);
     await expect(auth.authenticate(additionalSession?.token ?? "")).resolves.toBeNull();
+    const securityActivity = await auth.listSecurityActivity(developerId);
+    expect(securityActivity.map((event) => event.action)).toEqual(
+      expect.arrayContaining([
+        "auth.login_succeeded",
+        "auth.logged_out",
+        "auth.session_revoked",
+        "auth.other_sessions_revoked",
+        "auth.reauthenticated",
+      ]),
+    );
     await expect(auth.authenticate(byEmail?.token ?? "")).resolves.toMatchObject({
       id: developerId,
     });
@@ -225,7 +254,9 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       `accept-${suffix}`,
     );
     expect(accepted).toEqual({ status: "accepted", tenantSlug: slug });
-    const ownerLogin = await auth.login(`owner-${suffix}@example.com`, password, {});
+    const ownerLogin = await auth.login(`owner-${suffix}@example.com`, password, {
+      requestId: `login-owner-${suffix}`,
+    });
     expect(ownerLogin?.user.memberships).toContainEqual(
       expect.objectContaining({ tenantId: tenant.id, role: "owner" }),
     );
@@ -425,7 +456,9 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
        VALUES ($1, $2, 'collector', $3)`,
       [tenant.id, memberId, developerId],
     );
-    const memberLogin = await auth.login(`member-${suffix}`, password, {});
+    const memberLogin = await auth.login(`member-${suffix}`, password, {
+      requestId: `login-member-${suffix}`,
+    });
     expect(memberLogin?.user.memberships).toContainEqual(
       expect.objectContaining({ tenantId: tenant.id, role: "collector" }),
     );
@@ -646,5 +679,20 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
         requestId: `member-reinstate-${suffix}`,
       }),
     ).resolves.toEqual({ status: "invalid_transition" });
+
+    const nextPassword = "updated-integration-password-123";
+    await expect(
+      auth.changePassword(developerId, password, nextPassword, `password-change-${suffix}`),
+    ).resolves.toBe(true);
+    await expect(auth.authenticate(byEmail?.token ?? "")).resolves.toBeNull();
+    await expect(
+      auth.login(`developer-${suffix}`, password, { requestId: `old-password-${suffix}` }),
+    ).resolves.toBeNull();
+    await expect(
+      auth.login(`developer-${suffix}`, nextPassword, { requestId: `new-password-${suffix}` }),
+    ).resolves.toMatchObject({ user: { id: developerId } });
+    await expect(auth.listSecurityActivity(developerId)).resolves.toContainEqual(
+      expect.objectContaining({ action: "auth.password_changed" }),
+    );
   });
 });

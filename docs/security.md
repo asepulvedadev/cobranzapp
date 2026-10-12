@@ -49,6 +49,13 @@ This is an interim first-party identity baseline, not completion of the identity
 PKCE for mobile, MFA for privileged roles, approved support access, and an independent security
 review remain required before the corresponding launch gate can pass.
 
+Successful sign-in, sign-out, password change, reauthentication, individual remote-session
+revocation, and bulk session revocation create account-scoped audit events with the request
+correlation identifier. The security screen exposes only the authenticated user's latest account
+events; it never stores or displays the submitted password, raw IP address, or session token.
+Unsuccessful login identifiers are deliberately excluded from this audit stream to avoid turning
+the audit table into an unbounded store of attacker-controlled personal data.
+
 ### Implemented worker-security baseline
 
 The API and background worker use different PostgreSQL login roles. The API role can insert

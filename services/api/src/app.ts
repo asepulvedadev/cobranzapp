@@ -293,6 +293,7 @@ export function buildApp(dependencies: AppDependencies) {
     }
     const result = await dependencies.authService.login(identifier, parsed.data.password, {
       ipAddress: request.ip,
+      requestId: request.id,
       userAgent: request.headers["user-agent"],
     });
     if (!result) {
@@ -324,6 +325,12 @@ export function buildApp(dependencies: AppDependencies) {
     };
   });
 
+  app.get("/v1/auth/security-activity", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    return { activity: await dependencies.authService.listSecurityActivity(session.user.id) };
+  });
+
   app.delete("/v1/auth/sessions/:sessionId", async (request, reply) => {
     if (!requireAllowedOrigin(request, reply)) return;
     const session = await requireUser(request, reply);
@@ -336,6 +343,7 @@ export function buildApp(dependencies: AppDependencies) {
       session.user.id,
       params.data.sessionId,
       session.token,
+      request.id,
     );
     if (result === "current") {
       return sendError(
@@ -359,6 +367,7 @@ export function buildApp(dependencies: AppDependencies) {
     const revoked = await dependencies.authService.revokeOtherSessions(
       session.user.id,
       session.token,
+      request.id,
     );
     return reply.send({ revoked });
   });
@@ -404,7 +413,7 @@ export function buildApp(dependencies: AppDependencies) {
   app.post("/v1/auth/logout", async (request, reply) => {
     if (!requireAllowedOrigin(request, reply)) return;
     const token = parseCookies(request.headers.cookie).get(sessionCookieName);
-    if (token) await dependencies.authService.logout(token);
+    if (token) await dependencies.authService.logout(token, request.id);
     reply.header("set-cookie", expiredSessionCookie(secureCookies));
     return reply.code(204).send();
   });
@@ -427,6 +436,7 @@ export function buildApp(dependencies: AppDependencies) {
       session.user.id,
       parsed.data.currentPassword,
       parsed.data.newPassword,
+      request.id,
     );
     if (!changed)
       return sendError(

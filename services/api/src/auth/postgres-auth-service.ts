@@ -1,7 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { hashPassword, verifyPassword } from "./password.js";
-import type { AccountSession, AuthenticatedUser, AuthService, TenantRole } from "./types.js";
+import type {
+  AccountSession,
+  AuthenticatedUser,
+  AuthService,
+  SecurityActivity,
+  TenantRole,
+} from "./types.js";
 
 type UserRow = {
   id: string;
@@ -86,10 +92,11 @@ export function createPostgresAuthService(pool: Pool, sessionTtlHours: number): 
         }
 
         const token = randomBytes(32).toString("base64url");
-        await client.query(
+        const sessionResult = await client.query<{ id: string }>(
           `INSERT INTO auth_sessions
              (user_id, token_hash, expires_at, user_agent, ip_hash, reauthenticated_at)
-           VALUES ($1, $2, now() + make_interval(hours => $3), $4, $5, now())`,
+           VALUES ($1, $2, now() + make_interval(hours => $3), $4, $5, now())
+           RETURNING id`,
           [
             row.id,
             hashToken(token),
@@ -99,8 +106,16 @@ export function createPostgresAuthService(pool: Pool, sessionTtlHours: number): 
           ],
         );
         const user = await loadUser(client, row.id);
+        const sessionId = sessionResult.rows[0]?.id;
+        if (!user || !sessionId) throw new Error("Login did not create a complete session");
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id)
+           VALUES (NULL, $1, 'auth.login_succeeded', 'auth_session', $2, $3)`,
+          [row.id, sessionId, metadata.requestId],
+        );
         await client.query("COMMIT");
-        return user ? { token, user } : null;
+        return { token, user };
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -138,11 +153,34 @@ export function createPostgresAuthService(pool: Pool, sessionTtlHours: number): 
       }
     },
 
-    async logout(token) {
-      await pool.query(
-        "UPDATE auth_sessions SET revoked_at = now() WHERE token_hash = $1 AND revoked_at IS NULL",
-        [hashToken(token)],
-      );
+    async logout(token, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const result = await client.query<{ id: string; user_id: string }>(
+          `UPDATE auth_sessions
+              SET revoked_at = now()
+            WHERE token_hash = $1 AND revoked_at IS NULL
+          RETURNING id, user_id`,
+          [hashToken(token)],
+        );
+        const session = result.rows[0];
+        if (session) {
+          await client.query("SELECT set_config('app.user_id', $1, true)", [session.user_id]);
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id)
+             VALUES (NULL, $1, 'auth.logged_out', 'auth_session', $2, $3)`,
+            [session.user_id, session.id, requestId],
+          );
+        }
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
     },
 
     async reauthenticate(userId, token, password, requestId) {
@@ -215,7 +253,7 @@ export function createPostgresAuthService(pool: Pool, sessionTtlHours: number): 
       return Boolean(result.rowCount);
     },
 
-    async changePassword(userId, currentPassword, newPassword) {
+    async changePassword(userId, currentPassword, newPassword, requestId) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
@@ -229,6 +267,7 @@ export function createPostgresAuthService(pool: Pool, sessionTtlHours: number): 
           return false;
         }
         const nextHash = await hashPassword(newPassword);
+        await client.query("SELECT set_config('app.user_id', $1, true)", [userId]);
         await client.query(
           `UPDATE users
               SET password_hash = $2,
@@ -241,6 +280,12 @@ export function createPostgresAuthService(pool: Pool, sessionTtlHours: number): 
         await client.query(
           "UPDATE auth_sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL",
           [userId],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id)
+           VALUES (NULL, $1, 'auth.password_changed', 'user', $1, $2)`,
+          [userId, requestId],
         );
         await client.query("COMMIT");
         return true;
@@ -280,35 +325,113 @@ export function createPostgresAuthService(pool: Pool, sessionTtlHours: number): 
       );
     },
 
-    async revokeSession(userId, sessionId, currentToken) {
-      const currentHash = hashToken(currentToken);
-      const revoked = await pool.query(
-        `UPDATE auth_sessions
-            SET revoked_at = now()
-          WHERE id = $1 AND user_id = $2 AND token_hash <> $3
-            AND revoked_at IS NULL AND expires_at > now()
-        RETURNING id`,
-        [sessionId, userId, currentHash],
-      );
-      if (revoked.rowCount) return "revoked";
-      const current = await pool.query<{ current: boolean }>(
-        `SELECT token_hash = $3 AS current
-           FROM auth_sessions
-          WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL AND expires_at > now()`,
-        [sessionId, userId, currentHash],
-      );
-      return current.rows[0]?.current ? "current" : "not_found";
+    async listSecurityActivity(userId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("SELECT set_config('app.user_id', $1, true)", [userId]);
+        const result = await client.query<{
+          id: string;
+          action: string;
+          happened_at: Date;
+        }>(
+          `SELECT id, action, happened_at
+             FROM audit_events
+            WHERE tenant_id IS NULL
+              AND actor_user_id = $1
+              AND action LIKE 'auth.%'
+            ORDER BY happened_at DESC, id DESC
+            LIMIT 20`,
+          [userId],
+        );
+        await client.query("COMMIT");
+        return result.rows.map(
+          (event): SecurityActivity => ({
+            id: event.id,
+            action: event.action,
+            happenedAt: event.happened_at.toISOString(),
+          }),
+        );
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
     },
 
-    async revokeOtherSessions(userId, currentToken) {
-      const result = await pool.query(
-        `UPDATE auth_sessions
-            SET revoked_at = now()
-          WHERE user_id = $1 AND token_hash <> $2
-            AND revoked_at IS NULL AND expires_at > now()`,
-        [userId, hashToken(currentToken)],
-      );
-      return result.rowCount ?? 0;
+    async revokeSession(userId, sessionId, currentToken, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const currentHash = hashToken(currentToken);
+        const revoked = await client.query<{ id: string }>(
+          `UPDATE auth_sessions
+              SET revoked_at = now()
+            WHERE id = $1 AND user_id = $2 AND token_hash <> $3
+              AND revoked_at IS NULL AND expires_at > now()
+          RETURNING id`,
+          [sessionId, userId, currentHash],
+        );
+        if (revoked.rowCount) {
+          await client.query("SELECT set_config('app.user_id', $1, true)", [userId]);
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id)
+             VALUES (NULL, $1, 'auth.session_revoked', 'auth_session', $2, $3)`,
+            [userId, sessionId, requestId],
+          );
+          await client.query("COMMIT");
+          return "revoked";
+        }
+        const current = await client.query<{ current: boolean }>(
+          `SELECT token_hash = $3 AS current
+             FROM auth_sessions
+            WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL AND expires_at > now()`,
+          [sessionId, userId, currentHash],
+        );
+        await client.query("ROLLBACK");
+        return current.rows[0]?.current ? "current" : "not_found";
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async revokeOtherSessions(userId, currentToken, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const result = await client.query<{ id: string }>(
+          `UPDATE auth_sessions
+              SET revoked_at = now()
+            WHERE user_id = $1 AND token_hash <> $2
+              AND revoked_at IS NULL AND expires_at > now()
+          RETURNING id`,
+          [userId, hashToken(currentToken)],
+        );
+        if (result.rowCount) {
+          await client.query("SELECT set_config('app.user_id', $1, true)", [userId]);
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+             VALUES (
+               NULL, $1, 'auth.other_sessions_revoked', 'user', $1, $2,
+               jsonb_build_object('revokedCount', $3::integer)
+             )`,
+            [userId, requestId, result.rowCount],
+          );
+        }
+        await client.query("COMMIT");
+        return result.rowCount ?? 0;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
     },
   };
 }
