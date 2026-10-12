@@ -29,6 +29,12 @@ export type SecurityActivity = {
   happenedAt: string;
 };
 
+export type MfaStatus = {
+  enabled: boolean;
+  setupPending: boolean;
+  setupExpiresAt: string | null;
+};
+
 export type AuditActivity = {
   id: string;
   action: string;
