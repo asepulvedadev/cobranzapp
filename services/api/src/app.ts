@@ -50,6 +50,7 @@ import type { VerificationNetworkService } from "./verification-network/types.js
 const sessionCookieName = "cobranzapp_session";
 const mfaChallengeCookieName = "cobranzapp_mfa_challenge";
 const tenantIdParamsSchema = z.object({ tenantId: z.uuid() });
+const tenantLoanProductParamsSchema = z.object({ tenantId: z.uuid(), productId: z.uuid() });
 const tenantInvitationParamsSchema = z.object({ tenantId: z.uuid(), invitationId: z.uuid() });
 const tenantMemberParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
 const tenantMemberProfileParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
@@ -2621,6 +2622,79 @@ export function buildApp(dependencies: AppDependencies) {
       );
     }
     return reply.code(201).send({ product: result.product });
+  });
+
+  app.post("/v1/tenants/:tenantId/loan-products/:productId/review", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantLoanProductParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "LOAN_PRODUCT_NOT_FOUND", "El producto no existe.", request.id);
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo propietarios y supervisores pueden enviar productos a revisión.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    if (!dependencies.creditService) {
+      return sendError(
+        reply,
+        503,
+        "CREDIT_CATALOG_UNAVAILABLE",
+        "El catálogo de crédito todavía no está configurado.",
+        request.id,
+      );
+    }
+    const result = await dependencies.creditService.submitProductForReview(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.productId,
+      request.id,
+    );
+    if (result.status === "forbidden") {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo propietarios y supervisores pueden enviar productos a revisión.",
+        request.id,
+      );
+    }
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "LOAN_PRODUCT_NOT_FOUND", "El producto no existe.", request.id);
+    }
+    if (result.status === "invalid_state") {
+      return sendError(
+        reply,
+        409,
+        "LOAN_PRODUCT_INVALID_STATE",
+        "Solo un borrador puede enviarse a revisión.",
+        request.id,
+      );
+    }
+    if (result.status === "missing_evidence") {
+      return sendError(
+        reply,
+        409,
+        "LOAN_PRODUCT_EVIDENCE_REQUIRED",
+        "Agrega una referencia normativa vigente antes de enviar el producto a revisión.",
+        request.id,
+      );
+    }
+    return reply.send({ product: result.product });
   });
 
   app.get("/v1/tenants/:tenantId/loan-applications", async (request, reply) => {

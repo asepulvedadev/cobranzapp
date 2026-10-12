@@ -103,10 +103,11 @@ The network is disabled until the Colombian privacy policy, participant agreemen
 ### Catálogo de crédito en preparación
 
 La consola de propietario y supervisor permite registrar productos de crédito como borradores con
-montos COP, plazo, frecuencia, base de tasa, cargo documental y referencia normativa. El estado
-queda en `draft` y la API no permite todavía aprobar, calcular cuotas, originar, desembolsar ni
-registrar pagos. Esto evita convertir una tasa o ejemplo comercial en una regla financiera vigente
-sin revisión legal, contable y de calendario.
+montos COP, plazo, frecuencia, base de tasa, cargo documental y referencia normativa. Cuando la
+referencia está registrada, el producto puede enviarse a `under_review`; ese cambio exige
+reautenticación y queda auditado. La API no permite todavía aprobar, calcular cuotas, originar,
+desembolsar ni registrar pagos. Esto evita convertir una tasa o ejemplo comercial en una regla
+financiera vigente sin revisión legal, contable y de calendario.
 
 ### Solicitudes de crédito en borrador
 

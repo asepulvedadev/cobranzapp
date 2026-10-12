@@ -1771,6 +1771,12 @@ html:has(.panel-shell) {
   overflow-wrap: anywhere;
 }
 
+.credit-product-review-actions {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+}
+
 .credit-product-form {
   max-width: 720px;
 }

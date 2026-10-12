@@ -723,6 +723,39 @@ export function createOpenApiDocument(version: string) {
           },
         },
       },
+      "/v1/tenants/{tenantId}/loan-products/{productId}/review": {
+        post: {
+          tags: ["Crédito"],
+          operationId: "submitLoanProductForReview",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "productId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": response("Producto enviado a revisión.", schemaReference("LoanProductResponse")),
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("El producto no existe.", schemaReference("ApiError")),
+            "409": response(
+              "El producto no puede enviarse a revisión.",
+              schemaReference("ApiError"),
+            ),
+            "428": response("Confirmación reciente requerida.", schemaReference("ApiError")),
+            "503": response("El catálogo no está habilitado.", schemaReference("ApiError")),
+          },
+        },
+      },
       "/v1/tenants/{tenantId}/loan-applications": {
         get: {
           tags: ["Crédito"],

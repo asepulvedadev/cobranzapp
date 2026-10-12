@@ -1,7 +1,12 @@
 import type { LoanApplication, LoanProduct } from "@cobranzapp/contracts";
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
-import type { CreditService, LoanApplicationResult, LoanProductResult } from "./types.js";
+import type {
+  CreditService,
+  LoanApplicationResult,
+  LoanProductResult,
+  LoanProductReviewResult,
+} from "./types.js";
 
 type LoanProductRow = {
   id: string;
@@ -175,6 +180,53 @@ export function createPostgresCreditService(pool: Pool): CreditService {
           }
           throw error;
         }
+      });
+    },
+
+    async submitProductForReview(
+      actor,
+      tenantId,
+      productId,
+      requestId,
+    ): Promise<LoanProductReviewResult> {
+      if (!canManageProducts(actor)) return { status: "forbidden" };
+      return withTransaction(actor, tenantId, async (client) => {
+        const productResult = await client.query<LoanProductRow>(
+          `SELECT id, name, status, currency, principal_min, principal_max,
+                  term_count, payment_frequency, rate_basis, nominal_rate,
+                  documentation_fee_rate, compliance_status, compliance_source_ref,
+                  created_at, updated_at
+             FROM loan_products
+            WHERE tenant_id = $1 AND id = $2
+            FOR UPDATE`,
+          [tenantId, productId],
+        );
+        const product = productResult.rows[0];
+        if (!product) return { status: "not_found" };
+        if (product.status !== "draft") return { status: "invalid_state" };
+        if (!product.compliance_source_ref || product.compliance_status === "expired") {
+          return { status: "missing_evidence" };
+        }
+        const updated = await client.query<LoanProductRow>(
+          `UPDATE loan_products
+              SET status = 'under_review', reviewed_by = $3, updated_at = now()
+            WHERE tenant_id = $1 AND id = $2
+            RETURNING id, name, status, currency, principal_min, principal_max,
+                      term_count, payment_frequency, rate_basis, nominal_rate,
+                      documentation_fee_rate, compliance_status, compliance_source_ref,
+                      created_at, updated_at`,
+          [tenantId, productId, actor.userId],
+        );
+        const row = updated.rows[0];
+        if (!row) throw new Error("LOAN_PRODUCT_REVIEW_NOT_CREATED");
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'loan_product.submitted_for_review', 'loan_product', $3, $4,
+                   jsonb_build_object('status', 'under_review', 'complianceSourceRef', $5))`,
+          [tenantId, actor.userId, productId, requestId, product.compliance_source_ref],
+        );
+        return { status: "submitted", product: mapProduct(row) };
       });
     },
 

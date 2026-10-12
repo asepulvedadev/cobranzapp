@@ -11,6 +11,13 @@ export type LoanProductResult =
   | { status: "duplicate" }
   | { status: "forbidden" };
 
+export type LoanProductReviewResult =
+  | { status: "submitted"; product: LoanProduct }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "invalid_state" }
+  | { status: "missing_evidence" };
+
 export type LoanApplicationResult =
   | { status: "created"; application: LoanApplication }
   | { status: "not_found" }
@@ -26,6 +33,12 @@ export interface CreditService {
     tenantId: string,
     input: LoanProductCreateRequest & { requestId: string },
   ): Promise<LoanProductResult>;
+  submitProductForReview(
+    actor: TenantActor,
+    tenantId: string,
+    productId: string,
+    requestId: string,
+  ): Promise<LoanProductReviewResult>;
   listApplications(actor: TenantActor, tenantId: string): Promise<LoanApplication[]>;
   createApplication(
     actor: TenantActor,

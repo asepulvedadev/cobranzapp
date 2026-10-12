@@ -44,6 +44,7 @@ export function CreditProductCatalog({
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const [reviewingProductId, setReviewingProductId] = useState<string | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -75,6 +76,25 @@ export function CreditProductCatalog({
     event.currentTarget.reset();
     setMessage("Producto creado como borrador. Todavía no puede desembolsar créditos.");
     setIsBusy(false);
+    router.refresh();
+  }
+
+  async function submitForReview(product: LoanProduct) {
+    setReviewingProductId(product.id);
+    setMessage("");
+    setIsError(false);
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/loan-products/${product.id}/review`,
+      { method: "POST" },
+    ).catch(() => null);
+    if (!response?.ok) {
+      setMessage(await errorMessage(response));
+      setIsError(true);
+      setReviewingProductId(null);
+      return;
+    }
+    setMessage(`El producto “${product.name}” quedó enviado a revisión.`);
+    setReviewingProductId(null);
     router.refresh();
   }
 
@@ -130,6 +150,23 @@ export function CreditProductCatalog({
                   </dd>
                 </div>
               </dl>
+              {product.status === "draft" ? (
+                <div className="credit-product-review-actions">
+                  {product.complianceSourceRef ? (
+                    <button
+                      disabled={reviewingProductId !== null}
+                      onClick={() => void submitForReview(product)}
+                      type="button"
+                    >
+                      {reviewingProductId === product.id ? "Enviando…" : "Enviar a revisión"}
+                    </button>
+                  ) : (
+                    <small className="form-help">
+                      Agrega una referencia normativa para habilitar la revisión.
+                    </small>
+                  )}
+                </div>
+              ) : null}
             </article>
           ))}
         </div>
