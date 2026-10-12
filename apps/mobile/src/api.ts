@@ -1,5 +1,7 @@
 import {
   authenticatedResponseSchema,
+  type BorrowerDirectory,
+  borrowerDirectorySchema,
   type CurrentUser,
   currentUserSchema,
   messageResponseSchema,
@@ -179,6 +181,16 @@ export class MobileApi {
         response.status,
       );
     return tenantOverviewSchema.parse((await response.json()).overview);
+  }
+
+  async borrowerDirectory(tenantId: string): Promise<BorrowerDirectory> {
+    const response = await this.request(`/v1/tenants/${tenantId}/borrowers?page=1&pageSize=20`);
+    if (!response.ok)
+      throw new MobileApiError(
+        await apiError(response, "No fue posible cargar los clientes."),
+        response.status,
+      );
+    return borrowerDirectorySchema.parse(await response.json());
   }
 
   async logout() {

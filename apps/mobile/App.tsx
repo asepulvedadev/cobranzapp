@@ -1,4 +1,5 @@
 import type {
+  BorrowerDirectory,
   CurrentUser,
   PlatformOverview,
   PlatformSystemStatus,
@@ -356,12 +357,19 @@ function DeveloperHome({
   );
 }
 
-function TenantHome({ overview }: { overview: TenantOverview }) {
+function TenantHome({
+  overview,
+  directory,
+}: {
+  overview: TenantOverview;
+  directory: BorrowerDirectory | null;
+}) {
   const metrics = [
     ["Integrantes", overview.metrics.members],
     ["Sedes", overview.metrics.branches],
     ["Equipos", overview.metrics.teams],
     ["Invitaciones", overview.metrics.pendingInvitations],
+    ...(directory ? [["Clientes", directory.pagination.total] as const] : []),
   ] as const;
   return (
     <View style={styles.stack}>
@@ -400,6 +408,30 @@ function TenantHome({ overview }: { overview: TenantOverview }) {
           </View>
         </View>
       ))}
+      {directory ? (
+        <>
+          <Text style={styles.cardTitle}>Clientes recientes</Text>
+          {directory.borrowers.slice(0, 5).map((borrower) => (
+            <View key={borrower.id} style={styles.listRow}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{borrower.fullName.slice(0, 1).toUpperCase()}</Text>
+              </View>
+              <View style={styles.listCopy}>
+                <Text style={styles.listTitle}>{borrower.fullName}</Text>
+                <Text style={styles.muted}>
+                  {borrower.identity.documentType} •••• {borrower.identity.documentLast4} ·{" "}
+                  {borrower.identity.verificationState === "reviewed"
+                    ? "Identidad revisada"
+                    : "Pendiente de revisión"}
+                </Text>
+              </View>
+            </View>
+          ))}
+          {!directory.borrowers.length ? (
+            <Text style={styles.muted}>Aún no hay clientes registrados.</Text>
+          ) : null}
+        </>
+      ) : null}
     </View>
   );
 }
@@ -415,22 +447,31 @@ function AuthenticatedHome({
 }) {
   const [tenantId, setTenantId] = useState(user.memberships[0]?.tenantId ?? null);
   const [tenant, setTenant] = useState<TenantOverview | null>(null);
+  const [directory, setDirectory] = useState<BorrowerDirectory | null>(null);
   const [platform, setPlatform] = useState<PlatformOverview | null>(null);
   const [system, setSystem] = useState<PlatformSystemStatus | null>(null);
   const [message, setMessage] = useState("");
+  const selectedMembershipRole = user.memberships.find(
+    (membership) => membership.tenantId === tenantId,
+  )?.role;
 
   useEffect(() => {
     let mounted = true;
+    const canReadBorrowers = selectedMembershipRole
+      ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
+      : false;
     Promise.all([
       user.platformRole === "developer" ? api.platformOverview() : Promise.resolve(null),
       user.platformRole === "developer" ? api.systemStatus() : Promise.resolve(null),
       tenantId ? api.tenantOverview(tenantId) : Promise.resolve(null),
+      tenantId && canReadBorrowers ? api.borrowerDirectory(tenantId) : Promise.resolve(null),
     ])
-      .then(([platformResult, systemResult, tenantResult]) => {
+      .then(([platformResult, systemResult, tenantResult, borrowerResult]) => {
         if (!mounted) return;
         setPlatform(platformResult);
         setSystem(systemResult);
         setTenant(tenantResult);
+        setDirectory(borrowerResult);
       })
       .catch(
         (error) => mounted && setMessage(errorText(error, "No fue posible cargar el espacio.")),
@@ -438,7 +479,7 @@ function AuthenticatedHome({
     return () => {
       mounted = false;
     };
-  }, [api, tenantId, user.platformRole]);
+  }, [api, selectedMembershipRole, tenantId, user.platformRole]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -490,7 +531,11 @@ function AuthenticatedHome({
                 </Pressable>
               ))}
             </View>
-            {tenant ? <TenantHome overview={tenant} /> : <ActivityIndicator color="#fbbf24" />}
+            {tenant ? (
+              <TenantHome directory={directory} overview={tenant} />
+            ) : (
+              <ActivityIndicator color="#fbbf24" />
+            )}
           </>
         ) : user.platformRole !== "developer" ? (
           <View style={styles.boundaryCard}>
