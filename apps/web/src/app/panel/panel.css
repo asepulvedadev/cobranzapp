@@ -3900,6 +3900,43 @@ html:has(.panel-shell) {
   accent-color: var(--tenant-brand-primary, var(--panel-accent));
 }
 
+.borrower-details {
+  margin-top: 8px;
+}
+
+.borrower-details summary {
+  color: var(--panel-ink);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.borrower-details-content {
+  display: grid;
+  gap: 8px;
+  margin-top: 9px;
+  max-width: 360px;
+}
+
+.borrower-details-content div {
+  display: grid;
+  gap: 2px;
+}
+
+.borrower-details-content span {
+  color: var(--panel-ink-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.borrower-details-content strong {
+  color: var(--panel-ink);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .borrower-table .status-manual_pending {
   background: #fff5dd;
   color: #8b5b00;

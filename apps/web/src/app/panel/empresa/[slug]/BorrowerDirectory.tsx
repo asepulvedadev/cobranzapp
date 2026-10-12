@@ -15,6 +15,11 @@ function statusLabel(status: Borrower["identity"]["verificationState"]) {
       : "Pendiente de revisión";
 }
 
+function documentLabel(category: Borrower["documents"][number]["category"], side: string | null) {
+  if (category === "profile_photo") return "Foto designada de perfil";
+  return side === "front" ? "Documento · frente" : "Documento · reverso";
+}
+
 export function BorrowerDirectory({
   tenantId,
   directory,
@@ -119,6 +124,40 @@ export function BorrowerDirectory({
                     <td data-label="Cliente">
                       <strong>{borrower.fullName}</strong>
                       <small>{borrower.emergencyContacts.length} contacto(s) de emergencia</small>
+                      <details className="borrower-details">
+                        <summary>Ver ficha</summary>
+                        <div className="borrower-details-content">
+                          <div>
+                            <span>Casa</span>
+                            <strong>{borrower.homeAddress}</strong>
+                          </div>
+                          <div>
+                            <span>Trabajo</span>
+                            <strong>{borrower.workAddress}</strong>
+                          </div>
+                          <div>
+                            <span>Contactos de emergencia</span>
+                            {borrower.emergencyContacts.map((contact) => (
+                              <strong key={contact.id}>
+                                {contact.fullName} · {contact.relationship} · {contact.phone}
+                              </strong>
+                            ))}
+                          </div>
+                          <div>
+                            <span>Documentos privados</span>
+                            {borrower.documents.length ? (
+                              borrower.documents.map((document) => (
+                                <strong key={document.id}>
+                                  {documentLabel(document.category, document.side)} ·{" "}
+                                  {document.scanStatus}
+                                </strong>
+                              ))
+                            ) : (
+                              <strong>Pendientes de carga</strong>
+                            )}
+                          </div>
+                        </div>
+                      </details>
                     </td>
                     <td data-label="Documento">
                       <strong>{borrower.identity.documentType}</strong>
