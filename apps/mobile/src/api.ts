@@ -10,7 +10,9 @@ import {
   type PlatformSystemStatus,
   platformOverviewSchema,
   platformSystemStatusSchema,
+  type RouteDirectory,
   reauthenticationResponseSchema,
+  routeDirectorySchema,
   type TenantOverview,
   tenantOverviewSchema,
 } from "@cobranzapp/contracts";
@@ -215,6 +217,16 @@ export class MobileApi {
         response.status,
       );
     return borrowerDirectorySchema.parse(await response.json());
+  }
+
+  async routeDirectory(tenantId: string): Promise<RouteDirectory> {
+    const response = await this.request(`/v1/tenants/${tenantId}/routes`);
+    if (!response.ok)
+      throw new MobileApiError(
+        await apiError(response, "No fue posible cargar las rutas."),
+        response.status,
+      );
+    return routeDirectorySchema.parse(await response.json());
   }
 
   async logout() {

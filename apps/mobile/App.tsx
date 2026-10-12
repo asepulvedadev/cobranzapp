@@ -3,6 +3,7 @@ import type {
   CurrentUser,
   PlatformOverview,
   PlatformSystemStatus,
+  RouteDirectory,
   TenantOverview,
 } from "@cobranzapp/contracts";
 import { StatusBar } from "expo-status-bar";
@@ -361,12 +362,14 @@ function DeveloperHome({
 function TenantHome({
   overview,
   directory,
+  routes,
   directorySearch,
   onDirectoryPageChange,
   onDirectorySearch,
 }: {
   overview: TenantOverview;
   directory: BorrowerDirectory | null;
+  routes: RouteDirectory | null;
   directorySearch: string;
   onDirectoryPageChange: (page: number) => void;
   onDirectorySearch: (search: string) => void;
@@ -497,6 +500,50 @@ function TenantHome({
           ) : null}
         </>
       ) : null}
+      {routes ? (
+        <>
+          <View style={styles.directoryHeading}>
+            <Text style={styles.cardTitle}>Rutas de cobranza</Text>
+            <Text style={styles.muted}>{routes.routes.length} configuradas</Text>
+          </View>
+          {routes.routes.map((route) => (
+            <View key={route.id} style={styles.routeCard}>
+              <View style={styles.routeCardHeading}>
+                <View style={styles.listCopy}>
+                  <Text style={styles.listTitle}>{route.name}</Text>
+                  <Text style={styles.muted}>
+                    {route.branchName ?? "Sin sede"} · {route.stops.length} parada(s)
+                  </Text>
+                </View>
+                <Text style={styles.routeStatus}>
+                  {route.status === "draft"
+                    ? "Borrador"
+                    : route.status === "active"
+                      ? "Activa"
+                      : "Archivada"}
+                </Text>
+              </View>
+              {route.stops.slice(0, 5).map((stop) => (
+                <View key={stop.id} style={styles.routeStopRow}>
+                  <Text style={styles.routeStopNumber}>{stop.position}</Text>
+                  <View style={styles.listCopy}>
+                    <Text style={styles.listTitle}>{stop.borrowerName}</Text>
+                    <Text style={styles.muted}>
+                      {stop.addressKind === "home" ? "Casa" : "Trabajo"} · {stop.address}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+              {route.stops.length > 5 ? (
+                <Text style={styles.muted}>+{route.stops.length - 5} paradas más</Text>
+              ) : null}
+            </View>
+          ))}
+          {!routes.routes.length ? (
+            <Text style={styles.muted}>Aún no hay rutas configuradas.</Text>
+          ) : null}
+        </>
+      ) : null}
     </View>
   );
 }
@@ -513,6 +560,7 @@ function AuthenticatedHome({
   const [tenantId, setTenantId] = useState(user.memberships[0]?.tenantId ?? null);
   const [tenant, setTenant] = useState<TenantOverview | null>(null);
   const [directory, setDirectory] = useState<BorrowerDirectory | null>(null);
+  const [routes, setRoutes] = useState<RouteDirectory | null>(null);
   const [platform, setPlatform] = useState<PlatformOverview | null>(null);
   const [system, setSystem] = useState<PlatformSystemStatus | null>(null);
   const [message, setMessage] = useState("");
@@ -540,13 +588,15 @@ function AuthenticatedHome({
       tenantId && canReadBorrowers
         ? api.borrowerDirectory(tenantId, { search: directorySearch, page: directoryPage })
         : Promise.resolve(null),
+      tenantId && canReadBorrowers ? api.routeDirectory(tenantId) : Promise.resolve(null),
     ])
-      .then(([platformResult, systemResult, tenantResult, borrowerResult]) => {
+      .then(([platformResult, systemResult, tenantResult, borrowerResult, routeResult]) => {
         if (!mounted) return;
         setPlatform(platformResult);
         setSystem(systemResult);
         setTenant(tenantResult);
         setDirectory(borrowerResult);
+        setRoutes(routeResult);
       })
       .catch((error) => {
         if (!mounted) return;
@@ -691,6 +741,7 @@ function AuthenticatedHome({
                   setDirectoryPage(1);
                 }}
                 overview={tenant}
+                routes={routes}
               />
             ) : (
               <ActivityIndicator color="#fbbf24" />
@@ -977,6 +1028,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#343b36",
     gap: 6,
+  },
+  routeCard: {
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: "#202523",
+    borderWidth: 1,
+    borderColor: "#343b36",
+    gap: 9,
+  },
+  routeCardHeading: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  routeStatus: { color: "#fbbf24", fontSize: 12, fontWeight: "800" },
+  routeStopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#2d342f",
+  },
+  routeStopNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#263b55",
+    color: "#b7d6ff",
+    textAlign: "center",
+    lineHeight: 24,
+    fontSize: 12,
+    fontWeight: "800",
   },
   tenantAccent: { height: 5, borderRadius: 999, width: 70, marginBottom: 4 },
 });
