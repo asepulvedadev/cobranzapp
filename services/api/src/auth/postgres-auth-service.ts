@@ -14,6 +14,7 @@ import type {
   AccountSession,
   AuthenticatedUser,
   AuthService,
+  MfaChallengeResult,
   MfaDisableResult,
   SecurityActivity,
   TenantRole,
@@ -91,6 +92,17 @@ type MfaCredentialRow = {
   mfa_last_used_counter: string | null;
 };
 
+type MfaChallengeRow = MfaCredentialRow & {
+  id: string;
+  user_id: string;
+  platform_role: "developer" | null;
+  attempts: number;
+  expires_at: Date;
+  used_at: Date | null;
+  user_agent: string | null;
+  ip_hash: Buffer | null;
+};
+
 async function verifyAndConsumeMfaCode(
   client: PoolClient,
   userId: string,
@@ -146,6 +158,48 @@ export function createPostgresAuthService(
           return null;
         }
 
+        if (row.mfa_enabled_at) {
+          const challengeToken = randomBytes(32).toString("base64url");
+          const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+          await client.query("SELECT set_config('app.user_id', $1, true)", [row.id]);
+          await client.query("SELECT set_config('app.platform_role', $1, true)", [
+            row.platform_role ?? "",
+          ]);
+          await client.query(
+            `UPDATE auth_mfa_challenges
+                SET used_at = now()
+              WHERE user_id = $1 AND used_at IS NULL`,
+            [row.id],
+          );
+          const challenge = await client.query<{ id: string }>(
+            `INSERT INTO auth_mfa_challenges
+               (user_id, token_hash, expires_at, user_agent, ip_hash)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING id`,
+            [
+              row.id,
+              hashToken(challengeToken),
+              expiresAt,
+              metadata.userAgent ?? null,
+              hashIp(metadata.ipAddress),
+            ],
+          );
+          const challengeId = challenge.rows[0]?.id;
+          if (!challengeId) throw new Error("MFA login did not create a challenge");
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id)
+             VALUES (NULL, $1, 'auth.mfa_challenge_created', 'auth_mfa_challenge', $2, $3)`,
+            [row.id, challengeId, metadata.requestId],
+          );
+          await client.query("COMMIT");
+          return {
+            status: "mfa_required",
+            challengeToken,
+            expiresAt: expiresAt.toISOString(),
+          } as const;
+        }
+
         const token = randomBytes(32).toString("base64url");
         const sessionResult = await client.query<{ id: string }>(
           `INSERT INTO auth_sessions
@@ -170,7 +224,107 @@ export function createPostgresAuthService(
           [row.id, sessionId, metadata.requestId],
         );
         await client.query("COMMIT");
-        return { token, user };
+        return { status: "authenticated", token, user } as const;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async verifyMfaChallenge(challengeToken, code, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const result = await client.query<MfaChallengeRow>(
+          `SELECT challenge.id, challenge.user_id, challenge.attempts, challenge.expires_at,
+                  challenge.used_at, challenge.user_agent, challenge.ip_hash,
+                  users.platform_role, users.mfa_secret_encrypted, users.mfa_enabled_at,
+                  users.mfa_setup_expires_at, users.mfa_last_used_counter
+             FROM auth_mfa_challenges challenge
+             JOIN users ON users.id = challenge.user_id AND users.status = 'active'
+            WHERE challenge.token_hash = $1
+            FOR UPDATE OF challenge, users`,
+          [hashToken(challengeToken)],
+        );
+        const challenge = result.rows[0];
+        if (!challenge || challenge.used_at) {
+          await client.query("ROLLBACK");
+          return { status: "invalid" } satisfies MfaChallengeResult;
+        }
+        if (challenge.expires_at <= new Date()) {
+          await client.query("ROLLBACK");
+          return { status: "expired" } satisfies MfaChallengeResult;
+        }
+        if (challenge.attempts >= 5) {
+          await client.query("ROLLBACK");
+          return { status: "locked" } satisfies MfaChallengeResult;
+        }
+        await client.query("SELECT set_config('app.user_id', $1, true)", [challenge.user_id]);
+        await client.query("SELECT set_config('app.platform_role', $1, true)", [
+          challenge.platform_role ?? "",
+        ]);
+        const valid = await verifyAndConsumeMfaCode(
+          client,
+          challenge.user_id,
+          challenge,
+          code,
+          mfaEncryptionKey,
+        );
+        if (!valid) {
+          const attempts = challenge.attempts + 1;
+          await client.query("UPDATE auth_mfa_challenges SET attempts = $2 WHERE id = $1", [
+            challenge.id,
+            attempts,
+          ]);
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id)
+             VALUES (NULL, $1, $2, 'auth_mfa_challenge', $3, $4)`,
+            [
+              challenge.user_id,
+              attempts >= 5 ? "auth.mfa_login_locked" : "auth.mfa_login_failed",
+              challenge.id,
+              requestId,
+            ],
+          );
+          await client.query("COMMIT");
+          return {
+            status: attempts >= 5 ? "locked" : "invalid",
+          } satisfies MfaChallengeResult;
+        }
+        await client.query("UPDATE auth_mfa_challenges SET used_at = now() WHERE id = $1", [
+          challenge.id,
+        ]);
+        const token = randomBytes(32).toString("base64url");
+        const session = await client.query<{ id: string }>(
+          `INSERT INTO auth_sessions
+             (user_id, token_hash, expires_at, user_agent, ip_hash, reauthenticated_at)
+           VALUES ($1, $2, now() + make_interval(hours => $3), $4, $5, now())
+           RETURNING id`,
+          [
+            challenge.user_id,
+            hashToken(token),
+            sessionTtlHours,
+            challenge.user_agent,
+            challenge.ip_hash,
+          ],
+        );
+        const user = await loadUser(client, challenge.user_id);
+        const sessionId = session.rows[0]?.id;
+        if (!user || !sessionId) throw new Error("MFA login did not create a complete session");
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES
+             (NULL, $1, 'auth.login_succeeded', 'auth_session', $2, $3,
+              jsonb_build_object('method', 'totp')),
+             (NULL, $1, 'auth.mfa_login_succeeded', 'auth_session', $2, $3, '{}'::jsonb)`,
+          [challenge.user_id, sessionId, requestId],
+        );
+        await client.query("COMMIT");
+        return { status: "authenticated", token, user } satisfies MfaChallengeResult;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;

@@ -64,7 +64,16 @@ function dependencies(overrides?: {
   supportAccessService?: Partial<SupportAccessService>;
 }) {
   const authService: AuthService = {
-    login: vi.fn(async () => ({ token: "session-token", user: developer })),
+    login: vi.fn(async () => ({
+      status: "authenticated",
+      token: "session-token",
+      user: developer,
+    })),
+    verifyMfaChallenge: vi.fn(async () => ({
+      status: "authenticated",
+      token: "mfa-session-token",
+      user: { ...developer, mfaEnabled: true },
+    })),
     authenticate: vi.fn(async () => developer),
     logout: vi.fn(async () => undefined),
     reauthenticate: vi.fn(async () => true),
@@ -392,6 +401,55 @@ describe("authentication", () => {
     });
     expect(response.statusCode).toBe(403);
     expect(response.json()).toMatchObject({ error: { code: "ORIGIN_NOT_ALLOWED" } });
+  });
+
+  it("requires and verifies MFA before issuing a session", async () => {
+    const deps = dependencies({
+      authService: {
+        login: vi.fn(async () => ({
+          status: "mfa_required",
+          challengeToken: "challenge-token",
+          expiresAt: "2026-10-11T00:05:00.000Z",
+        })),
+      },
+    });
+    const app = buildApp(deps);
+    apps.push(app);
+    const login = await app.inject({
+      method: "POST",
+      url: "/v1/auth/login",
+      headers: { origin: "https://cobranzaap.tech" },
+      payload: { identifier: "desarrollador", password: "correct-password" },
+    });
+    expect(login.statusCode).toBe(202);
+    expect(login.json()).toEqual({
+      mfaRequired: true,
+      expiresAt: "2026-10-11T00:05:00.000Z",
+    });
+    expect(login.headers["set-cookie"]).toContain("cobranzapp_mfa_challenge=challenge-token");
+    expect(login.headers["set-cookie"]).not.toContain("cobranzapp_session=");
+
+    const verified = await app.inject({
+      method: "POST",
+      url: "/v1/auth/mfa/verify-login",
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_mfa_challenge=challenge-token",
+      },
+      payload: { code: "123456" },
+    });
+    expect(verified.statusCode).toBe(200);
+    expect(verified.headers["set-cookie"]).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("cobranzapp_session=mfa-session-token"),
+        expect.stringContaining("cobranzapp_mfa_challenge=;"),
+      ]),
+    );
+    expect(deps.authService.verifyMfaChallenge).toHaveBeenCalledWith(
+      "challenge-token",
+      "123456",
+      expect.any(String),
+    );
   });
 
   it("does not reveal which credential is incorrect", async () => {

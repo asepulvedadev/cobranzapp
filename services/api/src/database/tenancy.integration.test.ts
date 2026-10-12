@@ -205,6 +205,54 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       `mfa-already-confirmed-${suffix}`,
     );
     expect(enabledResult).toEqual({ status: "already_enabled" });
+    const lockedChallenge = await auth.login(`developer-${suffix}@example.com`, password, {
+      requestId: `mfa-lock-${suffix}`,
+    });
+    if (lockedChallenge?.status !== "mfa_required") {
+      throw new Error("MFA lock challenge was not created");
+    }
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      await expect(
+        auth.verifyMfaChallenge(
+          lockedChallenge.challengeToken,
+          "000000",
+          `mfa-lock-${attempt}-${suffix}`,
+        ),
+      ).resolves.toEqual({ status: attempt === 5 ? "locked" : "invalid" });
+    }
+    await expect(
+      auth.verifyMfaChallenge(
+        lockedChallenge.challengeToken,
+        generateMfaToken(enrollment.secret, Date.now() + 30_000),
+        `mfa-locked-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "locked" });
+    const challenged = await auth.login(`developer-${suffix}@example.com`, password, {
+      requestId: `mfa-login-${suffix}`,
+      userAgent: "MFA Integration Browser",
+    });
+    expect(challenged).toMatchObject({ status: "mfa_required" });
+    if (challenged?.status !== "mfa_required") {
+      throw new Error("MFA login challenge was not created");
+    }
+    const verified = await auth.verifyMfaChallenge(
+      challenged.challengeToken,
+      generateMfaToken(enrollment.secret, Date.now() + 30_000),
+      `mfa-verified-${suffix}`,
+    );
+    expect(verified).toMatchObject({ status: "authenticated" });
+    if (verified.status !== "authenticated") throw new Error("MFA challenge was not verified");
+    await expect(auth.authenticate(verified.token)).resolves.toMatchObject({
+      id: developerId,
+      mfaEnabled: true,
+    });
+    await expect(
+      auth.verifyMfaChallenge(
+        challenged.challengeToken,
+        generateMfaToken(enrollment.secret, Date.now() + 60_000),
+        `mfa-reused-${suffix}`,
+      ),
+    ).resolves.toEqual({ status: "invalid" });
     await expect(
       auth.disableMfa(
         developerId,
@@ -228,7 +276,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     const platform = createPostgresPlatformService(runtimePool);
     const supportAccess = createPostgresSupportAccessService(runtimePool);
     await expect(platform.systemStatus(developerId)).resolves.toMatchObject({
-      schemaVersion: "0014_totp_mfa_credentials.sql",
+      schemaVersion: "0015_mfa_login_challenges.sql",
       jobs: {
         status: expect.stringMatching(/^(operational|attention)$/),
         due: expect.any(Number),

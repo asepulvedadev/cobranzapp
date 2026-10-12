@@ -62,12 +62,27 @@ export type MfaDisableResult =
   | { status: "not_enabled" }
   | { status: "not_found" };
 
+export type LoginResult =
+  | { status: "authenticated"; token: string; user: AuthenticatedUser }
+  | { status: "mfa_required"; challengeToken: string; expiresAt: string };
+
+export type MfaChallengeResult =
+  | { status: "authenticated"; token: string; user: AuthenticatedUser }
+  | { status: "invalid" }
+  | { status: "expired" }
+  | { status: "locked" };
+
 export interface AuthService {
   login(
     identifier: string,
     password: string,
     metadata: SessionMetadata,
-  ): Promise<{ token: string; user: AuthenticatedUser } | null>;
+  ): Promise<LoginResult | null>;
+  verifyMfaChallenge(
+    challengeToken: string,
+    code: string,
+    requestId: string,
+  ): Promise<MfaChallengeResult>;
   authenticate(token: string): Promise<AuthenticatedUser | null>;
   logout(token: string, requestId: string): Promise<void>;
   reauthenticate(

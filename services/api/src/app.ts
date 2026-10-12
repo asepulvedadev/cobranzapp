@@ -9,6 +9,7 @@ import type { SupportAccessService } from "./support-access/types.js";
 import type { TenancyService } from "./tenancy/types.js";
 
 const sessionCookieName = "cobranzapp_session";
+const mfaChallengeCookieName = "cobranzapp_mfa_challenge";
 const loginSchema = z.object({
   identifier: z.string().trim().min(3).max(254),
   password: z.string().min(12).max(256),
@@ -159,6 +160,14 @@ function sessionCookie(token: string, secure: boolean, maxAgeSeconds: number) {
 
 function expiredSessionCookie(secure: boolean) {
   return `${sessionCookieName}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure ? "; Secure" : ""}`;
+}
+
+function mfaChallengeCookie(token: string, secure: boolean) {
+  return `${mfaChallengeCookieName}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=300${secure ? "; Secure" : ""}`;
+}
+
+function expiredMfaChallengeCookie(secure: boolean) {
+  return `${mfaChallengeCookieName}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure ? "; Secure" : ""}`;
 }
 
 export function buildApp(dependencies: AppDependencies) {
@@ -325,7 +334,76 @@ export function buildApp(dependencies: AppDependencies) {
       );
     }
     loginRateLimiter.clear(limiterKey);
+    if (result.status === "mfa_required") {
+      reply.header("set-cookie", mfaChallengeCookie(result.challengeToken, secureCookies));
+      reply.header("cache-control", "no-store");
+      return reply.code(202).send({ mfaRequired: true, expiresAt: result.expiresAt });
+    }
     reply.header("set-cookie", sessionCookie(result.token, secureCookies, sessionMaxAgeSeconds));
+    return reply.send({ user: result.user });
+  });
+
+  app.post("/v1/auth/mfa/verify-login", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const parsed = mfaCodeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return sendError(
+        reply,
+        400,
+        "MFA_CODE_INVALID",
+        "Escribe un código válido de autenticación o recuperación.",
+        request.id,
+      );
+    }
+    const challengeToken = parseCookies(request.headers.cookie).get(mfaChallengeCookieName);
+    if (!challengeToken) {
+      return sendError(
+        reply,
+        401,
+        "MFA_CHALLENGE_REQUIRED",
+        "Inicia sesión nuevamente para verificar tu identidad.",
+        request.id,
+      );
+    }
+    const result = await dependencies.authService.verifyMfaChallenge(
+      challengeToken,
+      parsed.data.code,
+      request.id,
+    );
+    if (result.status === "invalid") {
+      return sendError(
+        reply,
+        401,
+        "MFA_CODE_INVALID",
+        "El código no es válido o ya fue utilizado.",
+        request.id,
+      );
+    }
+    if (result.status === "expired") {
+      reply.header("set-cookie", expiredMfaChallengeCookie(secureCookies));
+      return sendError(
+        reply,
+        410,
+        "MFA_CHALLENGE_EXPIRED",
+        "La verificación venció. Inicia sesión nuevamente.",
+        request.id,
+      );
+    }
+    if (result.status === "locked") {
+      reply.header("set-cookie", expiredMfaChallengeCookie(secureCookies));
+      return sendError(
+        reply,
+        429,
+        "MFA_CHALLENGE_LOCKED",
+        "Agotaste los intentos. Inicia sesión nuevamente.",
+        request.id,
+      );
+    }
+    reply.header("set-cookie", [
+      sessionCookie(result.token, secureCookies, sessionMaxAgeSeconds),
+      expiredMfaChallengeCookie(secureCookies),
+    ]);
+    reply.header("cache-control", "no-store");
     return reply.send({ user: result.user });
   });
 
