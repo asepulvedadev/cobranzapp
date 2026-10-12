@@ -377,11 +377,17 @@ function TenantHome({
     ["Sedes", overview.metrics.branches],
     ["Equipos", overview.metrics.teams],
     ["Invitaciones", overview.metrics.pendingInvitations],
-    ...(directory ? [["Clientes", directory.pagination.total] as const] : []),
+    ...(directory
+      ? [
+          ["Clientes activos", directory.borrowerSummary.active] as const,
+          ["Clientes archivados", directory.borrowerSummary.archived] as const,
+        ]
+      : []),
     ...(directory
       ? [
           ["Identidades pendientes", directory.identitySummary.pending] as const,
           ["Identidades revisadas", directory.identitySummary.reviewed] as const,
+          ["Identidades rechazadas", directory.identitySummary.rejected] as const,
         ]
       : []),
   ] as const;
