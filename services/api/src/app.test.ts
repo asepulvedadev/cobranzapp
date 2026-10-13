@@ -1,4 +1,4 @@
-import type { Route } from "@cobranzapp/contracts";
+import type { LoanProduct, Route } from "@cobranzapp/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "./app.js";
 import type { AuthenticatedUser, AuthService } from "./auth/types.js";
@@ -600,6 +600,110 @@ describe("loan application review queue", () => {
     expect(response.statusCode).toBe(403);
     expect(response.json()).toMatchObject({ error: { code: "SCOPE_DENIED" } });
     expect(startApplicationReview).not.toHaveBeenCalled();
+  });
+});
+
+describe("loan product configuration permissions", () => {
+  const product: LoanProduct = {
+    id: "56d33f0e-b1a8-4a55-9061-2ccf283ce0f5",
+    name: "Crédito estándar",
+    status: "draft",
+    currency: "COP",
+    principalMin: "1.00",
+    principalMax: "100000.00",
+    termCount: 30,
+    paymentFrequency: "daily",
+    rateBasis: "flat_total",
+    nominalRate: "10.00",
+    documentationFeeRate: "0.00",
+    complianceStatus: "pending",
+    complianceSourceRef: "configuracion-automatica",
+    createdAt: "2026-10-11T00:00:00.000Z",
+    updatedAt: "2026-10-11T00:00:00.000Z",
+  };
+
+  it("blocks supervisors from changing the owner financial rule", async () => {
+    const supervisor: AuthenticatedUser = {
+      ...tenantOwner,
+      id: "8b8f4a23-3207-497f-a4b6-778cb8f4d1d0",
+      memberships: [{ ...tenantOwner.memberships[0], role: "supervisor" }],
+    };
+    const createProduct = vi.fn();
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => supervisor) },
+        creditService: { createProduct } as unknown as CreditService,
+      }),
+    );
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/loan-products",
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+      },
+      payload: {
+        name: "Crédito estándar",
+        principalMin: "1",
+        principalMax: "100000",
+        termCount: 30,
+        paymentFrequency: "daily",
+        rateBasis: "flat_total",
+        nominalRate: "10",
+        documentationFeeRate: "0",
+        complianceSourceRef: "configuracion-automatica",
+      },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({
+      error: {
+        code: "SCOPE_DENIED",
+        message: "Solo el propietario puede configurar productos de crédito.",
+      },
+    });
+    expect(createProduct).not.toHaveBeenCalled();
+  });
+
+  it("allows the owner to create the financial rule", async () => {
+    const createProduct = vi.fn(async () => ({ status: "created" as const, product }));
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => tenantOwner) },
+        creditService: { createProduct } as unknown as CreditService,
+      }),
+    );
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/loan-products",
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+      },
+      payload: {
+        name: "Crédito estándar",
+        principalMin: "1",
+        principalMax: "100000",
+        termCount: 30,
+        paymentFrequency: "daily",
+        rateBasis: "flat_total",
+        nominalRate: "10",
+        documentationFeeRate: "0",
+        complianceSourceRef: "configuracion-automatica",
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual({ product });
+    expect(createProduct).toHaveBeenCalledWith(
+      {
+        userId: tenantOwner.id,
+        platformRole: null,
+        tenantRole: "owner",
+      },
+      "5c58269f-ce16-4250-82e2-c0c16621b0fb",
+      expect.objectContaining({ principalMax: "100000", nominalRate: "10" }),
+    );
   });
 });
 

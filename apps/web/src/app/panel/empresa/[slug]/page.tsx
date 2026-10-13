@@ -312,7 +312,12 @@ export default async function TenantDashboard({
 
       {loanProducts ? (
         overview.actorRole === "owner" || overview.actorRole === "supervisor" ? (
-          <CreditProductCatalog products={loanProducts} tenantId={overview.tenant.id} />
+          <CreditProductCatalog
+            canConfigure={overview.actorRole === "owner"}
+            canReview={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
+            products={loanProducts}
+            tenantId={overview.tenant.id}
+          />
         ) : null
       ) : null}
 

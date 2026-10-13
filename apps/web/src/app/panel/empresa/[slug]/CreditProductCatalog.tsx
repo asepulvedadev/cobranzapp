@@ -35,9 +35,13 @@ async function errorMessage(response: Response | null) {
 }
 
 export function CreditProductCatalog({
+  canConfigure,
+  canReview,
   tenantId,
   products,
 }: {
+  canConfigure: boolean;
+  canReview: boolean;
   tenantId: string;
   products: LoanProduct[];
 }) {
@@ -152,9 +156,9 @@ export function CreditProductCatalog({
                   </dd>
                 </div>
               </dl>
-              {product.status === "draft" ? (
+              {product.status === "draft" && (canReview || canConfigure) ? (
                 <div className="credit-product-review-actions">
-                  {product.complianceSourceRef ? (
+                  {canReview && product.complianceSourceRef ? (
                     <button
                       disabled={reviewingProductId !== null}
                       onClick={() => void submitForReview(product)}
@@ -167,7 +171,9 @@ export function CreditProductCatalog({
                       Agrega una referencia normativa para habilitar la revisión.
                     </small>
                   )}
-                  <LoanProductDraftEditor product={product} tenantId={tenantId} />
+                  {canConfigure ? (
+                    <LoanProductDraftEditor product={product} tenantId={tenantId} />
+                  ) : null}
                 </div>
               ) : null}
               <LoanSchedulePreview product={product} tenantId={tenantId} />
@@ -175,38 +181,44 @@ export function CreditProductCatalog({
           ))}
         </div>
       ) : null}
-      <form className="tenant-form credit-product-form" onSubmit={submit}>
-        <h3>Regla de crédito</h3>
-        <p className="form-help">Solo debes indicar el monto máximo y el porcentaje de interés.</p>
-        <label>
-          Monto máximo por crédito (COP)
-          <input
-            inputMode="decimal"
-            name="principalMax"
-            pattern="[0-9]+(\\.[0-9]{1,2})?"
-            required
-          />
-        </label>
-        <div className="borrower-form-row">
+      {canConfigure ? (
+        <form className="tenant-form credit-product-form" onSubmit={submit}>
+          <h3>Regla de crédito</h3>
+          <p className="form-help">
+            Solo debes indicar el monto máximo y el porcentaje de interés.
+          </p>
           <label>
-            Porcentaje de interés total
+            Monto máximo por crédito (COP)
             <input
               inputMode="decimal"
-              name="nominalRate"
-              pattern="[0-9]+(\\.[0-9]{1,8})?"
+              name="principalMax"
+              pattern="[0-9]+(\\.[0-9]{1,2})?"
               required
             />
           </label>
-        </div>
-        {message ? (
-          <p className={`tenant-form-message${isError ? " form-message-error" : ""}`} role="status">
-            {message}
-          </p>
-        ) : null}
-        <button disabled={isBusy} type="submit">
-          {isBusy ? "Guardando…" : "Guardar regla"}
-        </button>
-      </form>
+          <div className="borrower-form-row">
+            <label>
+              Porcentaje de interés total
+              <input
+                inputMode="decimal"
+                name="nominalRate"
+                pattern="[0-9]+(\\.[0-9]{1,8})?"
+                required
+              />
+            </label>
+          </div>
+          <button disabled={isBusy} type="submit">
+            {isBusy ? "Guardando…" : "Guardar regla"}
+          </button>
+        </form>
+      ) : (
+        <p className="operational-note">Solo el propietario puede ajustar monto y porcentaje.</p>
+      )}
+      {message ? (
+        <p className={`tenant-form-message${isError ? " form-message-error" : ""}`} role="status">
+          {message}
+        </p>
+      ) : null}
     </section>
   );
 }

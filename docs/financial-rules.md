@@ -49,7 +49,9 @@ Use configurable, jurisdiction-approved products rather than hardcoding 10% or 3
 
 ## Configurable owner preview
 
-The owner or supervisor can adjust a product while it is still a draft. The catalog supports:
+Only the owner can create or adjust a product while it is still a draft. Supervisors and collectors
+can read the catalog and use its non-binding schedule preview; owner and supervisor can submit a
+draft for review. The catalog supports:
 
 - Daily, weekly, fortnightly and monthly due dates.
 - Flat total interest, simple interest per period on the opening balance, or effective annual interest converted to the selected frequency.

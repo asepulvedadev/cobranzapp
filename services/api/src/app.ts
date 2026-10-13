@@ -4107,12 +4107,12 @@ export function buildApp(dependencies: AppDependencies) {
     const membership = session.user.memberships.find(
       (item) => item.tenantId === params.data.tenantId,
     );
-    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+    if (membership?.role !== "owner") {
       return sendError(
         reply,
         403,
         "SCOPE_DENIED",
-        "No puedes crear productos de crédito.",
+        "Solo el propietario puede configurar productos de crédito.",
         request.id,
       );
     }
@@ -4140,7 +4140,7 @@ export function buildApp(dependencies: AppDependencies) {
         reply,
         403,
         "SCOPE_DENIED",
-        "No puedes crear productos de crédito.",
+        "Solo el propietario puede configurar productos de crédito.",
         request.id,
       );
     }
@@ -4174,12 +4174,12 @@ export function buildApp(dependencies: AppDependencies) {
     const membership = session.user.memberships.find(
       (item) => item.tenantId === params.data.tenantId,
     );
-    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+    if (membership?.role !== "owner") {
       return sendError(
         reply,
         403,
         "SCOPE_DENIED",
-        "Solo propietarios y supervisores pueden ajustar productos.",
+        "Solo el propietario puede ajustar productos.",
         request.id,
       );
     }

@@ -50,11 +50,11 @@ type LoanApplicationRow = {
 };
 
 function canManageProducts(actor: TenantActor) {
-  return actor.tenantRole === "owner" || actor.tenantRole === "supervisor";
+  return actor.tenantRole === "owner";
 }
 
 function canReadProducts(actor: TenantActor) {
-  return canManageProducts(actor) || actor.tenantRole === "collector";
+  return ["owner", "supervisor", "collector"].includes(actor.tenantRole ?? "");
 }
 
 function canManageApplications(actor: TenantActor) {
