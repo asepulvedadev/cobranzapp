@@ -37,7 +37,7 @@ for _ in $(seq 1 30); do
 done
 docker exec "$container" pg_isready -U postgres -d postgres >/dev/null
 docker exec -i "$container" pg_restore \
-  --exit-on-error --no-owner --no-privileges --dbname=postgres < "$latest_dump"
+  --exit-on-error --no-owner --no-privileges --username=postgres --dbname=postgres < "$latest_dump"
 table_count=$(docker exec "$container" psql -U postgres -d postgres -Atc \
   "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';")
 if [[ ! "$table_count" =~ ^[1-9][0-9]*$ ]]; then
