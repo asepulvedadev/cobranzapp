@@ -106,7 +106,9 @@ function mapApplication(row: LoanApplicationRow): LoanApplication {
 const allowedTerms: Record<LoanApplication["paymentFrequency"], number[]> = {
   daily: [30, 35],
   weekly: [4, 5],
-  fortnightly: [2, 3],
+  // A standard month has two fortnightly installments. Three would create a
+  // six-week term, which is outside the one-month/exceptional-five-week rule.
+  fortnightly: [2],
   monthly: [1],
 };
 

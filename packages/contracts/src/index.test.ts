@@ -7,6 +7,7 @@ import {
   createBranchRequestSchema,
   createPlatformTenantRequestSchema,
   currentUserSchema,
+  loanProductCreateRequestSchema,
   loginRequestSchema,
   platformSystemStatusSchema,
   platformTenantDirectoryQuerySchema,
@@ -219,6 +220,32 @@ describe("shared API contracts", () => {
         consentConfirmed: true,
       }).success,
     ).toBe(true);
+  });
+
+  it("keeps the credit term at one month, with a five-week exception", () => {
+    const base = {
+      name: "Producto de prueba",
+      principalMin: "100000.00",
+      principalMax: "1000000.00",
+      rateBasis: "flat_total" as const,
+      nominalRate: "10",
+      documentationFeeRate: "0",
+      complianceSourceRef: null,
+    };
+    expect(
+      loanProductCreateRequestSchema.safeParse({
+        ...base,
+        paymentFrequency: "fortnightly",
+        termCount: 2,
+      }).success,
+    ).toBe(true);
+    expect(
+      loanProductCreateRequestSchema.safeParse({
+        ...base,
+        paymentFrequency: "fortnightly",
+        termCount: 3,
+      }).success,
+    ).toBe(false);
   });
 
   it("keeps borrower verification totals independent from the visible page", () => {
