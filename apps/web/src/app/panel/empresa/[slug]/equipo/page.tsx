@@ -128,7 +128,14 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
           </aside>
         ) : null}
       </div>
-      {canManage ? <MemberProfileDirectory members={overview.members} profiles={profiles} /> : null}
+      {canManage ? (
+        <MemberProfileDirectory
+          actorRole={overview.actorRole}
+          members={overview.members}
+          profiles={profiles}
+          tenantId={overview.tenant.id}
+        />
+      ) : null}
     </div>
   );
 }

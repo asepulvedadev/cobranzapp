@@ -1,4 +1,5 @@
 import type { TenantMemberProfile, TenantOverview } from "../../../../lib/platform";
+import { MemberProfileEditModal } from "./MemberProfileEditModal";
 
 const roleLabels: Record<TenantOverview["members"][number]["role"], string> = {
   owner: "Propietario",
@@ -24,9 +25,13 @@ const statusClasses: Record<TenantOverview["members"][number]["status"], string>
 export function MemberProfileDirectory({
   members,
   profiles,
+  actorRole,
+  tenantId,
 }: {
   members: TenantOverview["members"];
   profiles: TenantMemberProfile[];
+  actorRole: TenantOverview["actorRole"];
+  tenantId: string;
 }) {
   const profileByUserId = new Map(profiles.map((profile) => [profile.userId, profile]));
   const operationalMembers = members.filter((member) =>
@@ -61,54 +66,64 @@ export function MemberProfileDirectory({
                 </span>
               </div>
               {profile ? (
-                <dl>
-                  <div>
-                    <dt>Documento</dt>
-                    <dd>
-                      {profile.documentType && profile.documentLast4
-                        ? `${profile.documentType} · •••• ${profile.documentLast4}`
-                        : "Pendiente de registro"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Estado del documento</dt>
-                    <dd>
-                      {profile.documentVerificationState === "reviewed"
-                        ? "Revisado"
-                        : profile.documentVerificationState === "rejected"
-                          ? "Rechazado"
-                          : "Pendiente de revisión"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Celular</dt>
-                    <dd>{profile.phone ?? "Sin registrar"}</dd>
-                  </div>
-                  <div>
-                    <dt>Casa</dt>
-                    <dd>{profile.homeAddress ?? "Sin registrar"}</dd>
-                  </div>
-                  <div>
-                    <dt>Trabajo</dt>
-                    <dd>{profile.workAddress ?? "Sin registrar"}</dd>
-                  </div>
-                  <div>
-                    <dt>Tipo de sangre</dt>
-                    <dd>
-                      {profile.bloodType && profile.bloodTypeConsentVersion
-                        ? profile.bloodType
-                        : "No autorizado"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Emergencias</dt>
-                    <dd>{profile.emergencyContacts.length} contacto(s)</dd>
-                  </div>
-                  <div>
-                    <dt>Foto</dt>
-                    <dd>{profile.profilePhotoObjectKey ? "Privada registrada" : "Pendiente"}</dd>
-                  </div>
-                </dl>
+                <>
+                  <dl>
+                    <div>
+                      <dt>Documento</dt>
+                      <dd>
+                        {profile.documentType && profile.documentLast4
+                          ? `${profile.documentType} · •••• ${profile.documentLast4}`
+                          : "Pendiente de registro"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Estado del documento</dt>
+                      <dd>
+                        {profile.documentVerificationState === "reviewed"
+                          ? "Revisado"
+                          : profile.documentVerificationState === "rejected"
+                            ? "Rechazado"
+                            : "Pendiente de revisión"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Celular</dt>
+                      <dd>{profile.phone ?? "Sin registrar"}</dd>
+                    </div>
+                    <div>
+                      <dt>Casa</dt>
+                      <dd>{profile.homeAddress ?? "Sin registrar"}</dd>
+                    </div>
+                    <div>
+                      <dt>Trabajo</dt>
+                      <dd>{profile.workAddress ?? "Sin registrar"}</dd>
+                    </div>
+                    <div>
+                      <dt>Tipo de sangre</dt>
+                      <dd>
+                        {profile.bloodType && profile.bloodTypeConsentVersion
+                          ? profile.bloodType
+                          : "No autorizado"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Emergencias</dt>
+                      <dd>{profile.emergencyContacts.length} contacto(s)</dd>
+                    </div>
+                    <div>
+                      <dt>Foto</dt>
+                      <dd>{profile.profilePhotoObjectKey ? "Privada registrada" : "Pendiente"}</dd>
+                    </div>
+                  </dl>
+                  {actorRole === "owner" ||
+                  (actorRole === "supervisor" && member.role !== "owner") ? (
+                    <MemberProfileEditModal
+                      displayName={member.displayName}
+                      profile={profile}
+                      tenantId={tenantId}
+                    />
+                  ) : null}
+                </>
               ) : (
                 <p className="structure-empty">La persona aún no completa su ficha.</p>
               )}
