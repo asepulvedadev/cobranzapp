@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { MobileApi, MobileApiError } from "./src/api";
 import { BorrowerAddressControl } from "./src/BorrowerAddressControl";
+import { BorrowerAddressEditor } from "./src/BorrowerAddressEditor";
 import { BorrowerCreateForm } from "./src/BorrowerCreateForm";
 import { BorrowerOcrControl } from "./src/BorrowerOcrControl";
 import { CreditWorkspace } from "./src/CreditWorkspace";
@@ -526,6 +527,13 @@ function TenantClients({
                   tenantId={tenantId}
                 />
                 <BorrowerAddressControl
+                  api={api}
+                  borrower={borrower}
+                  onNeedsReauthentication={onNeedsReauthentication}
+                  onUpdated={onBorrowerCreated}
+                  tenantId={tenantId}
+                />
+                <BorrowerAddressEditor
                   api={api}
                   borrower={borrower}
                   onNeedsReauthentication={onNeedsReauthentication}

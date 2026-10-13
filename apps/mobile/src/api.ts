@@ -1,5 +1,6 @@
 import {
   authenticatedResponseSchema,
+  type BorrowerAddressUpdateRequest,
   type BorrowerCreateRequest,
   type BorrowerDirectory,
   borrowerDirectorySchema,
@@ -442,6 +443,28 @@ export class MobileApi {
     if (!response.ok) {
       throw new MobileApiError(
         await apiError(response, "No fue posible ubicar la dirección."),
+        response.status,
+      );
+    }
+    return borrowerResponseSchema.parse(await response.json()).borrower;
+  }
+
+  async updateBorrowerAddresses(
+    tenantId: string,
+    borrowerId: string,
+    input: BorrowerAddressUpdateRequest,
+  ) {
+    const response = await this.request(
+      `/v1/tenants/${tenantId}/borrowers/${borrowerId}/addresses`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    );
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible guardar las direcciones."),
         response.status,
       );
     }
