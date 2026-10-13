@@ -15,6 +15,7 @@
   "dependencies": {
     "@cobranzapp/contracts": "workspace:*",
     "expo": "~57.0.27",
+    "expo-contacts": "~57.0.7",
     "expo-image-picker": "~57.0.20",
     "expo-location": "~19.0.8",
     "expo-secure-store": "~15.0.8",

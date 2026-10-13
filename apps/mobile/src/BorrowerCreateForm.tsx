@@ -1,7 +1,8 @@
 import { borrowerCreateRequestSchema } from "@cobranzapp/contracts";
+import { Contact, ContactField, requestPermissionsAsync } from "expo-contacts";
 import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import type { MobileApi } from "./api";
 import { MobileApiError } from "./api";
 
@@ -114,6 +115,39 @@ export function BorrowerCreateForm({
       type: asset.mimeType ?? "image/jpeg",
       file: asset.file,
     });
+  }
+
+  async function pickDeviceContact() {
+    setMessage("");
+    if (Platform.OS === "web") {
+      setMessage("La agenda del dispositivo solo está disponible en la aplicación móvil.");
+      return;
+    }
+    try {
+      const permission = await requestPermissionsAsync();
+      if (!permission.granted) {
+        setMessage("Permite el acceso a un contacto para cargar su nombre y teléfono.");
+        return;
+      }
+      const contact = await Contact.presentPicker();
+      if (!contact) return;
+      const details = await contact.getDetails([ContactField.FULL_NAME] as const);
+      const phones = await contact.getPhones();
+      const selectedPhone = phones.find((item) => item.number?.trim())?.number?.trim();
+      const selectedName = details.fullName?.trim();
+      if (selectedName) setFullName(selectedName);
+      if (selectedPhone) {
+        setPhone(selectedPhone);
+        setWhatsappPhone(selectedPhone);
+      }
+      if (!selectedName && !selectedPhone) {
+        setMessage("El contacto no tiene nombre ni teléfono guardado.");
+      }
+    } catch {
+      setMessage(
+        "No fue posible consultar la agenda. También puedes escribir los datos manualmente.",
+      );
+    }
   }
 
   function stepError(stepToValidate: number) {
@@ -404,6 +438,9 @@ export function BorrowerCreateForm({
               {step === 2 ? (
                 <>
                   <Text style={styles.sectionTitle}>Contacto y direcciones</Text>
+                  <Pressable onPress={() => void pickDeviceContact()} style={styles.contactButton}>
+                    <Text style={styles.contactButtonText}>Usar contacto del dispositivo</Text>
+                  </Pressable>
                   <Text style={styles.label}>Celular</Text>
                   <TextInput
                     keyboardType="phone-pad"
@@ -722,6 +759,16 @@ const styles = {
   },
   imageButtonText: { color: "#f6f7f5", fontSize: 14, fontWeight: "700" as const },
   imageActions: { flexDirection: "row" as const, gap: 8, alignItems: "center" as const },
+  contactButton: {
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#fbbf24",
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    paddingHorizontal: 12,
+  },
+  contactButtonText: { color: "#fbbf24", fontWeight: "800" as const, fontSize: 13 },
   cameraButton: {
     minHeight: 46,
     borderRadius: 12,

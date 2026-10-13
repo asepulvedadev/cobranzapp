@@ -42,6 +42,12 @@
           "photosPermission": "Permite a cobranzapp seleccionar documentos y fotos de perfil para el expediente del cliente.",
           "cameraPermission": "Permite a cobranzapp tomar fotos del documento y de la foto de perfil del cliente."
         }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Permite a cobranzapp usar un contacto que selecciones para completar los datos del cliente."
+        }
       ]
     ]
   }
