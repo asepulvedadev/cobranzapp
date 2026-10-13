@@ -16,6 +16,7 @@ export type {
   PlatformUserDirectory,
   Route,
   SecurityActivity,
+  SharedClientVerification,
   SupportAccessRecord,
   TenantMemberProfile,
   TenantOverview,

@@ -9,26 +9,17 @@ import type {
   LoanProduct,
   Route,
   SupportAccessRecord,
-  TenantMemberProfile,
   TenantOverview,
 } from "../../../../lib/platform";
 import { serverApi } from "../../../../lib/server-api";
 import { ActivityFeed } from "../../ActivityFeed";
-import { BorrowerDirectory as BorrowerDirectoryView } from "./BorrowerDirectory";
 import { CollectionRouteBoard } from "./CollectionRouteBoard";
 import { CreditProductCatalog } from "./CreditProductCatalog";
 import { CustomerWorkspace } from "./CustomerWorkspace";
 import { LoanApplicationBoard } from "./LoanApplicationBoard";
 import { MemberAccessControl } from "./MemberAccessControl";
-import { MemberProfileDirectory } from "./MemberProfileDirectory";
-import { MemberProfileForm } from "./MemberProfileForm";
-import { OrganizationStatusButton } from "./OrganizationStatusButton";
-import { SettingsVersionHistory } from "./SettingsVersionHistory";
 import { SupportAccessReview } from "./SupportAccessReview";
-import { TeamAssignmentManager } from "./TeamAssignmentManager";
-import { VerificationNetworkPanel } from "./VerificationNetworkPanel";
 import { WorkspaceMembershipSummary } from "./WorkspaceMembershipSummary";
-import { CreateBranchForm, CreateTeamForm, WorkspaceSettingsForm } from "./WorkspaceOperations";
 
 export const metadata: Metadata = { title: "Espacio empresarial" };
 
@@ -92,20 +83,11 @@ export default async function TenantDashboard({
   if (!response.ok) throw new Error("No fue posible cargar la empresa");
   const overview = (await response.json()) as TenantOverview;
   const canSeeTeam = overview.actorRole === "owner" || overview.actorRole === "supervisor";
-  let memberProfile: TenantMemberProfile | null = null;
-  let memberProfiles: TenantMemberProfile[] = [];
   let loanProducts: LoanProduct[] | null = null;
   let loanApplications: LoanApplication[] | null = null;
   let borrowerDirectory: BorrowerDirectory | null = null;
   let routes: Route[] | null = null;
   if (overview.actorRole !== "customer" && overview.actorRole !== "support") {
-    const profileResponse = await serverApi(
-      `/v1/tenants/${membership.tenantId}/members/${user.id}/profile`,
-    );
-    if (!profileResponse.ok) throw new Error("No fue posible cargar tu ficha operativa");
-    ({ profile: memberProfile } = (await profileResponse.json()) as {
-      profile: TenantMemberProfile;
-    });
     const borrowerQuery = new URLSearchParams({ page: String(borrowerPage), pageSize: "20" });
     if (borrowerSearch) borrowerQuery.set("q", borrowerSearch);
     const borrowersResponse = await serverApi(
@@ -113,24 +95,6 @@ export default async function TenantDashboard({
     );
     if (borrowersResponse.ok) {
       borrowerDirectory = (await borrowersResponse.json()) as BorrowerDirectory;
-    }
-    if (canSeeTeam) {
-      const profileResponses = await Promise.all(
-        overview.members
-          .filter((member) => ["owner", "supervisor", "collector"].includes(member.role))
-          .map((member) =>
-            serverApi(`/v1/tenants/${membership.tenantId}/members/${member.userId}/profile`),
-          ),
-      );
-      memberProfiles = (
-        await Promise.all(
-          profileResponses.map(async (profileResponse) => {
-            if (!profileResponse.ok) return null;
-            const body = (await profileResponse.json()) as { profile: TenantMemberProfile };
-            return body.profile;
-          }),
-        )
-      ).filter((profile): profile is TenantMemberProfile => profile !== null);
     }
     if (["owner", "supervisor", "collector"].includes(overview.actorRole)) {
       const routesResponse = await serverApi(`/v1/tenants/${membership.tenantId}/routes`);
@@ -192,14 +156,14 @@ export default async function TenantDashboard({
       {overview.actorRole === "collector" ? (
         <section aria-label="Alcance asignado" className="metric-grid tenant-metrics">
           <article>
-            <span>Sedes asignadas</span>
-            <strong>{overview.metrics.branches}</strong>
-            <small>Solo las vinculadas a tus equipos</small>
+            <span>Clientes asignados</span>
+            <strong>{borrowerDirectory?.borrowerSummary.active ?? 0}</strong>
+            <small>Registros disponibles para tu operación</small>
           </article>
           <article>
-            <span>Equipos asignados</span>
-            <strong>{overview.metrics.teams}</strong>
-            <small>Alcance operativo vigente</small>
+            <span>Rol operativo</span>
+            <strong>Cobrador</strong>
+            <small>Consulta clientes y verifica cédulas</small>
           </article>
           <article>
             <span>Perfil</span>
@@ -353,10 +317,6 @@ export default async function TenantDashboard({
         )}
       </div>
 
-      {canSeeTeam ? (
-        <MemberProfileDirectory members={overview.members} profiles={memberProfiles} />
-      ) : null}
-
       {loanProducts ? (
         overview.actorRole === "owner" || overview.actorRole === "supervisor" ? (
           <CreditProductCatalog products={loanProducts} tenantId={overview.tenant.id} />
@@ -386,149 +346,6 @@ export default async function TenantDashboard({
         />
       ) : null}
 
-      {borrowerDirectory ? (
-        <section className="dashboard-card borrower-directory-card" id="clientes">
-          <BorrowerDirectoryView
-            canCreate={false}
-            canReview={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
-            directory={borrowerDirectory}
-            search={borrowerSearch}
-            tenantSlug={slug}
-            tenantId={overview.tenant.id}
-          />
-        </section>
-      ) : (
-        <section className="dashboard-card borrower-directory-card" id="clientes">
-          <span className="panel-eyebrow">Cartera</span>
-          <h2>Clientes</h2>
-          <p className="operational-note">
-            El módulo de clientes está pendiente de configurar su clave privada de protección.
-          </p>
-        </section>
-      )}
-
-      {overview.actorRole !== "support" ? (
-        <VerificationNetworkPanel
-          canPublish={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
-          tenantId={overview.tenant.id}
-        />
-      ) : null}
-
-      <section className="workspace-configuration" id="configuracion">
-        <div className="dashboard-card settings-card">
-          <div className="card-heading">
-            <div>
-              <span className="panel-eyebrow">Datos operativos</span>
-              <h2>Configuración de la empresa</h2>
-            </div>
-          </div>
-          {overview.actorRole === "owner" ? (
-            <WorkspaceSettingsForm settings={overview.settings} tenantId={overview.tenant.id} />
-          ) : (
-            <div className="settings-readonly">
-              <p>Solo el propietario puede modificar esta información.</p>
-              <dl>
-                <div>
-                  <dt>Correo</dt>
-                  <dd>{overview.settings.contactEmail ?? "Sin registrar"}</dd>
-                </div>
-                <div>
-                  <dt>Teléfono</dt>
-                  <dd>{overview.settings.contactPhone ?? "Sin registrar"}</dd>
-                </div>
-                <div>
-                  <dt>Dirección</dt>
-                  <dd>{overview.settings.address ?? "Sin registrar"}</dd>
-                </div>
-              </dl>
-            </div>
-          )}
-          {canSeeTeam ? <SettingsVersionHistory versions={overview.settingsHistory} /> : null}
-        </div>
-
-        <div className="dashboard-card structure-card">
-          <div className="card-heading">
-            <div>
-              <span className="panel-eyebrow">Organización</span>
-              <h2>Sedes y equipos</h2>
-            </div>
-          </div>
-          <div className="structure-grid">
-            <section>
-              <h3>Sedes</h3>
-              {overview.branches.length ? (
-                <div className="structure-list">
-                  {overview.branches.map((branch) => (
-                    <article className="structure-item" key={branch.id}>
-                      <span>
-                        <strong>{branch.displayName}</strong>
-                        <small>Código: {branch.code}</small>
-                      </span>
-                      <div className="organization-status-actions">
-                        <span className={`status status-${branch.status}`}>
-                          {branch.status === "active" ? "Activa" : "Inactiva"}
-                        </span>
-                        <OrganizationStatusButton
-                          kind="branch"
-                          name={branch.displayName}
-                          resourceId={branch.id}
-                          status={branch.status}
-                          tenantId={overview.tenant.id}
-                        />
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <p className="structure-empty">Aún no hay sedes registradas.</p>
-              )}
-            </section>
-            <section>
-              <h3>Equipos</h3>
-              {canSeeTeam ? (
-                <TeamAssignmentManager
-                  key={[
-                    ...overview.branches.map((branch) => `${branch.id}:${branch.status}`),
-                    ...overview.teams.map((team) => `${team.id}:${team.status}`),
-                  ].join("|")}
-                  members={overview.members}
-                  teams={overview.teams}
-                  tenantId={overview.tenant.id}
-                />
-              ) : overview.teams.length ? (
-                <div className="structure-list">
-                  {overview.teams.map((team) => (
-                    <article className="structure-item" key={team.id}>
-                      <span>
-                        <strong>{team.displayName}</strong>
-                        <small>{team.branchName ?? "Sin sede asignada"}</small>
-                      </span>
-                      <span className={`status status-${team.status}`}>
-                        {team.status === "active" ? "Activo" : "Inactivo"}
-                      </span>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <p className="structure-empty">Aún no hay equipos registrados.</p>
-              )}
-            </section>
-          </div>
-          {canSeeTeam ? (
-            <div className="operations-grid">
-              <section>
-                <h3>Nueva sede</h3>
-                <CreateBranchForm tenantId={overview.tenant.id} />
-              </section>
-              <section>
-                <h3>Nuevo equipo</h3>
-                <CreateTeamForm branches={overview.branches} tenantId={overview.tenant.id} />
-              </section>
-            </div>
-          ) : null}
-        </div>
-      </section>
-
       {canSeeTeam ? (
         <section className="dashboard-card activity-card">
           <div className="card-heading">
@@ -554,18 +371,6 @@ export default async function TenantDashboard({
             cualquier momento.
           </p>
           <SupportAccessReview access={supportAccess} tenantId={overview.tenant.id} />
-        </section>
-      ) : null}
-
-      {memberProfile ? (
-        <section className="dashboard-card activity-card" id="mi-ficha">
-          <div className="card-heading">
-            <div>
-              <span className="panel-eyebrow">Información del equipo</span>
-              <h2>Mi ficha operativa</h2>
-            </div>
-          </div>
-          <MemberProfileForm profile={memberProfile} tenantId={overview.tenant.id} />
         </section>
       ) : null}
 

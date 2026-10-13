@@ -79,6 +79,15 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
     });
     if (created.status !== "created") throw new Error("Borrower was not created");
     expect(JSON.stringify(created)).not.toContain("1234567890");
+    await expect(
+      service.verifyShared(actor, tenantId, "1234567890", "borrower-verification-test"),
+    ).resolves.toMatchObject({
+      registered: true,
+      fullName: "Cliente de Integración",
+      activeCreditCount: 0,
+      payerRating: "no_data",
+      negativeReport: false,
+    });
     const directory = await service.list(actor, tenantId, {
       search: "Cliente",
       page: 1,

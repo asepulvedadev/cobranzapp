@@ -4,6 +4,7 @@ import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
 import {
   borrowerDocumentLookupHmac,
+  borrowerSharedDocumentLookupHmac,
   encryptBorrowerDocumentNumber,
   normalizeBorrowerDocumentNumber,
 } from "./identity.js";
@@ -15,6 +16,7 @@ import type {
   BorrowerReviewInput,
   BorrowerReviewResult,
   BorrowerService,
+  SharedClientVerification,
 } from "./types.js";
 
 type BorrowerRow = {
@@ -266,6 +268,11 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
             documentType: input.documentType,
             documentNumber: normalizedNumber,
           });
+          const sharedLookupHmac = borrowerSharedDocumentLookupHmac(identitySecret, {
+            country: input.country,
+            documentType: input.documentType,
+            documentNumber: normalizedNumber,
+          });
           try {
             await client.query(
               `INSERT INTO borrowers
@@ -288,8 +295,8 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
             await client.query(
               `INSERT INTO borrower_identities
                (tenant_id, borrower_id, country, document_type, document_number_ciphertext,
-                document_lookup_hmac, document_last4)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                document_lookup_hmac, shared_lookup_hmac, document_last4)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
               [
                 tenantId,
                 borrowerId,
@@ -297,6 +304,7 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
                 input.documentType.toUpperCase(),
                 encryptBorrowerDocumentNumber(identitySecret, normalizedNumber),
                 identityHmac,
+                sharedLookupHmac,
                 normalizedNumber.slice(-4),
               ],
             );
@@ -535,6 +543,55 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
           }
           throw error;
         }
+      });
+    },
+
+    async verifyShared(
+      actor,
+      tenantId,
+      documentNumber,
+      requestId,
+    ): Promise<SharedClientVerification> {
+      const sharedLookupHmac = borrowerSharedDocumentLookupHmac(identitySecret, {
+        country: "CO",
+        documentType: "CC",
+        documentNumber,
+      });
+      return withTransaction(actor, tenantId, async (client) => {
+        const result = await client.query<{
+          full_name: string | null;
+          active_credit_count: number;
+          payer_rating: SharedClientVerification["payerRating"];
+          negative_report: boolean;
+        }>("SELECT * FROM shared_client_verification($1)", [sharedLookupHmac]);
+        const row = result.rows[0];
+        const verification: SharedClientVerification = row
+          ? {
+              registered: true,
+              fullName: row.full_name,
+              activeCreditCount: Number(row.active_credit_count),
+              payerRating: row.payer_rating,
+              negativeReport: row.negative_report,
+            }
+          : {
+              registered: false,
+              fullName: null,
+              activeCreditCount: 0,
+              payerRating: "no_data",
+              negativeReport: false,
+            };
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'borrower.shared_verification_searched', 'borrower_identity', NULL, $3, $4::jsonb)`,
+          [
+            tenantId,
+            actor.userId,
+            requestId,
+            JSON.stringify({ registered: verification.registered }),
+          ],
+        );
+        return verification;
       });
     },
   };

@@ -47,6 +47,14 @@ export type BorrowerDocumentResult =
   | { status: "invalid_object_key" }
   | { status: "duplicate" };
 
+export type SharedClientVerification = {
+  registered: boolean;
+  fullName: string | null;
+  activeCreditCount: number;
+  payerRating: "good" | "regular" | "low" | "no_data";
+  negativeReport: boolean;
+};
+
 export interface BorrowerService {
   list(
     actor: TenantActor,
@@ -71,4 +79,10 @@ export interface BorrowerService {
     borrowerId: string,
     input: BorrowerDocumentInput,
   ): Promise<BorrowerDocumentResult>;
+  verifyShared(
+    actor: TenantActor,
+    tenantId: string,
+    documentNumber: string,
+    requestId: string,
+  ): Promise<SharedClientVerification>;
 }

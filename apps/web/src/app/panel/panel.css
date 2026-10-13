@@ -4735,6 +4735,109 @@ html:has(.panel-shell) {
   background: linear-gradient(145deg, #fffdf8 0%, #f6fbf8 100%);
 }
 
+.verification-search-card {
+  display: grid;
+  gap: 18px;
+  max-width: 760px;
+  margin-top: 24px;
+}
+
+.verification-search-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.verification-search-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--panel-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.verification-search-form button {
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--panel-ink);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.verification-search-form button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.verification-search-result {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--panel-line);
+  border-radius: 16px;
+  background: var(--panel-surface);
+}
+
+.verification-result-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.verification-result-header h3 {
+  margin: 4px 0 0;
+  font-size: 20px;
+}
+
+.verification-result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.verification-result-grid div {
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--panel-soft);
+}
+
+.verification-result-grid dt {
+  color: var(--panel-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.verification-result-grid dd {
+  margin: 5px 0 0;
+  color: var(--panel-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.verification-search-disclaimer {
+  color: var(--panel-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .verification-search-form,
+  .verification-result-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .verification-search-form button {
+    width: 100%;
+  }
+}
+
 .verification-form {
   display: grid;
   gap: 10px;

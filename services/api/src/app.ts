@@ -30,6 +30,7 @@ import {
   routeStatusUpdateRequestSchema,
   routeStopCreateRequestSchema,
   type ServiceStatus,
+  sharedClientVerificationRequestSchema,
   tenantInvitationRequestSchema,
   tenantMemberCreateRequestSchema,
   tenantMemberProfileRequestSchema,
@@ -2503,6 +2504,66 @@ export function buildApp(dependencies: AppDependencies) {
       },
     );
     return reply.send(directory);
+  });
+
+  app.post("/v1/tenants/:tenantId/client-verification", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = sharedClientVerificationRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_CLIENT_VERIFICATION",
+        "Ingresa una cédula válida.",
+        request.id,
+      );
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !canManageBorrowers(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo el propietario, supervisor o cobrador puede verificar clientes.",
+        request.id,
+      );
+    }
+    if (!dependencies.borrowerService) {
+      return sendError(
+        reply,
+        503,
+        "BORROWER_DOSSIER_UNAVAILABLE",
+        "El módulo de clientes requiere configurar su clave de protección.",
+        request.id,
+      );
+    }
+    try {
+      const verification = await dependencies.borrowerService.verifyShared(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        body.data.documentNumber,
+        request.id,
+      );
+      return reply.send({ verification });
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("INVALID_DOCUMENT_")) {
+        return sendError(
+          reply,
+          400,
+          "INVALID_CLIENT_VERIFICATION",
+          "Ingresa una cédula válida.",
+          request.id,
+        );
+      }
+      throw error;
+    }
   });
 
   app.get("/v1/tenants/:tenantId/borrowers/:borrowerId", async (request, reply) => {

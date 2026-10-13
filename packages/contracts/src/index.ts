@@ -1031,6 +1031,22 @@ export const borrowerDirectorySchema = z.object({
     .default({ active: 0, archived: 0 }),
 });
 
+export const sharedClientVerificationRequestSchema = z.object({
+  documentNumber: z.string().trim().min(4).max(32),
+});
+
+export const sharedClientVerificationSchema = z.object({
+  registered: z.boolean(),
+  fullName: z.string().min(2).nullable(),
+  activeCreditCount: z.number().int().nonnegative(),
+  payerRating: z.enum(["good", "regular", "low", "no_data"]),
+  negativeReport: z.boolean(),
+});
+
+export const sharedClientVerificationResponseSchema = z.object({
+  verification: sharedClientVerificationSchema,
+});
+
 export type ServiceStatus = z.infer<typeof serviceStatusSchema>;
 export type ApiError = z.infer<typeof apiErrorSchema>;
 export type TenantRole = z.infer<typeof tenantRoleSchema>;
@@ -1143,3 +1159,5 @@ export type BorrowerReviewRequest = z.infer<typeof borrowerReviewRequestSchema>;
 export type BorrowerDocumentResponse = z.infer<typeof borrowerDocumentResponseSchema>;
 export type Borrower = z.infer<typeof borrowerSchema>;
 export type BorrowerDirectory = z.infer<typeof borrowerDirectorySchema>;
+export type SharedClientVerificationRequest = z.infer<typeof sharedClientVerificationRequestSchema>;
+export type SharedClientVerification = z.infer<typeof sharedClientVerificationSchema>;

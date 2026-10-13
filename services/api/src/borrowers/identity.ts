@@ -25,6 +25,20 @@ export function borrowerDocumentLookupHmac(
     .digest();
 }
 
+/** Stable cross-company lookup key. It contains no tenant identifier and is
+ * only used by the minimal shared verification aggregate. */
+export function borrowerSharedDocumentLookupHmac(
+  secret: string,
+  input: { country: string; documentType: string; documentNumber: string },
+) {
+  const country = input.country.trim().toUpperCase();
+  const documentType = input.documentType.trim().toUpperCase();
+  const number = normalizeBorrowerDocumentNumber(input.documentNumber);
+  return createHmac("sha256", deriveKey(secret, "borrower-shared-lookup"))
+    .update(`${country}|${documentType}|${number}`)
+    .digest();
+}
+
 export function encryptBorrowerDocumentNumber(secret: string, documentNumber: string) {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", deriveKey(secret, "borrower-document"), iv);
