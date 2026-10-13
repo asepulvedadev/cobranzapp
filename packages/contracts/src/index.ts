@@ -217,6 +217,16 @@ export const ownerTenantResponseSchema = z.object({
   tenant: tenantMembershipSchema,
 });
 
+export const ownerSubscriptionSchema = z.object({
+  membershipPlan: membershipPlanSchema,
+  activatedAt: z.iso.datetime(),
+});
+
+export const ownerSubscriptionSummarySchema = z.object({
+  availableCount: z.number().int().nonnegative(),
+  availableSubscriptions: z.array(ownerSubscriptionSchema),
+});
+
 export const platformTenantResponseSchema = z.object({ tenant: platformTenantSchema });
 
 export const createPlatformOwnerRequestSchema = z.object({
@@ -1245,6 +1255,8 @@ export type CreateCompanyCreationCodeRequest = z.infer<
   typeof createCompanyCreationCodeRequestSchema
 >;
 export type CompanyCreationCode = z.infer<typeof companyCreationCodeSchema>;
+export type OwnerSubscription = z.infer<typeof ownerSubscriptionSchema>;
+export type OwnerSubscriptionSummary = z.infer<typeof ownerSubscriptionSummarySchema>;
 export type PlatformOwnerCreatedResponse = z.infer<typeof platformOwnerCreatedResponseSchema>;
 export type PlatformTenantStatusUpdateRequest = z.infer<
   typeof platformTenantStatusUpdateRequestSchema

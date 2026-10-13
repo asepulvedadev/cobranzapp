@@ -221,6 +221,37 @@ function tenantSlugSeed(displayName: string) {
 
 export function createPostgresPlatformService(pool: Pool): PlatformService {
   return {
+    async getOwnerSubscriptionSummary(userId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("SELECT set_config('app.user_id', $1, true)", [userId]);
+        await client.query("SELECT set_config('app.platform_role', '', true)");
+        const result = await client.query<{
+          membership_plan: MembershipPlan;
+          activated_at: Date;
+        }>(
+          `SELECT membership_plan, activated_at
+             FROM user_memberships
+            WHERE user_id = $1 AND status = 'active' AND consumed_at IS NULL
+            ORDER BY activated_at ASC, id ASC`,
+          [userId],
+        );
+        await client.query("COMMIT");
+        return {
+          availableCount: result.rows.length,
+          availableSubscriptions: result.rows.map((row) => ({
+            membershipPlan: row.membership_plan,
+            activatedAt: row.activated_at.toISOString(),
+          })),
+        };
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
     async getUserProfile(userId) {
       const result = await pool.query<UserProfileRow>(
         `SELECT id, username, email, display_name, profile_phone,

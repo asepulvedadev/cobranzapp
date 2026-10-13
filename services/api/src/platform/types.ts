@@ -2,6 +2,7 @@ import type {
   CompanyCreationCode,
   MembershipEntitlement,
   MembershipPlan,
+  OwnerSubscriptionSummary,
   PlatformActivityDirectory,
   PlatformOverview,
   PlatformTenantDirectory,
@@ -18,6 +19,7 @@ export type {
   CompanyCreationCode,
   MembershipEntitlement,
   MembershipPlan,
+  OwnerSubscriptionSummary,
   PlatformActivityDirectory,
   PlatformAuditActivity,
   PlatformOverview,
@@ -207,4 +209,5 @@ export interface PlatformService {
     input: PlatformUserMembershipUpdateRequest,
     requestId: string,
   ): Promise<PlatformUserMembershipUpdateResult>;
+  getOwnerSubscriptionSummary?(userId: string): Promise<OwnerSubscriptionSummary>;
 }

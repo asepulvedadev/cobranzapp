@@ -714,6 +714,31 @@ export function buildApp(dependencies: AppDependencies) {
     }
   });
 
+  app.get("/v1/account/subscriptions", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    if (session.user.platformRole === "developer") {
+      return sendError(
+        reply,
+        403,
+        "OWNER_ACCOUNT_REQUIRED",
+        "Las suscripciones empresariales pertenecen a cuentas de propietario.",
+        request.id,
+      );
+    }
+    const getOwnerSubscriptionSummary = dependencies.platformService.getOwnerSubscriptionSummary;
+    if (!getOwnerSubscriptionSummary) {
+      return sendError(
+        reply,
+        501,
+        "SUBSCRIPTIONS_UNAVAILABLE",
+        "El resumen de suscripciones todavía no está habilitado.",
+        request.id,
+      );
+    }
+    return reply.send(await getOwnerSubscriptionSummary(session.user.id));
+  });
+
   app.get("/v1/auth/sessions", async (request, reply) => {
     const session = await requireUser(request, reply);
     if (!session) return;

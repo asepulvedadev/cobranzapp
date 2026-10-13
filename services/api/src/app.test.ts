@@ -143,6 +143,13 @@ function dependencies(overrides?: {
       tenants: [],
       activity: [],
     })),
+    getOwnerSubscriptionSummary: vi.fn(async () => ({
+      availableCount: 2,
+      availableSubscriptions: [
+        { membershipPlan: "pro" as const, activatedAt: "2026-10-11T00:00:00.000Z" },
+        { membershipPlan: "ultra" as const, activatedAt: "2026-10-11T01:00:00.000Z" },
+      ],
+    })),
     listActivity: vi.fn(async (_actor, query) => ({
       activity: [
         {
@@ -1467,6 +1474,28 @@ describe("developer platform", () => {
       tenantOwner.id,
       expect.objectContaining({ displayName: "Empresa Nueva", code: undefined }),
     );
+  });
+
+  it("returns the owner's available subscriptions for onboarding", async () => {
+    const deps = dependencies({
+      authService: { authenticate: vi.fn(async () => tenantOwner) },
+    });
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/account/subscriptions",
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      availableCount: 2,
+      availableSubscriptions: [
+        { membershipPlan: "pro", activatedAt: "2026-10-11T00:00:00.000Z" },
+        { membershipPlan: "ultra", activatedAt: "2026-10-11T01:00:00.000Z" },
+      ],
+    });
+    expect(deps.platformService.getOwnerSubscriptionSummary).toHaveBeenCalledWith(tenantOwner.id);
   });
 
   it("explains when an owner has no available subscription for a company", async () => {

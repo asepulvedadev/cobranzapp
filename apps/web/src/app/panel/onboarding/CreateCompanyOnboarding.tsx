@@ -4,12 +4,19 @@ import type { ApiError } from "@cobranzapp/contracts";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { fetchWithTimeout } from "../../../lib/fetch-with-timeout";
+import type { OwnerSubscriptionSummary } from "../../../lib/platform";
 import { formatApiError } from "../api-error";
 
-export function CreateCompanyOnboarding() {
+export function CreateCompanyOnboarding({
+  availableSubscriptions,
+}: {
+  availableSubscriptions: OwnerSubscriptionSummary | null;
+}) {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const hasAvailableSubscription =
+    availableSubscriptions === null || availableSubscriptions.availableCount > 0;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -38,9 +45,21 @@ export function CreateCompanyOnboarding() {
   return (
     <form className="tenant-form onboarding-company-form" onSubmit={submit}>
       <p className="onboarding-subscription-note">
-        Tu suscripción ya está asociada a tu cuenta. Cada suscripción disponible permite crear una
-        empresa adicional.
+        {availableSubscriptions === null
+          ? "Consulta tus suscripciones disponibles para crear una empresa adicional."
+          : availableSubscriptions.availableCount > 0
+            ? `Tienes ${availableSubscriptions.availableCount} suscripción(es) disponible(s) para crear empresa(s).`
+            : "No tienes suscripciones disponibles. Solicita al desarrollador que active una antes de crear otra empresa."}
       </p>
+      {availableSubscriptions?.availableSubscriptions.length ? (
+        <small>
+          Planes disponibles:{" "}
+          {availableSubscriptions.availableSubscriptions
+            .map((item) => (item.membershipPlan === "pro" ? "Pro" : "Ultra"))
+            .join(", ")}
+          .
+        </small>
+      ) : null}
       <label htmlFor="company-display-name">Nombre de la empresa</label>
       <input
         autoComplete="organization"
@@ -66,8 +85,8 @@ export function CreateCompanyOnboarding() {
           {message}
         </p>
       ) : null}
-      <button disabled={busy} type="submit">
-        {busy ? "Creando empresa…" : "Crear empresa"}
+      <button disabled={busy || !hasAvailableSubscription} type="submit">
+        {busy ? "Creando empresa…" : hasAvailableSubscription ? "Crear empresa" : "Sin suscripción"}
       </button>
     </form>
   );

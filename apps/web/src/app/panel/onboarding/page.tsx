@@ -1,16 +1,22 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import type { CurrentUser } from "../../../lib/platform";
+import type { CurrentUser, OwnerSubscriptionSummary } from "../../../lib/platform";
 import { serverApi } from "../../../lib/server-api";
 import { CreateCompanyOnboarding } from "./CreateCompanyOnboarding";
 
 export const metadata: Metadata = { title: "Crear empresa" };
 
 export default async function CompanyOnboardingPage() {
-  const response = await serverApi("/v1/auth/me");
+  const [response, subscriptionsResponse] = await Promise.all([
+    serverApi("/v1/auth/me"),
+    serverApi("/v1/account/subscriptions"),
+  ]);
   if (response.status === 401) redirect("/ingresar");
   if (!response.ok) throw new Error("No fue posible validar la sesión");
   const { user } = (await response.json()) as { user: CurrentUser };
+  const subscriptions = subscriptionsResponse.ok
+    ? ((await subscriptionsResponse.json()) as OwnerSubscriptionSummary)
+    : null;
 
   return (
     <div className="dashboard-page narrow-page onboarding-page">
@@ -19,8 +25,8 @@ export default async function CompanyOnboardingPage() {
           <span className="panel-eyebrow">Nuevo espacio</span>
           <h1>Crea tu empresa</h1>
           <p>
-            Tu suscripción ya está asociada a tu cuenta. Cada suscripción disponible permite crear
-            una empresa y una misma cuenta puede administrar varias.
+            Cada suscripción disponible permite crear una empresa y una misma cuenta puede
+            administrar varias.
           </p>
         </div>
       </header>
@@ -32,7 +38,7 @@ export default async function CompanyOnboardingPage() {
           </div>
           <span className="onboarding-user">{user.email}</span>
         </div>
-        <CreateCompanyOnboarding />
+        <CreateCompanyOnboarding availableSubscriptions={subscriptions} />
       </section>
     </div>
   );

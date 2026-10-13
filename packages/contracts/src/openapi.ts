@@ -45,6 +45,7 @@ import {
   mfaStatusResponseSchema,
   mfaStatusSchema,
   organizationStatusUpdateRequestSchema,
+  ownerSubscriptionSummarySchema,
   ownerTenantResponseSchema,
   platformActivityDirectorySchema,
   platformActivityQuerySchema,
@@ -173,6 +174,7 @@ const documentedSchemas = {
   TenantOverview: tenantOverviewSchema,
   CompanyCreationCodeResponse: companyCreationCodeResponseSchema,
   OwnerTenantResponse: ownerTenantResponseSchema,
+  OwnerSubscriptionSummary: ownerSubscriptionSummarySchema,
   TenantBranchResponse: tenantBranchResponseSchema,
   TenantInvitationCreatedResponse: tenantInvitationCreatedResponseSchema,
   TenantInvitationRequest: tenantInvitationRequestSchema,
@@ -336,6 +338,21 @@ export function createOpenApiDocument(version: string) {
             "401": errorResponses["401"],
             "403": errorResponses["403"],
             "409": response("El nombre de empresa ya está en uso.", schemaReference("ApiError")),
+          },
+        },
+      },
+      "/v1/account/subscriptions": {
+        get: {
+          tags: ["Cuenta"],
+          operationId: "listOwnerSubscriptions",
+          security: sessionSecurity,
+          responses: {
+            "200": response(
+              "Suscripciones disponibles para crear empresas.",
+              schemaReference("OwnerSubscriptionSummary"),
+            ),
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
           },
         },
       },

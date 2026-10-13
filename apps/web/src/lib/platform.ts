@@ -10,6 +10,7 @@ export type {
   MembershipEntitlement,
   MembershipPlan,
   MfaStatus,
+  OwnerSubscriptionSummary,
   PlatformActivityDirectory,
   PlatformOverview,
   PlatformSystemStatus,
