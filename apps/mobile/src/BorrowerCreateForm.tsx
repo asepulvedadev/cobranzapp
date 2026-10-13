@@ -33,8 +33,11 @@ export function BorrowerCreateForm({
   const [documentType, setDocumentType] = useState("CC");
   const [documentNumber, setDocumentNumber] = useState("");
   const [phone, setPhone] = useState("");
+  const [whatsappPhone, setWhatsappPhone] = useState("");
   const [homeAddress, setHomeAddress] = useState("");
   const [workAddress, setWorkAddress] = useState("");
+  const [homeAddressConfirmed, setHomeAddressConfirmed] = useState(false);
+  const [workAddressConfirmed, setWorkAddressConfirmed] = useState(false);
   const [contactName, setContactName] = useState("");
   const [contactRelationship, setContactRelationship] = useState("");
   const [contactPhone, setContactPhone] = useState("");
@@ -72,8 +75,17 @@ export function BorrowerCreateForm({
   }
 
   function missingFields() {
-    if (!fullName.trim() || !documentNumber.trim() || !phone.trim()) return true;
-    if (!homeAddress.trim() || !workAddress.trim()) return true;
+    if (!fullName.trim() || !documentNumber.trim() || !phone.trim() || !whatsappPhone.trim()) {
+      return true;
+    }
+    if (
+      !homeAddress.trim() ||
+      !workAddress.trim() ||
+      !homeAddressConfirmed ||
+      !workAddressConfirmed
+    ) {
+      return true;
+    }
     if (!contactName.trim() || !contactRelationship.trim() || !contactPhone.trim()) return true;
     if (
       secondContact &&
@@ -86,7 +98,9 @@ export function BorrowerCreateForm({
 
   async function submit() {
     if (missingFields()) {
-      setMessage("Completa los datos obligatorios, el consentimiento y las tres imágenes.");
+      setMessage(
+        "Completa celular, WhatsApp, direcciones verificadas, contactos, consentimiento y las tres imágenes.",
+      );
       return;
     }
     setBusy(true);
@@ -98,8 +112,11 @@ export function BorrowerCreateForm({
         documentType: documentType.trim().toUpperCase(),
         documentNumber: documentNumber.trim(),
         phone: phone.trim(),
+        whatsappPhone: whatsappPhone.trim(),
         homeAddress: homeAddress.trim(),
         workAddress: workAddress.trim(),
+        homeAddressConfirmed,
+        workAddressConfirmed,
         profilePhotoObjectKey: null,
         consentVersion: "borrower-dossier-v1",
         consentEvidenceRef: `mobile-consent-${Date.now()}`,
@@ -138,8 +155,11 @@ export function BorrowerCreateForm({
       setFullName("");
       setDocumentNumber("");
       setPhone("");
+      setWhatsappPhone("");
       setHomeAddress("");
       setWorkAddress("");
+      setHomeAddressConfirmed(false);
+      setWorkAddressConfirmed(false);
       setContactName("");
       setContactRelationship("");
       setContactPhone("");
@@ -170,8 +190,8 @@ export function BorrowerCreateForm({
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Alta rápida de cliente</Text>
       <Text style={styles.help}>
-        Captura manual, sin OCR ni afirmaciones de autenticidad. Las imágenes quedan privadas para
-        revisión humana.
+        Captura rápida con OCR asistivo en segundo plano. Las sugerencias requieren revisión humana
+        y las imágenes quedan privadas.
       </Text>
       <Text style={styles.label}>Nombre completo</Text>
       <TextInput
@@ -211,6 +231,15 @@ export function BorrowerCreateForm({
         style={styles.input}
         value={phone}
       />
+      <Text style={styles.label}>WhatsApp</Text>
+      <TextInput
+        keyboardType="phone-pad"
+        onChangeText={setWhatsappPhone}
+        placeholder="Número de WhatsApp"
+        placeholderTextColor="#77817a"
+        style={styles.input}
+        value={whatsappPhone}
+      />
       <Text style={styles.label}>Dirección de casa</Text>
       <TextInput
         onChangeText={setHomeAddress}
@@ -227,6 +256,24 @@ export function BorrowerCreateForm({
         style={styles.input}
         value={workAddress}
       />
+      <Pressable
+        onPress={() => setHomeAddressConfirmed((current) => !current)}
+        style={styles.consentRow}
+      >
+        <Text style={styles.checkbox}>{homeAddressConfirmed ? "☑" : "☐"}</Text>
+        <Text style={styles.consentText}>
+          Confirmo que la dirección de casa está completa y fue verificada con el cliente.
+        </Text>
+      </Pressable>
+      <Pressable
+        onPress={() => setWorkAddressConfirmed((current) => !current)}
+        style={styles.consentRow}
+      >
+        <Text style={styles.checkbox}>{workAddressConfirmed ? "☑" : "☐"}</Text>
+        <Text style={styles.consentText}>
+          Confirmo que la dirección de trabajo está completa y fue verificada con el cliente.
+        </Text>
+      </Pressable>
       <Text style={styles.label}>Contacto de emergencia</Text>
       <TextInput
         onChangeText={setContactName}
