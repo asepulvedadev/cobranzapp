@@ -13,8 +13,10 @@ const config = z
     APP_VERSION: z.string().default("development"),
     DATABASE_URL: z.string().min(1),
     WORKER_ID: z.string().trim().min(3).max(100).optional(),
-    WORKER_LEASE_SECONDS: z.coerce.number().int().min(10).max(300).default(30),
+    WORKER_LEASE_SECONDS: z.coerce.number().int().min(10).max(300).default(120),
     WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(1_000).max(60_000).default(10_000),
+    BORROWER_DOCUMENTS_ROOT: z.string().min(1).default("/var/lib/cobranzapp/documents"),
+    BORROWER_IDENTITY_KEY: z.string().min(32).optional(),
   })
   .parse(process.env);
 
@@ -66,7 +68,10 @@ async function tick() {
     return;
   }
   try {
-    const result = await processClaimedOutboxEvent(pool, claimed, workerId);
+    const result = await processClaimedOutboxEvent(pool, claimed, workerId, {
+      documentsRoot: config.BORROWER_DOCUMENTS_ROOT,
+      identitySecret: config.BORROWER_IDENTITY_KEY,
+    });
     log("info", "outbox_processed", {
       outboxEventId: claimed.id,
       tenantId: claimed.tenantId,

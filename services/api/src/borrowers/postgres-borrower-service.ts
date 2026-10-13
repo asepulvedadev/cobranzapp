@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { Borrower, BorrowerDocument } from "@cobranzapp/contracts";
+import type { Borrower, BorrowerDocument, BorrowerOcrExtraction } from "@cobranzapp/contracts";
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
 import {
   borrowerDocumentLookupHmac,
   borrowerSharedDocumentLookupHmac,
+  decryptBorrowerOcrFields,
   encryptBorrowerDocumentNumber,
   normalizeBorrowerDocumentNumber,
 } from "./identity.js";
@@ -34,6 +35,21 @@ type BorrowerRow = {
   document_last4: string;
   verification_state: Borrower["identity"]["verificationState"];
   created_at: Date;
+};
+
+type OcrRow = {
+  id: string;
+  document_id: string;
+  category: BorrowerDocument["category"];
+  side: BorrowerDocument["side"];
+  status: BorrowerOcrExtraction["status"];
+  fields_ciphertext: string | null;
+  confidence: number | string | null;
+  model_name: string;
+  error_code: string | null;
+  reviewed_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
 };
 
 class DuplicateBorrowerIdentityError extends Error {
@@ -127,6 +143,31 @@ async function loadBorrower(
   };
 }
 
+function mapOcrRow(row: OcrRow, identitySecret: string): BorrowerOcrExtraction {
+  let fields: BorrowerOcrExtraction["fields"] = null;
+  if (row.fields_ciphertext) {
+    try {
+      fields = decryptBorrowerOcrFields(identitySecret, row.fields_ciphertext);
+    } catch {
+      fields = null;
+    }
+  }
+  return {
+    id: row.id,
+    documentId: row.document_id,
+    category: row.category,
+    side: row.side,
+    status: row.status,
+    fields,
+    confidence: row.confidence === null ? null : Number(row.confidence),
+    modelName: row.model_name,
+    errorCode: row.error_code,
+    reviewedAt: row.reviewed_at?.toISOString() ?? null,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+  };
+}
+
 export function createPostgresBorrowerService(pool: Pool, identitySecret: string): BorrowerService {
   async function setActorContext(client: PoolClient, actor: TenantActor, tenantId: string) {
     await client.query("SELECT set_config('app.user_id', $1, true)", [actor.userId]);
@@ -155,6 +196,56 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
     } finally {
       client.release();
     }
+  }
+
+  async function enqueueDocumentOcr(
+    client: Pick<PoolClient, "query">,
+    input: {
+      tenantId: string;
+      borrowerId: string;
+      documentId: string;
+      objectKey: string;
+      mediaType: string;
+      category: BorrowerDocument["category"];
+      side: BorrowerDocument["side"];
+    },
+  ) {
+    if (input.category !== "identity") return;
+    const extraction = await client.query<{ id: string }>(
+      `INSERT INTO borrower_document_ocr_extractions
+         (tenant_id, borrower_id, document_id, status, model_name)
+       VALUES ($1, $2, $3, 'pending', 'tesseract-spa-v1')
+       ON CONFLICT (tenant_id, borrower_id, document_id) DO UPDATE
+         SET status = CASE
+           WHEN borrower_document_ocr_extractions.status IN ('failed', 'rejected') THEN 'pending'
+           ELSE borrower_document_ocr_extractions.status
+         END,
+         updated_at = now()
+       RETURNING id`,
+      [input.tenantId, input.borrowerId, input.documentId],
+    );
+    const extractionId = extraction.rows[0]?.id;
+    if (!extractionId) return;
+    await client.query(
+      `INSERT INTO outbox_events
+         (tenant_id, event_type, aggregate_type, aggregate_id, idempotency_key, payload)
+       VALUES ($1, 'borrower.document.ocr_requested', 'borrower_document', $2, $3, $4::jsonb)
+       ON CONFLICT (idempotency_key) DO NOTHING`,
+      [
+        input.tenantId,
+        input.documentId,
+        `borrower-document-ocr:${input.tenantId}:${input.documentId}`,
+        JSON.stringify({
+          extractionId,
+          borrowerId: input.borrowerId,
+          documentId: input.documentId,
+          objectKey: input.objectKey,
+          mediaType: input.mediaType,
+          category: input.category,
+          side: input.side,
+        }),
+      ],
+    );
   }
 
   return {
@@ -320,10 +411,11 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
               );
             }
             for (const document of input.documents) {
-              await client.query(
+              const inserted = await client.query<{ id: string }>(
                 `INSERT INTO borrower_documents
                  (tenant_id, borrower_id, category, side, object_key, media_type, size_bytes, sha256, created_by)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, lower($8), $9)`,
+               VALUES ($1, $2, $3, $4, $5, $6, $7, lower($8), $9)
+               RETURNING id`,
                 [
                   tenantId,
                   borrowerId,
@@ -336,6 +428,18 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
                   actor.userId,
                 ],
               );
+              const documentId = inserted.rows[0]?.id;
+              if (documentId) {
+                await enqueueDocumentOcr(client, {
+                  tenantId,
+                  borrowerId,
+                  documentId,
+                  objectKey: document.objectKey,
+                  mediaType: document.mediaType,
+                  category: document.category,
+                  side: document.side,
+                });
+              }
             }
             await client.query(
               `INSERT INTO audit_events
@@ -526,6 +630,15 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
               JSON.stringify({ category: input.category, side: input.side, scanStatus: "pending" }),
             ],
           );
+          await enqueueDocumentOcr(client, {
+            tenantId,
+            borrowerId,
+            documentId: row.id,
+            objectKey: row.object_key,
+            mediaType: row.media_type,
+            category: row.category,
+            side: row.side,
+          });
           return {
             status: "created",
             document: {
@@ -546,6 +659,160 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
           }
           throw error;
         }
+      });
+    },
+
+    async listOcr(actor, tenantId, borrowerId) {
+      return withTransaction(actor, tenantId, async (client) => {
+        const result = await client.query<OcrRow>(
+          `SELECT extraction.id, extraction.document_id, document.category, document.side,
+                  extraction.status, extraction.fields_ciphertext, extraction.confidence,
+                  extraction.model_name, extraction.error_code, extraction.reviewed_at,
+                  extraction.created_at, extraction.updated_at
+             FROM borrower_document_ocr_extractions extraction
+             JOIN borrower_documents document
+               ON document.tenant_id = extraction.tenant_id
+              AND document.borrower_id = extraction.borrower_id
+              AND document.id = extraction.document_id
+            WHERE extraction.tenant_id = $1 AND extraction.borrower_id = $2
+            ORDER BY extraction.created_at ASC, extraction.id ASC`,
+          [tenantId, borrowerId],
+        );
+        return result.rows.map((row) => mapOcrRow(row, identitySecret));
+      });
+    },
+
+    async confirmOcr(actor, tenantId, borrowerId, input) {
+      if (!actor.tenantRole || !["owner", "supervisor", "collector"].includes(actor.tenantRole)) {
+        return { status: "forbidden" };
+      }
+      return withTransaction(actor, tenantId, async (client) => {
+        const extractionResult = await client.query<OcrRow>(
+          `SELECT extraction.id, extraction.document_id, document.category, document.side,
+                  extraction.status, extraction.fields_ciphertext, extraction.confidence,
+                  extraction.model_name, extraction.error_code, extraction.reviewed_at,
+                  extraction.created_at, extraction.updated_at
+             FROM borrower_document_ocr_extractions extraction
+             JOIN borrower_documents document
+               ON document.tenant_id = extraction.tenant_id
+              AND document.borrower_id = extraction.borrower_id
+              AND document.id = extraction.document_id
+            WHERE extraction.tenant_id = $1 AND extraction.borrower_id = $2 AND extraction.id = $3
+            FOR UPDATE`,
+          [tenantId, borrowerId, input.extractionId],
+        );
+        const extraction = extractionResult.rows[0];
+        if (!extraction) return { status: "not_found" };
+        if (!extraction.fields_ciphertext && !input.fullName && !input.documentNumber) {
+          return { status: "invalid_extraction" };
+        }
+        const borrower = await client.query<{ id: string }>(
+          `SELECT id FROM borrowers WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
+          [tenantId, borrowerId],
+        );
+        if (!borrower.rows[0]) return { status: "not_found" };
+        let candidate = extraction.fields_ciphertext
+          ? decryptBorrowerOcrFields(identitySecret, extraction.fields_ciphertext)
+          : { fullName: null, documentNumber: null, country: null, documentType: null };
+        candidate = {
+          ...candidate,
+          fullName: input.fullName ?? candidate.fullName,
+          documentNumber: input.documentNumber ?? candidate.documentNumber,
+        };
+        if (candidate.fullName) {
+          await client.query(
+            `UPDATE borrowers SET full_name = $3, updated_at = now()
+               WHERE tenant_id = $1 AND id = $2`,
+            [tenantId, borrowerId, candidate.fullName],
+          );
+        }
+        if (candidate.documentNumber) {
+          const normalized = normalizeBorrowerDocumentNumber(candidate.documentNumber);
+          const identity = await client.query<{
+            country: string;
+            document_type: string;
+          }>(
+            `SELECT country, document_type FROM borrower_identities
+              WHERE tenant_id = $1 AND borrower_id = $2 FOR UPDATE`,
+            [tenantId, borrowerId],
+          );
+          const currentIdentity = identity.rows[0];
+          if (!currentIdentity) return { status: "not_found" };
+          const lookup = borrowerDocumentLookupHmac(identitySecret, {
+            tenantId,
+            country: currentIdentity.country,
+            documentType: currentIdentity.document_type,
+            documentNumber: normalized,
+          });
+          const sharedLookup = borrowerSharedDocumentLookupHmac(identitySecret, {
+            country: currentIdentity.country,
+            documentType: currentIdentity.document_type,
+            documentNumber: normalized,
+          });
+          await client.query(
+            `UPDATE borrower_identities
+                SET document_number_ciphertext = $3,
+                    document_lookup_hmac = $4,
+                    shared_lookup_hmac = $5,
+                    document_last4 = $6,
+                    updated_at = now()
+              WHERE tenant_id = $1 AND borrower_id = $2`,
+            [
+              tenantId,
+              borrowerId,
+              encryptBorrowerDocumentNumber(identitySecret, normalized),
+              lookup,
+              sharedLookup,
+              normalized.slice(-4),
+            ],
+          );
+        }
+        await client.query(
+          `UPDATE borrower_document_ocr_extractions
+              SET status = 'confirmed', reviewed_by = $4, reviewed_at = now(), updated_at = now()
+            WHERE tenant_id = $1 AND borrower_id = $2 AND id = $3`,
+          [tenantId, borrowerId, input.extractionId, actor.userId],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'borrower.ocr_confirmed', 'borrower', $3, $4, $5::jsonb)`,
+          [
+            tenantId,
+            actor.userId,
+            borrowerId,
+            input.requestId,
+            JSON.stringify({
+              extractionId: input.extractionId,
+              fields: [
+                ...(candidate.fullName ? ["fullName"] : []),
+                ...(candidate.documentNumber ? ["documentNumber"] : []),
+              ],
+            }),
+          ],
+        );
+        const updatedBorrower = await loadBorrower(client, tenantId, borrowerId);
+        if (!updatedBorrower) return { status: "not_found" };
+        const updatedExtraction = await client.query<OcrRow>(
+          `SELECT extraction.id, extraction.document_id, document.category, document.side,
+                  extraction.status, extraction.fields_ciphertext, extraction.confidence,
+                  extraction.model_name, extraction.error_code, extraction.reviewed_at,
+                  extraction.created_at, extraction.updated_at
+             FROM borrower_document_ocr_extractions extraction
+             JOIN borrower_documents document
+               ON document.tenant_id = extraction.tenant_id
+              AND document.borrower_id = extraction.borrower_id
+              AND document.id = extraction.document_id
+            WHERE extraction.tenant_id = $1 AND extraction.borrower_id = $2 AND extraction.id = $3`,
+          [tenantId, borrowerId, input.extractionId],
+        );
+        const updated = updatedExtraction.rows[0];
+        if (!updated) return { status: "not_found" };
+        return {
+          status: "updated",
+          borrower: updatedBorrower,
+          extraction: mapOcrRow(updated, identitySecret),
+        };
       });
     },
 

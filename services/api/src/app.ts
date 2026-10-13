@@ -1,6 +1,7 @@
 import {
   borrowerCreateRequestSchema,
   borrowerDirectoryQuerySchema,
+  borrowerOcrConfirmRequestSchema,
   borrowerReviewRequestSchema,
   changePasswordRequestSchema,
   createBranchRequestSchema,
@@ -85,6 +86,11 @@ const tenantTeamMemberParamsSchema = z.object({
 const tenantBranchParamsSchema = z.object({ tenantId: z.uuid(), branchId: z.uuid() });
 const tenantTeamParamsSchema = z.object({ tenantId: z.uuid(), teamId: z.uuid() });
 const tenantBorrowerParamsSchema = z.object({ tenantId: z.uuid(), borrowerId: z.uuid() });
+const tenantBorrowerOcrParamsSchema = z.object({
+  tenantId: z.uuid(),
+  borrowerId: z.uuid(),
+  extractionId: z.uuid(),
+});
 const verificationNetworkParamsSchema = z.object({ tenantId: z.uuid() });
 const verificationNetworkConsentParamsSchema = z.object({
   tenantId: z.uuid(),
@@ -2601,6 +2607,113 @@ export function buildApp(dependencies: AppDependencies) {
       return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
     return reply.send({ borrower });
   });
+
+  app.get("/v1/tenants/:tenantId/borrowers/:borrowerId/ocr", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantBorrowerParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !canManageBorrowers(membership.role)) {
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a este cliente.", request.id);
+    }
+    if (!dependencies.borrowerService) {
+      return sendError(
+        reply,
+        503,
+        "BORROWER_DOSSIER_UNAVAILABLE",
+        "El módulo de clientes requiere configurar su clave de protección.",
+        request.id,
+      );
+    }
+    const extractions = await dependencies.borrowerService.listOcr(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.borrowerId,
+    );
+    return reply.send({ extractions });
+  });
+
+  app.post(
+    "/v1/tenants/:tenantId/borrowers/:borrowerId/ocr/:extractionId/confirm",
+    async (request, reply) => {
+      if (!requireAllowedOrigin(request, reply)) return;
+      const session = await requireUser(request, reply);
+      if (!session) return;
+      const params = tenantBorrowerOcrParamsSchema.safeParse(request.params);
+      const body = borrowerOcrConfirmRequestSchema.safeParse({
+        ...(request.body && typeof request.body === "object" ? request.body : {}),
+        extractionId: params.success ? params.data.extractionId : undefined,
+      });
+      if (!params.success || !body.success) {
+        return sendError(
+          reply,
+          400,
+          "INVALID_OCR_CONFIRMATION",
+          "Confirma al menos un dato extraído.",
+          request.id,
+        );
+      }
+      const membership = tenantMembershipForSession(session, params.data.tenantId);
+      if (!membership || !canManageBorrowers(membership.role)) {
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "No tienes acceso a este cliente.",
+          request.id,
+        );
+      }
+      if (!(await requireRecentReauthentication(session, request, reply))) return;
+      if (!dependencies.borrowerService) {
+        return sendError(
+          reply,
+          503,
+          "BORROWER_DOSSIER_UNAVAILABLE",
+          "El módulo de clientes requiere configurar su clave de protección.",
+          request.id,
+        );
+      }
+      const result = await dependencies.borrowerService.confirmOcr(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.borrowerId,
+        { ...body.data, requestId: request.id },
+      );
+      if (result.status === "not_found") {
+        return sendError(reply, 404, "OCR_NOT_FOUND", "La extracción no existe.", request.id);
+      }
+      if (result.status === "forbidden") {
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "No puedes confirmar estos datos.",
+          request.id,
+        );
+      }
+      if (result.status === "invalid_extraction") {
+        return sendError(
+          reply,
+          409,
+          "OCR_NOT_READY",
+          "La extracción aún no tiene datos confirmables.",
+          request.id,
+        );
+      }
+      return reply.send({ borrower: result.borrower, extraction: result.extraction });
+    },
+  );
 
   app.post("/v1/tenants/:tenantId/borrowers/:borrowerId/documents", async (request, reply) => {
     if (!requireAllowedOrigin(request, reply)) return;

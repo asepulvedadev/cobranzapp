@@ -66,3 +66,42 @@ export function decryptBorrowerDocumentNumber(secret: string, payload: string) {
     decipher.final(),
   ]).toString("utf8");
 }
+
+export type BorrowerOcrFields = {
+  fullName: string | null;
+  documentNumber: string | null;
+  country: string | null;
+  documentType: string | null;
+};
+
+export function encryptBorrowerOcrFields(secret: string, fields: BorrowerOcrFields) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", deriveKey(secret, "borrower-ocr"), iv);
+  const ciphertext = Buffer.concat([cipher.update(JSON.stringify(fields), "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `v1:${iv.toString("base64url")}:${tag.toString("base64url")}:${ciphertext.toString("base64url")}`;
+}
+
+export function decryptBorrowerOcrFields(secret: string, payload: string): BorrowerOcrFields {
+  const [version, ivEncoded, tagEncoded, ciphertextEncoded] = payload.split(":");
+  if (!ivEncoded || !tagEncoded || !ciphertextEncoded || version !== "v1") {
+    throw new Error("INVALID_OCR_CIPHERTEXT");
+  }
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    deriveKey(secret, "borrower-ocr"),
+    Buffer.from(ivEncoded, "base64url"),
+  );
+  decipher.setAuthTag(Buffer.from(tagEncoded, "base64url"));
+  const raw = Buffer.concat([
+    decipher.update(Buffer.from(ciphertextEncoded, "base64url")),
+    decipher.final(),
+  ]).toString("utf8");
+  const parsed = JSON.parse(raw) as Partial<BorrowerOcrFields>;
+  return {
+    fullName: typeof parsed.fullName === "string" ? parsed.fullName : null,
+    documentNumber: typeof parsed.documentNumber === "string" ? parsed.documentNumber : null,
+    country: typeof parsed.country === "string" ? parsed.country : null,
+    documentType: typeof parsed.documentType === "string" ? parsed.documentType : null,
+  };
+}

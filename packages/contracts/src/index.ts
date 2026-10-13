@@ -1022,6 +1022,50 @@ export const borrowerSchema = z.object({
 
 export const borrowerResponseSchema = z.object({ borrower: borrowerSchema });
 export const borrowerDocumentResponseSchema = z.object({ document: borrowerDocumentSchema });
+export const borrowerOcrExtractionStatusSchema = z.enum([
+  "pending",
+  "processing",
+  "ready",
+  "confirmed",
+  "rejected",
+  "failed",
+]);
+export const borrowerOcrFieldsSchema = z.object({
+  fullName: z.string().min(2).max(160).nullable(),
+  documentNumber: z.string().min(4).max(32).nullable(),
+  country: z.string().length(2).nullable(),
+  documentType: z.string().min(2).max(30).nullable(),
+});
+export const borrowerOcrExtractionSchema = z.object({
+  id: z.uuid(),
+  documentId: z.uuid(),
+  category: z.enum(["identity", "profile_photo"]),
+  side: borrowerDocumentSideSchema.nullable(),
+  status: borrowerOcrExtractionStatusSchema,
+  fields: borrowerOcrFieldsSchema.nullable(),
+  confidence: z.number().min(0).max(1).nullable(),
+  modelName: z.string().min(1).max(100),
+  errorCode: z.string().min(1).max(120).nullable(),
+  reviewedAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+export const borrowerOcrResponseSchema = z.object({
+  extractions: z.array(borrowerOcrExtractionSchema),
+});
+export const borrowerOcrConfirmRequestSchema = z
+  .object({
+    extractionId: z.uuid(),
+    fullName: z.string().trim().min(2).max(160).nullable().optional(),
+    documentNumber: z.string().trim().min(4).max(32).nullable().optional(),
+  })
+  .refine((value) => Boolean(value.fullName || value.documentNumber), {
+    message: "Confirma al menos un dato extraído.",
+  });
+export const borrowerOcrConfirmResponseSchema = z.object({
+  borrower: borrowerSchema,
+  extraction: borrowerOcrExtractionSchema,
+});
 export const borrowerReviewRequestSchema = z
   .object({
     decision: z.enum(["reviewed", "rejected"]),
@@ -1203,6 +1247,10 @@ export type BorrowerDocument = z.infer<typeof borrowerDocumentSchema>;
 export type BorrowerCreateRequest = z.infer<typeof borrowerCreateRequestSchema>;
 export type BorrowerReviewRequest = z.infer<typeof borrowerReviewRequestSchema>;
 export type BorrowerDocumentResponse = z.infer<typeof borrowerDocumentResponseSchema>;
+export type BorrowerOcrExtraction = z.infer<typeof borrowerOcrExtractionSchema>;
+export type BorrowerOcrResponse = z.infer<typeof borrowerOcrResponseSchema>;
+export type BorrowerOcrConfirmRequest = z.infer<typeof borrowerOcrConfirmRequestSchema>;
+export type BorrowerOcrConfirmResponse = z.infer<typeof borrowerOcrConfirmResponseSchema>;
 export type Borrower = z.infer<typeof borrowerSchema>;
 export type BorrowerDirectory = z.infer<typeof borrowerDirectorySchema>;
 export type SharedClientVerificationRequest = z.infer<typeof sharedClientVerificationRequestSchema>;

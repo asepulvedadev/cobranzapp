@@ -6,6 +6,7 @@ import { type FormEvent, useRef, useState } from "react";
 import { Modal } from "../../Modal";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
 import { BorrowerDocumentUpload } from "./BorrowerDocumentUpload";
+import { BorrowerOcrControl } from "./BorrowerOcrControl";
 import { BorrowerReviewControl } from "./BorrowerReviewControl";
 
 function statusLabel(status: Borrower["identity"]["verificationState"]) {
@@ -202,7 +203,7 @@ export function BorrowerDirectory({
     setMessage(
       uploadFailure
         ? "Cliente creado, pero una o más imágenes no pudieron guardarse. Revisa la ficha y vuelve a cargarlas."
-        : "Cliente creado con documento frente, reverso y foto de perfil en cuarentena privada; queda pendiente la revisión humana.",
+        : "Cliente creado. Las imágenes quedaron privadas y el OCR se procesará en segundo plano para revisión humana.",
     );
     setIsSubmitting(false);
     setIsCreateOpen(false);
@@ -314,6 +315,7 @@ export function BorrowerDirectory({
                             ) : (
                               <strong>Pendientes de carga</strong>
                             )}
+                            <BorrowerOcrControl borrowerId={borrower.id} tenantId={tenantId} />
                           </div>
                         </div>
                       </details>
@@ -396,8 +398,8 @@ export function BorrowerDirectory({
             </div>
           </div>
           <p className="operational-note">
-            Esta captura no hace OCR ni afirma autenticidad. Las imágenes se validan y se guardan en
-            cuarentena privada para la revisión humana.
+            Las imágenes se guardan en cuarentena privada y el OCR propone datos para que un usuario
+            autorizado los revise antes de confirmarlos.
           </p>
           <form
             className="tenant-form borrower-create-form"
@@ -429,8 +431,8 @@ export function BorrowerDirectory({
             <section aria-labelledby="borrower-step-document" hidden={createStep !== 1}>
               <h3 id="borrower-step-document">Documento de identidad</h3>
               <p className="operational-note">
-                Captura frente y reverso desde el celular. Las imágenes quedan guardadas en el
-                expediente privado; confirma manualmente los datos antes de continuar.
+                Captura frente y reverso desde el celular. El OCR se ejecutará en segundo plano; sus
+                sugerencias siempre deben confirmarse manualmente.
               </p>
               <label htmlFor="borrower-full-name">Nombre completo</label>
               <input id="borrower-full-name" name="fullName" maxLength={160} />

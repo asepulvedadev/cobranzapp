@@ -61,11 +61,14 @@ services:
       NODE_ENV: production
       APP_VERSION: ${IMAGE_TAG}
       DATABASE_URL: postgresql://${WORKER_DATABASE_USER}:${WORKER_DATABASE_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      WORKER_LEASE_SECONDS: ${WORKER_LEASE_SECONDS:-30}
+      WORKER_LEASE_SECONDS: ${WORKER_LEASE_SECONDS:-120}
+      BORROWER_DOCUMENTS_ROOT: /var/lib/cobranzapp/documents
     depends_on:
       postgres:
         condition: service_healthy
     networks: [backend]
+    volumes:
+      - documents_data:/var/lib/cobranzapp/documents:ro
     restart: unless-stopped
     cpus: 0.5
     mem_limit: 512m

@@ -2143,6 +2143,14 @@ html:has(.panel-shell) {
   overflow-wrap: anywhere;
 }
 
+.route-stop-navigation {
+  display: inline-block;
+  margin-top: 4px;
+  color: var(--panel-accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .route-board-actions {
   display: flex;
   align-items: center;
@@ -4748,6 +4756,60 @@ html:has(.panel-shell) {
   border: 0;
   border-radius: 9px;
   background: #176b43;
+  color: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.borrower-ocr-control {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.borrower-ocr-control > small {
+  color: var(--panel-muted);
+  font-size: 11px;
+}
+
+.borrower-ocr-list {
+  display: grid;
+  gap: 8px;
+}
+
+.borrower-ocr-item {
+  display: grid;
+  gap: 6px;
+  padding: 9px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  background: var(--panel-surface-soft);
+}
+
+.borrower-ocr-item label {
+  display: grid;
+  gap: 3px;
+  color: var(--panel-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.borrower-ocr-item input {
+  min-height: 30px;
+  padding: 5px 7px;
+  border: 1px solid var(--panel-line);
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.borrower-ocr-item button {
+  justify-self: start;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--tenant-brand-primary, var(--panel-accent));
   color: #fff;
   cursor: pointer;
   font-size: 11px;

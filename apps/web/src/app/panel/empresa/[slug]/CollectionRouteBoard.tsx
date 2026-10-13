@@ -11,6 +11,10 @@ const statusLabels: Record<Route["status"], string> = {
   archived: "Archivada",
 };
 
+function wazeUrl(address: string) {
+  return `https://www.waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes&utm_source=cobranzapp`;
+}
+
 async function errorMessage(response: Response | null, fallback: string) {
   const body = (await response?.json().catch(() => ({}))) as {
     error?: { message?: string };
@@ -201,6 +205,14 @@ export function CollectionRouteBoard({
                         <small>
                           {stop.addressKind === "home" ? "Casa" : "Trabajo"} · {stop.address}
                         </small>
+                        <a
+                          className="route-stop-navigation"
+                          href={wazeUrl(stop.address)}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          Navegar en Waze
+                        </a>
                       </div>
                     </li>
                   ))}

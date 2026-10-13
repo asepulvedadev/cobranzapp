@@ -3,6 +3,8 @@ import type {
   BorrowerCreateRequest,
   BorrowerDirectory,
   BorrowerDocument,
+  BorrowerOcrConfirmRequest,
+  BorrowerOcrExtraction,
   BorrowerReviewRequest,
 } from "@cobranzapp/contracts";
 import type { TenantActor } from "../tenancy/types.js";
@@ -47,6 +49,12 @@ export type BorrowerDocumentResult =
   | { status: "invalid_object_key" }
   | { status: "duplicate" };
 
+export type BorrowerOcrConfirmResult =
+  | { status: "updated"; borrower: Borrower; extraction: BorrowerOcrExtraction }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "invalid_extraction" };
+
 export type SharedClientVerification = {
   registered: boolean;
   fullName: string | null;
@@ -79,6 +87,17 @@ export interface BorrowerService {
     borrowerId: string,
     input: BorrowerDocumentInput,
   ): Promise<BorrowerDocumentResult>;
+  listOcr(
+    actor: TenantActor,
+    tenantId: string,
+    borrowerId: string,
+  ): Promise<BorrowerOcrExtraction[]>;
+  confirmOcr(
+    actor: TenantActor,
+    tenantId: string,
+    borrowerId: string,
+    input: BorrowerOcrConfirmRequest & { requestId: string },
+  ): Promise<BorrowerOcrConfirmResult>;
   verifyShared(
     actor: TenantActor,
     tenantId: string,
