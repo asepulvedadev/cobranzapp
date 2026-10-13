@@ -15,7 +15,7 @@ const principles = [
   {
     number: "01",
     title: "Explicar antes que impresionar",
-    text: "Un reporte vale cuando permite reconstruir el saldo, el pago y la persona responsable sin esconder los detalles importantes.",
+    text: "Un reporte vale cuando permite reconstruir la gestión, la cuota y la persona responsable sin esconder los detalles importantes.",
   },
   {
     number: "02",
@@ -49,9 +49,9 @@ export default function AboutPage() {
             Estamos construyendo control operativo para negocios que necesitan cuentas claras.
           </h1>
           <p>
-            cobranzapp nace como una plataforma independiente para conectar cartera, rutas, recaudo
-            y cierres sin convertirse en prestamista, entidad financiera o custodio del dinero de
-            sus usuarios.
+            cobranzapp nace como una plataforma independiente para conectar clientes, rutas,
+            verificación y seguimiento operativo sin convertirse en prestamista, entidad financiera
+            o custodio del dinero de sus usuarios.
           </p>
         </section>
 

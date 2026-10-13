@@ -58,7 +58,8 @@ export const membershipFeatures = [
   {
     id: "analytics",
     label: "Análisis en tiempo real",
-    detail: "Cartera, recaudo y novedades sobre los movimientos confirmados en el sistema.",
+    detail:
+      "Clientes, cuotas operativas y novedades sobre los movimientos confirmados en el sistema.",
   },
   {
     id: "routes",

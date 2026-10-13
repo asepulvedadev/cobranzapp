@@ -14,8 +14,8 @@ export const metadata: Metadata = {
 const modules = [
   {
     number: "01",
-    title: "Cartera y obligaciones",
-    text: "Una ficha común para relacionar clientes, créditos, cuotas, vencimientos, abonos y novedades sin duplicar la historia.",
+    title: "Clientes y créditos operativos",
+    text: "Una ficha común para relacionar clientes, documentos, direcciones, créditos, cuotas proyectadas y novedades.",
     detail: "Base operativa",
   },
   {
@@ -26,15 +26,15 @@ const modules = [
   },
   {
     number: "03",
-    title: "Gestión de cobro",
-    text: "Registro de visitas, contactos, compromisos, pagos y resultados contra la obligación correspondiente.",
+    title: "Gestión de campo",
+    text: "Registro de visitas, contactos, compromisos y resultados contra el cliente y el crédito correspondiente.",
     detail: "Trabajo en campo",
   },
   {
     number: "04",
-    title: "Comprobantes",
-    text: "Evidencia digital asociada al pago y disponible para consulta, sin depender de fotos o mensajes aislados.",
-    detail: "Trazabilidad",
+    title: "Verificación compartida",
+    text: "Consulta mínima por cédula, con consentimiento explícito, calificación operativa y reporte negativo resumido.",
+    detail: "Acceso restringido",
   },
   {
     number: "05",
@@ -44,21 +44,21 @@ const modules = [
   },
   {
     number: "06",
-    title: "Cierre y conciliación",
-    text: "Comparación entre pagos registrados, medios de pago, entregas y diferencias antes de cerrar la jornada.",
-    detail: "Control diario",
+    title: "Documentos y OCR asistivo",
+    text: "Guarda frente, reverso y foto designada del cliente en almacenamiento privado; el OCR propone datos para revisión humana.",
+    detail: "Evidencia privada",
   },
   {
     number: "07",
-    title: "Reportes",
-    text: "Lecturas de cartera, recaudo y mora con fecha de corte, filtros y contexto suficiente para tomar decisiones.",
+    title: "Reportes operativos",
+    text: "Lecturas de créditos activos, cuotas vencidas, solicitudes en revisión, frecuencias y responsables.",
     detail: "Seguimiento",
   },
   {
     number: "08",
-    title: "Consulta del cliente",
-    text: "Un espacio separado para revisar obligaciones y comprobantes propios, sin exponer la operación interna de la empresa.",
-    detail: "Autoservicio",
+    title: "Multiempresa y perfiles",
+    text: "El propietario cambia de empresa, administra su marca y crea supervisores y cobradores con permisos definidos.",
+    detail: "Control de acceso",
   },
 ];
 
@@ -67,7 +67,10 @@ const flow = [
   ["Asignar", "Cada caso queda relacionado con un responsable y un alcance."],
   ["Gestionar", "El cobrador registra el resultado donde ocurrió la operación."],
   ["Revisar", "Las novedades y diferencias llegan al perfil que puede resolverlas."],
-  ["Cerrar", "La jornada conserva una explicación común del recaudo y los pendientes."],
+  [
+    "Documentar",
+    "La jornada conserva una explicación común de gestiones, cuotas vencidas y pendientes.",
+  ],
 ];
 
 const permissions = [
@@ -76,42 +79,36 @@ const permissions = [
     owner: true,
     supervisor: false,
     collector: false,
-    customer: false,
   },
   {
     action: "Consultar toda la cartera",
     owner: true,
     supervisor: "Asignada",
     collector: false,
-    customer: false,
   },
   {
     action: "Organizar y revisar rutas",
     owner: true,
     supervisor: true,
     collector: false,
-    customer: false,
   },
   {
-    action: "Registrar gestiones y cobros",
+    action: "Registrar gestiones y avances operativos",
     owner: true,
     supervisor: true,
     collector: "Propios",
-    customer: false,
   },
   {
-    action: "Revisar cierres y diferencias",
+    action: "Revisar rutas, novedades y prioridades",
     owner: true,
     supervisor: true,
     collector: "Propios",
-    customer: false,
   },
   {
-    action: "Consultar obligaciones y comprobantes",
-    owner: false,
-    supervisor: false,
-    collector: false,
-    customer: "Propios",
+    action: "Consultar verificación compartida",
+    owner: true,
+    supervisor: true,
+    collector: true,
   },
 ];
 
@@ -135,7 +132,7 @@ export default function ProductPage() {
     operatingSystem: "Web",
     inLanguage: "es-CO",
     description:
-      "Plataforma en desarrollo para organizar cartera, rutas, recaudo y cierres de empresas colombianas.",
+      "Plataforma para organizar clientes, rutas, verificación y seguimiento operativo de créditos en empresas colombianas.",
   };
 
   return (
@@ -153,12 +150,15 @@ export default function ProductPage() {
             <span>Producto</span>
           </div>
           <span className="eyebrow">Una operación conectada</span>
-          <h1>El sistema que estamos construyendo para explicar cada peso y cada gestión.</h1>
+          <h1>
+            El sistema que estamos construyendo para explicar cada gestión y cada decisión
+            operativa.
+          </h1>
           <div className="product-hero-bottom">
             <p>
-              cobranzapp conecta la información que prepara la jornada, acompaña el cobro y permite
-              revisar el cierre. Cada empresa opera en un espacio independiente y cada perfil entra
-              solo a lo que necesita.
+              cobranzapp conecta la información que prepara la jornada, acompaña el trabajo de campo
+              y permite revisar prioridades. Cada empresa opera en un espacio independiente y cada
+              perfil entra solo a lo que necesita.
             </p>
             <a className="button" href="/contacto?source=producto">
               Solicitar una demostración
@@ -176,8 +176,8 @@ export default function ProductPage() {
               <h2 id="modules-title">Ocho módulos, una misma historia operativa.</h2>
             </div>
             <p>
-              La arquitectura evita convertir cada función en una isla: cartera, ruta, recaudo y
-              cierre comparten responsables y trazabilidad.
+              La arquitectura evita convertir cada función en una isla: clientes, rutas,
+              verificación y seguimiento comparten responsables y trazabilidad.
             </p>
           </div>
           <div className="module-grid">
@@ -231,7 +231,6 @@ export default function ProductPage() {
                   <th scope="col">Propietario</th>
                   <th scope="col">Supervisor</th>
                   <th scope="col">Cobrador</th>
-                  <th scope="col">Cliente</th>
                 </tr>
               </thead>
               <tbody>
@@ -246,9 +245,6 @@ export default function ProductPage() {
                     </td>
                     <td>
                       <Permission value={row.collector} />
-                    </td>
-                    <td>
-                      <Permission value={row.customer} />
                     </td>
                   </tr>
                 ))}
@@ -274,8 +270,8 @@ export default function ProductPage() {
             <span className="eyebrow">Modelo comercial</span>
             <h2>El propietario es quien contrata cobranzapp.</h2>
             <p>
-              Supervisores, cobradores y clientes finales son usuarios vinculados a esa operación;
-              no se presentan como compradores separados del servicio.
+              Supervisores y cobradores son usuarios vinculados a esa operación; no se presentan
+              como compradores separados del servicio.
             </p>
           </article>
         </section>
@@ -284,8 +280,8 @@ export default function ProductPage() {
           <span className="eyebrow">Validación del producto</span>
           <h2>Una buena demostración empieza con tu operación real.</h2>
           <p>
-            Cuéntanos cómo administras hoy la cartera, las rutas y el recaudo. Así podremos validar
-            el alcance antes de ofrecer una promesa comercial.
+            Cuéntanos cómo administras hoy los clientes, las rutas y el seguimiento de cuotas. Así
+            podremos validar el alcance antes de ofrecer una promesa comercial.
           </p>
           <a className="button button-light" href="/contacto?source=producto">
             Hablar con el equipo
