@@ -429,8 +429,12 @@ export function createPostgresCreditService(pool: Pool): CreditService {
           principal_min: string;
           principal_max: string;
           term_count: number;
+          rate_basis: LoanProduct["rateBasis"];
+          nominal_rate: string;
+          documentation_fee_rate: string;
         }>(
-          `SELECT id, name, status, principal_min, principal_max, term_count
+          `SELECT id, name, status, principal_min, principal_max, term_count,
+                  rate_basis, nominal_rate, documentation_fee_rate
              FROM loan_products
             WHERE tenant_id = $1 AND id = $2`,
           [tenantId, input.loanProductId],
@@ -450,8 +454,9 @@ export function createPostgresCreditService(pool: Pool): CreditService {
         const inserted = await client.query<{ id: string }>(
           `INSERT INTO loan_applications
              (tenant_id, borrower_id, loan_product_id, requested_principal,
-              payment_frequency, requested_term_count, purpose, status, created_by)
-           VALUES ($1, $2, $3, $4::numeric, $5, $6, $7, 'active', $8)
+              payment_frequency, requested_term_count, purpose, status, created_by,
+              rate_basis, nominal_rate, documentation_fee_rate)
+           VALUES ($1, $2, $3, $4::numeric, $5, $6, $7, 'active', $8, $9, $10::numeric, $11::numeric)
            RETURNING id`,
           [
             tenantId,
@@ -462,6 +467,9 @@ export function createPostgresCreditService(pool: Pool): CreditService {
             input.requestedTermCount,
             input.purpose,
             actor.userId,
+            product.rate_basis,
+            product.nominal_rate,
+            product.documentation_fee_rate,
           ],
         );
         const applicationId = inserted.rows[0]?.id;
@@ -547,9 +555,9 @@ export function createPostgresCreditService(pool: Pool): CreditService {
                   application.status,
                   application.created_at,
                   application.updated_at,
-                  product.rate_basis,
-                  product.nominal_rate,
-                  product.documentation_fee_rate
+                  application.rate_basis,
+                  application.nominal_rate,
+                  application.documentation_fee_rate
              FROM loan_applications application
              JOIN borrowers borrower
                ON borrower.tenant_id = application.tenant_id
@@ -678,9 +686,9 @@ export function createPostgresCreditService(pool: Pool): CreditService {
                   application.purpose,
                   application.status,
                   application.created_at,
-                  product.rate_basis,
-                  product.nominal_rate,
-                  product.documentation_fee_rate,
+                  application.rate_basis,
+                  application.nominal_rate,
+                  application.documentation_fee_rate,
                   product.principal_min,
                   product.principal_max
              FROM loan_applications application
@@ -718,8 +726,9 @@ export function createPostgresCreditService(pool: Pool): CreditService {
         const inserted = await client.query<{ id: string }>(
           `INSERT INTO loan_applications
              (tenant_id, borrower_id, loan_product_id, requested_principal,
-              payment_frequency, requested_term_count, purpose, status, created_by, renewed_from_id)
-           VALUES ($1, $2, $3, $4::numeric, $5, $6, $7, 'active', $8, $9)
+              payment_frequency, requested_term_count, purpose, status, created_by, renewed_from_id,
+              rate_basis, nominal_rate, documentation_fee_rate)
+           VALUES ($1, $2, $3, $4::numeric, $5, $6, $7, 'active', $8, $9, $10, $11::numeric, $12::numeric)
            RETURNING id`,
           [
             tenantId,
@@ -731,6 +740,9 @@ export function createPostgresCreditService(pool: Pool): CreditService {
             state.purpose,
             actor.userId,
             applicationId,
+            state.rate_basis,
+            state.nominal_rate,
+            state.documentation_fee_rate,
           ],
         );
         const newId = inserted.rows[0]?.id;
