@@ -121,9 +121,7 @@ export function LoanApplicationBoard({
     event.currentTarget.reset();
     setFrequency("daily");
     setTermCount(30);
-    setMessage(
-      "Solicitud creada como borrador. Envíala a revisión cuando la identidad del cliente y el producto estén revisados.",
-    );
+    setMessage("Crédito creado y activo. El calendario quedó calculado automáticamente.");
     setIsBusy(false);
     router.refresh();
   }
