@@ -185,6 +185,19 @@ export default async function TenantDashboard({
         </section>
       ) : null}
 
+      <section aria-label="Estado operativo de créditos" className="metric-grid tenant-metrics">
+        <article>
+          <span>Créditos activos</span>
+          <strong>{overview.metrics.activeCredits ?? 0}</strong>
+          <small>Seguimiento operativo vigente</small>
+        </article>
+        <article className="metric-accent">
+          <span>Solicitudes en revisión</span>
+          <strong>{overview.metrics.creditApplicationsInReview ?? 0}</strong>
+          <small>Requieren seguimiento del equipo</small>
+        </article>
+      </section>
+
       <div className="dashboard-columns">
         <section className="dashboard-card tenant-card" id="equipo">
           <div className="card-heading">

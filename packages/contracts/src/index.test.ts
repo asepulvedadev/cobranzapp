@@ -357,6 +357,8 @@ describe("shared API contracts", () => {
         teams: 1,
         pendingInvitations: 0,
         activeEmployeeSeats: 0,
+        activeCredits: 2,
+        creditApplicationsInReview: 1,
       },
       membershipEntitlement: null,
       settings: {

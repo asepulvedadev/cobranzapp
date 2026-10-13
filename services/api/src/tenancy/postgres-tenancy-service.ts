@@ -517,6 +517,8 @@ export function createPostgresTenancyService(
           teams: string;
           pending_invitations: string;
           active_employee_seats: string;
+          active_credits: string;
+          credit_applications_in_review: string;
         }>(
           `SELECT
              (SELECT count(*) FROM tenant_memberships WHERE tenant_id = $1 AND status = 'active') AS members,
@@ -526,7 +528,11 @@ export function createPostgresTenancyService(
                AND revoked_at IS NULL AND expires_at > now()) AS pending_invitations,
              (SELECT count(*) FROM tenant_memberships
                WHERE tenant_id = $1 AND status = 'active'
-                 AND role IN ('supervisor', 'collector')) AS active_employee_seats`,
+                 AND role IN ('supervisor', 'collector')) AS active_employee_seats,
+             (SELECT count(*) FROM loan_applications
+                WHERE tenant_id = $1 AND status = 'active') AS active_credits,
+             (SELECT count(*) FROM loan_applications
+                WHERE tenant_id = $1 AND status IN ('submitted', 'under_review')) AS credit_applications_in_review`,
           [tenantId],
         );
         const settings = await client.query<{
@@ -689,6 +695,8 @@ export function createPostgresTenancyService(
             teams: Number(counts?.teams ?? 0),
             pendingInvitations: maySeeOrganization ? Number(counts?.pending_invitations ?? 0) : 0,
             activeEmployeeSeats: maySeeOrganization ? activeEmployeeSeats : 0,
+            activeCredits: Number(counts?.active_credits ?? 0),
+            creditApplicationsInReview: Number(counts?.credit_applications_in_review ?? 0),
           },
           membershipEntitlement: entitlement
             ? {
