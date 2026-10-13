@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import type { TenantMemberProfile } from "../../../../../lib/platform";
 import { serverApi } from "../../../../../lib/server-api";
 import { ProfileSettingsModal } from "../ProfileSettingsModal";
@@ -26,8 +27,12 @@ export default async function TenantSettingsPage({
       profile = ((await profileResponse.json()) as { profile: TenantMemberProfile }).profile;
   }
   const canManage = overview.actorRole === "owner" || overview.actorRole === "supervisor";
+  const brandStyle = {
+    "--tenant-brand-primary": overview.settings.primaryColor,
+    "--tenant-brand-accent": overview.settings.accentColor,
+  } as CSSProperties;
   return (
-    <div className="dashboard-page tenant-subpage">
+    <div className="dashboard-page tenant-subpage" style={brandStyle}>
       <header className="dashboard-header">
         <div>
           <span className="panel-eyebrow">{overview.tenant.displayName}</span>

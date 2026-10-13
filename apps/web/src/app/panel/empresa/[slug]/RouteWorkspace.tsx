@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import type { BorrowerDirectory, Route, TenantOverview } from "../../../../lib/platform";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
 import { CollectionRouteBoard } from "./CollectionRouteBoard";
@@ -8,11 +8,13 @@ import { CollectionRouteBoard } from "./CollectionRouteBoard";
 export function RouteWorkspace({
   actorRole,
   collectors,
+  settings,
   tenantId,
   tenantName,
 }: {
   actorRole: TenantOverview["actorRole"];
   collectors: TenantOverview["members"];
+  settings: TenantOverview["settings"];
   tenantId: string;
   tenantName: string;
 }) {
@@ -47,7 +49,15 @@ export function RouteWorkspace({
   }, [load]);
 
   return (
-    <div className="route-workspace">
+    <div
+      className="dashboard-page tenant-subpage route-workspace"
+      style={
+        {
+          "--tenant-brand-primary": settings.primaryColor,
+          "--tenant-brand-accent": settings.accentColor,
+        } as CSSProperties
+      }
+    >
       <header className="dashboard-header">
         <div>
           <span className="panel-eyebrow">{tenantName}</span>

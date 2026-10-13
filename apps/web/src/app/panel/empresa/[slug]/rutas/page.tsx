@@ -14,6 +14,7 @@ export default async function RoutesPage({ params }: { params: Promise<{ slug: s
     <RouteWorkspace
       actorRole={overview.actorRole}
       collectors={overview.members}
+      settings={overview.settings}
       tenantId={overview.tenant.id}
       tenantName={overview.tenant.displayName}
     />

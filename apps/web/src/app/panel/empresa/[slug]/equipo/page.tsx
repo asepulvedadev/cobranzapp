@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import type { TenantMemberProfile } from "../../../../../lib/platform";
 import { serverApi } from "../../../../../lib/server-api";
 import { CreateMemberModal } from "../CreateMemberModal";
@@ -28,9 +29,13 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
         )
       ).filter((profile): profile is TenantMemberProfile => profile !== null)
     : [];
+  const brandStyle = {
+    "--tenant-brand-primary": overview.settings.primaryColor,
+    "--tenant-brand-accent": overview.settings.accentColor,
+  } as CSSProperties;
 
   return (
-    <div className="dashboard-page tenant-subpage">
+    <div className="dashboard-page tenant-subpage" style={brandStyle}>
       <header className="dashboard-header">
         <div>
           <span className="panel-eyebrow">{overview.tenant.displayName}</span>

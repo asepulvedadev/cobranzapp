@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import type { BorrowerDirectory } from "../../../../../lib/platform";
 import { serverApi } from "../../../../../lib/server-api";
 import { BorrowerDirectory as BorrowerDirectoryView } from "../BorrowerDirectory";
@@ -13,8 +14,12 @@ export default async function CustomersPage({ params }: { params: Promise<{ slug
     `/v1/tenants/${overview.tenant.id}/borrowers?page=1&pageSize=20`,
   );
   const directory = response.ok ? ((await response.json()) as BorrowerDirectory) : null;
+  const brandStyle = {
+    "--tenant-brand-primary": overview.settings.primaryColor,
+    "--tenant-brand-accent": overview.settings.accentColor,
+  } as CSSProperties;
   return (
-    <div className="dashboard-page tenant-subpage">
+    <div className="dashboard-page tenant-subpage" style={brandStyle}>
       <header className="dashboard-header">
         <div>
           <span className="panel-eyebrow">{overview.tenant.displayName}</span>
