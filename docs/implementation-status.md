@@ -10,12 +10,12 @@
 | Multitenencia | Completado | Empresas, membresías, roles, RLS y claves compuestas por empresa; la operación del propietario se presenta como una empresa con empleados, sin sedes ni equipos en el flujo principal |
 | Alta comercial | Completado | El desarrollador registra propietarios, emite códigos únicos por suscripción y cada propietario crea varias empresas desde su panel |
 | Consola de desarrollador | Completado | Directorios paginados, registro de propietarios, emisión de códigos, planes, cupos, estados, actividad, estado técnico y soporte temporal auditado |
-| Expediente de cliente | Completado | Identidad manual, teléfonos, direcciones, contactos de emergencia, foto designada y documentos privados |
+| Expediente de cliente | Completado | Identidad manual, teléfonos, WhatsApp, direcciones de casa y trabajo con confirmación/corrección y geocodificación, contactos de emergencia, foto designada y documentos privados; alta móvil dentro de un modal cerrable |
 | OCR asistivo de documentos | Completado con revisión humana | Tesseract en el worker, imágenes/PDF privados, sugerencias cifradas, reintento y confirmación auditada |
 | Personal operativo | Completado | Perfil de supervisores y cobradores, identidad cifrada, últimos cuatro dígitos, tipo de sangre con consentimiento y documentos privados |
 | Verificación compartida | Completado con activación controlada | Vista independiente para propietario, supervisor y cobrador con búsqueda simple por cédula; devuelve únicamente nombre, créditos vigentes, calificación derivada de pagos y reporte negativo; la red consentida avanzada, correcciones, disputas y auditoría permanecen controladas; no es lista negra |
 | Rutas de cobranza | Completado | Vista independiente en sidebar, direcciones geocodificadas bajo demanda, Waze, optimización por cercanía, visitas auditadas y asignación por empresa |
-| Originación operativa protegida | Completado como piloto | Catálogo configurable, reglas de monto/interés, frecuencias y plazos de un mes/5 semanas, calendario determinista, renovación desde la segunda cuota y marcadores de cuotas; disponible en web y móvil; no aprueba contabilidad, desembolsa ni registra recibos financieros |
+| Originación operativa protegida | Completado como piloto | Catálogo configurable en vista independiente de Créditos, reglas de monto/interés, frecuencias y plazos de un mes/5 semanas, calendario determinista, renovación desde la segunda cuota y marcadores de cuotas; disponible en web y móvil; no aprueba contabilidad, desembolsa ni registra recibos financieros |
 | Entrega VPS | Completado para el entorno actual | Imágenes inmutables transferidas por SSH, orden estricto de despliegue, health/readiness, Caddy y roles PostgreSQL separados |
 
 ## Bloques deliberadamente protegidos
