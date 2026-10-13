@@ -1127,8 +1127,11 @@ function AuthenticatedHome({
           </>
         ) : user.platformRole !== "developer" ? (
           <View style={styles.boundaryCard}>
-            <Text style={styles.cardTitle}>Aún no tienes un espacio asignado</Text>
-            <Text style={styles.muted}>Acepta una invitación de empresa para comenzar.</Text>
+            <Text style={styles.cardTitle}>Aún no tienes una empresa activa</Text>
+            <Text style={styles.muted}>
+              Si eres propietario, crea la empresa desde el panel web. Si eres empleado, el
+              propietario debe registrarte con tu usuario y teléfono.
+            </Text>
           </View>
         ) : null}
       </ScrollView>
