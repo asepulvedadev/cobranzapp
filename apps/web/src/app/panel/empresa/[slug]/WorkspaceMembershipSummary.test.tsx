@@ -28,7 +28,7 @@ describe("WorkspaceMembershipSummary", () => {
     expect(html).toContain("5 incluidos + 2 adicionales");
     expect(html).toContain("Cupos disponibles");
     expect(html).toContain("Hasta 100");
-    expect(html).toContain("3/4");
+    expect(html).toContain("4/4");
     expect(html).toContain("Los cupos se validan al activar cada empleado");
   });
 
@@ -44,6 +44,6 @@ describe("WorkspaceMembershipSummary", () => {
     );
 
     expect(html).toContain("Plan pendiente");
-    expect(html).toContain("2/4");
+    expect(html).toContain("3/4");
   });
 });
