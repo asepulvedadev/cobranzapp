@@ -48,7 +48,7 @@ Discuss one decision at a time. Jurisdiction and a reported loan example are rec
 - [x] Manual document capture, deep analytics, deterministic automation boundaries, and VPS/recovery plan are included.
 - [x] The no-generative-AI requirement replaces the earlier Hermes direction; deterministic Tesseract OCR is allowed only as an assistive suggestion with mandatory human confirmation.
 - [x] Assumptions are explicit and distinct from requirements and approved decisions.
-- [x] Technical constraints are checked against primary documentation; no application was constructed.
+- [x] Technical constraints are checked against primary documentation; the current operational pilot is implemented within the protected scope below, while accounting, custody, offline money capture, and full reporting remain gated.
 - [x] Documentation is separated by responsibility; visual design is isolated in `design.md`.
 - [x] User-selected Aura reference is documented as the whole-app visual direction; mobile-first adaptation and proposed tokens/components are specified. Actual screen mockups and user review remain pending.
 - [x] The user-provided nominal/net amount example and daily/fortnightly/monthly cadences are documented as unapproved discovery evidence.
@@ -66,7 +66,7 @@ Discuss one decision at a time. Jurisdiction and a reported loan example are rec
 - [ ] Stack, providers, data regions, hosting budget, volumes, and recovery targets are approved.
 - [ ] Mobile screens and role-specific flows have been reviewed before UI implementation.
 - [ ] Final physical schema/migrations, acceptance plan, and ordered delivery backlog are reviewed.
-- [x] User explicitly authorized the engineering repository, development foundation, CI/CD, and VPS deployment on 2026-10-11. Borrower/financial vertical slices remain blocked by the unresolved gates above.
+- [x] User explicitly authorized the engineering repository, development foundation, CI/CD, VPS deployment, borrower dossier, verification, routes, and the protected operational credit pilot on 2026-10-11. Full accounting, custody, offline money capture, and reporting remain gated by the unresolved decisions above.
 
 **Next discovery question:** What do borrowers primarily use the loan funds for? Purpose is discovery evidence; it does not by itself prove eligibility for a legal credit category.
 
