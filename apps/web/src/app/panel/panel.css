@@ -4516,6 +4516,98 @@ html:has(.panel-shell) {
   background: linear-gradient(145deg, #fff 0%, #f7fbf8 100%);
 }
 
+.borrower-create-form {
+  gap: 16px;
+}
+
+.borrower-stepper {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 4px;
+}
+
+.borrower-step {
+  display: grid;
+  gap: 5px;
+  justify-items: start;
+  min-height: 58px;
+  padding: 10px;
+  border: 1px solid var(--panel-line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel-surface) 92%, var(--panel-line) 8%);
+  color: var(--panel-ink-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.borrower-step span {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--panel-line);
+  color: var(--panel-ink);
+  font-size: 11px;
+}
+
+.borrower-step.is-active {
+  border-color: var(--tenant-brand-primary, var(--panel-accent));
+  background: color-mix(in srgb, var(--tenant-brand-primary, var(--panel-accent)) 8%, white);
+  color: var(--panel-ink);
+}
+
+.borrower-step.is-active span {
+  background: var(--tenant-brand-primary, var(--panel-accent));
+  color: white;
+}
+
+.borrower-step:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.borrower-create-form section[hidden] {
+  display: none;
+}
+
+.borrower-create-form section {
+  display: grid;
+  gap: 10px;
+}
+
+.borrower-create-form section h3 {
+  margin: 0;
+  color: var(--panel-ink);
+  font-size: 20px;
+}
+
+.borrower-step-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.borrower-step-actions button {
+  min-width: 140px;
+}
+
+.borrower-confirmation-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--panel-ink-muted);
+}
+
+.borrower-details-content a {
+  color: #8b5b00;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .borrower-form-row {
   display: grid;
   gap: 12px;
@@ -4955,6 +5047,24 @@ html:has(.panel-shell) {
 }
 
 @media (max-width: 580px) {
+  .borrower-stepper {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .borrower-step-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin-inline: -14px;
+    padding: 12px 14px;
+    background: color-mix(in srgb, var(--panel-surface) 92%, transparent);
+    backdrop-filter: blur(10px);
+  }
+
+  .borrower-step-actions button {
+    flex: 1;
+  }
+
   .borrower-form-row {
     grid-template-columns: 1fr;
   }

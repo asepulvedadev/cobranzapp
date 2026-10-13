@@ -24,6 +24,7 @@ type BorrowerRow = {
   full_name: string;
   status: Borrower["status"];
   phone: string;
+  whatsapp_phone: string | null;
   home_address: string;
   work_address: string;
   profile_photo_object_key: string | null;
@@ -48,7 +49,7 @@ async function loadBorrower(
 ): Promise<Borrower | null> {
   const result = await client.query<BorrowerRow>(
     `SELECT borrower.id, borrower.full_name, borrower.status,
-            borrower.phone, borrower.home_address, borrower.work_address,
+            borrower.phone, borrower.whatsapp_phone, borrower.home_address, borrower.work_address,
             borrower.profile_photo_object_key, borrower.consent_version,
             identity.country, identity.document_type, identity.document_last4,
             identity.verification_state, borrower.created_at
@@ -94,6 +95,7 @@ async function loadBorrower(
     fullName: row.full_name,
     status: row.status,
     phone: row.phone,
+    whatsappPhone: row.whatsapp_phone,
     homeAddress: row.home_address,
     workAddress: row.work_address,
     profilePhotoObjectKey: row.profile_photo_object_key,
@@ -208,7 +210,7 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
         for (const row of statusRows.rows) borrowerSummary[row.status] = Number(row.total);
         const rows = await client.query<BorrowerRow>(
           `SELECT borrower.id, borrower.full_name, borrower.status,
-                  borrower.phone, borrower.home_address, borrower.work_address,
+                  borrower.phone, borrower.whatsapp_phone, borrower.home_address, borrower.work_address,
                   borrower.profile_photo_object_key, borrower.consent_version,
                   identity.country, identity.document_type, identity.document_last4,
                   identity.verification_state, borrower.created_at
@@ -276,14 +278,15 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
           try {
             await client.query(
               `INSERT INTO borrowers
-               (tenant_id, id, full_name, phone, home_address, work_address,
+               (tenant_id, id, full_name, phone, whatsapp_phone, home_address, work_address,
                 profile_photo_object_key, consent_version, consent_evidence_ref, created_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
               [
                 tenantId,
                 borrowerId,
                 input.fullName,
                 input.phone,
+                input.whatsappPhone ?? input.phone,
                 input.homeAddress,
                 input.workAddress,
                 profileKey,
