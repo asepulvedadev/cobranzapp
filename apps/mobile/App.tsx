@@ -11,7 +11,10 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Linking,
+  Modal,
+  Platform,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -411,13 +414,16 @@ function TenantProfile({
   api,
   memberProfile,
   onNeedsReauthentication,
+  onUpdated,
   overview,
 }: {
   api: MobileApi;
   memberProfile: TenantMemberProfile | null;
   onNeedsReauthentication: () => void;
+  onUpdated: () => void;
   overview: TenantOverview;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
   return (
     <View style={styles.stack}>
       <View style={styles.directoryHeading}>
@@ -431,13 +437,63 @@ function TenantProfile({
         empresa.
       </Text>
       {memberProfile ? (
-        <MemberProfileForm
-          api={api}
-          onNeedsReauthentication={onNeedsReauthentication}
-          profile={memberProfile}
-          tenantId={overview.tenant.id}
-          userId={memberProfile.userId}
-        />
+        <>
+          <View style={styles.boundaryCard}>
+            <Text style={styles.cardTitle}>Ficha operativa privada</Text>
+            <Text style={styles.muted}>
+              Actualiza documento, celular, direcciones, contactos, tipo de sangre y foto desde una
+              ventana segura.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setIsEditing(true)}
+              style={styles.primaryButton}
+            >
+              <Text style={styles.primaryButtonText}>Editar mis datos</Text>
+            </Pressable>
+          </View>
+          <Modal
+            animationType="slide"
+            onRequestClose={() => setIsEditing(false)}
+            transparent
+            visible={isEditing}
+          >
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={styles.profileModalBackdrop}
+            >
+              <ScrollView
+                contentContainerStyle={styles.profileModalScroll}
+                keyboardShouldPersistTaps="handled"
+              >
+                <View style={styles.profileModalCard}>
+                  <View style={styles.profileModalHeader}>
+                    <View style={styles.listCopy}>
+                      <Text style={styles.eyebrow}>CONFIGURACIÓN PERSONAL</Text>
+                      <Text style={styles.cardTitle}>Editar mis datos</Text>
+                    </View>
+                    <Pressable
+                      accessibilityLabel="Cerrar edición de perfil"
+                      accessibilityRole="button"
+                      onPress={() => setIsEditing(false)}
+                      style={styles.profileModalClose}
+                    >
+                      <Text style={styles.profileModalCloseText}>×</Text>
+                    </Pressable>
+                  </View>
+                  <MemberProfileForm
+                    api={api}
+                    onNeedsReauthentication={onNeedsReauthentication}
+                    onSaved={onUpdated}
+                    profile={memberProfile}
+                    tenantId={overview.tenant.id}
+                    userId={memberProfile.userId}
+                  />
+                </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          </Modal>
+        </>
       ) : (
         <ActivityIndicator color="#fbbf24" />
       )}
@@ -1141,6 +1197,7 @@ function AuthenticatedHome({
                       setNeedsReauthentication(true);
                       setMessage("Confirma tu contraseña para continuar con esta acción.");
                     }}
+                    onUpdated={refreshWorkspace}
                     overview={tenant}
                   />
                 ) : tenantSection === "personnel" ? (
@@ -1505,6 +1562,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#343b36",
     gap: 6,
+  },
+  profileModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.72)",
+  },
+  profileModalScroll: {
+    flexGrow: 1,
+    justifyContent: "flex-end",
+    padding: 14,
+  },
+  profileModalCard: {
+    maxHeight: "94%",
+    borderRadius: 22,
+    backgroundColor: "#202523",
+    borderWidth: 1,
+    borderColor: "#3c453e",
+    padding: 14,
+  },
+  profileModalHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 10,
+  },
+  profileModalClose: {
+    paddingHorizontal: 5,
+    paddingVertical: 0,
+  },
+  profileModalCloseText: {
+    color: "#f4f6f4",
+    fontSize: 28,
+    lineHeight: 28,
   },
   routeCard: {
     padding: 14,

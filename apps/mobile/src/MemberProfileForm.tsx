@@ -15,12 +15,14 @@ function errorText(error: unknown) {
 export function MemberProfileForm({
   api,
   onNeedsReauthentication,
+  onSaved,
   profile,
   tenantId,
   userId,
 }: {
   api: MobileApi;
   onNeedsReauthentication: () => void;
+  onSaved?: () => void;
   profile: TenantMemberProfile;
   tenantId: string;
   userId: string;
@@ -107,6 +109,7 @@ export function MemberProfileForm({
       });
       setDocumentNumber("");
       setMessage("Ficha operativa guardada.");
+      onSaved?.();
     } catch (error) {
       if (error instanceof MobileApiError && error.status === 428) onNeedsReauthentication();
       setMessage(errorText(error));
