@@ -38,6 +38,8 @@ type StopRow = {
   address_kind: Route["stops"][number]["addressKind"];
   address: string;
   position: number;
+  latitude: number | string | null;
+  longitude: number | string | null;
   visit_status: Route["stops"][number]["visitStatus"];
   visited_at: Date | null;
   visit_notes: string | null;
@@ -85,10 +87,15 @@ async function loadRoute(client: Pick<PoolClient, "query">, tenantId: string, ro
     `SELECT stop.id, stop.borrower_id, borrower.full_name AS borrower_name,
             stop.address_kind,
             CASE stop.address_kind WHEN 'home' THEN borrower.home_address ELSE borrower.work_address END AS address,
-            stop.position, stop.visit_status, stop.visited_at, stop.visit_notes
+            stop.position, location.latitude, location.longitude,
+            stop.visit_status, stop.visited_at, stop.visit_notes
        FROM collection_route_stops stop
        JOIN borrowers borrower
          ON borrower.tenant_id = stop.tenant_id AND borrower.id = stop.borrower_id
+       LEFT JOIN borrower_address_locations location
+         ON location.tenant_id = stop.tenant_id
+        AND location.borrower_id = stop.borrower_id
+        AND location.address_kind = stop.address_kind
       WHERE stop.tenant_id = $1 AND stop.route_id = $2
       ORDER BY stop.position ASC, stop.id ASC`,
     [tenantId, routeId],
@@ -109,6 +116,8 @@ async function loadRoute(client: Pick<PoolClient, "query">, tenantId: string, ro
       addressKind: stop.address_kind,
       address: stop.address,
       position: stop.position,
+      latitude: stop.latitude === null ? null : Number(stop.latitude),
+      longitude: stop.longitude === null ? null : Number(stop.longitude),
       visitStatus: stop.visit_status,
       visitedAt: stop.visited_at?.toISOString() ?? null,
       visitNotes: stop.visit_notes,

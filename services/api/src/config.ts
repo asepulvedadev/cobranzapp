@@ -16,6 +16,7 @@ const configSchema = z.object({
   RESEND_API_KEY: z.string().min(1).optional(),
   RESEND_FROM: z.string().min(1).default("cobranzapp <contacto@cobranzaap.tech>"),
   CONTACT_TO_EMAIL: z.email().default("info@cobranzaap.tech"),
+  GEOCODING_ENDPOINT: z.url().default("https://nominatim.openstreetmap.org/search"),
 });
 
 export type ApiConfig = z.infer<typeof configSchema>;

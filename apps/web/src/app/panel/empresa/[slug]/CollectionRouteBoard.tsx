@@ -11,7 +11,10 @@ const statusLabels: Record<Route["status"], string> = {
   archived: "Archivada",
 };
 
-function wazeUrl(address: string) {
+function wazeUrl(address: string, latitude: number | null, longitude: number | null) {
+  if (latitude !== null && longitude !== null) {
+    return `https://www.waze.com/ul?ll=${latitude}%2C${longitude}&navigate=yes&utm_source=cobranzapp`;
+  }
   return `https://www.waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes&utm_source=cobranzapp`;
 }
 
@@ -263,7 +266,7 @@ export function CollectionRouteBoard({
                         </small>
                         <a
                           className="route-stop-navigation"
-                          href={wazeUrl(stop.address)}
+                          href={wazeUrl(stop.address, stop.latitude, stop.longitude)}
                           rel="noreferrer"
                           target="_blank"
                         >

@@ -47,6 +47,7 @@ export function BorrowerDirectory({
   const [isError, setIsError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [geocodeBusy, setGeocodeBusy] = useState("");
   const [includeSecondContact, setIncludeSecondContact] = useState(false);
   const [homeAddressConfirmed, setHomeAddressConfirmed] = useState(false);
   const [workAddressConfirmed, setWorkAddressConfirmed] = useState(false);
@@ -108,6 +109,28 @@ export function BorrowerDirectory({
 
   function nextCreateStep() {
     if (validateCreateStep(createStep)) setCreateStep((step) => Math.min(4, step + 1));
+  }
+
+  async function geocodeAddress(borrowerId: string, addressKind: "home" | "work") {
+    const key = `${borrowerId}:${addressKind}`;
+    setGeocodeBusy(key);
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/borrowers/${borrowerId}/geocode`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ addressKind }),
+      },
+    ).catch(() => null);
+    setGeocodeBusy("");
+    if (!response?.ok) {
+      setMessage("No fue posible ubicar la dirección. Verifica el texto e inténtalo de nuevo.");
+      setIsError(true);
+      return;
+    }
+    setMessage("Dirección ubicada y guardada para las rutas.");
+    setIsError(false);
+    router.refresh();
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -289,6 +312,25 @@ export function BorrowerDirectory({
                                 ? "Dirección confirmada"
                                 : "Pendiente de confirmar"}
                             </small>
+                            <small>
+                              {borrower.addressLocations.home.status === "ready"
+                                ? `Ubicada: ${borrower.addressLocations.home.formattedAddress}`
+                                : borrower.addressLocations.home.status === "failed"
+                                  ? "No se pudo ubicar; puedes reintentar"
+                                  : "Sin coordenadas todavía"}
+                            </small>
+                            <button
+                              className="button-link"
+                              disabled={geocodeBusy === `${borrower.id}:home`}
+                              onClick={() => void geocodeAddress(borrower.id, "home")}
+                              type="button"
+                            >
+                              {geocodeBusy === `${borrower.id}:home`
+                                ? "Ubicando…"
+                                : borrower.addressLocations.home.status === "ready"
+                                  ? "Actualizar ubicación"
+                                  : "Ubicar dirección"}
+                            </button>
                             <a
                               href={wazeUrl(borrower.homeAddress)}
                               rel="noreferrer"
@@ -305,6 +347,25 @@ export function BorrowerDirectory({
                                 ? "Dirección confirmada"
                                 : "Pendiente de confirmar"}
                             </small>
+                            <small>
+                              {borrower.addressLocations.work.status === "ready"
+                                ? `Ubicada: ${borrower.addressLocations.work.formattedAddress}`
+                                : borrower.addressLocations.work.status === "failed"
+                                  ? "No se pudo ubicar; puedes reintentar"
+                                  : "Sin coordenadas todavía"}
+                            </small>
+                            <button
+                              className="button-link"
+                              disabled={geocodeBusy === `${borrower.id}:work`}
+                              onClick={() => void geocodeAddress(borrower.id, "work")}
+                              type="button"
+                            >
+                              {geocodeBusy === `${borrower.id}:work`
+                                ? "Ubicando…"
+                                : borrower.addressLocations.work.status === "ready"
+                                  ? "Actualizar ubicación"
+                                  : "Ubicar dirección"}
+                            </button>
                             <a
                               href={wazeUrl(borrower.workAddress)}
                               rel="noreferrer"

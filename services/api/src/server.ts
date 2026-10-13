@@ -30,7 +30,7 @@ const app = buildApp({
     : undefined,
   allowedWebOrigins: parseAllowedOrigins(config.ALLOWED_WEB_ORIGINS),
   borrowerService: config.BORROWER_IDENTITY_KEY
-    ? createPostgresBorrowerService(pool, config.BORROWER_IDENTITY_KEY)
+    ? createPostgresBorrowerService(pool, config.BORROWER_IDENTITY_KEY, config.GEOCODING_ENDPOINT)
     : undefined,
   creditService: createPostgresCreditService(pool),
   routeService: createPostgresRouteService(pool),

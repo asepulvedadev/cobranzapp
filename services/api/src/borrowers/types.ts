@@ -1,5 +1,6 @@
 import type {
   Borrower,
+  BorrowerAddressLocation,
   BorrowerCreateRequest,
   BorrowerDirectory,
   BorrowerDocument,
@@ -61,6 +62,13 @@ export type BorrowerOcrRetryResult =
   | { status: "forbidden" }
   | { status: "not_retryable" };
 
+export type BorrowerAddressKind = "home" | "work";
+export type BorrowerAddressGeocodeResult =
+  | { status: "updated"; borrower: Borrower }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "unavailable"; location: BorrowerAddressLocation };
+
 export type SharedClientVerification = {
   registered: boolean;
   fullName: string | null;
@@ -111,6 +119,13 @@ export interface BorrowerService {
     extractionId: string,
     requestId: string,
   ): Promise<BorrowerOcrRetryResult>;
+  geocodeAddress(
+    actor: TenantActor,
+    tenantId: string,
+    borrowerId: string,
+    addressKind: BorrowerAddressKind,
+    requestId: string,
+  ): Promise<BorrowerAddressGeocodeResult>;
   verifyShared(
     actor: TenantActor,
     tenantId: string,

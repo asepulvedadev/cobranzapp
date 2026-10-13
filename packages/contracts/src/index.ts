@@ -759,6 +759,8 @@ export const routeStopSchema = z.object({
   addressKind: routeAddressKindSchema,
   address: z.string().min(3),
   position: z.number().int().positive(),
+  latitude: z.number().min(-90).max(90).nullable(),
+  longitude: z.number().min(-180).max(180).nullable(),
   visitStatus: routeStopVisitStatusSchema,
   visitedAt: z.iso.datetime().nullable(),
   visitNotes: z.string().nullable(),
@@ -1018,6 +1020,22 @@ export const borrowerIdentitySchema = z.object({
 });
 
 export const borrowerAddressStatusSchema = z.enum(["pending", "confirmed"]);
+export const borrowerAddressLocationSchema = z.object({
+  status: z.enum(["pending", "ready", "failed"]),
+  latitude: z.number().min(-90).max(90).nullable(),
+  longitude: z.number().min(-180).max(180).nullable(),
+  formattedAddress: z.string().nullable(),
+  provider: z.string().nullable(),
+  precision: z.string().nullable(),
+  errorCode: z.string().nullable(),
+  geocodedAt: z.iso.datetime().nullable(),
+});
+export const borrowerAddressGeocodeRequestSchema = z.object({
+  addressKind: z.enum(["home", "work"]),
+});
+export const borrowerAddressLocationResponseSchema = z.object({
+  location: borrowerAddressLocationSchema,
+});
 
 export const borrowerSchema = z.object({
   id: z.uuid(),
@@ -1029,6 +1047,10 @@ export const borrowerSchema = z.object({
   workAddress: z.string().min(3),
   homeAddressStatus: borrowerAddressStatusSchema,
   workAddressStatus: borrowerAddressStatusSchema,
+  addressLocations: z.object({
+    home: borrowerAddressLocationSchema,
+    work: borrowerAddressLocationSchema,
+  }),
   profilePhotoObjectKey: z.string().nullable(),
   consentVersion: z.string().min(1),
   identity: borrowerIdentitySchema,
@@ -1243,6 +1265,9 @@ export type RouteStopCreateRequest = z.infer<typeof routeStopCreateRequestSchema
 export type RouteStopReorderRequest = z.infer<typeof routeStopReorderRequestSchema>;
 export type RouteStopVisitRequest = z.infer<typeof routeStopVisitRequestSchema>;
 export type RouteStop = z.infer<typeof routeStopSchema>;
+export type BorrowerAddressLocation = z.infer<typeof borrowerAddressLocationSchema>;
+export type BorrowerAddressGeocodeRequest = z.infer<typeof borrowerAddressGeocodeRequestSchema>;
+export type BorrowerAddressLocationResponse = z.infer<typeof borrowerAddressLocationResponseSchema>;
 export type Route = z.infer<typeof routeSchema>;
 export type RouteDirectory = z.infer<typeof routeDirectorySchema>;
 export type LoanProductStatus = z.infer<typeof loanProductStatusSchema>;

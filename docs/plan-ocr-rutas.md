@@ -42,13 +42,17 @@ guardan direcciones y coordenadas, pero Waze sigue siendo la navegación final.
 - El tablero muestra la dirección y un enlace Waze por parada.
 - Se puede asignar la ruta a un cobrador y activar/archivar la ruta.
 - Se puede reordenar manualmente cada parada con controles subir/bajar.
-- Pendiente: geocodificación persistida y registro de visita.
+- Se puede marcar cada parada como pendiente, realizada u omitida, con auditoría.
+- La ubicación se puede consultar bajo demanda y queda cacheada por dirección; Waze usa
+  coordenadas cuando existen y conserva el texto completo como respaldo.
 
 ### 5. Optimización opcional
 
 - Si se requiere ordenar automáticamente las visitas: integrar Google Routes API
   con `optimizeWaypointOrder`, o desplegar OSRM/GraphHopper en el VPS.
 - Mantener Waze como aplicación de navegación y no como motor de optimización.
+- La geocodificación actual usa Nominatim con límite de una solicitud por segundo y solo se
+  ejecuta cuando un usuario autorizado pulsa «Ubicar dirección».
 
 ## Criterios de seguridad
 

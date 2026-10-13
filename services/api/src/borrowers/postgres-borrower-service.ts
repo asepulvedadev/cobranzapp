@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { Borrower, BorrowerDocument, BorrowerOcrExtraction } from "@cobranzapp/contracts";
+import type {
+  Borrower,
+  BorrowerAddressLocation,
+  BorrowerDocument,
+  BorrowerOcrExtraction,
+} from "@cobranzapp/contracts";
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
 import {
@@ -11,6 +16,8 @@ import {
   normalizeBorrowerDocumentNumber,
 } from "./identity.js";
 import type {
+  BorrowerAddressGeocodeResult,
+  BorrowerAddressKind,
   BorrowerCreateInput,
   BorrowerCreateResult,
   BorrowerDocumentInput,
@@ -54,6 +61,85 @@ type OcrRow = {
   created_at: Date;
   updated_at: Date;
 };
+
+type AddressLocationRow = {
+  address_kind: BorrowerAddressKind;
+  status: BorrowerAddressLocation["status"];
+  latitude: number | string | null;
+  longitude: number | string | null;
+  formatted_address: string | null;
+  provider: string | null;
+  precision: string | null;
+  error_code: string | null;
+  geocoded_at: Date | null;
+};
+
+type GeocodedAddress = {
+  latitude: number;
+  longitude: number;
+  formattedAddress: string;
+  precision: string;
+};
+
+let lastGeocodingRequestAt = 0;
+
+function mapAddressLocation(row: AddressLocationRow): BorrowerAddressLocation {
+  return {
+    status: row.status,
+    latitude: row.latitude === null ? null : Number(row.latitude),
+    longitude: row.longitude === null ? null : Number(row.longitude),
+    formattedAddress: row.formatted_address,
+    provider: row.provider,
+    precision: row.precision,
+    errorCode: row.error_code,
+    geocodedAt: row.geocoded_at?.toISOString() ?? null,
+  };
+}
+
+async function geocodeWithNominatim(endpoint: string, address: string): Promise<GeocodedAddress> {
+  const waitMs = Math.max(0, 1_100 - (Date.now() - lastGeocodingRequestAt));
+  if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+  lastGeocodingRequestAt = Date.now();
+  const url = new URL(endpoint);
+  url.searchParams.set("q", `${address}, Colombia`);
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("limit", "1");
+  url.searchParams.set("countrycodes", "co");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        accept: "application/json",
+        "accept-language": "es-CO,es;q=0.9",
+        "user-agent": "CobranzApp/1.0 (+https://cobranzaap.tech/contacto)",
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`GEOCODER_HTTP_${response.status}`);
+    const payload = (await response.json()) as Array<{
+      lat?: string;
+      lon?: string;
+      display_name?: string;
+      type?: string;
+      addresstype?: string;
+    }>;
+    const result = payload[0];
+    const latitude = Number(result?.lat);
+    const longitude = Number(result?.lon);
+    if (!result?.display_name || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      throw new Error("GEOCODER_NO_RESULT");
+    }
+    return {
+      latitude,
+      longitude,
+      formattedAddress: result.display_name.slice(0, 500),
+      precision: (result.addresstype ?? result.type ?? "unknown").slice(0, 80),
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 class DuplicateBorrowerIdentityError extends Error {
   constructor() {
@@ -110,6 +196,26 @@ async function loadBorrower(
       ORDER BY category ASC, side ASC NULLS LAST, created_at ASC`,
     [tenantId, borrowerId],
   );
+  const locations = await client.query<AddressLocationRow>(
+    `SELECT address_kind, status, latitude, longitude, formatted_address,
+            provider, precision, error_code, geocoded_at
+       FROM borrower_address_locations
+      WHERE tenant_id = $1 AND borrower_id = $2`,
+    [tenantId, borrowerId],
+  );
+  const locationByKind = new Map(
+    locations.rows.map((location) => [location.address_kind, mapAddressLocation(location)]),
+  );
+  const pendingLocation: BorrowerAddressLocation = {
+    status: "pending",
+    latitude: null,
+    longitude: null,
+    formattedAddress: null,
+    provider: null,
+    precision: null,
+    errorCode: null,
+    geocodedAt: null,
+  };
   return {
     id: row.id,
     fullName: row.full_name,
@@ -120,6 +226,10 @@ async function loadBorrower(
     workAddress: row.work_address,
     homeAddressStatus: row.home_address_status,
     workAddressStatus: row.work_address_status,
+    addressLocations: {
+      home: locationByKind.get("home") ?? pendingLocation,
+      work: locationByKind.get("work") ?? pendingLocation,
+    },
     profilePhotoObjectKey: row.profile_photo_object_key,
     consentVersion: row.consent_version,
     identity: {
@@ -174,7 +284,11 @@ function mapOcrRow(row: OcrRow, identitySecret: string): BorrowerOcrExtraction {
   };
 }
 
-export function createPostgresBorrowerService(pool: Pool, identitySecret: string): BorrowerService {
+export function createPostgresBorrowerService(
+  pool: Pool,
+  identitySecret: string,
+  geocodingEndpoint = "https://nominatim.openstreetmap.org/search",
+): BorrowerService {
   async function setActorContext(client: PoolClient, actor: TenantActor, tenantId: string) {
     await client.query("SELECT set_config('app.user_id', $1, true)", [actor.userId]);
     await client.query("SELECT set_config('app.platform_role', $1, true)", [
@@ -421,6 +535,12 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
                 sharedLookupHmac,
                 normalizedNumber.slice(-4),
               ],
+            );
+            await client.query(
+              `INSERT INTO borrower_address_locations (tenant_id, borrower_id, address_kind)
+               VALUES ($1, $2, 'home'), ($1, $2, 'work')
+               ON CONFLICT (tenant_id, borrower_id, address_kind) DO NOTHING`,
+              [tenantId, borrowerId],
             );
             for (const contact of input.emergencyContacts) {
               await client.query(
@@ -913,6 +1033,103 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
         return refreshed
           ? { status: "queued", extraction: mapOcrRow(refreshed, identitySecret) }
           : { status: "not_found" };
+      });
+    },
+
+    async geocodeAddress(
+      actor,
+      tenantId,
+      borrowerId,
+      addressKind,
+      requestId,
+    ): Promise<BorrowerAddressGeocodeResult> {
+      if (!["owner", "supervisor", "collector"].includes(actor.tenantRole ?? "")) {
+        return { status: "forbidden" };
+      }
+      const address = await withTransaction(actor, tenantId, async (client) => {
+        const result = await client.query<{ home_address: string; work_address: string }>(
+          `SELECT home_address, work_address
+             FROM borrowers
+            WHERE tenant_id = $1 AND id = $2 AND status = 'active'`,
+          [tenantId, borrowerId],
+        );
+        const row = result.rows[0];
+        if (!row) return null;
+        return addressKind === "home" ? row.home_address : row.work_address;
+      });
+      if (!address) return { status: "not_found" };
+
+      let geocoded: GeocodedAddress;
+      try {
+        geocoded = await geocodeWithNominatim(geocodingEndpoint, address);
+      } catch (error) {
+        const errorCode = (error instanceof Error ? error.message : "GEOCODER_FAILED")
+          .replaceAll(/[^A-Z0-9_]+/g, "_")
+          .slice(0, 120);
+        const location = await withTransaction(actor, tenantId, async (client) => {
+          const result = await client.query<AddressLocationRow>(
+            `UPDATE borrower_address_locations
+                SET status = 'failed', latitude = NULL, longitude = NULL,
+                    formatted_address = NULL, provider = 'nominatim', precision = NULL,
+                    error_code = $4, geocoded_at = NULL, updated_at = now()
+              WHERE tenant_id = $1 AND borrower_id = $2 AND address_kind = $3
+              RETURNING address_kind, status, latitude, longitude, formatted_address,
+                        provider, precision, error_code, geocoded_at`,
+            [tenantId, borrowerId, addressKind, errorCode],
+          );
+          const row = result.rows[0];
+          if (!row) return null;
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+             VALUES ($1, $2, 'borrower.address_geocode_failed', 'borrower', $3, $4, $5::jsonb)`,
+            [
+              tenantId,
+              actor.userId,
+              borrowerId,
+              requestId,
+              JSON.stringify({ addressKind, errorCode }),
+            ],
+          );
+          return mapAddressLocation(row);
+        });
+        return location ? { status: "unavailable", location } : { status: "not_found" };
+      }
+
+      return withTransaction(actor, tenantId, async (client) => {
+        const result = await client.query<AddressLocationRow>(
+          `UPDATE borrower_address_locations
+              SET status = 'ready', latitude = $4, longitude = $5,
+                  formatted_address = $6, provider = 'nominatim', precision = $7,
+                  error_code = NULL, geocoded_at = now(), updated_at = now()
+            WHERE tenant_id = $1 AND borrower_id = $2 AND address_kind = $3
+            RETURNING address_kind, status, latitude, longitude, formatted_address,
+                      provider, precision, error_code, geocoded_at`,
+          [
+            tenantId,
+            borrowerId,
+            addressKind,
+            geocoded.latitude,
+            geocoded.longitude,
+            geocoded.formattedAddress,
+            geocoded.precision,
+          ],
+        );
+        if (!result.rows[0]) return { status: "not_found" } as const;
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'borrower.address_geocoded', 'borrower', $3, $4, $5::jsonb)`,
+          [
+            tenantId,
+            actor.userId,
+            borrowerId,
+            requestId,
+            JSON.stringify({ addressKind, provider: "nominatim", precision: geocoded.precision }),
+          ],
+        );
+        const borrower = await loadBorrower(client, tenantId, borrowerId);
+        return borrower ? { status: "updated", borrower } : { status: "not_found" };
       });
     },
 
