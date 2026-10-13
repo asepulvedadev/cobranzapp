@@ -269,7 +269,7 @@ export default async function TenantDashboard({
           <div className="card-heading">
             <div>
               <span className="panel-eyebrow">Accesos</span>
-              <h2>Equipo de trabajo</h2>
+              <h2>Personal de la empresa</h2>
             </div>
             <span>{overview.members.length} visibles</span>
           </div>
@@ -289,7 +289,7 @@ export default async function TenantDashboard({
                     <tr key={member.userId}>
                       <td data-label="Persona">
                         <strong>{member.displayName}</strong>
-                        <small>{member.email}</small>
+                        <small>{member.phone ?? "Sin teléfono registrado"}</small>
                       </td>
                       <td data-label="Rol">{roleLabels[member.role]}</td>
                       <td data-label="Estado">

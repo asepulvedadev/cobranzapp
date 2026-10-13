@@ -2571,14 +2571,32 @@ html:has(.panel-shell) {
 }
 
 .primary-action {
+  align-items: center;
   background: var(--tenant-brand-primary);
   border: 1px solid color-mix(in srgb, var(--tenant-brand-primary) 80%, #000 20%);
   border-radius: 10px;
   color: var(--tenant-brand-accent);
   cursor: pointer;
+  display: inline-flex;
   font-weight: 750;
+  justify-content: center;
   min-height: 2.75rem;
   padding: 0.65rem 1rem;
+  text-decoration: none;
+  transition:
+    filter 160ms ease,
+    transform 160ms ease;
+}
+
+.primary-action:hover,
+.primary-action:focus-visible {
+  color: var(--tenant-brand-accent);
+  filter: brightness(0.96) saturate(1.05);
+  text-decoration: none;
+}
+
+.primary-action:active {
+  transform: translateY(1px);
 }
 
 .credential-result dl {
