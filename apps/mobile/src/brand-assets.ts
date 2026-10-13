@@ -8,3 +8,14 @@ export function buildBrandLogoSource(tenantId: string, sessionCookie: string | n
     ...(sessionCookie ? { headers: { Cookie: sessionCookie } } : {}),
   };
 }
+
+export function buildAccountProfilePhotoSource(
+  sessionCookie: string | null = null,
+  version?: string | number | null,
+) {
+  const query = version ? `?v=${encodeURIComponent(String(version))}` : "";
+  return {
+    uri: `${mobileApiBaseUrl}/api/v1/account/profile-photo${query}`,
+    ...(sessionCookie ? { headers: { Cookie: sessionCookie } } : {}),
+  };
+}

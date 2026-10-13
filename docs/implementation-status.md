@@ -12,7 +12,7 @@
 | Consola de desarrollador | Completado | Directorios paginados, registro de propietarios, emisión de códigos, planes, cupos, estados, actividad, estado técnico y soporte temporal auditado |
 | Expediente de cliente | Completado | Identidad manual, teléfonos, WhatsApp, direcciones de casa y trabajo normalizadas y obligatoriamente confirmadas con el cliente antes de guardar o corregir, ubicación por texto o GPS del dispositivo para rutas Waze, contactos de emergencia, foto designada y documentos privados; alta móvil por pasos dentro de un modal cerrable, captura desde cámara o galería, validación Zod y reanudación segura de cargas si falla un documento |
 | OCR asistivo de documentos | Completado con revisión humana | Tesseract en el worker, imágenes/PDF privados, sugerencias cifradas, reintento y confirmación auditada; controles de consulta, confirmación y reintento disponibles también en móvil |
-| Personal operativo | Completado | Perfil de supervisores y cobradores, identidad cifrada, últimos cuatro dígitos, tipo de sangre con consentimiento y documentos privados; propietarios pueden crear empleados desde un modal con usuario/teléfono/clave y toda edición de perfil se abre en una ventana independiente |
+| Personal operativo | Completado | Perfil de supervisores y cobradores, identidad cifrada, últimos cuatro dígitos, tipo de sangre con consentimiento y documentos privados; propietarios pueden crear empleados desde un modal con usuario/teléfono/clave y toda edición de perfil se abre en una ventana independiente; móvil también permite editar el perfil de cuenta del propietario o desarrollador |
 | Verificación compartida | Completado con activación controlada | Vista independiente para propietario, supervisor y cobrador con búsqueda simple por cédula; exige confirmar que el cliente autorizó la consulta y deja esa confirmación en auditoría; devuelve únicamente nombre, créditos vigentes, calificación derivada de pagos y reporte negativo; la red consentida avanzada, correcciones, disputas y auditoría permanecen controladas; no es lista negra |
 | Rutas de cobranza | Completado | Vista independiente en sidebar, direcciones geocodificadas bajo demanda, Waze, optimización por cercanía, visitas auditadas y asignación por empresa; móvil puede ubicar casa/trabajo desde el expediente |
 | Reportes operativos | Completado como vista operativa | Vista independiente web y móvil para propietarios, supervisores y cobradores con créditos activos, solicitudes en revisión, cuotas vencidas acumuladas, frecuencias y prioridades de cobro; no presenta saldos ni ingresos contables |
@@ -41,6 +41,7 @@ La proyección configurable ya está disponible para comparar escenarios, pero n
 - Financiero: 8 pruebas aprobadas.
 - Worker: 2 pruebas aprobadas y 5 omitidas cuando no hay PostgreSQL de CI.
 - Web: 45 pruebas aprobadas.
+- Móvil: 3 pruebas aprobadas.
 - API: 102 pruebas aprobadas y 2 suites de integración omitidas cuando no hay PostgreSQL de CI.
 - Integración PostgreSQL de aislamiento: 1 escenario aprobado localmente con las migraciones completas; CI lo omite cuando no hay `TEST_DATABASE_URL`.
 - Producción: `https://cobranzaap.tech/api/health` responde con la versión desplegada y los servicios API, web, worker y PostgreSQL están activos.

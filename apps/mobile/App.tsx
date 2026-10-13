@@ -6,6 +6,7 @@ import type {
   RouteDirectory,
   TenantMemberProfile,
   TenantOverview,
+  UserProfile,
 } from "@cobranzapp/contracts";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
@@ -25,6 +26,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { AccountProfileForm } from "./src/AccountProfileForm";
 import { MobileApi, MobileApiError } from "./src/api";
 import { BorrowerAddressControl } from "./src/BorrowerAddressControl";
 import { BorrowerAddressEditor } from "./src/BorrowerAddressEditor";
@@ -1007,6 +1009,9 @@ function AuthenticatedHome({
   const [routes, setRoutes] = useState<RouteDirectory | null>(null);
   const [platform, setPlatform] = useState<PlatformOverview | null>(null);
   const [system, setSystem] = useState<PlatformSystemStatus | null>(null);
+  const [accountProfile, setAccountProfile] = useState<UserProfile | null>(null);
+  const [accountProfileOpen, setAccountProfileOpen] = useState(false);
+  const [accountProfileLoading, setAccountProfileLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [reauthPassword, setReauthPassword] = useState("");
   const [reauthenticating, setReauthenticating] = useState(false);
@@ -1105,6 +1110,24 @@ function AuthenticatedHome({
     setReloadKey((current) => current + 1);
   }
 
+  async function openAccountProfile() {
+    setAccountProfileOpen(true);
+    if (accountProfile) return;
+    setAccountProfileLoading(true);
+    try {
+      setAccountProfile(await api.accountProfile());
+    } catch (error) {
+      if (error instanceof MobileApiError && error.status === 428) {
+        setNeedsReauthentication(true);
+        setMessage("Confirma tu contraseña para editar tu perfil.");
+      } else {
+        setMessage(errorText(error, "No fue posible cargar tu perfil."));
+      }
+    } finally {
+      setAccountProfileLoading(false);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar style="light" />
@@ -1124,10 +1147,67 @@ function AuthenticatedHome({
             <Text style={styles.brand}>cobranzapp</Text>
             <Text style={styles.muted}>@{user.username}</Text>
           </View>
-          <Pressable accessibilityRole="button" onPress={onLogout} style={styles.logout}>
-            <Text style={styles.logoutText}>Salir</Text>
-          </Pressable>
+          <View style={styles.topbarActions}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void openAccountProfile()}
+              style={styles.profileButton}
+            >
+              <Text style={styles.profileButtonText}>Mi perfil</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={onLogout} style={styles.logout}>
+              <Text style={styles.logoutText}>Salir</Text>
+            </Pressable>
+          </View>
         </View>
+        <Modal
+          animationType="slide"
+          onRequestClose={() => setAccountProfileOpen(false)}
+          transparent
+          visible={accountProfileOpen}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.accountProfileBackdrop}
+          >
+            <ScrollView
+              contentContainerStyle={styles.accountProfileScroll}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.accountProfileCard}>
+                <View style={styles.accountProfileHeading}>
+                  <View style={styles.listCopy}>
+                    <Text style={styles.eyebrow}>CUENTA</Text>
+                    <Text style={styles.cardTitle}>Mi perfil</Text>
+                  </View>
+                  <Pressable
+                    accessibilityLabel="Cerrar perfil"
+                    accessibilityRole="button"
+                    onPress={() => setAccountProfileOpen(false)}
+                    style={styles.profileModalClose}
+                  >
+                    <Text style={styles.profileModalCloseText}>×</Text>
+                  </Pressable>
+                </View>
+                {accountProfileLoading ? (
+                  <ActivityIndicator color="#fbbf24" />
+                ) : accountProfile ? (
+                  <AccountProfileForm
+                    api={api}
+                    onNeedsReauthentication={() => {
+                      setNeedsReauthentication(true);
+                      setMessage("Confirma tu contraseña para continuar con esta acción.");
+                    }}
+                    onSaved={setAccountProfile}
+                    profile={accountProfile}
+                  />
+                ) : (
+                  <Text style={styles.muted}>No fue posible cargar tu perfil.</Text>
+                )}
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </Modal>
         {user.mustChangePassword ? (
           <View style={styles.warning}>
             <Text style={styles.cardTitle}>Protege tu cuenta</Text>
@@ -1503,7 +1583,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 4,
   },
+  topbarActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   muted: { color: "#99a39c", fontSize: 14, lineHeight: 20 },
+  profileButton: {
+    borderWidth: 1,
+    borderColor: "#fbbf24",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  profileButtonText: { color: "#fbbf24", fontWeight: "800" },
   logout: {
     borderWidth: 1,
     borderColor: "#48514b",
@@ -1656,6 +1745,29 @@ const styles = StyleSheet.create({
     color: "#f4f6f4",
     fontSize: 28,
     lineHeight: 28,
+  },
+  accountProfileBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.72)",
+  },
+  accountProfileScroll: {
+    flexGrow: 1,
+    justifyContent: "flex-end",
+    padding: 14,
+  },
+  accountProfileCard: {
+    maxHeight: "94%",
+    borderRadius: 22,
+    backgroundColor: "#202523",
+    borderWidth: 1,
+    borderColor: "#3c453e",
+    padding: 18,
+    gap: 10,
+  },
+  accountProfileHeading: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
   },
   routeCard: {
     padding: 14,

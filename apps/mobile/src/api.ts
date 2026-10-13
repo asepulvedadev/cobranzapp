@@ -35,6 +35,9 @@ import {
   tenantMemberProfileSchema,
   tenantMemberResponseSchema,
   tenantOverviewSchema,
+  type UserProfile,
+  userProfileResponseSchema,
+  userProfileUpdateRequestSchema,
   type VerificationNetworkConsentRequest,
   type VerificationNetworkCorrectionRequest,
   type VerificationNetworkQueryRequest,
@@ -44,7 +47,11 @@ import {
 } from "@cobranzapp/contracts";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import { buildBrandLogoSource, mobileApiBaseUrl } from "./brand-assets";
+import {
+  buildAccountProfilePhotoSource,
+  buildBrandLogoSource,
+  mobileApiBaseUrl,
+} from "./brand-assets";
 import { fetchWithTimeout, RequestTimeoutError, requestTimeoutMessage } from "./request-timeout";
 
 const sessionStorageKey = "cobranzapp.mobile.session";
@@ -248,6 +255,60 @@ export class MobileApi {
 
   brandLogoSource(tenantId: string) {
     return buildBrandLogoSource(tenantId, this.sessionCookie);
+  }
+
+  accountProfilePhotoSource(version?: string | number | null) {
+    return buildAccountProfilePhotoSource(this.sessionCookie, version);
+  }
+
+  async accountProfile(): Promise<UserProfile> {
+    const response = await this.request("/v1/account/profile");
+    if (!response.ok)
+      throw new MobileApiError(
+        await apiError(response, "No fue posible cargar tu perfil."),
+        response.status,
+      );
+    return userProfileResponseSchema.parse(await response.json()).profile;
+  }
+
+  async updateAccountProfile(input: {
+    displayName: string;
+    phone: string | null;
+    homeAddress: string | null;
+    workAddress: string | null;
+  }) {
+    const parsed = userProfileUpdateRequestSchema.parse(input);
+    const response = await this.request("/v1/account/profile", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsed),
+    });
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible guardar tu perfil."),
+        response.status,
+      );
+    }
+    return userProfileResponseSchema.parse(await response.json()).profile;
+  }
+
+  async uploadAccountProfilePhoto(input: { uri: string; name: string; type: string; file?: Blob }) {
+    const form = new FormData();
+    form.append(
+      "file",
+      input.file ?? ({ uri: input.uri, name: input.name, type: input.type } as unknown as Blob),
+    );
+    const response = await this.request("/v1/account/profile-photo", {
+      method: "POST",
+      body: form,
+    });
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible guardar la foto de perfil."),
+        response.status,
+      );
+    }
+    return userProfileResponseSchema.parse(await response.json()).profile;
   }
 
   async createMember(tenantId: string, input: TenantMemberCreateRequest) {
