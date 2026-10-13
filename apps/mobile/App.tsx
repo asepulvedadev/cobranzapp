@@ -707,6 +707,7 @@ function TenantRoutes({ routes }: { routes: RouteDirectory | null }) {
 function TenantSectionNav({
   active,
   onChange,
+  primaryColor,
   canVerify,
   canViewProfile,
   canViewPersonnel,
@@ -716,6 +717,7 @@ function TenantSectionNav({
 }: {
   active: TenantSection;
   onChange: (section: TenantSection) => void;
+  primaryColor: string;
   canVerify: boolean;
   canViewProfile: boolean;
   canViewPersonnel: boolean;
@@ -734,9 +736,19 @@ function TenantSectionNav({
       <Pressable
         accessibilityRole="button"
         onPress={() => onChange("home")}
-        style={[styles.sectionNavItem, active === "home" && styles.sectionNavItemActive]}
+        style={[
+          styles.sectionNavItem,
+          active === "home" && styles.sectionNavItemActive,
+          active === "home" && { borderColor: primaryColor },
+        ]}
       >
-        <Text style={[styles.sectionNavText, active === "home" && styles.sectionNavTextActive]}>
+        <Text
+          style={[
+            styles.sectionNavText,
+            active === "home" && styles.sectionNavTextActive,
+            active === "home" && { color: primaryColor },
+          ]}
+        >
           Inicio
         </Text>
       </Pressable>
@@ -744,10 +756,18 @@ function TenantSectionNav({
         <Pressable
           accessibilityRole="button"
           onPress={() => onChange("profile")}
-          style={[styles.sectionNavItem, active === "profile" && styles.sectionNavItemActive]}
+          style={[
+            styles.sectionNavItem,
+            active === "profile" && styles.sectionNavItemActive,
+            active === "profile" && { borderColor: primaryColor },
+          ]}
         >
           <Text
-            style={[styles.sectionNavText, active === "profile" && styles.sectionNavTextActive]}
+            style={[
+              styles.sectionNavText,
+              active === "profile" && styles.sectionNavTextActive,
+              active === "profile" && { color: primaryColor },
+            ]}
           >
             Mi perfil
           </Text>
@@ -757,10 +777,18 @@ function TenantSectionNav({
         <Pressable
           accessibilityRole="button"
           onPress={() => onChange("personnel")}
-          style={[styles.sectionNavItem, active === "personnel" && styles.sectionNavItemActive]}
+          style={[
+            styles.sectionNavItem,
+            active === "personnel" && styles.sectionNavItemActive,
+            active === "personnel" && { borderColor: primaryColor },
+          ]}
         >
           <Text
-            style={[styles.sectionNavText, active === "personnel" && styles.sectionNavTextActive]}
+            style={[
+              styles.sectionNavText,
+              active === "personnel" && styles.sectionNavTextActive,
+              active === "personnel" && { color: primaryColor },
+            ]}
           >
             Personal
           </Text>
@@ -770,10 +798,18 @@ function TenantSectionNav({
         <Pressable
           accessibilityRole="button"
           onPress={() => onChange("clients")}
-          style={[styles.sectionNavItem, active === "clients" && styles.sectionNavItemActive]}
+          style={[
+            styles.sectionNavItem,
+            active === "clients" && styles.sectionNavItemActive,
+            active === "clients" && { borderColor: primaryColor },
+          ]}
         >
           <Text
-            style={[styles.sectionNavText, active === "clients" && styles.sectionNavTextActive]}
+            style={[
+              styles.sectionNavText,
+              active === "clients" && styles.sectionNavTextActive,
+              active === "clients" && { color: primaryColor },
+            ]}
           >
             Clientes
           </Text>
@@ -783,12 +819,17 @@ function TenantSectionNav({
         <Pressable
           accessibilityRole="button"
           onPress={() => onChange("verification")}
-          style={[styles.sectionNavItem, active === "verification" && styles.sectionNavItemActive]}
+          style={[
+            styles.sectionNavItem,
+            active === "verification" && styles.sectionNavItemActive,
+            active === "verification" && { borderColor: primaryColor },
+          ]}
         >
           <Text
             style={[
               styles.sectionNavText,
               active === "verification" && styles.sectionNavTextActive,
+              active === "verification" && { color: primaryColor },
             ]}
           >
             Verificar cliente
@@ -799,10 +840,18 @@ function TenantSectionNav({
         <Pressable
           accessibilityRole="button"
           onPress={() => onChange("credits")}
-          style={[styles.sectionNavItem, active === "credits" && styles.sectionNavItemActive]}
+          style={[
+            styles.sectionNavItem,
+            active === "credits" && styles.sectionNavItemActive,
+            active === "credits" && { borderColor: primaryColor },
+          ]}
         >
           <Text
-            style={[styles.sectionNavText, active === "credits" && styles.sectionNavTextActive]}
+            style={[
+              styles.sectionNavText,
+              active === "credits" && styles.sectionNavTextActive,
+              active === "credits" && { color: primaryColor },
+            ]}
           >
             Créditos
           </Text>
@@ -812,9 +861,19 @@ function TenantSectionNav({
         <Pressable
           accessibilityRole="button"
           onPress={() => onChange("routes")}
-          style={[styles.sectionNavItem, active === "routes" && styles.sectionNavItemActive]}
+          style={[
+            styles.sectionNavItem,
+            active === "routes" && styles.sectionNavItemActive,
+            active === "routes" && { borderColor: primaryColor },
+          ]}
         >
-          <Text style={[styles.sectionNavText, active === "routes" && styles.sectionNavTextActive]}>
+          <Text
+            style={[
+              styles.sectionNavText,
+              active === "routes" && styles.sectionNavTextActive,
+              active === "routes" && { color: primaryColor },
+            ]}
+          >
             Rutas
           </Text>
         </Pressable>
@@ -1016,13 +1075,28 @@ function AuthenticatedHome({
                   style={[
                     styles.workspaceOption,
                     membership.tenantId === tenantId && styles.workspaceOptionActive,
+                    membership.tenantId === tenantId && {
+                      borderColor: tenant?.settings.primaryColor ?? "#fbbf24",
+                    },
                   ]}
                 >
                   <View>
                     <Text style={styles.listTitle}>{membership.tenantName}</Text>
                     <Text style={styles.muted}>{roleLabels[membership.role]}</Text>
                   </View>
-                  <Text style={styles.radio}>{membership.tenantId === tenantId ? "●" : "○"}</Text>
+                  <Text
+                    style={[
+                      styles.radio,
+                      {
+                        color:
+                          membership.tenantId === tenantId
+                            ? (tenant?.settings.primaryColor ?? "#fbbf24")
+                            : "#fbbf24",
+                      },
+                    ]}
+                  >
+                    {membership.tenantId === tenantId ? "●" : "○"}
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -1030,6 +1104,7 @@ function AuthenticatedHome({
               <>
                 <TenantSectionNav
                   active={tenantSection}
+                  primaryColor={tenant.settings.primaryColor}
                   canVerify={
                     selectedMembershipRole
                       ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
