@@ -3316,6 +3316,15 @@ export function buildApp(dependencies: AppDependencies) {
         params.data.tenantId,
         { ...body.data, requestId: request.id },
       );
+      if (result.status === "addresses_unconfirmed") {
+        return sendError(
+          reply,
+          400,
+          "BORROWER_ADDRESSES_UNCONFIRMED",
+          "Confirma con el cliente las direcciones completas de casa y trabajo antes de guardar.",
+          request.id,
+        );
+      }
       if (result.status === "duplicate_identity") {
         return sendError(
           reply,

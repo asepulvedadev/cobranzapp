@@ -539,6 +539,51 @@ describe("borrower creation security", () => {
     expect(create).not.toHaveBeenCalled();
   });
 
+  it("keeps the address confirmation invariant at the HTTP boundary", async () => {
+    const app = buildApp(
+      dependencies({
+        authService: {
+          authenticate: vi.fn(async () => tenantOwner),
+          isRecentlyReauthenticated: vi.fn(async () => true),
+        },
+        borrowerService: {
+          create: vi.fn(async () => ({ status: "addresses_unconfirmed" })),
+        } as unknown as BorrowerService,
+      }),
+    );
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/borrowers",
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+      },
+      payload: {
+        fullName: "Cliente de prueba",
+        country: "CO",
+        documentType: "CC",
+        documentNumber: "1234567890",
+        phone: "3000000000",
+        homeAddress: "Calle 1 # 2-3",
+        workAddress: "Carrera 4 # 5-6",
+        homeAddressConfirmed: true,
+        workAddressConfirmed: true,
+        profilePhotoObjectKey: null,
+        consentVersion: "borrower-dossier-v1",
+        consentEvidenceRef: "test-consent",
+        emergencyContacts: [
+          { fullName: "Contacto Uno", relationship: "Familiar", phone: "3110000000" },
+        ],
+        documents: [],
+      },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: { code: "BORROWER_ADDRESSES_UNCONFIRMED" },
+    });
+  });
+
   it("updates home and work addresses together after reauthentication", async () => {
     const updatedBorrower = {
       id: "193a2db4-2349-4a48-8833-746a2a334260",

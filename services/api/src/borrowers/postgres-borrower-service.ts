@@ -456,6 +456,11 @@ export function createPostgresBorrowerService(
     },
 
     async create(actor, tenantId, input: BorrowerCreateInput): Promise<BorrowerCreateResult> {
+      // Keep the invariant at the persistence boundary as well as in the HTTP
+      // contract: a direct service caller must not create an unverified address.
+      if (input.homeAddressConfirmed !== true || input.workAddressConfirmed !== true) {
+        return { status: "addresses_unconfirmed" };
+      }
       const normalizedNumber = normalizeBorrowerDocumentNumber(input.documentNumber);
       const homeAddress = normalizeBorrowerAddress(input.homeAddress);
       const workAddress = normalizeBorrowerAddress(input.workAddress);

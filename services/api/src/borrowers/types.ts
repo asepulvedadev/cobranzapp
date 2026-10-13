@@ -31,6 +31,7 @@ export type BorrowerDocumentInput = {
 
 export type BorrowerCreateResult =
   | { status: "created"; borrower: Borrower }
+  | { status: "addresses_unconfirmed" }
   | { status: "duplicate_identity" }
   | { status: "invalid_object_key" }
   | { status: "not_found" };
