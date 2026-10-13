@@ -11,6 +11,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -31,7 +32,7 @@ type Screen =
   | { kind: "mfa" }
   | { kind: "authenticated"; user: CurrentUser };
 
-type TenantSection = "home" | "verification";
+type TenantSection = "home" | "verification" | "routes";
 
 const roleLabels: Record<
   CurrentUser["memberships"][number]["role"] | TenantOverview["actorRole"],
@@ -370,7 +371,6 @@ function TenantHome({
   overview,
   memberProfile,
   directory,
-  routes,
   directorySearch,
   onDirectoryPageChange,
   onDirectorySearch,
@@ -381,7 +381,6 @@ function TenantHome({
   overview: TenantOverview;
   memberProfile: TenantMemberProfile | null;
   directory: BorrowerDirectory | null;
-  routes: RouteDirectory | null;
   directorySearch: string;
   onDirectoryPageChange: (page: number) => void;
   onDirectorySearch: (search: string) => void;
@@ -514,54 +513,72 @@ function TenantHome({
           ) : null}
         </>
       ) : null}
-      {routes ? (
-        <>
-          <View style={styles.directoryHeading}>
-            <Text style={styles.cardTitle}>Rutas de cobranza</Text>
-            <Text style={styles.muted}>{routes.routes.length} configuradas</Text>
+    </View>
+  );
+}
+
+function wazeUrl(address: string, latitude: number | null, longitude: number | null) {
+  if (latitude !== null && longitude !== null) {
+    return `https://www.waze.com/ul?ll=${latitude}%2C${longitude}&navigate=yes&utm_source=cobranzapp`;
+  }
+  return `https://www.waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes&utm_source=cobranzapp`;
+}
+
+function TenantRoutes({ routes }: { routes: RouteDirectory | null }) {
+  if (!routes) return <ActivityIndicator color="#fbbf24" />;
+  return (
+    <View style={styles.stack}>
+      <View style={styles.directoryHeading}>
+        <Text style={styles.cardTitle}>Rutas de cobranza</Text>
+        <Text style={styles.muted}>{routes.routes.length} configuradas</Text>
+      </View>
+      {routes.routes.map((route) => (
+        <View key={route.id} style={styles.routeCard}>
+          <View style={styles.routeCardHeading}>
+            <View style={styles.listCopy}>
+              <Text style={styles.listTitle}>{route.name}</Text>
+              <Text style={styles.muted}>{route.stops.length} parada(s)</Text>
+              <Text style={styles.muted}>
+                {route.assignedCollectorName
+                  ? `Cobrador: ${route.assignedCollectorName}`
+                  : "Sin cobrador asignado"}
+              </Text>
+            </View>
+            <Text style={styles.routeStatus}>
+              {route.status === "draft"
+                ? "Borrador"
+                : route.status === "active"
+                  ? "Activa"
+                  : "Archivada"}
+            </Text>
           </View>
-          {routes.routes.map((route) => (
-            <View key={route.id} style={styles.routeCard}>
-              <View style={styles.routeCardHeading}>
-                <View style={styles.listCopy}>
-                  <Text style={styles.listTitle}>{route.name}</Text>
-                  <Text style={styles.muted}>
-                    {route.branchName ?? "Sin sede"} · {route.stops.length} parada(s)
-                  </Text>
-                  <Text style={styles.muted}>
-                    {route.assignedCollectorName
-                      ? `Cobrador: ${route.assignedCollectorName}`
-                      : "Sin cobrador asignado"}
-                  </Text>
-                </View>
-                <Text style={styles.routeStatus}>
-                  {route.status === "draft"
-                    ? "Borrador"
-                    : route.status === "active"
-                      ? "Activa"
-                      : "Archivada"}
+          {route.stops.slice(0, 5).map((stop) => (
+            <View key={stop.id} style={styles.routeStopRow}>
+              <Text style={styles.routeStopNumber}>{stop.position}</Text>
+              <View style={styles.listCopy}>
+                <Text style={styles.listTitle}>{stop.borrowerName}</Text>
+                <Text style={styles.muted}>
+                  {stop.addressKind === "home" ? "Casa" : "Trabajo"} · {stop.address}
                 </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() =>
+                    void Linking.openURL(wazeUrl(stop.address, stop.latitude, stop.longitude))
+                  }
+                  style={styles.routeNavigate}
+                >
+                  <Text style={styles.routeNavigateText}>Abrir en Waze</Text>
+                </Pressable>
               </View>
-              {route.stops.slice(0, 5).map((stop) => (
-                <View key={stop.id} style={styles.routeStopRow}>
-                  <Text style={styles.routeStopNumber}>{stop.position}</Text>
-                  <View style={styles.listCopy}>
-                    <Text style={styles.listTitle}>{stop.borrowerName}</Text>
-                    <Text style={styles.muted}>
-                      {stop.addressKind === "home" ? "Casa" : "Trabajo"} · {stop.address}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-              {route.stops.length > 5 ? (
-                <Text style={styles.muted}>+{route.stops.length - 5} paradas más</Text>
-              ) : null}
             </View>
           ))}
-          {!routes.routes.length ? (
-            <Text style={styles.muted}>Aún no hay rutas configuradas.</Text>
+          {route.stops.length > 5 ? (
+            <Text style={styles.muted}>+{route.stops.length - 5} paradas más</Text>
           ) : null}
-        </>
+        </View>
+      ))}
+      {!routes.routes.length ? (
+        <Text style={styles.muted}>Aún no hay rutas configuradas.</Text>
       ) : null}
     </View>
   );
@@ -571,10 +588,12 @@ function TenantSectionNav({
   active,
   onChange,
   canVerify,
+  canViewRoutes,
 }: {
   active: TenantSection;
   onChange: (section: TenantSection) => void;
   canVerify: boolean;
+  canViewRoutes: boolean;
 }) {
   return (
     <View style={styles.sectionNav}>
@@ -600,6 +619,17 @@ function TenantSectionNav({
             ]}
           >
             Verificar cliente
+          </Text>
+        </Pressable>
+      ) : null}
+      {canViewRoutes ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onChange("routes")}
+          style={[styles.sectionNavItem, active === "routes" && styles.sectionNavItemActive]}
+        >
+          <Text style={[styles.sectionNavText, active === "routes" && styles.sectionNavTextActive]}>
+            Rutas
           </Text>
         </Pressable>
       ) : null}
@@ -814,6 +844,11 @@ function AuthenticatedHome({
                       ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
                       : false
                   }
+                  canViewRoutes={
+                    selectedMembershipRole
+                      ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
+                      : false
+                  }
                   onChange={setTenantSection}
                 />
                 {tenantSection === "verification" ? (
@@ -825,6 +860,8 @@ function AuthenticatedHome({
                     }}
                     tenantId={tenant.tenant.id}
                   />
+                ) : tenantSection === "routes" ? (
+                  <TenantRoutes routes={routes} />
                 ) : (
                   <TenantHome
                     api={api}
@@ -842,7 +879,6 @@ function AuthenticatedHome({
                       setMessage("Confirma tu contraseña para continuar con esta acción.");
                     }}
                     overview={tenant}
-                    routes={routes}
                   />
                 )}
               </>
@@ -1167,6 +1203,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#2d342f",
   },
+  routeNavigate: { alignSelf: "flex-start", marginTop: 4 },
+  routeNavigateText: { color: "#fbbf24", fontSize: 13, fontWeight: "800" },
   routeStopNumber: {
     width: 24,
     height: 24,

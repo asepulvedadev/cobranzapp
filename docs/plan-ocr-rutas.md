@@ -42,6 +42,8 @@ guardan direcciones y coordenadas, pero Waze sigue siendo la navegación final.
 - El tablero muestra la dirección y un enlace Waze por parada.
 - La vista independiente **Rutas** está enlazada desde el sidebar para propietarios,
   supervisores y cobradores; carga clientes y rutas después de la reautenticación necesaria.
+- En móvil, **Rutas** es una vista separada de Inicio y cada parada abre Waze usando coordenadas
+  verificadas o la dirección completa como respaldo.
 - Se puede asignar la ruta a un cobrador y activar/archivar la ruta.
 - Se puede reordenar manualmente cada parada con controles subir/bajar.
 - Se puede marcar cada parada como pendiente, realizada u omitida, con auditoría.
