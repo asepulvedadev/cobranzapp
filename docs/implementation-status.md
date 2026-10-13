@@ -12,10 +12,10 @@
 | Consola de desarrollador | Completado | Directorios paginados, registro de propietarios, emisión de códigos, planes, cupos, estados, actividad, estado técnico y soporte temporal auditado |
 | Expediente de cliente | Completado | Identidad manual, teléfonos, WhatsApp, direcciones de casa y trabajo con confirmación/corrección desde web y móvil, ubicación por texto o GPS del dispositivo para rutas Waze, contactos de emergencia, foto designada y documentos privados; alta móvil por pasos dentro de un modal cerrable, captura desde cámara o galería, validación Zod y reanudación segura de cargas si falla un documento |
 | OCR asistivo de documentos | Completado con revisión humana | Tesseract en el worker, imágenes/PDF privados, sugerencias cifradas, reintento y confirmación auditada; controles de consulta, confirmación y reintento disponibles también en móvil |
-| Personal operativo | Completado | Perfil de supervisores y cobradores, identidad cifrada, últimos cuatro dígitos, tipo de sangre con consentimiento y documentos privados; propietarios pueden crear empleados desde un modal móvil con usuario/teléfono/clave y móvil expone Mi perfil como vista independiente |
+| Personal operativo | Completado | Perfil de supervisores y cobradores, identidad cifrada, últimos cuatro dígitos, tipo de sangre con consentimiento y documentos privados; propietarios pueden crear empleados desde un modal con usuario/teléfono/clave y toda edición de perfil se abre en una ventana independiente |
 | Verificación compartida | Completado con activación controlada | Vista independiente para propietario, supervisor y cobrador con búsqueda simple por cédula; devuelve únicamente nombre, créditos vigentes, calificación derivada de pagos y reporte negativo; la red consentida avanzada, correcciones, disputas y auditoría permanecen controladas; no es lista negra |
 | Rutas de cobranza | Completado | Vista independiente en sidebar, direcciones geocodificadas bajo demanda, Waze, optimización por cercanía, visitas auditadas y asignación por empresa; móvil puede ubicar casa/trabajo desde el expediente |
-| Originación operativa protegida | Completado como piloto | Catálogo configurable en vista independiente de Créditos, reglas de monto/interés, frecuencias y plazos de un mes/5 semanas, calendario determinista, renovación desde la segunda cuota y marcadores de cuotas; disponible en web y móvil; no aprueba contabilidad, desembolsa ni registra recibos financieros |
+| Originación operativa protegida | Completado como piloto | Catálogo configurable en vista independiente de Créditos, reglas de monto/interés desde modales, frecuencias y plazos de un mes/5 semanas, calendario determinista, renovación desde la segunda cuota y marcadores de cuotas; disponible en web y móvil; las solicitudes se crean como borradores hasta revisión; no aprueba contabilidad, desembolsa ni registra recibos financieros |
 | Entrega VPS | Completado para el entorno actual | Imágenes inmutables transferidas por SSH, orden estricto de despliegue, health/readiness, Caddy y roles PostgreSQL separados |
 
 ## Bloques deliberadamente protegidos
@@ -34,7 +34,7 @@ La proyección configurable ya está disponible para comparar escenarios, pero n
 ## Evidencia de calidad de la última entrega
 
 - `pnpm check` pasa formato, tipos, pruebas y compilación.
-- Contratos: 30 pruebas aprobadas.
+- Contratos: 32 pruebas aprobadas.
 - Financiero: 8 pruebas aprobadas.
 - Worker: 2 pruebas aprobadas y 5 omitidas cuando no hay PostgreSQL de CI.
 - Web: 40 pruebas aprobadas.
