@@ -1,4 +1,9 @@
-import type { Borrower, LoanApplication, LoanProduct } from "@cobranzapp/contracts";
+import type {
+  Borrower,
+  FinancialSchedulePreview,
+  LoanApplication,
+  LoanProduct,
+} from "@cobranzapp/contracts";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { type MobileApi, MobileApiError } from "./api";
@@ -47,6 +52,7 @@ export function CreditWorkspace({
   const [termCount, setTermCount] = useState(30);
   const [principal, setPrincipal] = useState("");
   const [renewalAmount, setRenewalAmount] = useState("");
+  const [schedulePreview, setSchedulePreview] = useState<FinancialSchedulePreview | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -107,6 +113,7 @@ export function CreditWorkspace({
     setBusyAction("create");
     setMessage("");
     setError(false);
+    setSchedulePreview(null);
     try {
       await api.createLoanApplication(tenantId, {
         borrowerId,
@@ -116,6 +123,15 @@ export function CreditWorkspace({
         requestedTermCount: termCount,
         purpose: null,
       });
+      const preview = await api
+        .previewLoanSchedule(tenantId, productId, {
+          principal: principal.trim(),
+          termCount,
+          paymentFrequency: frequency,
+          startDate: new Date().toISOString().slice(0, 10),
+        })
+        .catch(() => null);
+      setSchedulePreview(preview);
       setPrincipal("");
       setMessage("Crédito creado y calendario calculado automáticamente.");
       await load();
@@ -270,6 +286,15 @@ export function CreditWorkspace({
         </View>
       ) : null}
       {message ? <Text style={error ? styles.error : styles.success}>{message}</Text> : null}
+      {schedulePreview ? (
+        <View style={styles.scheduleCard}>
+          <Text style={styles.scheduleTitle}>Calendario calculado</Text>
+          <Text style={styles.muted}>
+            Total a pagar: COP {schedulePreview.scheduledTotal} · Primera cuota: COP{" "}
+            {schedulePreview.periods[0]?.installment ?? "—"}
+          </Text>
+        </View>
+      ) : null}
       {applications.map((application) => (
         <View key={application.id} style={styles.loanCard}>
           <View style={styles.heading}>
@@ -406,6 +431,15 @@ const styles = {
     padding: 12,
   },
   noticeText: { color: "#f6d782", fontSize: 13, lineHeight: 19 },
+  scheduleCard: {
+    backgroundColor: "#153323",
+    borderColor: "#2e7049",
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 4,
+    padding: 12,
+  },
+  scheduleTitle: { color: "#9fe3b0", fontSize: 14, fontWeight: "800" },
   error: { color: "#ff9d93", fontSize: 14, lineHeight: 20 },
   success: { color: "#9fe3b0", fontSize: 14, lineHeight: 20 },
 } as const;

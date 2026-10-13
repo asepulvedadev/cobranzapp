@@ -7,6 +7,8 @@ import {
   borrowerResponseSchema,
   type CurrentUser,
   currentUserSchema,
+  type FinancialSchedulePreview,
+  financialSchedulePreviewResponseSchema,
   type LoanApplication,
   type LoanProduct,
   loanApplicationDirectorySchema,
@@ -501,6 +503,33 @@ export class MobileApi {
       );
     }
     return loanApplicationResponseSchema.parse(await response.json()).application;
+  }
+
+  async previewLoanSchedule(
+    tenantId: string,
+    productId: string,
+    input: {
+      principal: string;
+      termCount: number;
+      paymentFrequency: LoanProduct["paymentFrequency"];
+      startDate: string;
+    },
+  ): Promise<FinancialSchedulePreview> {
+    const response = await this.request(
+      `/v1/tenants/${tenantId}/loan-products/${productId}/schedule-preview`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    );
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible calcular el calendario."),
+        response.status,
+      );
+    }
+    return financialSchedulePreviewResponseSchema.parse(await response.json()).preview;
   }
 
   async recordLoanPayment(tenantId: string, application: LoanApplication) {
