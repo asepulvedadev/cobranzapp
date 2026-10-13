@@ -17,30 +17,29 @@ guardan direcciones y coordenadas, pero Waze sigue siendo la navegación final.
 - Una o dos referencias.
 - Enlaces de navegación a Waze por dirección.
 
-### 2. OCR con confirmación — siguiente entrega
+### 2. OCR con confirmación — implementada en el VPS
 
-- Scanner nativo en Android con ML Kit Document Scanner.
-- Reconocimiento de texto en español en el dispositivo.
-- Lectura de frente, reverso y PDF417 cuando el dispositivo lo soporte.
-- Normalización específica para cédulas colombianas.
-- Vista de resultados con confianza por campo y edición manual.
-- No se guarda ningún campo extraído hasta la confirmación del cobrador o supervisor.
+- El worker procesa imágenes y la primera página de PDF con Tesseract 5.5 y español.
+- El procesamiento es asíncrono mediante `outbox_events`, sin bloquear el alta.
+- Se extraen sugerencias de nombre y número de documento, con confianza estimada.
+- La vista de ficha permite editar y confirmar cada extracción.
+- No se guarda ningún campo extraído en la identidad hasta la confirmación del usuario.
+- ML Kit queda como mejora futura si se empaqueta una aplicación Android nativa.
 
-### 3. Persistencia segura del OCR
+### 3. Persistencia segura del OCR — implementada
 
-- Tabla de extracciones con estado `pending`, `confirmed` o `rejected`.
+- Tabla de extracciones con estados `pending`, `processing`, `ready`, `confirmed`, `rejected` y `failed`.
 - Cifrado de número completo y campos sensibles.
 - Versión del modelo, confianza, usuario y fecha de confirmación.
-- Auditoría y política de retención/borrado.
-- Worker para procesar documentos sin bloquear el formulario.
+- Hash del texto OCR, auditoría y worker con reintentos.
+- El almacenamiento de documentos continúa siendo privado en el volumen del VPS.
 
-### 4. Rutas operativas
+### 4. Rutas operativas — base implementada
 
-- Geocodificar direcciones y guardar latitud/longitud con estado de precisión.
-- Mostrar dirección, coordenada y enlace Waze por parada.
-- Reordenar paradas manualmente.
-- Asignar ruta a cobrador y marcar visita.
-- Generar navegación a la siguiente parada.
+- Las direcciones completas de casa y trabajo se guardan en el expediente.
+- El tablero muestra la dirección y un enlace Waze por parada.
+- Se puede asignar la ruta a un cobrador y activar/archivar la ruta.
+- Pendiente: geocodificación persistida, reordenamiento visual y registro de visita.
 
 ### 5. Optimización opcional
 
