@@ -182,6 +182,13 @@ function dependencies(overrides?: {
       },
       createdAt: "2026-10-11T00:00:00.000Z",
     })),
+    createTenantForOwner: vi.fn(async (_actor, input) => ({
+      status: "created" as const,
+      tenantId: "f1d80b2d-c1d8-4b30-9f02-12f4e1f7c8b6",
+      tenantName: input.displayName,
+      tenantSlug: "empresa-nueva",
+      role: "owner" as const,
+    })),
     updateMembershipPlan: vi.fn(async (_actor, _tenantId, membershipPlan) => ({
       status: "updated",
       membershipPlan,
@@ -1382,6 +1389,64 @@ describe("developer platform", () => {
     expect(response.statusCode).toBe(201);
     expect(response.json()).toMatchObject({
       tenant: { slug: "empresa-uno", status: "draft", membershipPlan: "pro" },
+    });
+  });
+
+  it("creates an additional owner company without requiring a code", async () => {
+    const deps = dependencies({
+      authService: { authenticate: vi.fn(async () => tenantOwner) },
+    });
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/account/tenants",
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { displayName: "Empresa Nueva", password: "owner-password-12" },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual({
+      tenant: {
+        tenantId: "f1d80b2d-c1d8-4b30-9f02-12f4e1f7c8b6",
+        tenantName: "Empresa Nueva",
+        tenantSlug: "empresa-nueva",
+        role: "owner",
+      },
+    });
+    expect(deps.platformService.createTenantForOwner).toHaveBeenCalledWith(
+      tenantOwner.id,
+      expect.objectContaining({ displayName: "Empresa Nueva", code: undefined }),
+    );
+  });
+
+  it("explains when an owner has no available subscription for a company", async () => {
+    const deps = dependencies({
+      authService: { authenticate: vi.fn(async () => tenantOwner) },
+    });
+    vi.mocked(deps.platformService.createTenantForOwner).mockResolvedValue({
+      status: "no_subscription",
+    });
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/account/tenants",
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { displayName: "Empresa Sin Plan", password: "owner-password-12" },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({
+      error: {
+        code: "SUBSCRIPTION_REQUIRED",
+        message:
+          "Tu cuenta no tiene una suscripción disponible. Solicita al desarrollador que active una.",
+      },
     });
   });
 
