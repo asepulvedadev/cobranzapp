@@ -67,7 +67,20 @@ export function BorrowerDirectory({
   const [homeAddressConfirmed, setHomeAddressConfirmed] = useState(false);
   const [workAddressConfirmed, setWorkAddressConfirmed] = useState(false);
   const [createStep, setCreateStep] = useState(1);
+  const [createdBorrowerId, setCreatedBorrowerId] = useState<string | null>(null);
+  const [uploadedDocumentFields, setUploadedDocumentFields] = useState<string[]>([]);
   const createFormRef = useRef<HTMLFormElement>(null);
+
+  function closeCreateModal(force = false) {
+    if (isSubmitting && !force) return;
+    setIsCreateOpen(false);
+    setCreatedBorrowerId(null);
+    setUploadedDocumentFields([]);
+    setIncludeSecondContact(false);
+    setHomeAddressConfirmed(false);
+    setWorkAddressConfirmed(false);
+    setCreateStep(1);
+  }
 
   function fieldValue(name: string) {
     const element = createFormRef.current?.elements.namedItem(name);
@@ -252,61 +265,65 @@ export function BorrowerDirectory({
       setIsSubmitting(false);
       return;
     }
-    const payload = {
-      fullName: String(form.get("fullName") ?? "").trim(),
-      country: "CO",
-      documentType: String(form.get("documentType") ?? "CC"),
-      documentNumber: String(form.get("documentNumber") ?? "").trim(),
-      phone: String(form.get("phone") ?? "").trim(),
-      whatsappPhone: String(form.get("whatsappPhone") ?? "").trim(),
-      homeAddress: String(form.get("homeAddress") ?? "").trim(),
-      workAddress: String(form.get("workAddress") ?? "").trim(),
-      homeAddressConfirmed,
-      workAddressConfirmed,
-      profilePhotoObjectKey: null,
-      consentVersion: "borrower-dossier-v1",
-      consentEvidenceRef: String(form.get("consentEvidenceRef") ?? "").trim(),
-      emergencyContacts: [
-        {
-          fullName: String(form.get("contactName") ?? "").trim(),
-          relationship: String(form.get("contactRelationship") ?? "").trim(),
-          phone: String(form.get("contactPhone") ?? "").trim(),
-        },
-        ...(includeSecondContact
-          ? [
-              {
-                fullName: String(form.get("secondContactName") ?? "").trim(),
-                relationship: String(form.get("secondContactRelationship") ?? "").trim(),
-                phone: String(form.get("secondContactPhone") ?? "").trim(),
-              },
-            ]
-          : []),
-      ],
-      documents: [],
-    };
-    const parsedPayload = borrowerCreateRequestSchema.safeParse(payload);
-    if (!parsedPayload.success) {
-      setMessage(parsedPayload.error.issues[0]?.message ?? "Revisa los datos del cliente.");
-      setIsError(true);
-      setIsSubmitting(false);
-      return;
+    let borrowerId = createdBorrowerId;
+    if (!borrowerId) {
+      const payload = {
+        fullName: String(form.get("fullName") ?? "").trim(),
+        country: "CO",
+        documentType: String(form.get("documentType") ?? "CC"),
+        documentNumber: String(form.get("documentNumber") ?? "").trim(),
+        phone: String(form.get("phone") ?? "").trim(),
+        whatsappPhone: String(form.get("whatsappPhone") ?? "").trim(),
+        homeAddress: String(form.get("homeAddress") ?? "").trim(),
+        workAddress: String(form.get("workAddress") ?? "").trim(),
+        homeAddressConfirmed,
+        workAddressConfirmed,
+        profilePhotoObjectKey: null,
+        consentVersion: "borrower-dossier-v1",
+        consentEvidenceRef: String(form.get("consentEvidenceRef") ?? "").trim(),
+        emergencyContacts: [
+          {
+            fullName: String(form.get("contactName") ?? "").trim(),
+            relationship: String(form.get("contactRelationship") ?? "").trim(),
+            phone: String(form.get("contactPhone") ?? "").trim(),
+          },
+          ...(includeSecondContact
+            ? [
+                {
+                  fullName: String(form.get("secondContactName") ?? "").trim(),
+                  relationship: String(form.get("secondContactRelationship") ?? "").trim(),
+                  phone: String(form.get("secondContactPhone") ?? "").trim(),
+                },
+              ]
+            : []),
+        ],
+        documents: [],
+      };
+      const parsedPayload = borrowerCreateRequestSchema.safeParse(payload);
+      if (!parsedPayload.success) {
+        setMessage(parsedPayload.error.issues[0]?.message ?? "Revisa los datos del cliente.");
+        setIsError(true);
+        setIsSubmitting(false);
+        return;
+      }
+      const response = await sensitiveFetch(`/api/v1/tenants/${tenantId}/borrowers`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(parsedPayload.data),
+      }).catch(() => null);
+      if (!response?.ok) {
+        const body = await response?.json().catch(() => ({}));
+        setMessage(formatApiError(body, "No fue posible crear el cliente."));
+        setIsError(true);
+        setIsSubmitting(false);
+        return;
+      }
+      const created = (await response.json().catch(() => null)) as {
+        borrower?: { id?: string };
+      } | null;
+      borrowerId = created?.borrower?.id ?? null;
+      if (borrowerId) setCreatedBorrowerId(borrowerId);
     }
-    const response = await sensitiveFetch(`/api/v1/tenants/${tenantId}/borrowers`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(parsedPayload.data),
-    }).catch(() => null);
-    if (!response?.ok) {
-      const body = await response?.json().catch(() => ({}));
-      setMessage(formatApiError(body, "No fue posible crear el cliente."));
-      setIsError(true);
-      setIsSubmitting(false);
-      return;
-    }
-    const created = (await response.json().catch(() => null)) as {
-      borrower?: { id?: string };
-    } | null;
-    const borrowerId = created?.borrower?.id;
     const uploads: Array<{
       field: string;
       category: "identity" | "profile_photo";
@@ -317,8 +334,10 @@ export function BorrowerDirectory({
       { field: "profilePhoto", category: "profile_photo" },
     ];
     let uploadFailure = !borrowerId;
+    const uploadedFields = new Set(uploadedDocumentFields);
     if (borrowerId) {
       for (const upload of uploads) {
+        if (uploadedFields.has(upload.field)) continue;
         const file = form.get(upload.field);
         if (!(file instanceof File) || file.size === 0) {
           uploadFailure = true;
@@ -332,21 +351,32 @@ export function BorrowerDirectory({
           `/api/v1/tenants/${tenantId}/borrowers/${borrowerId}/documents`,
           { method: "POST", body },
         ).catch(() => null);
-        if (!uploadResponse?.ok) uploadFailure = true;
+        if (!uploadResponse?.ok) {
+          uploadFailure = true;
+        } else {
+          uploadedFields.add(upload.field);
+        }
       }
     }
+    setUploadedDocumentFields(Array.from(uploadedFields));
+    if (uploadFailure) {
+      setMessage(
+        borrowerId
+          ? "El cliente quedó creado, pero faltan imágenes por guardar. Mantén esta ventana abierta y pulsa reintentar; no se volverá a crear el cliente."
+          : "No fue posible crear el cliente. Revisa la conexión e inténtalo de nuevo.",
+      );
+      setIsError(true);
+      setIsSubmitting(false);
+      router.refresh();
+      return;
+    }
     event.currentTarget.reset();
-    setIncludeSecondContact(false);
-    setHomeAddressConfirmed(false);
-    setWorkAddressConfirmed(false);
-    setCreateStep(1);
     setMessage(
-      uploadFailure
-        ? "Cliente creado, pero una o más imágenes no pudieron guardarse. Revisa la ficha y vuelve a cargarlas."
-        : "Cliente creado. Las imágenes quedaron privadas y el OCR se procesará en segundo plano para revisión humana.",
+      "Cliente creado. Las imágenes quedaron privadas y el OCR se procesará en segundo plano para revisión humana.",
     );
+    setIsError(false);
     setIsSubmitting(false);
-    setIsCreateOpen(false);
+    closeCreateModal(true);
     router.refresh();
   }
 
@@ -363,7 +393,13 @@ export function BorrowerDirectory({
             {canCreate ? (
               <button
                 className="primary-action"
-                onClick={() => setIsCreateOpen(true)}
+                onClick={() => {
+                  setCreatedBorrowerId(null);
+                  setUploadedDocumentFields([]);
+                  setMessage("");
+                  setIsError(false);
+                  setIsCreateOpen(true);
+                }}
                 type="button"
               >
                 Nuevo cliente
@@ -601,7 +637,7 @@ export function BorrowerDirectory({
       </section>
 
       {canCreate && isCreateOpen ? (
-        <Modal onClose={() => setIsCreateOpen(false)} title="Nuevo cliente">
+        <Modal onClose={() => closeCreateModal()} title="Nuevo cliente">
           <div className="card-heading">
             <div>
               <span className="panel-eyebrow">Alta rápida</span>
@@ -840,7 +876,11 @@ export function BorrowerDirectory({
                 </button>
               ) : (
                 <button disabled={isSubmitting} type="submit">
-                  {isSubmitting ? "Guardando…" : "Crear cliente"}
+                  {isSubmitting
+                    ? "Guardando…"
+                    : createdBorrowerId
+                      ? "Reintentar imágenes"
+                      : "Crear cliente"}
                 </button>
               )}
             </div>
