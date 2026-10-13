@@ -2712,11 +2712,15 @@ export function buildApp(dependencies: AppDependencies) {
     const params = tenantIdParamsSchema.safeParse(request.params);
     const body = sharedClientVerificationRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
+      const consentMissing =
+        !body.success && body.error.issues.some((issue) => issue.path[0] === "consentConfirmed");
       return sendError(
         reply,
         400,
-        "INVALID_CLIENT_VERIFICATION",
-        "Ingresa una cédula válida.",
+        consentMissing ? "CLIENT_VERIFICATION_CONSENT_REQUIRED" : "INVALID_CLIENT_VERIFICATION",
+        consentMissing
+          ? "Confirma que el cliente autorizó esta consulta antes de continuar."
+          : "Ingresa una cédula válida.",
         request.id,
       );
     }
