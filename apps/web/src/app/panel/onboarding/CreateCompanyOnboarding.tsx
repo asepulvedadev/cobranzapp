@@ -48,7 +48,7 @@ export function CreateCompanyOnboarding() {
         placeholder="Cobranzas del Norte"
         required
       />
-      <small>Usaremos este nombre para crear el espacio y su sede principal.</small>
+      <small>Usaremos este nombre para crear el espacio de trabajo de tu empresa.</small>
       <label htmlFor="company-password">Confirma tu contraseña</label>
       <input
         autoComplete="current-password"
