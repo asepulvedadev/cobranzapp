@@ -22,7 +22,9 @@ import {
   View,
 } from "react-native";
 import { MobileApi, MobileApiError } from "./src/api";
+import { BorrowerAddressControl } from "./src/BorrowerAddressControl";
 import { BorrowerCreateForm } from "./src/BorrowerCreateForm";
+import { BorrowerOcrControl } from "./src/BorrowerOcrControl";
 import { CreditWorkspace } from "./src/CreditWorkspace";
 import { MemberProfileForm } from "./src/MemberProfileForm";
 import { VerificationNetworkCard } from "./src/VerificationNetworkCard";
@@ -498,6 +500,19 @@ function TenantClients({
                     ? "Identidad revisada"
                     : "Pendiente de revisión"}
                 </Text>
+                <BorrowerOcrControl
+                  api={api}
+                  borrowerId={borrower.id}
+                  onNeedsReauthentication={onNeedsReauthentication}
+                  tenantId={tenantId}
+                />
+                <BorrowerAddressControl
+                  api={api}
+                  borrower={borrower}
+                  onNeedsReauthentication={onNeedsReauthentication}
+                  onUpdated={onBorrowerCreated}
+                  tenantId={tenantId}
+                />
               </View>
             </View>
           ))}

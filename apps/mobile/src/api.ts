@@ -4,6 +4,9 @@ import {
   type BorrowerDirectory,
   borrowerDirectorySchema,
   borrowerDocumentResponseSchema,
+  borrowerOcrConfirmResponseSchema,
+  borrowerOcrExtractionSchema,
+  borrowerOcrResponseSchema,
   borrowerResponseSchema,
   type CurrentUser,
   currentUserSchema,
@@ -380,6 +383,69 @@ export class MobileApi {
       );
     }
     return borrowerDocumentResponseSchema.parse(await response.json()).document;
+  }
+
+  async borrowerOcr(tenantId: string, borrowerId: string) {
+    const response = await this.request(`/v1/tenants/${tenantId}/borrowers/${borrowerId}/ocr`);
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible consultar el resultado del OCR."),
+        response.status,
+      );
+    }
+    return borrowerOcrResponseSchema.parse(await response.json());
+  }
+
+  async confirmBorrowerOcr(
+    tenantId: string,
+    borrowerId: string,
+    extractionId: string,
+    input: { fullName: string | null; documentNumber: string | null },
+  ) {
+    const response = await this.request(
+      `/v1/tenants/${tenantId}/borrowers/${borrowerId}/ocr/${extractionId}/confirm`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ extractionId, ...input }),
+      },
+    );
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible confirmar los datos del OCR."),
+        response.status,
+      );
+    }
+    return borrowerOcrConfirmResponseSchema.parse(await response.json());
+  }
+
+  async retryBorrowerOcr(tenantId: string, borrowerId: string, extractionId: string) {
+    const response = await this.request(
+      `/v1/tenants/${tenantId}/borrowers/${borrowerId}/ocr/${extractionId}/retry`,
+      { method: "POST" },
+    );
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible volver a procesar el documento."),
+        response.status,
+      );
+    }
+    return borrowerOcrExtractionSchema.parse((await response.json()).extraction);
+  }
+
+  async geocodeBorrowerAddress(tenantId: string, borrowerId: string, addressKind: "home" | "work") {
+    const response = await this.request(`/v1/tenants/${tenantId}/borrowers/${borrowerId}/geocode`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ addressKind }),
+    });
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible ubicar la dirección."),
+        response.status,
+      );
+    }
+    return borrowerResponseSchema.parse(await response.json()).borrower;
   }
 
   async createVerificationConsent(tenantId: string, input: VerificationNetworkConsentRequest) {
