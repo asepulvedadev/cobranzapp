@@ -33,6 +33,7 @@ export function ClientVerificationSearch({ tenantId }: { tenantId: string }) {
     const documentNumber = String(form.get("documentNumber") ?? "").trim();
     if (!consentConfirmed) {
       setMessage("Confirma que el cliente autorizó esta consulta antes de continuar.");
+      setIsBusy(false);
       return;
     }
     const response = await fetchWithTimeout(`/api/v1/tenants/${tenantId}/client-verification`, {

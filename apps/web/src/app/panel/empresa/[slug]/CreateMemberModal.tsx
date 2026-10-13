@@ -70,7 +70,7 @@ export function CreateMemberModal({
       const body = await response?.json().catch(() => ({}));
       setMessage(
         response?.status === 428
-          ? "La confirmación de seguridad tardó demasiado. Inténtalo de nuevo."
+          ? "Confirma tu contraseña actual en la ventana de seguridad para crear el empleado."
           : formatApiError(body, "No fue posible crear el empleado."),
       );
       setIsError(true);
