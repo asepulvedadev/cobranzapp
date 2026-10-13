@@ -37,6 +37,8 @@ guardan direcciones y coordenadas, pero Waze sigue siendo la navegación final.
 ### 4. Rutas operativas — base implementada
 
 - Las direcciones completas de casa y trabajo se guardan en el expediente.
+- La creación exige confirmar por separado que casa y trabajo fueron verificadas con el cliente;
+  cada confirmación queda fechada y asociada al usuario que la hizo.
 - El tablero muestra la dirección y un enlace Waze por parada.
 - Se puede asignar la ruta a un cobrador y activar/archivar la ruta.
 - Se puede reordenar manualmente cada parada con controles subir/bajar.
