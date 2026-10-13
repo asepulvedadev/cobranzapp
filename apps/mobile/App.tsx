@@ -391,10 +391,7 @@ function TenantHome({
   const [searchInput, setSearchInput] = useState(directorySearch);
   useEffect(() => setSearchInput(directorySearch), [directorySearch]);
   const metrics = [
-    ["Integrantes", overview.metrics.members],
-    ["Sedes", overview.metrics.branches],
-    ["Equipos", overview.metrics.teams],
-    ["Invitaciones", overview.metrics.pendingInvitations],
+    ["Personal", overview.metrics.members],
     ...(directory
       ? [
           ["Clientes activos", directory.borrowerSummary.active] as const,
@@ -449,20 +446,6 @@ function TenantHome({
           tenantId={overview.tenant.id}
         />
       ) : null}
-      <Text style={styles.cardTitle}>Estructura operativa</Text>
-      {overview.branches.slice(0, 4).map((branch) => (
-        <View key={branch.id} style={styles.listRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{branch.displayName.slice(0, 1).toUpperCase()}</Text>
-          </View>
-          <View style={styles.listCopy}>
-            <Text style={styles.listTitle}>{branch.displayName}</Text>
-            <Text style={styles.muted}>
-              {branch.code} · {branch.status === "active" ? "Activa" : "Inactiva"}
-            </Text>
-          </View>
-        </View>
-      ))}
       {directory ? (
         <>
           <View style={styles.directoryHeading}>
