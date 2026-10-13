@@ -524,6 +524,58 @@ describe("borrower creation security", () => {
     expect(response.json()).toMatchObject({ error: { code: "REAUTHENTICATION_REQUIRED" } });
     expect(create).not.toHaveBeenCalled();
   });
+
+  it("updates home and work addresses together after reauthentication", async () => {
+    const updatedBorrower = {
+      id: "193a2db4-2349-4a48-8833-746a2a334260",
+      fullName: "Cliente de prueba",
+      homeAddress: "Calle 10 # 20-30, Bogotá",
+      workAddress: "Carrera 7 # 80-10, Bogotá",
+      homeAddressStatus: "confirmed",
+      workAddressStatus: "confirmed",
+    };
+    const updateAddresses = vi.fn(async () => ({
+      status: "updated" as const,
+      borrower: updatedBorrower,
+    }));
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => tenantOwner) },
+        borrowerService: { updateAddresses } as unknown as BorrowerService,
+      }),
+    );
+    apps.push(app);
+    const tenantId = tenantOwner.memberships[0]?.tenantId;
+    const borrowerId = updatedBorrower.id;
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/v1/tenants/${tenantId}/borrowers/${borrowerId}/addresses`,
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+      },
+      payload: {
+        homeAddress: "Calle 10 # 20-30, Bogotá",
+        workAddress: "Carrera 7 # 80-10, Bogotá",
+        homeAddressConfirmed: true,
+        workAddressConfirmed: true,
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ borrower: updatedBorrower });
+    expect(updateAddresses).toHaveBeenCalledWith(
+      { userId: tenantOwner.id, platformRole: null, tenantRole: "owner" },
+      tenantId,
+      borrowerId,
+      expect.objectContaining({
+        homeAddress: "Calle 10 # 20-30, Bogotá",
+        workAddress: "Carrera 7 # 80-10, Bogotá",
+        homeAddressConfirmed: true,
+        workAddressConfirmed: true,
+        requestId: expect.any(String),
+      }),
+    );
+  });
 });
 
 describe("loan application review queue", () => {
