@@ -4,10 +4,17 @@ import type {
   RouteCreateRequest,
   RouteStatusUpdateRequest,
   RouteStopCreateRequest,
+  RouteStopReorderRequest,
 } from "@cobranzapp/contracts";
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
-import type { RouteAssignmentResult, RouteResult, RouteService, RouteStopResult } from "./types.js";
+import type {
+  RouteAssignmentResult,
+  RouteResult,
+  RouteService,
+  RouteStopReorderResult,
+  RouteStopResult,
+} from "./types.js";
 
 type RouteRow = {
   id: string;
@@ -221,6 +228,69 @@ export function createPostgresRouteService(pool: Pool): RouteService {
         const updated = await loadRoute(client, tenantId, routeId);
         if (!updated) return { status: "not_found" };
         return { status: "updated", route: updated };
+      });
+    },
+
+    async reorderStops(
+      actor,
+      tenantId,
+      routeId,
+      input: RouteStopReorderRequest & { requestId: string },
+    ): Promise<RouteStopReorderResult> {
+      if (!canManage(actor)) return { status: "forbidden" };
+      return withTransaction(actor, tenantId, async (client) => {
+        const route = await client.query<{ id: string }>(
+          `SELECT id FROM collection_routes WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
+          [tenantId, routeId],
+        );
+        if (!route.rows[0]) return { status: "not_found" };
+        const current = await client.query<{ id: string }>(
+          `SELECT id FROM collection_route_stops
+            WHERE tenant_id = $1 AND route_id = $2
+            ORDER BY position ASC, id ASC
+            FOR UPDATE`,
+          [tenantId, routeId],
+        );
+        const currentIds = current.rows.map((row) => row.id);
+        if (
+          input.stopIds.length !== currentIds.length ||
+          new Set(input.stopIds).size !== input.stopIds.length ||
+          input.stopIds.some((id) => !currentIds.includes(id))
+        ) {
+          return { status: "invalid_order" };
+        }
+        await client.query(
+          `UPDATE collection_route_stops
+              SET position = position + 10000, updated_at = now()
+            WHERE tenant_id = $1 AND route_id = $2`,
+          [tenantId, routeId],
+        );
+        for (const [index, stopId] of input.stopIds.entries()) {
+          await client.query(
+            `UPDATE collection_route_stops
+                SET position = $4, updated_at = now()
+              WHERE tenant_id = $1 AND route_id = $2 AND id = $3`,
+            [tenantId, routeId, stopId, index + 1],
+          );
+        }
+        await client.query(
+          `UPDATE collection_routes SET updated_at = now() WHERE tenant_id = $1 AND id = $2`,
+          [tenantId, routeId],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'collection_route.stops_reordered', 'collection_route', $3, $4, $5::jsonb)`,
+          [
+            tenantId,
+            actor.userId,
+            routeId,
+            input.requestId,
+            JSON.stringify({ stopIds: input.stopIds }),
+          ],
+        );
+        const updated = await loadRoute(client, tenantId, routeId);
+        return updated ? { status: "updated", route: updated } : { status: "not_found" };
       });
     },
 

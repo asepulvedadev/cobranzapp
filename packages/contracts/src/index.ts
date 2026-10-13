@@ -744,6 +744,9 @@ export const routeStopCreateRequestSchema = z.object({
   addressKind: routeAddressKindSchema,
   position: z.number().int().positive(),
 });
+export const routeStopReorderRequestSchema = z.object({
+  stopIds: z.array(z.uuid()).min(1).max(500),
+});
 export const routeStopSchema = z.object({
   id: z.uuid(),
   borrowerId: z.uuid(),
@@ -1223,6 +1226,7 @@ export type RouteStatusUpdateRequest = z.infer<typeof routeStatusUpdateRequestSc
 export type RouteAssignmentUpdateRequest = z.infer<typeof routeAssignmentUpdateRequestSchema>;
 export type RouteCreateRequest = z.infer<typeof routeCreateRequestSchema>;
 export type RouteStopCreateRequest = z.infer<typeof routeStopCreateRequestSchema>;
+export type RouteStopReorderRequest = z.infer<typeof routeStopReorderRequestSchema>;
 export type RouteStop = z.infer<typeof routeStopSchema>;
 export type Route = z.infer<typeof routeSchema>;
 export type RouteDirectory = z.infer<typeof routeDirectorySchema>;

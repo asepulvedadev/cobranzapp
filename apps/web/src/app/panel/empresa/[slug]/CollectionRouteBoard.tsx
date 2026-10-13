@@ -160,6 +160,33 @@ export function CollectionRouteBoard({
     router.refresh();
   }
 
+  async function reorderStops(route: Route, index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= route.stops.length) return;
+    const stopIds = route.stops.map((stop) => stop.id);
+    [stopIds[index], stopIds[target]] = [stopIds[target], stopIds[index]];
+    setIsBusy(true);
+    setMessage("");
+    setIsError(false);
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/routes/${route.id}/stops/order`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ stopIds }),
+      },
+    ).catch(() => null);
+    if (!response?.ok) {
+      setMessage(await errorMessage(response, "No fue posible ordenar las paradas."));
+      setIsError(true);
+      setIsBusy(false);
+      return;
+    }
+    setMessage("Orden de paradas actualizado.");
+    setIsBusy(false);
+    router.refresh();
+  }
+
   return (
     <section className="dashboard-card route-board-card" id="rutas">
       <div className="card-heading">
@@ -197,7 +224,7 @@ export function CollectionRouteBoard({
               {route.description ? <p>{route.description}</p> : null}
               {route.stops.length ? (
                 <ol className="route-stop-list">
-                  {route.stops.map((stop) => (
+                  {route.stops.map((stop, index) => (
                     <li key={stop.id}>
                       <span>{stop.position}</span>
                       <div>
@@ -213,6 +240,26 @@ export function CollectionRouteBoard({
                         >
                           Navegar en Waze
                         </a>
+                        {canManage ? (
+                          <div className="route-stop-order-actions">
+                            <button
+                              aria-label={`Subir ${stop.borrowerName}`}
+                              disabled={isBusy || index === 0}
+                              onClick={() => void reorderStops(route, index, -1)}
+                              type="button"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              aria-label={`Bajar ${stop.borrowerName}`}
+                              disabled={isBusy || index === route.stops.length - 1}
+                              onClick={() => void reorderStops(route, index, 1)}
+                              type="button"
+                            >
+                              ↓
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     </li>
                   ))}

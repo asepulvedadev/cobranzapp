@@ -32,6 +32,7 @@ import {
   routeCreateRequestSchema,
   routeStatusUpdateRequestSchema,
   routeStopCreateRequestSchema,
+  routeStopReorderRequestSchema,
   type ServiceStatus,
   sharedClientVerificationRequestSchema,
   tenantInvitationRequestSchema,
@@ -2301,6 +2302,71 @@ export function buildApp(dependencies: AppDependencies) {
         403,
         "SCOPE_DENIED",
         "Solo propietarios y supervisores pueden editar rutas.",
+        request.id,
+      );
+    }
+    return reply.send({ route: result.route });
+  });
+
+  app.patch("/v1/tenants/:tenantId/routes/:routeId/stops/order", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantRouteParamsSchema.safeParse(request.params);
+    const body = routeStopReorderRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_ROUTE_ORDER",
+        "El orden de paradas no es válido.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo propietarios y supervisores pueden ordenar rutas.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    if (!dependencies.routeService) {
+      return sendError(
+        reply,
+        503,
+        "ROUTES_UNAVAILABLE",
+        "Las rutas todavía no están configuradas.",
+        request.id,
+      );
+    }
+    const result = await dependencies.routeService.reorderStops(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.routeId,
+      { ...body.data, requestId: request.id },
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "ROUTE_NOT_FOUND", "La ruta no existe.", request.id);
+    }
+    if (result.status === "forbidden") {
+      return sendError(reply, 403, "SCOPE_DENIED", "No puedes ordenar esta ruta.", request.id);
+    }
+    if (result.status === "invalid_order") {
+      return sendError(
+        reply,
+        409,
+        "ROUTE_ORDER_INVALID",
+        "Debes incluir todas las paradas una sola vez.",
         request.id,
       );
     }

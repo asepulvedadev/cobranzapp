@@ -71,6 +71,7 @@ import {
   routeResponseSchema,
   routeStatusUpdateRequestSchema,
   routeStopCreateRequestSchema,
+  routeStopReorderRequestSchema,
   securityActivityResponseSchema,
   securityActivitySchema,
   serviceStatusSchema,
@@ -207,6 +208,7 @@ const documentedSchemas = {
   RouteResponse: routeResponseSchema,
   RouteStatusUpdateRequest: routeStatusUpdateRequestSchema,
   RouteStopCreateRequest: routeStopCreateRequestSchema,
+  RouteStopReorderRequest: routeStopReorderRequestSchema,
   SecurityActivity: securityActivitySchema,
   ServiceStatus: serviceStatusSchema,
 } as const;

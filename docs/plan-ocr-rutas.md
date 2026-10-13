@@ -39,7 +39,8 @@ guardan direcciones y coordenadas, pero Waze sigue siendo la navegación final.
 - Las direcciones completas de casa y trabajo se guardan en el expediente.
 - El tablero muestra la dirección y un enlace Waze por parada.
 - Se puede asignar la ruta a un cobrador y activar/archivar la ruta.
-- Pendiente: geocodificación persistida, reordenamiento visual y registro de visita.
+- Se puede reordenar manualmente cada parada con controles subir/bajar.
+- Pendiente: geocodificación persistida y registro de visita.
 
 ### 5. Optimización opcional
 
