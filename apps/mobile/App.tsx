@@ -33,7 +33,7 @@ type Screen =
   | { kind: "mfa" }
   | { kind: "authenticated"; user: CurrentUser };
 
-type TenantSection = "home" | "verification" | "credits" | "routes";
+type TenantSection = "home" | "clients" | "verification" | "credits" | "routes";
 
 const roleLabels: Record<
   CurrentUser["memberships"][number]["role"] | TenantOverview["actorRole"],
@@ -371,41 +371,14 @@ function TenantHome({
   api,
   overview,
   memberProfile,
-  directory,
-  directorySearch,
-  onDirectoryPageChange,
-  onDirectorySearch,
-  onBorrowerCreated,
   onNeedsReauthentication,
 }: {
   api: MobileApi;
   overview: TenantOverview;
   memberProfile: TenantMemberProfile | null;
-  directory: BorrowerDirectory | null;
-  directorySearch: string;
-  onDirectoryPageChange: (page: number) => void;
-  onDirectorySearch: (search: string) => void;
-  onBorrowerCreated: () => void;
   onNeedsReauthentication: () => void;
 }) {
-  const [searchInput, setSearchInput] = useState(directorySearch);
-  useEffect(() => setSearchInput(directorySearch), [directorySearch]);
-  const metrics = [
-    ["Personal", overview.metrics.members],
-    ...(directory
-      ? [
-          ["Clientes activos", directory.borrowerSummary.active] as const,
-          ["Clientes archivados", directory.borrowerSummary.archived] as const,
-        ]
-      : []),
-    ...(directory
-      ? [
-          ["Identidades pendientes", directory.identitySummary.pending] as const,
-          ["Identidades revisadas", directory.identitySummary.reviewed] as const,
-          ["Identidades rechazadas", directory.identitySummary.rejected] as const,
-        ]
-      : []),
-  ] as const;
+  const metrics = [["Personal", overview.metrics.members]] as const;
   return (
     <View style={styles.stack}>
       <View style={[styles.tenantAccent, { backgroundColor: overview.settings.primaryColor }]} />
@@ -438,18 +411,57 @@ function TenantHome({
           userId={memberProfile.userId}
         />
       ) : null}
-      {overview.actorRole !== "customer" && overview.actorRole !== "support" ? (
-        <BorrowerCreateForm
-          api={api}
-          onCreated={onBorrowerCreated}
-          onNeedsReauthentication={onNeedsReauthentication}
-          tenantId={overview.tenant.id}
-        />
-      ) : null}
+    </View>
+  );
+}
+
+function TenantClients({
+  api,
+  directory,
+  directorySearch,
+  onBorrowerCreated,
+  onDirectoryPageChange,
+  onDirectorySearch,
+  onNeedsReauthentication,
+  tenantId,
+}: {
+  api: MobileApi;
+  directory: BorrowerDirectory | null;
+  directorySearch: string;
+  onBorrowerCreated: () => void;
+  onDirectoryPageChange: (page: number) => void;
+  onDirectorySearch: (search: string) => void;
+  onNeedsReauthentication: () => void;
+  tenantId: string;
+}) {
+  const [searchInput, setSearchInput] = useState(directorySearch);
+  useEffect(() => setSearchInput(directorySearch), [directorySearch]);
+
+  return (
+    <View style={styles.stack}>
+      <View style={styles.directoryHeading}>
+        <View>
+          <Text style={styles.eyebrow}>DIRECTORIO</Text>
+          <Text style={styles.sectionTitle}>Clientes</Text>
+        </View>
+        {directory ? (
+          <Text style={styles.muted}>{directory.borrowerSummary.active} activos</Text>
+        ) : null}
+      </View>
+      <Text style={styles.body}>
+        Crea clientes en un modal por pasos y conserva sus documentos, referencias y direcciones
+        confirmadas en un expediente privado.
+      </Text>
+      <BorrowerCreateForm
+        api={api}
+        onCreated={onBorrowerCreated}
+        onNeedsReauthentication={onNeedsReauthentication}
+        tenantId={tenantId}
+      />
       {directory ? (
         <>
           <View style={styles.directoryHeading}>
-            <Text style={styles.cardTitle}>Clientes</Text>
+            <Text style={styles.cardTitle}>Directorio</Text>
             <Text style={styles.muted}>
               Página {directory.pagination.page} de {directory.pagination.totalPages}
             </Text>
@@ -513,7 +525,9 @@ function TenantHome({
             </View>
           ) : null}
         </>
-      ) : null}
+      ) : (
+        <ActivityIndicator color="#fbbf24" />
+      )}
     </View>
   );
 }
@@ -589,12 +603,14 @@ function TenantSectionNav({
   active,
   onChange,
   canVerify,
+  canViewClients,
   canViewCredits,
   canViewRoutes,
 }: {
   active: TenantSection;
   onChange: (section: TenantSection) => void;
   canVerify: boolean;
+  canViewClients: boolean;
   canViewCredits: boolean;
   canViewRoutes: boolean;
 }) {
@@ -609,6 +625,19 @@ function TenantSectionNav({
           Inicio
         </Text>
       </Pressable>
+      {canViewClients ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onChange("clients")}
+          style={[styles.sectionNavItem, active === "clients" && styles.sectionNavItemActive]}
+        >
+          <Text
+            style={[styles.sectionNavText, active === "clients" && styles.sectionNavTextActive]}
+          >
+            Clientes
+          </Text>
+        </Pressable>
+      ) : null}
       {canVerify ? (
         <Pressable
           accessibilityRole="button"
@@ -860,6 +889,11 @@ function AuthenticatedHome({
                       ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
                       : false
                   }
+                  canViewClients={
+                    selectedMembershipRole
+                      ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
+                      : false
+                  }
                   canViewRoutes={
                     selectedMembershipRole
                       ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
@@ -881,6 +915,23 @@ function AuthenticatedHome({
                     }}
                     tenantId={tenant.tenant.id}
                   />
+                ) : tenantSection === "clients" ? (
+                  <TenantClients
+                    api={api}
+                    directory={directory}
+                    directorySearch={directorySearch}
+                    onBorrowerCreated={() => setReloadKey((current) => current + 1)}
+                    onDirectoryPageChange={setDirectoryPage}
+                    onDirectorySearch={(search) => {
+                      setDirectorySearch(search);
+                      setDirectoryPage(1);
+                    }}
+                    onNeedsReauthentication={() => {
+                      setNeedsReauthentication(true);
+                      setMessage("Confirma tu contraseña para continuar con esta acción.");
+                    }}
+                    tenantId={tenant.tenant.id}
+                  />
                 ) : tenantSection === "credits" ? (
                   <CreditWorkspace
                     api={api}
@@ -896,15 +947,7 @@ function AuthenticatedHome({
                 ) : (
                   <TenantHome
                     api={api}
-                    directory={directory}
-                    directorySearch={directorySearch}
                     memberProfile={memberProfile}
-                    onBorrowerCreated={() => setReloadKey((current) => current + 1)}
-                    onDirectoryPageChange={setDirectoryPage}
-                    onDirectorySearch={(search) => {
-                      setDirectorySearch(search);
-                      setDirectoryPage(1);
-                    }}
                     onNeedsReauthentication={() => {
                       setNeedsReauthentication(true);
                       setMessage("Confirma tu contraseña para continuar con esta acción.");
