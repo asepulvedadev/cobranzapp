@@ -1,4 +1,5 @@
 import type { Borrower } from "@cobranzapp/contracts";
+import * as Location from "expo-location";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { MobileApi } from "./api";
@@ -23,7 +24,7 @@ export function BorrowerAddressControl({
   onUpdated,
   tenantId,
 }: BorrowerAddressControlProps) {
-  const [busy, setBusy] = useState<"home" | "work" | null>(null);
+  const [busy, setBusy] = useState<"home" | "work" | "device-home" | "device-work" | null>(null);
   const [message, setMessage] = useState("");
 
   async function geocode(addressKind: "home" | "work") {
@@ -47,6 +48,43 @@ export function BorrowerAddressControl({
     }
   }
 
+  async function captureDeviceLocation(addressKind: "home" | "work") {
+    const busyKey = `device-${addressKind}` as const;
+    setBusy(busyKey);
+    setMessage("");
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (!permission.granted) {
+        setMessage("Permite la ubicación solo cuando estés frente a la dirección del cliente.");
+        return;
+      }
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      await api.geocodeBorrowerAddress(tenantId, borrower.id, addressKind, {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      });
+      setMessage(
+        `Ubicación de ${addressKind === "home" ? "casa" : "trabajo"} guardada para las rutas.`,
+      );
+      onUpdated();
+    } catch (error) {
+      if (error instanceof MobileApiError && error.status === 428) {
+        onNeedsReauthentication();
+        setMessage("Confirma tu contraseña actual para guardar la ubicación.");
+      } else {
+        setMessage(
+          error instanceof MobileApiError
+            ? error.message
+            : "No fue posible obtener la ubicación del dispositivo.",
+        );
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.row}>
@@ -60,6 +98,13 @@ export function BorrowerAddressControl({
         >
           <Text style={styles.actionText}>{busy === "home" ? "Ubicando…" : "Ubicar"}</Text>
         </Pressable>
+        <Pressable
+          disabled={busy !== null}
+          onPress={() => void captureDeviceLocation("home")}
+          style={styles.action}
+        >
+          <Text style={styles.actionText}>{busy === "device-home" ? "Guardando…" : "GPS"}</Text>
+        </Pressable>
       </View>
       <View style={styles.row}>
         <Text style={styles.label}>
@@ -71,6 +116,13 @@ export function BorrowerAddressControl({
           style={styles.action}
         >
           <Text style={styles.actionText}>{busy === "work" ? "Ubicando…" : "Ubicar"}</Text>
+        </Pressable>
+        <Pressable
+          disabled={busy !== null}
+          onPress={() => void captureDeviceLocation("work")}
+          style={styles.action}
+        >
+          <Text style={styles.actionText}>{busy === "device-work" ? "Guardando…" : "GPS"}</Text>
         </Pressable>
       </View>
       {message ? <Text style={styles.message}>{message}</Text> : null}

@@ -64,6 +64,11 @@ export type BorrowerOcrRetryResult =
   | { status: "not_retryable" };
 
 export type BorrowerAddressKind = "home" | "work";
+export type BorrowerAddressGeocodeInput = {
+  addressKind: BorrowerAddressKind;
+  latitude?: number;
+  longitude?: number;
+};
 export type BorrowerAddressGeocodeResult =
   | { status: "updated"; borrower: Borrower }
   | { status: "not_found" }
@@ -130,7 +135,7 @@ export interface BorrowerService {
     actor: TenantActor,
     tenantId: string,
     borrowerId: string,
-    addressKind: BorrowerAddressKind,
+    input: BorrowerAddressGeocodeInput,
     requestId: string,
   ): Promise<BorrowerAddressGeocodeResult>;
   updateAddresses(

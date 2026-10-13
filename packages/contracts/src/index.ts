@@ -1033,9 +1033,22 @@ export const borrowerAddressLocationSchema = z.object({
   errorCode: z.string().nullable(),
   geocodedAt: z.iso.datetime().nullable(),
 });
-export const borrowerAddressGeocodeRequestSchema = z.object({
-  addressKind: z.enum(["home", "work"]),
-});
+export const borrowerAddressGeocodeRequestSchema = z
+  .object({
+    addressKind: z.enum(["home", "work"]),
+    /** Optional device coordinates captured explicitly by the field operator. */
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+  })
+  .superRefine((value, context) => {
+    if ((value.latitude === undefined) !== (value.longitude === undefined)) {
+      context.addIssue({
+        code: "custom",
+        path: ["latitude"],
+        message: "La ubicación debe incluir latitud y longitud.",
+      });
+    }
+  });
 /**
  * Corrects both operational addresses in one atomic action. Requiring both
  * confirmations prevents a stale address from being silently left behind

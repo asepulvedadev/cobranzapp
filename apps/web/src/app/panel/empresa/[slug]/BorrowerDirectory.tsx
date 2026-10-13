@@ -125,7 +125,11 @@ export function BorrowerDirectory({
     if (validateCreateStep(createStep)) setCreateStep((step) => Math.min(4, step + 1));
   }
 
-  async function geocodeAddress(borrowerId: string, addressKind: "home" | "work") {
+  async function geocodeAddress(
+    borrowerId: string,
+    addressKind: "home" | "work",
+    coordinates?: { latitude: number; longitude: number },
+  ) {
     const key = `${borrowerId}:${addressKind}`;
     setGeocodeBusy(key);
     const response = await sensitiveFetch(
@@ -133,7 +137,7 @@ export function BorrowerDirectory({
       {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ addressKind }),
+        body: JSON.stringify({ addressKind, ...coordinates }),
       },
     ).catch(() => null);
     setGeocodeBusy("");
@@ -145,6 +149,35 @@ export function BorrowerDirectory({
     setMessage("Dirección ubicada y guardada para las rutas.");
     setIsError(false);
     router.refresh();
+  }
+
+  function captureDeviceLocation(borrowerId: string, addressKind: "home" | "work") {
+    const key = `${borrowerId}:${addressKind}`;
+    if (!navigator.geolocation) {
+      setMessage(
+        "Este dispositivo no permite obtener la ubicación. Escribe la dirección y ubícala.",
+      );
+      setIsError(true);
+      return;
+    }
+    setGeocodeBusy(key);
+    setMessage("");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        void geocodeAddress(borrowerId, addressKind, {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      },
+      () => {
+        setGeocodeBusy("");
+        setMessage(
+          "No se pudo obtener la ubicación. Permítela solo cuando estés frente al cliente.",
+        );
+        setIsError(true);
+      },
+      { enableHighAccuracy: true, maximumAge: 30_000, timeout: 15_000 },
+    );
   }
 
   function openAddressEditor(borrower: Borrower) {
@@ -406,6 +439,14 @@ export function BorrowerDirectory({
                                   ? "Actualizar ubicación"
                                   : "Ubicar dirección"}
                             </button>
+                            <button
+                              className="button-link"
+                              disabled={geocodeBusy === `${borrower.id}:home`}
+                              onClick={() => captureDeviceLocation(borrower.id, "home")}
+                              type="button"
+                            >
+                              Usar GPS del dispositivo
+                            </button>
                             <a
                               href={wazeUrl(borrower.homeAddress, borrower.addressLocations.home)}
                               rel="noreferrer"
@@ -440,6 +481,14 @@ export function BorrowerDirectory({
                                 : borrower.addressLocations.work.status === "ready"
                                   ? "Actualizar ubicación"
                                   : "Ubicar dirección"}
+                            </button>
+                            <button
+                              className="button-link"
+                              disabled={geocodeBusy === `${borrower.id}:work`}
+                              onClick={() => captureDeviceLocation(borrower.id, "work")}
+                              type="button"
+                            >
+                              Usar GPS del dispositivo
                             </button>
                             <a
                               href={wazeUrl(borrower.workAddress, borrower.addressLocations.work)}

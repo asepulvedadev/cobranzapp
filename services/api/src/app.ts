@@ -2912,7 +2912,7 @@ export function buildApp(dependencies: AppDependencies) {
       },
       params.data.tenantId,
       params.data.borrowerId,
-      body.data.addressKind,
+      body.data,
       request.id,
     );
     if (result.status === "not_found") {

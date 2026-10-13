@@ -453,11 +453,16 @@ export class MobileApi {
     return borrowerOcrExtractionSchema.parse((await response.json()).extraction);
   }
 
-  async geocodeBorrowerAddress(tenantId: string, borrowerId: string, addressKind: "home" | "work") {
+  async geocodeBorrowerAddress(
+    tenantId: string,
+    borrowerId: string,
+    addressKind: "home" | "work",
+    coordinates?: { latitude: number; longitude: number },
+  ) {
     const response = await this.request(`/v1/tenants/${tenantId}/borrowers/${borrowerId}/geocode`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ addressKind }),
+      body: JSON.stringify({ addressKind, ...coordinates }),
     });
     if (!response.ok) {
       throw new MobileApiError(

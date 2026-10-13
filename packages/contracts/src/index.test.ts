@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  borrowerAddressGeocodeRequestSchema,
   borrowerCreateRequestSchema,
   borrowerDirectorySchema,
   borrowerReviewRequestSchema,
@@ -181,6 +182,22 @@ describe("shared API contracts", () => {
         profilePhotoConfirmed: false,
       }).success,
     ).toBe(true);
+  });
+
+  it("accepts a complete device location and rejects half a coordinate pair", () => {
+    expect(
+      borrowerAddressGeocodeRequestSchema.safeParse({
+        addressKind: "home",
+        latitude: 4.711,
+        longitude: -74.0721,
+      }).success,
+    ).toBe(true);
+    expect(
+      borrowerAddressGeocodeRequestSchema.safeParse({
+        addressKind: "work",
+        latitude: 4.711,
+      }).success,
+    ).toBe(false);
   });
 
   it("keeps borrower verification totals independent from the visible page", () => {

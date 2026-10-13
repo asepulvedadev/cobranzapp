@@ -16,6 +16,7 @@ import {
   normalizeBorrowerDocumentNumber,
 } from "./identity.js";
 import type {
+  BorrowerAddressGeocodeInput,
   BorrowerAddressGeocodeResult,
   BorrowerAddressKind,
   BorrowerAddressUpdateInput,
@@ -1042,7 +1043,7 @@ export function createPostgresBorrowerService(
       actor,
       tenantId,
       borrowerId,
-      addressKind,
+      input: BorrowerAddressGeocodeInput,
       requestId,
     ): Promise<BorrowerAddressGeocodeResult> {
       if (!["owner", "supervisor", "collector"].includes(actor.tenantRole ?? "")) {
@@ -1057,13 +1058,24 @@ export function createPostgresBorrowerService(
         );
         const row = result.rows[0];
         if (!row) return null;
-        return addressKind === "home" ? row.home_address : row.work_address;
+        return input.addressKind === "home" ? row.home_address : row.work_address;
       });
       if (!address) return { status: "not_found" };
 
       let geocoded: GeocodedAddress;
+      const provider = input.latitude !== undefined ? "device" : "nominatim";
       try {
-        geocoded = await geocodeWithNominatim(geocodingEndpoint, address);
+        geocoded =
+          input.latitude !== undefined && input.longitude !== undefined
+            ? {
+                latitude: input.latitude,
+                longitude: input.longitude,
+                // The manually confirmed text remains the source of truth;
+                // device coordinates only make routing more precise.
+                formattedAddress: address,
+                precision: "device-gps",
+              }
+            : await geocodeWithNominatim(geocodingEndpoint, address);
       } catch (error) {
         const errorCode = (error instanceof Error ? error.message : "GEOCODER_FAILED")
           .replaceAll(/[^A-Z0-9_]+/g, "_")
@@ -1077,7 +1089,7 @@ export function createPostgresBorrowerService(
               WHERE tenant_id = $1 AND borrower_id = $2 AND address_kind = $3
               RETURNING address_kind, status, latitude, longitude, formatted_address,
                         provider, precision, error_code, geocoded_at`,
-            [tenantId, borrowerId, addressKind, errorCode],
+            [tenantId, borrowerId, input.addressKind, errorCode],
           );
           const row = result.rows[0];
           if (!row) return null;
@@ -1090,7 +1102,7 @@ export function createPostgresBorrowerService(
               actor.userId,
               borrowerId,
               requestId,
-              JSON.stringify({ addressKind, errorCode }),
+              JSON.stringify({ addressKind: input.addressKind, errorCode }),
             ],
           );
           return mapAddressLocation(row);
@@ -1102,7 +1114,7 @@ export function createPostgresBorrowerService(
         const result = await client.query<AddressLocationRow>(
           `UPDATE borrower_address_locations
               SET status = 'ready', latitude = $4, longitude = $5,
-                  formatted_address = $6, provider = 'nominatim', precision = $7,
+                  formatted_address = $6, provider = $8, precision = $7,
                   error_code = NULL, geocoded_at = now(), updated_at = now()
             WHERE tenant_id = $1 AND borrower_id = $2 AND address_kind = $3
             RETURNING address_kind, status, latitude, longitude, formatted_address,
@@ -1110,11 +1122,12 @@ export function createPostgresBorrowerService(
           [
             tenantId,
             borrowerId,
-            addressKind,
+            input.addressKind,
             geocoded.latitude,
             geocoded.longitude,
             geocoded.formattedAddress,
             geocoded.precision,
+            provider,
           ],
         );
         if (!result.rows[0]) return { status: "not_found" } as const;
@@ -1127,7 +1140,11 @@ export function createPostgresBorrowerService(
             actor.userId,
             borrowerId,
             requestId,
-            JSON.stringify({ addressKind, provider: "nominatim", precision: geocoded.precision }),
+            JSON.stringify({
+              addressKind: input.addressKind,
+              provider,
+              precision: geocoded.precision,
+            }),
           ],
         );
         const borrower = await loadBorrower(client, tenantId, borrowerId);
