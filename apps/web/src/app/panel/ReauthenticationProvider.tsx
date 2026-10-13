@@ -2,6 +2,7 @@
 
 import { LockKey } from "@phosphor-icons/react";
 import { createContext, type FormEvent, type ReactNode, useContext, useRef, useState } from "react";
+import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
 
 type PendingRequest = {
   input: RequestInfo | URL;
@@ -36,7 +37,7 @@ export function ReauthenticationProvider({
   const pendingRequests = useRef<PendingRequest[]>([]);
 
   async function sensitiveFetch(input: RequestInfo | URL, init?: RequestInit) {
-    const response = await fetch(input, init).catch(() => null);
+    const response = await fetchWithTimeout(input, init);
     if (response?.status !== 428) return response;
 
     return new Promise<Response | null>((resolve) => {
@@ -80,11 +81,11 @@ export function ReauthenticationProvider({
     event.preventDefault();
     setIsSubmitting(true);
     setMessage("");
-    const response = await fetch("/api/v1/auth/reauthenticate", {
+    const response = await fetchWithTimeout("/api/v1/auth/reauthenticate", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ password }),
-    }).catch(() => null);
+    });
     if (!response?.ok) {
       setMessage(await apiError(response, "No fue posible confirmar tu identidad."));
       setIsSubmitting(false);
@@ -97,7 +98,7 @@ export function ReauthenticationProvider({
     await Promise.all(
       requests.map(async (request) => {
         clearTimeout(request.timeoutId);
-        const retried = await fetch(request.input, request.init).catch(() => null);
+        const retried = await fetchWithTimeout(request.input, request.init);
         request.resolve(retried);
       }),
     );

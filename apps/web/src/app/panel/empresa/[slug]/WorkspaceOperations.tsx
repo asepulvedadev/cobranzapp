@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { fetchWithTimeout } from "../../../../lib/fetch-with-timeout";
 import type { TenantOverview } from "../../../../lib/platform";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
 
@@ -37,7 +38,7 @@ export function WorkspaceSettingsForm({
     feedback.setIsError(false);
     feedback.setIsSubmitting(true);
     const form = new FormData(event.currentTarget);
-    const response = await fetch(`/api/v1/tenants/${tenantId}/settings`, {
+    const response = await fetchWithTimeout(`/api/v1/tenants/${tenantId}/settings`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -48,7 +49,7 @@ export function WorkspaceSettingsForm({
         address: form.get("address"),
         version: settings.version,
       }),
-    }).catch(() => null);
+    });
     if (!response?.ok) {
       feedback.setMessage(await errorMessage(response, "No fue posible guardar la configuración."));
       feedback.setIsError(true);
@@ -169,11 +170,11 @@ export function CreateBranchForm({ tenantId }: { tenantId: string }) {
     feedback.setIsSubmitting(true);
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const response = await fetch(`/api/v1/tenants/${tenantId}/branches`, {
+    const response = await fetchWithTimeout(`/api/v1/tenants/${tenantId}/branches`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ code: form.get("code"), displayName: form.get("displayName") }),
-    }).catch(() => null);
+    });
     if (!response?.ok) {
       feedback.setMessage(await errorMessage(response, "No fue posible crear la sede."));
       feedback.setIsError(true);
@@ -232,14 +233,14 @@ export function CreateTeamForm({
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     const branchId = String(form.get("branchId") ?? "");
-    const response = await fetch(`/api/v1/tenants/${tenantId}/teams`, {
+    const response = await fetchWithTimeout(`/api/v1/tenants/${tenantId}/teams`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         branchId: branchId || null,
         displayName: form.get("displayName"),
       }),
-    }).catch(() => null);
+    });
     if (!response?.ok) {
       feedback.setMessage(await errorMessage(response, "No fue posible crear el equipo."));
       feedback.setIsError(true);

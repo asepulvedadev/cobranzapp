@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
+import { fetchWithTimeout } from "../../../../lib/fetch-with-timeout";
 import type { SharedClientVerification } from "../../../../lib/platform";
 
 const ratingLabels: Record<SharedClientVerification["payerRating"], string> = {
@@ -34,11 +35,11 @@ export function ClientVerificationSearch({ tenantId }: { tenantId: string }) {
       setMessage("Confirma que el cliente autorizó esta consulta antes de continuar.");
       return;
     }
-    const response = await fetch(`/api/v1/tenants/${tenantId}/client-verification`, {
+    const response = await fetchWithTimeout(`/api/v1/tenants/${tenantId}/client-verification`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ documentNumber, consentConfirmed }),
-    }).catch(() => null);
+    });
     if (!response?.ok) {
       setMessage(await getError(response));
       setIsBusy(false);

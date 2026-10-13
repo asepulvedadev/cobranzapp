@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { fetchWithTimeout } from "../../../../lib/fetch-with-timeout";
 import type {
   Borrower,
   FinancialSchedulePreview,
@@ -101,7 +102,7 @@ export function LoanApplicationBoard({
     }
     const productId = String(form.get("loanProductId") ?? "");
     const principal = String(form.get("requestedPrincipal") ?? "").trim();
-    const previewResponse = await fetch(
+    const previewResponse = await fetchWithTimeout(
       `/api/v1/tenants/${tenantId}/loan-products/${productId}/schedule-preview`,
       {
         method: "POST",
@@ -113,7 +114,7 @@ export function LoanApplicationBoard({
           startDate: new Date().toISOString().slice(0, 10),
         }),
       },
-    ).catch(() => null);
+    );
     if (previewResponse?.ok) {
       const previewBody = (await previewResponse.json()) as { preview?: FinancialSchedulePreview };
       setSchedulePreview(previewBody.preview ?? null);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fetchWithTimeout } from "../../../lib/fetch-with-timeout";
 import type { AccountSession } from "../../../lib/platform";
 
 function sessionName(userAgent: string | null) {
@@ -54,9 +55,9 @@ export function SessionManager({ initialSessions }: { initialSessions: AccountSe
     setPendingId(session.id);
     setMessage("");
     setIsError(false);
-    const response = await fetch(`/api/v1/auth/sessions/${session.id}`, {
+    const response = await fetchWithTimeout(`/api/v1/auth/sessions/${session.id}`, {
       method: "DELETE",
-    }).catch(() => null);
+    });
     if (!response?.ok) {
       setMessage(await errorMessage(response));
       setIsError(true);
@@ -73,9 +74,9 @@ export function SessionManager({ initialSessions }: { initialSessions: AccountSe
     setPendingId("others");
     setMessage("");
     setIsError(false);
-    const response = await fetch("/api/v1/auth/sessions/revoke-others", {
+    const response = await fetchWithTimeout("/api/v1/auth/sessions/revoke-others", {
       method: "POST",
-    }).catch(() => null);
+    });
     if (!response?.ok) {
       setMessage(await errorMessage(response));
       setIsError(true);

@@ -3,6 +3,7 @@
 import type { ApiError } from "@cobranzapp/contracts";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { fetchWithTimeout } from "../../../lib/fetch-with-timeout";
 import { formatApiError } from "../api-error";
 
 export function CreateCompanyOnboarding() {
@@ -15,14 +16,14 @@ export function CreateCompanyOnboarding() {
     setBusy(true);
     setMessage("");
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/v1/account/tenants", {
+    const response = await fetchWithTimeout("/api/v1/account/tenants", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         displayName: String(form.get("displayName") ?? "").trim(),
         password: String(form.get("password") ?? ""),
       }),
-    }).catch(() => null);
+    });
     if (!response?.ok) {
       const body = (await response?.json().catch(() => ({}))) as ApiError | undefined;
       setMessage(formatApiError(body, "No fue posible crear la empresa."));

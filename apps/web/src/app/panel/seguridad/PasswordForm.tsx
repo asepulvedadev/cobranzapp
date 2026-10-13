@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
+import { fetchWithTimeout } from "../../../lib/fetch-with-timeout";
 
 export function PasswordForm() {
   const [message, setMessage] = useState("");
@@ -17,14 +18,14 @@ export function PasswordForm() {
       setIsSubmitting(false);
       return;
     }
-    const response = await fetch("/api/v1/auth/change-password", {
+    const response = await fetchWithTimeout("/api/v1/auth/change-password", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         currentPassword: form.get("currentPassword"),
         newPassword,
       }),
-    }).catch(() => null);
+    });
     if (!response?.ok) {
       const body = (await response?.json().catch(() => ({}))) as
         | { error?: { message?: string } }

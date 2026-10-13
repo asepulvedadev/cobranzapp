@@ -3,6 +3,7 @@
 import type { ApiError, MfaLoginRequiredResponse } from "@cobranzapp/contracts";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
 
 type LoginStep = "credentials" | "mfa";
 
@@ -26,7 +27,7 @@ export function LoginForm() {
     setMessage("");
     const form = new FormData(event.currentTarget);
     try {
-      const response = await fetch("/api/v1/auth/login", {
+      const response = await fetchWithTimeout("/api/v1/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -34,8 +35,8 @@ export function LoginForm() {
           password: form.get("password"),
         }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as ApiError | null;
+      if (!response?.ok) {
+        const body = (await response?.json().catch(() => null)) as ApiError | null;
         setMessage(body?.error.message ?? "No pudimos iniciar la sesión. Intenta nuevamente.");
         return;
       }
@@ -59,13 +60,13 @@ export function LoginForm() {
     setMessage("");
     const form = new FormData(event.currentTarget);
     try {
-      const response = await fetch("/api/v1/auth/mfa/verify-login", {
+      const response = await fetchWithTimeout("/api/v1/auth/mfa/verify-login", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ code: form.get("code") }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as ApiError | null;
+      if (!response?.ok) {
+        const body = (await response?.json().catch(() => null)) as ApiError | null;
         setMessage(body?.error.message ?? "No pudimos verificar el código. Intenta nuevamente.");
         return;
       }

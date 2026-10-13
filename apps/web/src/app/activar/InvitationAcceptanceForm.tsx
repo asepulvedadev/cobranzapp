@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
+import { fetchWithTimeout } from "../../lib/fetch-with-timeout";
 
 export function InvitationAcceptanceForm({
   accountExists,
@@ -26,17 +27,20 @@ export function InvitationAcceptanceForm({
       setIsSubmitting(false);
       return;
     }
-    const response = await fetch(`/api/v1/invitations/${encodeURIComponent(token)}/accept`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: accountExists
-        ? "{}"
-        : JSON.stringify({
-            username: form.get("username"),
-            displayName: form.get("displayName"),
-            password: form.get("password"),
-          }),
-    }).catch(() => null);
+    const response = await fetchWithTimeout(
+      `/api/v1/invitations/${encodeURIComponent(token)}/accept`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: accountExists
+          ? "{}"
+          : JSON.stringify({
+              username: form.get("username"),
+              displayName: form.get("displayName"),
+              password: form.get("password"),
+            }),
+      },
+    );
     if (!response?.ok) {
       const body = (await response?.json().catch(() => ({}))) as
         | { error?: { message?: string } }
