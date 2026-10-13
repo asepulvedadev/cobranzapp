@@ -1,0 +1,8 @@
+[Unit]
+Description=Verify CobranzApp backup restore in an isolated PostgreSQL container
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/cobranzapp/verify-cobranzapp-backup.sh

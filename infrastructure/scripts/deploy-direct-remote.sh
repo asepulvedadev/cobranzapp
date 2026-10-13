@@ -6,6 +6,9 @@ archive=${2:-}
 backup_script=${3:-}
 backup_service=${4:-}
 backup_timer=${5:-}
+backup_verify_script=${6:-}
+backup_verify_service=${7:-}
+backup_verify_timer=${8:-}
 
 if [[ ! "$release" =~ ^[0-9a-f]{40}$ ]]; then
   echo "Invalid release" >&2
@@ -15,7 +18,8 @@ if [[ ! -f "$archive" ]]; then
   echo "Image archive not found" >&2
   exit 66
 fi
-for file in "$backup_script" "$backup_service" "$backup_timer"; do
+for file in "$backup_script" "$backup_service" "$backup_timer" \
+  "$backup_verify_script" "$backup_verify_service" "$backup_verify_timer"; do
   if [[ ! -f "$file" ]]; then
     echo "Required backup file not found: $file" >&2
     exit 66
@@ -27,8 +31,12 @@ umask 077
 install -m 0700 "$backup_script" /srv/cobranzapp/backup-cobranzapp.sh
 install -m 0644 "$backup_service" /etc/systemd/system/cobranzapp-backup.service
 install -m 0644 "$backup_timer" /etc/systemd/system/cobranzapp-backup.timer
+install -m 0700 "$backup_verify_script" /srv/cobranzapp/verify-cobranzapp-backup.sh
+install -m 0644 "$backup_verify_service" /etc/systemd/system/cobranzapp-backup-verify.service
+install -m 0644 "$backup_verify_timer" /etc/systemd/system/cobranzapp-backup-verify.timer
 systemctl daemon-reload
 systemctl enable cobranzapp-backup.timer >/dev/null
+systemctl enable cobranzapp-backup-verify.timer >/dev/null
 timestamp=$(date -u +%Y%m%d%H%M%S)
 previous=""
 if [[ -f .release.env ]]; then
@@ -70,6 +78,7 @@ set +a
 "${compose[@]}" up -d --wait --remove-orphans
 ./smoke-test.sh http://127.0.0.1:13200 http://127.0.0.1:18200
 systemctl start cobranzapp-backup.timer
+systemctl start cobranzapp-backup-verify.timer
 
 printf '%s\n' "$release" > .deployed-release
 chmod 600 .deployed-release
