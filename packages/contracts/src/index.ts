@@ -799,6 +799,19 @@ export const loanProductCreateRequestSchema = z
         message: "El máximo debe ser mayor o igual al mínimo.",
       });
     }
+    const allowedTerms: Record<"daily" | "weekly" | "fortnightly" | "monthly", number[]> = {
+      daily: [30, 35],
+      weekly: [4, 5],
+      fortnightly: [2, 3],
+      monthly: [1],
+    };
+    if (!allowedTerms[value.paymentFrequency].includes(value.termCount)) {
+      context.addIssue({
+        code: "custom",
+        path: ["termCount"],
+        message: "El plazo debe ser de un mes o de cinco semanas según la frecuencia.",
+      });
+    }
   });
 
 export const loanProductUpdateRequestSchema = loanProductCreateRequestSchema;
@@ -829,6 +842,7 @@ export const loanProductResponseSchema = z.object({ product: loanProductSchema }
 export const financialSchedulePreviewRequestSchema = z.object({
   principal: decimalAmountSchema,
   termCount: z.number().int().min(1).max(365),
+  paymentFrequency: loanProductFrequencySchema.optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe usar AAAA-MM-DD."),
 });
 export const financialSchedulePeriodSchema = z.object({
@@ -859,16 +873,35 @@ export const loanApplicationStatusSchema = z.enum([
   "submitted",
   "under_review",
   "approved",
+  "active",
+  "paid",
   "rejected",
   "cancelled",
 ]);
-export const loanApplicationCreateRequestSchema = z.object({
-  borrowerId: z.uuid(),
-  loanProductId: z.uuid(),
-  requestedPrincipal: decimalAmountSchema,
-  requestedTermCount: z.number().int().min(1).max(365),
-  purpose: z.string().trim().min(3).max(240).nullable(),
-});
+export const loanApplicationCreateRequestSchema = z
+  .object({
+    borrowerId: z.uuid(),
+    loanProductId: z.uuid(),
+    requestedPrincipal: decimalAmountSchema,
+    paymentFrequency: loanProductFrequencySchema,
+    requestedTermCount: z.number().int().min(1).max(365),
+    purpose: z.string().trim().min(3).max(240).nullable(),
+  })
+  .superRefine((value, context) => {
+    const allowedTerms: Record<"daily" | "weekly" | "fortnightly" | "monthly", number[]> = {
+      daily: [30, 35],
+      weekly: [4, 5],
+      fortnightly: [2, 3],
+      monthly: [1],
+    };
+    if (!allowedTerms[value.paymentFrequency].includes(value.requestedTermCount)) {
+      context.addIssue({
+        code: "custom",
+        path: ["requestedTermCount"],
+        message: "El plazo debe ser de un mes o de cinco semanas según la frecuencia.",
+      });
+    }
+  });
 export const loanApplicationSchema = z.object({
   id: z.uuid(),
   borrowerId: z.uuid(),
@@ -876,7 +909,9 @@ export const loanApplicationSchema = z.object({
   loanProductId: z.uuid(),
   loanProductName: z.string().min(2),
   requestedPrincipal: decimalAmountSchema,
+  paymentFrequency: loanProductFrequencySchema,
   requestedTermCount: z.number().int().positive(),
+  paidInstallments: z.number().int().nonnegative().default(0),
   purpose: z.string().nullable(),
   status: loanApplicationStatusSchema,
   createdAt: z.iso.datetime(),
@@ -886,6 +921,13 @@ export const loanApplicationDirectorySchema = z.object({
   applications: z.array(loanApplicationSchema),
 });
 export const loanApplicationResponseSchema = z.object({ application: loanApplicationSchema });
+
+export const loanPaymentCreateRequestSchema = z.object({
+  installmentNumber: z.number().int().min(1).max(365),
+});
+export const loanRenewalRequestSchema = z.object({
+  excessAmount: decimalAmountSchema,
+});
 
 export const borrowerDocumentSideSchema = z.enum(["front", "back"]);
 export const borrowerDocumentSchema = z.object({
@@ -1150,6 +1192,8 @@ export type LoanApplicationStatus = z.infer<typeof loanApplicationStatusSchema>;
 export type LoanApplicationCreateRequest = z.infer<typeof loanApplicationCreateRequestSchema>;
 export type LoanApplication = z.infer<typeof loanApplicationSchema>;
 export type LoanApplicationDirectory = z.infer<typeof loanApplicationDirectorySchema>;
+export type LoanPaymentCreateRequest = z.infer<typeof loanPaymentCreateRequestSchema>;
+export type LoanRenewalRequest = z.infer<typeof loanRenewalRequestSchema>;
 export type FinancialSchedulePreviewRequest = z.infer<typeof financialSchedulePreviewRequestSchema>;
 export type FinancialSchedulePeriod = z.infer<typeof financialSchedulePeriodSchema>;
 export type FinancialSchedulePreview = z.infer<typeof financialSchedulePreviewSchema>;

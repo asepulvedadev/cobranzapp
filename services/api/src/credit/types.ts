@@ -1,9 +1,11 @@
 import type {
   LoanApplication,
   LoanApplicationCreateRequest,
+  LoanPaymentCreateRequest,
   LoanProduct,
   LoanProductCreateRequest,
   LoanProductUpdateRequest,
+  LoanRenewalRequest,
 } from "@cobranzapp/contracts";
 import type { SchedulePreview } from "@cobranzapp/financial";
 import type { TenantActor } from "../tenancy/types.js";
@@ -55,6 +57,26 @@ export type LoanApplicationReviewStartResult =
   | { status: "forbidden" }
   | { status: "invalid_state" };
 
+export type LoanPaymentResult =
+  | { status: "recorded"; application: LoanApplication; amount: string }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "invalid_state" }
+  | { status: "invalid_installment" }
+  | { status: "already_paid" };
+
+export type LoanRenewalResult =
+  | {
+      status: "created";
+      application: LoanApplication;
+      renewedPrincipal: string;
+      excessAmount: string;
+    }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "invalid_state" }
+  | { status: "amount_out_of_range" };
+
 export interface CreditService {
   listProducts(actor: TenantActor, tenantId: string): Promise<LoanProduct[]>;
   createProduct(
@@ -78,7 +100,12 @@ export interface CreditService {
     actor: TenantActor,
     tenantId: string,
     productId: string,
-    input: { principal: string; termCount: number; startDate: string },
+    input: {
+      principal: string;
+      termCount: number;
+      paymentFrequency?: LoanProduct["paymentFrequency"];
+      startDate: string;
+    },
   ): Promise<LoanProductSchedulePreviewResult>;
   listApplications(actor: TenantActor, tenantId: string): Promise<LoanApplication[]>;
   createApplication(
@@ -86,6 +113,18 @@ export interface CreditService {
     tenantId: string,
     input: LoanApplicationCreateRequest & { requestId: string },
   ): Promise<LoanApplicationResult>;
+  recordPayment(
+    actor: TenantActor,
+    tenantId: string,
+    applicationId: string,
+    input: LoanPaymentCreateRequest & { requestId: string },
+  ): Promise<LoanPaymentResult>;
+  renewApplication(
+    actor: TenantActor,
+    tenantId: string,
+    applicationId: string,
+    input: LoanRenewalRequest & { requestId: string },
+  ): Promise<LoanRenewalResult>;
   submitApplicationForReview(
     actor: TenantActor,
     tenantId: string,

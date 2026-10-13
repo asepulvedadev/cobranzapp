@@ -11,8 +11,10 @@ import {
   createTeamRequestSchema,
   financialSchedulePreviewRequestSchema,
   loanApplicationCreateRequestSchema,
+  loanPaymentCreateRequestSchema,
   loanProductCreateRequestSchema,
   loanProductUpdateRequestSchema,
+  loanRenewalRequestSchema,
   loginRequestSchema,
   mfaCodeRequestSchema,
   organizationStatusUpdateRequestSchema,
@@ -4026,6 +4028,158 @@ export function buildApp(dependencies: AppDependencies) {
     }
     return reply.code(201).send({ application: result.application });
   });
+
+  app.post(
+    "/v1/tenants/:tenantId/loan-applications/:applicationId/payments",
+    async (request, reply) => {
+      if (!requireAllowedOrigin(request, reply)) return;
+      const session = await requireUser(request, reply);
+      if (!session) return;
+      const params = tenantLoanApplicationParamsSchema.safeParse(request.params);
+      const body = loanPaymentCreateRequestSchema.safeParse(request.body);
+      if (!params.success || !body.success) {
+        return sendError(reply, 400, "INVALID_LOAN_PAYMENT", "La cuota no es válida.", request.id);
+      }
+      const membership = session.user.memberships.find(
+        (item) => item.tenantId === params.data.tenantId,
+      );
+      if (!membership || !["owner", "supervisor", "collector"].includes(membership.role)) {
+        return sendError(reply, 403, "SCOPE_DENIED", "No puedes registrar pagos.", request.id);
+      }
+      if (!(await requireRecentReauthentication(session, request, reply))) return;
+      if (!dependencies.creditService) {
+        return sendError(
+          reply,
+          503,
+          "CREDIT_APPLICATIONS_UNAVAILABLE",
+          "Los créditos no están configurados.",
+          request.id,
+        );
+      }
+      const result = await dependencies.creditService.recordPayment(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.applicationId,
+        { ...body.data, requestId: request.id },
+      );
+      if (result.status === "forbidden") {
+        return sendError(reply, 403, "SCOPE_DENIED", "No puedes registrar pagos.", request.id);
+      }
+      if (result.status === "not_found") {
+        return sendError(
+          reply,
+          404,
+          "LOAN_APPLICATION_NOT_FOUND",
+          "El crédito no existe.",
+          request.id,
+        );
+      }
+      if (result.status === "invalid_state") {
+        return sendError(
+          reply,
+          409,
+          "LOAN_APPLICATION_INVALID_STATE",
+          "El crédito no está activo.",
+          request.id,
+        );
+      }
+      if (result.status === "already_paid" || result.status === "invalid_installment") {
+        return sendError(
+          reply,
+          409,
+          "LOAN_PAYMENT_INVALID_INSTALLMENT",
+          "Registra las cuotas en orden y una sola vez.",
+          request.id,
+        );
+      }
+      return reply.send({ application: result.application, amount: result.amount });
+    },
+  );
+
+  app.post(
+    "/v1/tenants/:tenantId/loan-applications/:applicationId/renew",
+    async (request, reply) => {
+      if (!requireAllowedOrigin(request, reply)) return;
+      const session = await requireUser(request, reply);
+      if (!session) return;
+      const params = tenantLoanApplicationParamsSchema.safeParse(request.params);
+      const body = loanRenewalRequestSchema.safeParse(request.body);
+      if (!params.success || !body.success) {
+        return sendError(
+          reply,
+          400,
+          "INVALID_LOAN_RENEWAL",
+          "El excedente de renovación no es válido.",
+          request.id,
+        );
+      }
+      const membership = session.user.memberships.find(
+        (item) => item.tenantId === params.data.tenantId,
+      );
+      if (!membership || !["owner", "supervisor", "collector"].includes(membership.role)) {
+        return sendError(reply, 403, "SCOPE_DENIED", "No puedes renovar créditos.", request.id);
+      }
+      if (!(await requireRecentReauthentication(session, request, reply))) return;
+      if (!dependencies.creditService) {
+        return sendError(
+          reply,
+          503,
+          "CREDIT_APPLICATIONS_UNAVAILABLE",
+          "Los créditos no están configurados.",
+          request.id,
+        );
+      }
+      const result = await dependencies.creditService.renewApplication(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.applicationId,
+        { ...body.data, requestId: request.id },
+      );
+      if (result.status === "forbidden") {
+        return sendError(reply, 403, "SCOPE_DENIED", "No puedes renovar créditos.", request.id);
+      }
+      if (result.status === "not_found") {
+        return sendError(
+          reply,
+          404,
+          "LOAN_APPLICATION_NOT_FOUND",
+          "El crédito no existe.",
+          request.id,
+        );
+      }
+      if (result.status === "invalid_state") {
+        return sendError(
+          reply,
+          409,
+          "LOAN_RENEWAL_REQUIRES_TWO_PAYMENTS",
+          "La renovación está disponible después de dos cuotas pagadas.",
+          request.id,
+        );
+      }
+      if (result.status === "amount_out_of_range") {
+        return sendError(
+          reply,
+          409,
+          "LOAN_RENEWAL_AMOUNT_OUT_OF_RANGE",
+          "El nuevo crédito supera el monto máximo configurado.",
+          request.id,
+        );
+      }
+      return reply.code(201).send({
+        application: result.application,
+        renewedPrincipal: result.renewedPrincipal,
+        excessAmount: result.excessAmount,
+      });
+    },
+  );
 
   app.post(
     "/v1/tenants/:tenantId/loan-applications/:applicationId/submit",

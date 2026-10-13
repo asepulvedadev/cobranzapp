@@ -44,15 +44,15 @@ export function LoanProductDraftEditor({
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          name: String(form.get("name") ?? "").trim(),
-          principalMin: String(form.get("principalMin") ?? "").trim(),
+          name: product.name,
+          principalMin: "1",
           principalMax: String(form.get("principalMax") ?? "").trim(),
-          termCount: Number(form.get("termCount")),
-          paymentFrequency: String(form.get("paymentFrequency") ?? "daily"),
-          rateBasis: String(form.get("rateBasis") ?? "flat_total"),
+          termCount: product.termCount,
+          paymentFrequency: product.paymentFrequency,
+          rateBasis: "flat_total",
           nominalRate: String(form.get("nominalRate") ?? "").trim(),
-          documentationFeeRate: String(form.get("documentationFeeRate") ?? "0").trim(),
-          complianceSourceRef: String(form.get("complianceSourceRef") ?? "").trim() || null,
+          documentationFeeRate: "0",
+          complianceSourceRef: "configuracion-automatica",
         }),
       },
     ).catch(() => null);
@@ -63,7 +63,7 @@ export function LoanProductDraftEditor({
       setBusy(false);
       return;
     }
-    setMessage("Producto ajustado. La revisión normativa debe iniciarse de nuevo.");
+    setMessage("Regla ajustada. La frecuencia y el plazo se eligen al crear cada crédito.");
     setBusy(false);
     setOpen(false);
     router.refresh();
@@ -86,79 +86,17 @@ export function LoanProductDraftEditor({
         </small>
       </div>
       <label>
-        Nombre interno
-        <input defaultValue={product.name} maxLength={120} name="name" required />
-      </label>
-      <div className="borrower-form-row">
-        <label>
-          Mínimo COP
-          <input
-            defaultValue={product.principalMin}
-            inputMode="decimal"
-            name="principalMin"
-            required
-          />
-        </label>
-        <label>
-          Máximo COP
-          <input
-            defaultValue={product.principalMax}
-            inputMode="decimal"
-            name="principalMax"
-            required
-          />
-        </label>
-      </div>
-      <div className="borrower-form-row">
-        <label>
-          Periodos
-          <input defaultValue={product.termCount} min="1" name="termCount" required type="number" />
-        </label>
-        <label>
-          Frecuencia
-          <select defaultValue={product.paymentFrequency} name="paymentFrequency">
-            <option value="daily">Diaria</option>
-            <option value="weekly">Semanal</option>
-            <option value="fortnightly">Quincenal</option>
-            <option value="monthly">Mensual</option>
-          </select>
-        </label>
-      </div>
-      <div className="borrower-form-row">
-        <label>
-          Base de interés
-          <select defaultValue={product.rateBasis} name="rateBasis">
-            <option value="flat_total">Tasa plana total</option>
-            <option value="periodic_simple">Tasa simple por periodo</option>
-            <option value="effective_annual">Efectiva anual</option>
-          </select>
-        </label>
-        <label>
-          Tasa configurable
-          <input
-            defaultValue={product.nominalRate}
-            inputMode="decimal"
-            name="nominalRate"
-            required
-          />
-        </label>
-      </div>
-      <label>
-        Cargo documental (tasa)
+        Monto máximo por crédito (COP)
         <input
-          defaultValue={product.documentationFeeRate}
+          defaultValue={product.principalMax}
           inputMode="decimal"
-          name="documentationFeeRate"
+          name="principalMax"
           required
         />
       </label>
       <label>
-        Referencia normativa
-        <input
-          defaultValue={product.complianceSourceRef ?? ""}
-          maxLength={240}
-          name="complianceSourceRef"
-        />
+        Porcentaje de interés total
+        <input defaultValue={product.nominalRate} inputMode="decimal" name="nominalRate" required />
       </label>
       {message ? (
         <p className={`tenant-form-message${error ? " form-message-error" : ""}`} role="status">

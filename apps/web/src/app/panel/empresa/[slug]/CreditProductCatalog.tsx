@@ -58,15 +58,15 @@ export function CreditProductCatalog({
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        name: String(form.get("name") ?? "").trim(),
-        principalMin: String(form.get("principalMin") ?? "").trim(),
+        name: "Crédito estándar",
+        principalMin: "1",
         principalMax: String(form.get("principalMax") ?? "").trim(),
-        termCount: Number(form.get("termCount")),
-        paymentFrequency: String(form.get("paymentFrequency") ?? "daily"),
-        rateBasis: String(form.get("rateBasis") ?? "flat_total"),
+        termCount: 30,
+        paymentFrequency: "daily",
+        rateBasis: "flat_total",
         nominalRate: String(form.get("nominalRate") ?? "").trim(),
-        documentationFeeRate: String(form.get("documentationFeeRate") ?? "0").trim(),
-        complianceSourceRef: String(form.get("complianceSourceRef") ?? "").trim() || null,
+        documentationFeeRate: "0",
+        complianceSourceRef: "configuracion-automatica",
       }),
     }).catch(() => null);
     if (!response?.ok) {
@@ -76,7 +76,7 @@ export function CreditProductCatalog({
       return;
     }
     event.currentTarget.reset();
-    setMessage("Producto creado como borrador. Todavía no puede desembolsar créditos.");
+    setMessage("Regla guardada. Los cobradores podrán elegir la frecuencia al crear cada crédito.");
     setIsBusy(false);
     router.refresh();
   }
@@ -110,8 +110,8 @@ export function CreditProductCatalog({
         <span>{products.length} configurados</span>
       </div>
       <p className="operational-note">
-        Los productos se guardan como borradores versionables. La aprobación legal y contable es
-        obligatoria antes de habilitar solicitudes o desembolsos.
+        El propietario solo define el monto máximo y el porcentaje. El equipo elige la frecuencia y
+        el plazo al crear cada crédito.
       </p>
       {products.length ? (
         <div className="credit-product-list">
@@ -176,62 +176,20 @@ export function CreditProductCatalog({
         </div>
       ) : null}
       <form className="tenant-form credit-product-form" onSubmit={submit}>
-        <h3>Nuevo borrador</h3>
-        <label htmlFor="loan-product-name">Nombre comercial interno</label>
-        <input id="loan-product-name" maxLength={120} name="name" required />
+        <h3>Regla de crédito</h3>
+        <p className="form-help">Solo debes indicar el monto máximo y el porcentaje de interés.</p>
+        <label>
+          Monto máximo por crédito (COP)
+          <input
+            inputMode="decimal"
+            name="principalMax"
+            pattern="[0-9]+(\\.[0-9]{1,2})?"
+            required
+          />
+        </label>
         <div className="borrower-form-row">
           <label>
-            Mínimo COP
-            <input
-              inputMode="decimal"
-              name="principalMin"
-              pattern="[0-9]+(\\.[0-9]{1,2})?"
-              required
-            />
-          </label>
-          <label>
-            Máximo COP
-            <input
-              inputMode="decimal"
-              name="principalMax"
-              pattern="[0-9]+(\\.[0-9]{1,2})?"
-              required
-            />
-          </label>
-        </div>
-        <div className="borrower-form-row">
-          <label>
-            Periodos
-            <input
-              defaultValue="30"
-              inputMode="numeric"
-              min="1"
-              name="termCount"
-              required
-              type="number"
-            />
-          </label>
-          <label>
-            Frecuencia
-            <select defaultValue="daily" name="paymentFrequency">
-              <option value="daily">Diaria</option>
-              <option value="weekly">Semanal</option>
-              <option value="fortnightly">Quincenal</option>
-              <option value="monthly">Mensual</option>
-            </select>
-          </label>
-        </div>
-        <div className="borrower-form-row">
-          <label>
-            Base de tasa
-            <select defaultValue="flat_total" name="rateBasis">
-              <option value="flat_total">Tasa plana total</option>
-              <option value="periodic_simple">Tasa simple periódica</option>
-              <option value="effective_annual">Efectiva anual</option>
-            </select>
-          </label>
-          <label>
-            Tasa nominal
+            Porcentaje de interés total
             <input
               inputMode="decimal"
               name="nominalRate"
@@ -240,24 +198,13 @@ export function CreditProductCatalog({
             />
           </label>
         </div>
-        <label htmlFor="loan-product-documentation-fee">Cargo documental (tasa)</label>
-        <input
-          id="loan-product-documentation-fee"
-          defaultValue="0"
-          inputMode="decimal"
-          name="documentationFeeRate"
-          pattern="[0-9]+(\\.[0-9]{1,8})?"
-          required
-        />
-        <label htmlFor="loan-product-compliance-source">Referencia normativa (opcional)</label>
-        <input id="loan-product-compliance-source" maxLength={240} name="complianceSourceRef" />
         {message ? (
           <p className={`tenant-form-message${isError ? " form-message-error" : ""}`} role="status">
             {message}
           </p>
         ) : null}
         <button disabled={isBusy} type="submit">
-          {isBusy ? "Guardando…" : "Guardar borrador"}
+          {isBusy ? "Guardando…" : "Guardar regla"}
         </button>
       </form>
     </section>
