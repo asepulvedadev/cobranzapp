@@ -1,6 +1,11 @@
 "use client";
 
-import type { Borrower, BorrowerDirectory as BorrowerDirectoryData } from "@cobranzapp/contracts";
+import {
+  type Borrower,
+  type BorrowerDirectory as BorrowerDirectoryData,
+  borrowerAddressUpdateRequestSchema,
+  borrowerCreateRequestSchema,
+} from "@cobranzapp/contracts";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useRef, useState } from "react";
 import { Modal } from "../../Modal";
@@ -160,6 +165,18 @@ export function BorrowerDirectory({
       setIsError(true);
       return;
     }
+    const addressPayload = {
+      homeAddress: addressEditHome.trim(),
+      workAddress: addressEditWork.trim(),
+      homeAddressConfirmed: addressEditHomeConfirmed,
+      workAddressConfirmed: addressEditWorkConfirmed,
+    };
+    const parsedAddress = borrowerAddressUpdateRequestSchema.safeParse(addressPayload);
+    if (!parsedAddress.success) {
+      setMessage(parsedAddress.error.issues[0]?.message ?? "Revisa las dos direcciones.");
+      setIsError(true);
+      return;
+    }
     setIsAddressSaving(true);
     setMessage("");
     const response = await sensitiveFetch(
@@ -167,12 +184,7 @@ export function BorrowerDirectory({
       {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          homeAddress: addressEditHome.trim(),
-          workAddress: addressEditWork.trim(),
-          homeAddressConfirmed: addressEditHomeConfirmed,
-          workAddressConfirmed: addressEditWorkConfirmed,
-        }),
+        body: JSON.stringify(parsedAddress.data),
       },
     ).catch(() => null);
     setIsAddressSaving(false);
@@ -206,41 +218,49 @@ export function BorrowerDirectory({
       setIsSubmitting(false);
       return;
     }
+    const payload = {
+      fullName: String(form.get("fullName") ?? "").trim(),
+      country: "CO",
+      documentType: String(form.get("documentType") ?? "CC"),
+      documentNumber: String(form.get("documentNumber") ?? "").trim(),
+      phone: String(form.get("phone") ?? "").trim(),
+      whatsappPhone: String(form.get("whatsappPhone") ?? "").trim(),
+      homeAddress: String(form.get("homeAddress") ?? "").trim(),
+      workAddress: String(form.get("workAddress") ?? "").trim(),
+      homeAddressConfirmed,
+      workAddressConfirmed,
+      profilePhotoObjectKey: null,
+      consentVersion: "borrower-dossier-v1",
+      consentEvidenceRef: String(form.get("consentEvidenceRef") ?? "").trim(),
+      emergencyContacts: [
+        {
+          fullName: String(form.get("contactName") ?? "").trim(),
+          relationship: String(form.get("contactRelationship") ?? "").trim(),
+          phone: String(form.get("contactPhone") ?? "").trim(),
+        },
+        ...(includeSecondContact
+          ? [
+              {
+                fullName: String(form.get("secondContactName") ?? "").trim(),
+                relationship: String(form.get("secondContactRelationship") ?? "").trim(),
+                phone: String(form.get("secondContactPhone") ?? "").trim(),
+              },
+            ]
+          : []),
+      ],
+      documents: [],
+    };
+    const parsedPayload = borrowerCreateRequestSchema.safeParse(payload);
+    if (!parsedPayload.success) {
+      setMessage(parsedPayload.error.issues[0]?.message ?? "Revisa los datos del cliente.");
+      setIsError(true);
+      setIsSubmitting(false);
+      return;
+    }
     const response = await sensitiveFetch(`/api/v1/tenants/${tenantId}/borrowers`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        fullName: String(form.get("fullName") ?? "").trim(),
-        country: "CO",
-        documentType: String(form.get("documentType") ?? "CC"),
-        documentNumber: String(form.get("documentNumber") ?? "").trim(),
-        phone: String(form.get("phone") ?? "").trim(),
-        whatsappPhone: String(form.get("whatsappPhone") ?? "").trim(),
-        homeAddress: String(form.get("homeAddress") ?? "").trim(),
-        workAddress: String(form.get("workAddress") ?? "").trim(),
-        homeAddressConfirmed,
-        workAddressConfirmed,
-        profilePhotoObjectKey: null,
-        consentVersion: "borrower-dossier-v1",
-        consentEvidenceRef: String(form.get("consentEvidenceRef") ?? "").trim(),
-        emergencyContacts: [
-          {
-            fullName: String(form.get("contactName") ?? "").trim(),
-            relationship: String(form.get("contactRelationship") ?? "").trim(),
-            phone: String(form.get("contactPhone") ?? "").trim(),
-          },
-          ...(includeSecondContact
-            ? [
-                {
-                  fullName: String(form.get("secondContactName") ?? "").trim(),
-                  relationship: String(form.get("secondContactRelationship") ?? "").trim(),
-                  phone: String(form.get("secondContactPhone") ?? "").trim(),
-                },
-              ]
-            : []),
-        ],
-        documents: [],
-      }),
+      body: JSON.stringify(parsedPayload.data),
     }).catch(() => null);
     if (!response?.ok) {
       const body = (await response?.json().catch(() => ({}))) as { error?: { message?: string } };
