@@ -27,6 +27,7 @@ import { BorrowerAddressEditor } from "./src/BorrowerAddressEditor";
 import { BorrowerCreateForm } from "./src/BorrowerCreateForm";
 import { BorrowerOcrControl } from "./src/BorrowerOcrControl";
 import { CreditWorkspace } from "./src/CreditWorkspace";
+import { EmployeeCreateForm } from "./src/EmployeeCreateForm";
 import { MemberProfileForm } from "./src/MemberProfileForm";
 import { VerificationNetworkCard } from "./src/VerificationNetworkCard";
 
@@ -36,7 +37,14 @@ type Screen =
   | { kind: "mfa" }
   | { kind: "authenticated"; user: CurrentUser };
 
-type TenantSection = "home" | "profile" | "clients" | "verification" | "credits" | "routes";
+type TenantSection =
+  | "home"
+  | "profile"
+  | "personnel"
+  | "clients"
+  | "verification"
+  | "credits"
+  | "routes";
 
 const roleLabels: Record<
   CurrentUser["memberships"][number]["role"] | TenantOverview["actorRole"],
@@ -574,6 +582,61 @@ function TenantClients({
   );
 }
 
+function TenantPersonnel({
+  api,
+  onCreated,
+  onNeedsReauthentication,
+  overview,
+  tenantId,
+}: {
+  api: MobileApi;
+  onCreated: () => void;
+  onNeedsReauthentication: () => void;
+  overview: TenantOverview;
+  tenantId: string;
+}) {
+  const availableSeats = overview.membershipEntitlement?.availableEmployeeSeats ?? null;
+  return (
+    <View style={styles.stack}>
+      <View style={styles.directoryHeading}>
+        <View>
+          <Text style={styles.eyebrow}>PERSONAL</Text>
+          <Text style={styles.sectionTitle}>Equipo operativo</Text>
+        </View>
+        <Text style={styles.muted}>{overview.members.length} personas</Text>
+      </View>
+      <Text style={styles.body}>
+        Crea accesos directos para cobradores y supervisores. Sus datos personales, documentos y
+        tipo de sangre se completan después desde Mi perfil.
+      </Text>
+      <EmployeeCreateForm
+        api={api}
+        availableSeats={availableSeats}
+        onCreated={onCreated}
+        onNeedsReauthentication={onNeedsReauthentication}
+        tenantId={tenantId}
+      />
+      {overview.members.map((member) => (
+        <View key={member.userId} style={styles.listRow}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{member.displayName.slice(0, 1).toUpperCase()}</Text>
+          </View>
+          <View style={styles.listCopy}>
+            <Text style={styles.listTitle}>{member.displayName}</Text>
+            <Text style={styles.muted}>
+              @{member.username} · {roleLabels[member.role]}
+            </Text>
+            <Text style={styles.muted}>{member.phone ?? "Sin teléfono"}</Text>
+          </View>
+          <Text style={styles.personnelStatus}>
+            {member.status === "active" ? "Activo" : member.status}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function wazeUrl(address: string, latitude: number | null, longitude: number | null) {
   if (latitude !== null && longitude !== null) {
     return `https://www.waze.com/ul?ll=${latitude}%2C${longitude}&navigate=yes&utm_source=cobranzapp`;
@@ -646,6 +709,7 @@ function TenantSectionNav({
   onChange,
   canVerify,
   canViewProfile,
+  canViewPersonnel,
   canViewClients,
   canViewCredits,
   canViewRoutes,
@@ -654,6 +718,7 @@ function TenantSectionNav({
   onChange: (section: TenantSection) => void;
   canVerify: boolean;
   canViewProfile: boolean;
+  canViewPersonnel: boolean;
   canViewClients: boolean;
   canViewCredits: boolean;
   canViewRoutes: boolean;
@@ -685,6 +750,19 @@ function TenantSectionNav({
             style={[styles.sectionNavText, active === "profile" && styles.sectionNavTextActive]}
           >
             Mi perfil
+          </Text>
+        </Pressable>
+      ) : null}
+      {canViewPersonnel ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onChange("personnel")}
+          style={[styles.sectionNavItem, active === "personnel" && styles.sectionNavItemActive]}
+        >
+          <Text
+            style={[styles.sectionNavText, active === "personnel" && styles.sectionNavTextActive]}
+          >
+            Personal
           </Text>
         </Pressable>
       ) : null}
@@ -962,6 +1040,7 @@ function AuthenticatedHome({
                       ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
                       : false
                   }
+                  canViewPersonnel={selectedMembershipRole === "owner"}
                   canViewClients={
                     selectedMembershipRole
                       ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
@@ -988,6 +1067,17 @@ function AuthenticatedHome({
                       setMessage("Confirma tu contraseña para continuar con esta acción.");
                     }}
                     overview={tenant}
+                  />
+                ) : tenantSection === "personnel" ? (
+                  <TenantPersonnel
+                    api={api}
+                    onCreated={refreshWorkspace}
+                    onNeedsReauthentication={() => {
+                      setNeedsReauthentication(true);
+                      setMessage("Confirma tu contraseña para continuar con esta acción.");
+                    }}
+                    overview={tenant}
+                    tenantId={tenant.tenant.id}
                   />
                 ) : tenantSection === "verification" ? (
                   <VerificationNetworkCard
@@ -1329,6 +1419,7 @@ const styles = StyleSheet.create({
   sectionNavItemActive: { borderColor: "#fbbf24", backgroundColor: "#2c2b20" },
   sectionNavText: { color: "#99a39c", fontSize: 13, fontWeight: "700" },
   sectionNavTextActive: { color: "#fbbf24" },
+  personnelStatus: { color: "#fbbf24", fontSize: 12, fontWeight: "800" as const },
   boundaryCard: {
     padding: 16,
     borderRadius: 18,

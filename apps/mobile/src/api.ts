@@ -29,9 +29,11 @@ import {
   routeDirectorySchema,
   type SharedClientVerification,
   sharedClientVerificationResponseSchema,
+  type TenantMemberCreateRequest,
   type TenantMemberProfile,
   type TenantOverview,
   tenantMemberProfileSchema,
+  tenantMemberResponseSchema,
   tenantOverviewSchema,
   type VerificationNetworkConsentRequest,
   type VerificationNetworkCorrectionRequest,
@@ -223,6 +225,21 @@ export class MobileApi {
         response.status,
       );
     return tenantOverviewSchema.parse((await response.json()).overview);
+  }
+
+  async createMember(tenantId: string, input: TenantMemberCreateRequest) {
+    const response = await this.request(`/v1/tenants/${tenantId}/members`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible crear el empleado."),
+        response.status,
+      );
+    }
+    return tenantMemberResponseSchema.parse(await response.json()).member;
   }
 
   async memberProfile(tenantId: string, userId: string): Promise<TenantMemberProfile> {
