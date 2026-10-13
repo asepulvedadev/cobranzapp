@@ -72,6 +72,22 @@ export function BorrowerOcrControl({
     await load();
   }
 
+  async function retry(extraction: BorrowerOcrExtraction) {
+    setBusy(true);
+    setMessage("");
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/borrowers/${borrowerId}/ocr/${extraction.id}/retry`,
+      { method: "POST" },
+    ).catch(() => null);
+    if (!response?.ok) {
+      setMessage("No fue posible volver a procesar el documento.");
+      setBusy(false);
+      return;
+    }
+    setMessage("El documento volvió a la cola de OCR.");
+    await load();
+  }
+
   return (
     <div className="borrower-ocr-control">
       <button className="button-link" disabled={busy} onClick={() => void load()} type="button">
@@ -119,7 +135,14 @@ export function BorrowerOcrControl({
                   ) : null}
                 </>
               ) : (
-                <small>{extraction.errorCode ?? "Aún no hay datos extraídos."}</small>
+                <>
+                  <small>{extraction.errorCode ?? "Aún no hay datos extraídos."}</small>
+                  {extraction.status === "failed" || extraction.status === "rejected" ? (
+                    <button disabled={busy} onClick={() => void retry(extraction)} type="button">
+                      Reintentar lectura
+                    </button>
+                  ) : null}
+                </>
               )}
             </form>
           ))}

@@ -2781,6 +2781,60 @@ export function buildApp(dependencies: AppDependencies) {
     },
   );
 
+  app.post(
+    "/v1/tenants/:tenantId/borrowers/:borrowerId/ocr/:extractionId/retry",
+    async (request, reply) => {
+      if (!requireAllowedOrigin(request, reply)) return;
+      const session = await requireUser(request, reply);
+      if (!session) return;
+      const params = tenantBorrowerOcrParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return sendError(reply, 404, "OCR_NOT_FOUND", "La extracción no existe.", request.id);
+      }
+      const membership = tenantMembershipForSession(session, params.data.tenantId);
+      if (!membership || !canManageBorrowers(membership.role)) {
+        return sendError(reply, 403, "SCOPE_DENIED", "No puedes reintentar este OCR.", request.id);
+      }
+      if (!(await requireRecentReauthentication(session, request, reply))) return;
+      if (!dependencies.borrowerService) {
+        return sendError(
+          reply,
+          503,
+          "BORROWER_DOSSIER_UNAVAILABLE",
+          "El módulo de clientes requiere configurar su clave de protección.",
+          request.id,
+        );
+      }
+      const result = await dependencies.borrowerService.retryOcr(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.borrowerId,
+        params.data.extractionId,
+        request.id,
+      );
+      if (result.status === "not_found") {
+        return sendError(reply, 404, "OCR_NOT_FOUND", "La extracción no existe.", request.id);
+      }
+      if (result.status === "forbidden") {
+        return sendError(reply, 403, "SCOPE_DENIED", "No puedes reintentar este OCR.", request.id);
+      }
+      if (result.status === "not_retryable") {
+        return sendError(
+          reply,
+          409,
+          "OCR_NOT_RETRYABLE",
+          "Este documento todavía está siendo procesado o ya fue confirmado.",
+          request.id,
+        );
+      }
+      return reply.code(202).send({ extraction: result.extraction });
+    },
+  );
+
   app.post("/v1/tenants/:tenantId/borrowers/:borrowerId/documents", async (request, reply) => {
     if (!requireAllowedOrigin(request, reply)) return;
     const session = await requireUser(request, reply);

@@ -816,6 +816,86 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
       });
     },
 
+    async retryOcr(actor, tenantId, borrowerId, extractionId, requestId) {
+      if (!actor.tenantRole || !["owner", "supervisor", "collector"].includes(actor.tenantRole)) {
+        return { status: "forbidden" };
+      }
+      return withTransaction(actor, tenantId, async (client) => {
+        const result = await client.query<OcrRow>(
+          `SELECT extraction.id, extraction.document_id, document.category, document.side,
+                  extraction.status, extraction.fields_ciphertext, extraction.confidence,
+                  extraction.model_name, extraction.error_code, extraction.reviewed_at,
+                  extraction.created_at, extraction.updated_at
+             FROM borrower_document_ocr_extractions extraction
+             JOIN borrower_documents document
+               ON document.tenant_id = extraction.tenant_id
+              AND document.borrower_id = extraction.borrower_id
+              AND document.id = extraction.document_id
+            WHERE extraction.tenant_id = $1 AND extraction.borrower_id = $2 AND extraction.id = $3
+            FOR UPDATE`,
+          [tenantId, borrowerId, extractionId],
+        );
+        const current = result.rows[0];
+        if (!current) return { status: "not_found" };
+        if (current.status !== "failed" && current.status !== "rejected") {
+          return { status: "not_retryable" };
+        }
+        await client.query(
+          `UPDATE borrower_document_ocr_extractions
+              SET status = 'pending', fields_ciphertext = NULL, confidence = NULL,
+                  error_code = NULL, reviewed_by = NULL, reviewed_at = NULL, updated_at = now()
+            WHERE tenant_id = $1 AND borrower_id = $2 AND id = $3`,
+          [tenantId, borrowerId, extractionId],
+        );
+        await client.query(
+          `INSERT INTO outbox_events
+             (tenant_id, event_type, aggregate_type, aggregate_id, idempotency_key, payload)
+           SELECT $1, 'borrower.document.ocr_requested', 'borrower_document', document.id,
+                  $4, jsonb_build_object(
+                    'extractionId', $3::text,
+                    'borrowerId', $2::text,
+                    'documentId', document.id::text,
+                    'objectKey', document.object_key,
+                    'mediaType', document.media_type,
+                    'category', document.category,
+                    'side', document.side
+                  )
+             FROM borrower_documents document
+            WHERE document.tenant_id = $1 AND document.borrower_id = $2 AND document.id = $5`,
+          [
+            tenantId,
+            borrowerId,
+            extractionId,
+            `borrower-document-ocr-retry:${tenantId}:${extractionId}:${randomUUID()}`,
+            current.document_id,
+          ],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'borrower.ocr_retry_requested', 'borrower_document', $3, $4, '{}'::jsonb)`,
+          [tenantId, actor.userId, current.document_id, requestId],
+        );
+        const updated = await client.query<OcrRow>(
+          `SELECT extraction.id, extraction.document_id, document.category, document.side,
+                  extraction.status, extraction.fields_ciphertext, extraction.confidence,
+                  extraction.model_name, extraction.error_code, extraction.reviewed_at,
+                  extraction.created_at, extraction.updated_at
+             FROM borrower_document_ocr_extractions extraction
+             JOIN borrower_documents document
+               ON document.tenant_id = extraction.tenant_id
+              AND document.borrower_id = extraction.borrower_id
+              AND document.id = extraction.document_id
+            WHERE extraction.tenant_id = $1 AND extraction.borrower_id = $2 AND extraction.id = $3`,
+          [tenantId, borrowerId, extractionId],
+        );
+        const refreshed = updated.rows[0];
+        return refreshed
+          ? { status: "queued", extraction: mapOcrRow(refreshed, identitySecret) }
+          : { status: "not_found" };
+      });
+    },
+
     async verifyShared(
       actor,
       tenantId,

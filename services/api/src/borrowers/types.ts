@@ -55,6 +55,12 @@ export type BorrowerOcrConfirmResult =
   | { status: "forbidden" }
   | { status: "invalid_extraction" };
 
+export type BorrowerOcrRetryResult =
+  | { status: "queued"; extraction: BorrowerOcrExtraction }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "not_retryable" };
+
 export type SharedClientVerification = {
   registered: boolean;
   fullName: string | null;
@@ -98,6 +104,13 @@ export interface BorrowerService {
     borrowerId: string,
     input: BorrowerOcrConfirmRequest & { requestId: string },
   ): Promise<BorrowerOcrConfirmResult>;
+  retryOcr(
+    actor: TenantActor,
+    tenantId: string,
+    borrowerId: string,
+    extractionId: string,
+    requestId: string,
+  ): Promise<BorrowerOcrRetryResult>;
   verifyShared(
     actor: TenantActor,
     tenantId: string,
