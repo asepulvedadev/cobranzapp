@@ -4,7 +4,6 @@ import { serverApi } from "../../../../../lib/server-api";
 import { ProfileSettingsModal } from "../ProfileSettingsModal";
 import { TenantSettingsModal } from "../TenantSettingsModal";
 import { loadTenantContext } from "../tenant-context";
-import { CreateBranchForm, CreateTeamForm } from "../WorkspaceOperations";
 
 export const metadata: Metadata = { title: "Configuración" };
 
@@ -33,7 +32,7 @@ export default async function TenantSettingsPage({
         <div>
           <span className="panel-eyebrow">{overview.tenant.displayName}</span>
           <h1>Configuración</h1>
-          <p>Datos de la empresa, estructura operativa y tu perfil en ventanas independientes.</p>
+          <p>Datos de la empresa y tu perfil en ventanas independientes.</p>
         </div>
       </header>
       {query.onboarding === "1" ? (
@@ -85,50 +84,10 @@ export default async function TenantSettingsPage({
         ) : null}
       </div>
       {canManage ? (
-        <section className="dashboard-card structure-card">
-          <div className="card-heading">
-            <div>
-              <span className="panel-eyebrow">Organización</span>
-              <h2>Sedes y equipos</h2>
-            </div>
-          </div>
-          <div className="structure-grid">
-            <section>
-              <h3>Sedes</h3>
-              <div className="structure-list">
-                {overview.branches.map((branch) => (
-                  <article className="structure-item" key={branch.id}>
-                    <span>
-                      <strong>{branch.displayName}</strong>
-                      <small>Código: {branch.code}</small>
-                    </span>
-                    <span className={`status status-${branch.status}`}>
-                      {branch.status === "active" ? "Activa" : "Inactiva"}
-                    </span>
-                  </article>
-                ))}
-              </div>
-              <CreateBranchForm tenantId={overview.tenant.id} />
-            </section>
-            <section>
-              <h3>Equipos</h3>
-              <div className="structure-list">
-                {overview.teams.map((team) => (
-                  <article className="structure-item" key={team.id}>
-                    <span>
-                      <strong>{team.displayName}</strong>
-                      <small>{team.branchName ?? "Sin sede asignada"}</small>
-                    </span>
-                    <span className={`status status-${team.status}`}>
-                      {team.status === "active" ? "Activo" : "Inactivo"}
-                    </span>
-                  </article>
-                ))}
-              </div>
-              <CreateTeamForm branches={overview.branches} tenantId={overview.tenant.id} />
-            </section>
-          </div>
-        </section>
+        <p className="operational-note">
+          La organización se gestiona como una sola empresa. Para administrar personas usa la vista
+          Personal.
+        </p>
       ) : null}
     </div>
   );
