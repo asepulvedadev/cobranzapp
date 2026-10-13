@@ -523,6 +523,8 @@ describe("borrower creation security", () => {
         phone: "3000000000",
         homeAddress: "Calle 1 # 2-3",
         workAddress: "Carrera 4 # 5-6",
+        homeAddressConfirmed: true,
+        workAddressConfirmed: true,
         profilePhotoObjectKey: null,
         consentVersion: "borrower-dossier-v1",
         consentEvidenceRef: "test-consent",
