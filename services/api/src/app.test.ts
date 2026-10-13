@@ -2037,4 +2037,29 @@ describe("tenant onboarding", () => {
     expect(response.statusCode).toBe(503);
     expect(response.json()).toMatchObject({ error: { code: "VERIFICATION_NETWORK_DISABLED" } });
   });
+
+  it("rejects a shared client lookup without explicit consent", async () => {
+    const verifyShared = vi.fn();
+    const deps = dependencies({
+      authService: { authenticate: vi.fn(async () => tenantOwner) },
+      borrowerService: { verifyShared } as unknown as BorrowerService,
+    });
+    const app = buildApp(deps);
+    apps.push(app);
+    const tenantId = tenantOwner.memberships[0]?.tenantId;
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/tenants/${tenantId}/client-verification`,
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { documentNumber: "1234567890" },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: { code: "CLIENT_VERIFICATION_CONSENT_REQUIRED" },
+    });
+    expect(verifyShared).not.toHaveBeenCalled();
+  });
 });
