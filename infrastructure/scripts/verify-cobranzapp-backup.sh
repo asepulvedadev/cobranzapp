@@ -5,6 +5,29 @@ APP_DIR=${COBRANZAPP_DIR:-/srv/cobranzapp}
 BACKUP_DIR=${COBRANZAPP_BACKUP_DIR:-${APP_DIR}/backups}
 POSTGRES_IMAGE=${COBRANZAPP_BACKUP_POSTGRES_IMAGE:-postgres:17.7-alpine3.23@sha256:bb377b7239d2774ac8cc76f481596ce96c5a6b5e9d141f6d0a0ee371a6e7c0f2}
 
+# Policies in the dump reference the least-privilege application roles. The
+# isolated verifier has no application migrations, so create matching empty
+# roles before restoring the schema. Names come from the production env when
+# available and are validated before being used as SQL identifiers.
+if [[ -f "${APP_DIR}/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${APP_DIR}/.env"
+  set +a
+fi
+APP_DATABASE_USER=${APP_DATABASE_USER:-cobranzapp_app}
+WORKER_DATABASE_USER=${WORKER_DATABASE_USER:-cobranzapp_worker}
+for role in "$APP_DATABASE_USER" "$WORKER_DATABASE_USER"; do
+  if [[ ! "$role" =~ ^[a-z_][a-z0-9_]{0,62}$ ]]; then
+    echo "Nombre de rol PostgreSQL inválido para verificación: $role" >&2
+    exit 64
+  fi
+done
+if [[ "$APP_DATABASE_USER" == "$WORKER_DATABASE_USER" ]]; then
+  echo "Los roles PostgreSQL de API y worker deben ser distintos" >&2
+  exit 64
+fi
+
 latest_dump=$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'cobranzapp-*.dump' -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
 latest_documents=$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'cobranzapp-*-documents.tar.gz' -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
 if [[ -z "$latest_dump" || -z "$latest_documents" ]]; then
@@ -36,6 +59,8 @@ for _ in $(seq 1 30); do
   sleep 2
 done
 docker exec "$container" pg_isready -U postgres -d postgres >/dev/null
+docker exec "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c \
+  "CREATE ROLE \"${APP_DATABASE_USER}\"; CREATE ROLE \"${WORKER_DATABASE_USER}\";" >/dev/null
 docker exec -i "$container" pg_restore \
   --exit-on-error --no-owner --no-privileges --username=postgres --dbname=postgres < "$latest_dump"
 table_count=$(docker exec "$container" psql -U postgres -d postgres -Atc \
