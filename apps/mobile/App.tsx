@@ -732,15 +732,19 @@ function AuthenticatedHome({
     const canReadBorrowers = selectedMembershipRole
       ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
       : false;
+    const shouldLoadProfile = canReadBorrowers && tenantSection === "home";
+    const shouldLoadDirectory =
+      canReadBorrowers && (tenantSection === "clients" || tenantSection === "credits");
+    const shouldLoadRoutes = canReadBorrowers && tenantSection === "routes";
     Promise.all([
       user.platformRole === "developer" ? api.platformOverview() : Promise.resolve(null),
       user.platformRole === "developer" ? api.systemStatus() : Promise.resolve(null),
       tenantId ? api.tenantOverview(tenantId) : Promise.resolve(null),
-      tenantId && canReadBorrowers ? api.memberProfile(tenantId, user.id) : Promise.resolve(null),
-      tenantId && canReadBorrowers
+      tenantId && shouldLoadProfile ? api.memberProfile(tenantId, user.id) : Promise.resolve(null),
+      tenantId && shouldLoadDirectory
         ? api.borrowerDirectory(tenantId, { search: directorySearch, page: directoryPage })
         : Promise.resolve(null),
-      tenantId && canReadBorrowers ? api.routeDirectory(tenantId) : Promise.resolve(null),
+      tenantId && shouldLoadRoutes ? api.routeDirectory(tenantId) : Promise.resolve(null),
     ])
       .then(
         ([
@@ -782,6 +786,7 @@ function AuthenticatedHome({
     reloadKey,
     selectedMembershipRole,
     tenantId,
+    tenantSection,
     user.id,
     user.platformRole,
   ]);
