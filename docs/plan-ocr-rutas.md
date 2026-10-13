@@ -13,6 +13,8 @@ guardan direcciones y coordenadas, pero Waze sigue siendo la navegación final.
 - Alta de cliente dividida en cuatro pasos.
 - Captura móvil de frente y reverso del documento.
 - Almacenamiento privado de las imágenes en el VPS.
+- La carga móvil se puede reanudar: si falla una imagen o la reautenticación, el expediente ya
+  creado no se duplica y solo se vuelven a enviar los documentos pendientes.
 - WhatsApp separado del teléfono principal.
 - Una o dos referencias.
 - Enlaces de navegación a Waze por dirección.
@@ -39,6 +41,8 @@ guardan direcciones y coordenadas, pero Waze sigue siendo la navegación final.
 - Las direcciones completas de casa y trabajo se guardan en el expediente.
 - La creación exige confirmar por separado que casa y trabajo fueron verificadas con el cliente;
   cada confirmación queda fechada y asociada al usuario que la hizo.
+- Web y móvil permiten corregir ambas direcciones en una sola operación; una corrección invalida
+  las coordenadas anteriores antes de volver a ubicarlas.
 - El tablero muestra la dirección y un enlace Waze por parada.
 - La vista independiente **Rutas** está enlazada desde el sidebar para propietarios,
   supervisores y cobradores; carga clientes y rutas después de la reautenticación necesaria.
