@@ -17,6 +17,7 @@
 | Rutas de cobranza | Completado | Vista independiente en sidebar, direcciones geocodificadas bajo demanda, Waze, optimización por cercanía, visitas auditadas y asignación por empresa; móvil puede ubicar casa/trabajo desde el expediente |
 | Reportes operativos | Completado como vista operativa | Vista independiente web y móvil para propietarios, supervisores y cobradores con créditos activos, solicitudes en revisión, cuotas vencidas acumuladas, frecuencias y prioridades de cobro; no presenta saldos ni ingresos contables |
 | Solicitudes web resilientes | Completado | Las mutaciones de autenticación, onboarding, configuración, empleados, verificación y créditos tienen un límite de 20 segundos y devuelven un mensaje accionable en lugar de dejar botones bloqueados indefinidamente |
+| Solicitudes móviles resilientes | Completado | La API móvil cancela consultas que superan 20 segundos, amplía cargas de documentos a 60 segundos y muestra un error accionable para evitar formularios bloqueados |
 | Originación operativa protegida | Completado como piloto | Catálogo configurable en vista independiente de Créditos, reglas de monto/interés desde modales, frecuencias y plazos de un mes/5 semanas, calendario determinista, próxima cuota y cuotas vencidas como proyección operativa, renovación desde la segunda cuota y marcadores de cuotas; el inicio muestra créditos activos, solicitudes en revisión y cuotas vencidas acumuladas; disponible en web y móvil; los créditos piloto se activan operacionalmente sin registrar dinero; no aprueba contabilidad, desembolsa ni registra recibos financieros |
 | Entrega VPS | Completado para el entorno actual | Imágenes inmutables transferidas por SSH, orden estricto de despliegue, health/readiness, Caddy, roles PostgreSQL separados, timer diario de respaldo local y verificación mensual de restauración aislada |
 
@@ -39,7 +40,7 @@ La proyección configurable ya está disponible para comparar escenarios, pero n
 - Contratos: 38 pruebas aprobadas.
 - Financiero: 8 pruebas aprobadas.
 - Worker: 2 pruebas aprobadas y 5 omitidas cuando no hay PostgreSQL de CI.
-- Web: 44 pruebas aprobadas.
+- Web: 45 pruebas aprobadas.
 - API: 102 pruebas aprobadas y 2 suites de integración omitidas cuando no hay PostgreSQL de CI.
 - Integración PostgreSQL de aislamiento: 1 escenario aprobado localmente con las migraciones completas; CI lo omite cuando no hay `TEST_DATABASE_URL`.
 - Producción: `https://cobranzaap.tech/api/health` responde con la versión desplegada y los servicios API, web, worker y PostgreSQL están activos.

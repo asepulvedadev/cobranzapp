@@ -45,10 +45,13 @@ import {
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { buildBrandLogoSource, mobileApiBaseUrl } from "./brand-assets";
+import { fetchWithTimeout, RequestTimeoutError, requestTimeoutMessage } from "./request-timeout";
 
 const sessionStorageKey = "cobranzapp.mobile.session";
 const apiBaseUrl = mobileApiBaseUrl;
 const usesBrowserCookies = Platform.OS === "web";
+const defaultRequestTimeoutMs = 20_000;
+const uploadRequestTimeoutMs = 60_000;
 
 function cookieValue(setCookie: string | null, name: string) {
   const match = setCookie?.match(new RegExp(`(?:^|,\\s*)${name}=([^;,]+)`));
@@ -76,7 +79,10 @@ export class MobileApi {
   private sessionCookie: string | null;
   private challengeCookie: string | null = null;
 
-  constructor(sessionCookie: string | null = null) {
+  constructor(
+    sessionCookie: string | null = null,
+    private readonly requestTimeoutMs = defaultRequestTimeoutMs,
+  ) {
     this.sessionCookie = sessionCookie;
   }
 
@@ -90,13 +96,28 @@ export class MobileApi {
     if (!usesBrowserCookies) headers.set("origin", apiBaseUrl);
     const cookie = this.sessionCookie ?? this.challengeCookie;
     if (!usesBrowserCookies && cookie) headers.set("cookie", cookie);
-    const response = await fetch(`${apiBaseUrl}/api${path}`, {
-      ...init,
-      credentials: usesBrowserCookies ? "include" : init.credentials,
-      headers,
-    });
-    if (response.status === 401 && path !== "/v1/auth/login") await this.clearSession();
-    return response;
+    const timeoutMs =
+      typeof FormData !== "undefined" && init.body instanceof FormData
+        ? uploadRequestTimeoutMs
+        : this.requestTimeoutMs;
+    try {
+      const response = await fetchWithTimeout(
+        `${apiBaseUrl}/api${path}`,
+        {
+          ...init,
+          credentials: usesBrowserCookies ? "include" : init.credentials,
+          headers,
+        },
+        timeoutMs,
+      );
+      if (response.status === 401 && path !== "/v1/auth/login") await this.clearSession();
+      return response;
+    } catch (error) {
+      if (error instanceof RequestTimeoutError) {
+        throw new MobileApiError(requestTimeoutMessage, 408);
+      }
+      throw error;
+    }
   }
 
   async login(identifier: string, password: string): Promise<LoginResult> {
