@@ -7,6 +7,11 @@ import {
   borrowerResponseSchema,
   type CurrentUser,
   currentUserSchema,
+  type LoanApplication,
+  type LoanProduct,
+  loanApplicationDirectorySchema,
+  loanApplicationResponseSchema,
+  loanProductDirectorySchema,
   messageResponseSchema,
   mfaLoginRequiredResponseSchema,
   type PlatformOverview,
@@ -449,6 +454,89 @@ export class MobileApi {
         response.status,
       );
     return routeDirectorySchema.parse(await response.json());
+  }
+
+  async loanProducts(tenantId: string): Promise<LoanProduct[]> {
+    const response = await this.request(`/v1/tenants/${tenantId}/loan-products`);
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible cargar los productos de crédito."),
+        response.status,
+      );
+    }
+    return loanProductDirectorySchema.parse(await response.json()).products;
+  }
+
+  async loanApplications(tenantId: string): Promise<LoanApplication[]> {
+    const response = await this.request(`/v1/tenants/${tenantId}/loan-applications`);
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible cargar los créditos."),
+        response.status,
+      );
+    }
+    return loanApplicationDirectorySchema.parse(await response.json()).applications;
+  }
+
+  async createLoanApplication(
+    tenantId: string,
+    input: {
+      borrowerId: string;
+      loanProductId: string;
+      requestedPrincipal: string;
+      paymentFrequency: LoanProduct["paymentFrequency"];
+      requestedTermCount: number;
+      purpose: string | null;
+    },
+  ) {
+    const response = await this.request(`/v1/tenants/${tenantId}/loan-applications`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible crear el crédito."),
+        response.status,
+      );
+    }
+    return loanApplicationResponseSchema.parse(await response.json()).application;
+  }
+
+  async recordLoanPayment(tenantId: string, application: LoanApplication) {
+    const response = await this.request(
+      `/v1/tenants/${tenantId}/loan-applications/${application.id}/payments`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ installmentNumber: application.paidInstallments + 1 }),
+      },
+    );
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible registrar la cuota."),
+        response.status,
+      );
+    }
+    return loanApplicationResponseSchema.parse(await response.json()).application;
+  }
+
+  async renewLoan(tenantId: string, applicationId: string, excessAmount: string) {
+    const response = await this.request(
+      `/v1/tenants/${tenantId}/loan-applications/${applicationId}/renew`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ excessAmount }),
+      },
+    );
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible renovar el crédito."),
+        response.status,
+      );
+    }
+    return loanApplicationResponseSchema.parse(await response.json()).application;
   }
 
   async logout() {

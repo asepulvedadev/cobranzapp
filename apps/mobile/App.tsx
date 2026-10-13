@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { MobileApi, MobileApiError } from "./src/api";
 import { BorrowerCreateForm } from "./src/BorrowerCreateForm";
+import { CreditWorkspace } from "./src/CreditWorkspace";
 import { MemberProfileForm } from "./src/MemberProfileForm";
 import { VerificationNetworkCard } from "./src/VerificationNetworkCard";
 
@@ -32,7 +33,7 @@ type Screen =
   | { kind: "mfa" }
   | { kind: "authenticated"; user: CurrentUser };
 
-type TenantSection = "home" | "verification" | "routes";
+type TenantSection = "home" | "verification" | "credits" | "routes";
 
 const roleLabels: Record<
   CurrentUser["memberships"][number]["role"] | TenantOverview["actorRole"],
@@ -588,11 +589,13 @@ function TenantSectionNav({
   active,
   onChange,
   canVerify,
+  canViewCredits,
   canViewRoutes,
 }: {
   active: TenantSection;
   onChange: (section: TenantSection) => void;
   canVerify: boolean;
+  canViewCredits: boolean;
   canViewRoutes: boolean;
 }) {
   return (
@@ -619,6 +622,19 @@ function TenantSectionNav({
             ]}
           >
             Verificar cliente
+          </Text>
+        </Pressable>
+      ) : null}
+      {canViewCredits ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onChange("credits")}
+          style={[styles.sectionNavItem, active === "credits" && styles.sectionNavItemActive]}
+        >
+          <Text
+            style={[styles.sectionNavText, active === "credits" && styles.sectionNavTextActive]}
+          >
+            Créditos
           </Text>
         </Pressable>
       ) : null}
@@ -849,11 +865,26 @@ function AuthenticatedHome({
                       ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
                       : false
                   }
+                  canViewCredits={
+                    selectedMembershipRole
+                      ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
+                      : false
+                  }
                   onChange={setTenantSection}
                 />
                 {tenantSection === "verification" ? (
                   <VerificationNetworkCard
                     api={api}
+                    onNeedsReauthentication={() => {
+                      setNeedsReauthentication(true);
+                      setMessage("Confirma tu contraseña para continuar con esta acción.");
+                    }}
+                    tenantId={tenant.tenant.id}
+                  />
+                ) : tenantSection === "credits" ? (
+                  <CreditWorkspace
+                    api={api}
+                    borrowers={directory?.borrowers ?? []}
                     onNeedsReauthentication={() => {
                       setNeedsReauthentication(true);
                       setMessage("Confirma tu contraseña para continuar con esta acción.");
