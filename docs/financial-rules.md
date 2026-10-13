@@ -1,6 +1,6 @@
 # Loan Calculations and Financial Integrity
 
-> **Status:** Planning draft v0.5 — preview engine implemented; posting and disbursement remain gated.
+> **Status:** Operational pilot v0.6 — deterministic previews, active-credit schedules and installment markers implemented; accounting posting and disbursement remain gated.
 > **Updated:** 2026-10-12.
 
 Owns nominal/net amounts, charge/interest treatment, schedule arithmetic, allocations, decimal/ledger invariants and approval boundaries.
@@ -58,6 +58,8 @@ The owner or supervisor can adjust a product while it is still a draft. The cata
 - Monthly dates that preserve the end of month (for example, January 31 → February 28).
 
 The web panel exposes **Ajustar intereses y cobro** for drafts and a non-binding **Ver proyección de cuotas** action. The API endpoint `/v1/tenants/{tenantId}/loan-products/{productId}/schedule-preview` only calculates a preview; it never creates a debt, journal, receipt, payment or disbursement. Editing a draft resets its compliance state and requires the product to be reviewed again.
+
+The operational pilot also lets an owner, supervisor or collector create an active credit using the selected amount, frequency and one-month/five-week term options. The API snapshots the rate rules on the credit, calculates the same deterministic schedule and records an installment marker when the expected installment is confirmed. These markers drive progress and the shared verification summary; they are **not** cash receipts, accounting journals, disbursements or proof that money changed hands.
 
 This preview is deliberately not the final financial engine. Before activation, the owner and legal/accounting reviewers must approve the rate basis, day-count convention, first due date, rounding policy, component allocation, early/late/partial/overpayment handling and posting templates. Approved terms must be snapshotted before any money movement is enabled.
 

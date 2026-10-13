@@ -13,9 +13,9 @@
 | Expediente de cliente | Completado | Identidad manual, teléfonos, direcciones, contactos de emergencia, foto designada y documentos privados |
 | OCR asistivo de documentos | Completado con revisión humana | Tesseract en el worker, imágenes/PDF privados, sugerencias cifradas, reintento y confirmación auditada |
 | Personal operativo | Completado | Perfil de supervisores y cobradores, identidad cifrada, últimos cuatro dígitos, tipo de sangre con consentimiento y documentos privados |
-| Verificación compartida | Completado con activación controlada | Consentimiento, propósito, vencimiento, consulta mínima, correcciones, disputas y auditoría; no es lista negra |
+| Verificación compartida | Completado con activación controlada | Consentimiento, propósito, vencimiento, consulta mínima, nombre, créditos vigentes y calificación derivada de pagos; correcciones, disputas y auditoría; no es lista negra |
 | Rutas de cobranza | Completado | Plantillas, geocodificación bajo demanda, optimización por cercanía, visitas auditadas y asignación por empresa |
-| Originación preliminar | Completado como borrador | Catálogo configurable, edición por propietario/supervisor, proyección de cuotas y solicitudes; no aprueba, desembolsa ni registra obligaciones |
+| Originación operativa protegida | Completado como piloto | Catálogo configurable, reglas de monto/interés, frecuencias y plazos de un mes/5 semanas, calendario determinista, renovación desde la segunda cuota y marcadores de cuotas; no aprueba contabilidad, desembolsa ni registra recibos financieros |
 | Entrega VPS | Completado para el entorno actual | Imágenes inmutables transferidas por SSH, orden estricto de despliegue, health/readiness, Caddy y roles PostgreSQL separados |
 
 ## Bloques deliberadamente protegidos
@@ -26,6 +26,8 @@ Estos bloques no se deben activar con valores inventados:
 2. Aprobación, contrato, desembolso, recibos, reversos y conciliación de efectivo.
 3. Captura offline de dinero y resolución de conflictos.
 4. Informes financieros y automatizaciones que dependan de saldos contables.
+
+Los marcadores operativos de `loan_payments` no son recibos ni asientos contables: solo confirman el avance de una cuota esperada y permiten calcular una calificación conservadora para la verificación compartida. La activación contable sigue bloqueada hasta contar con las reglas aprobadas.
 
 La proyección configurable ya está disponible para comparar escenarios, pero no crea obligaciones. Para liberar estos bloques hacen falta, como mínimo, la categoría legal del producto, ejemplos financieros aprobados, calendario de vencimientos, tratamiento de cargos, flujo de efectivo y política offline. Hasta entonces, la interfaz y la API mantienen los estados de producto y solicitud en preparación/revisión.
 
