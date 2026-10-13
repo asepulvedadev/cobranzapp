@@ -14,6 +14,7 @@ import {
   platformUserDirectoryQuerySchema,
   routeAssignmentUpdateRequestSchema,
   routeStatusUpdateRequestSchema,
+  sharedClientVerificationRequestSchema,
   tenantMemberProfileRequestSchema,
   tenantOverviewSchema,
   tenantSettingsUpdateRequestSchema,
@@ -198,6 +199,26 @@ describe("shared API contracts", () => {
         latitude: 4.711,
       }).success,
     ).toBe(false);
+  });
+
+  it("requires explicit client consent before a shared verification lookup", () => {
+    expect(
+      sharedClientVerificationRequestSchema.safeParse({
+        documentNumber: "1234567890",
+      }).success,
+    ).toBe(false);
+    expect(
+      sharedClientVerificationRequestSchema.safeParse({
+        documentNumber: "1234567890",
+        consentConfirmed: false,
+      }).success,
+    ).toBe(false);
+    expect(
+      sharedClientVerificationRequestSchema.safeParse({
+        documentNumber: "1234567890",
+        consentConfirmed: true,
+      }).success,
+    ).toBe(true);
   });
 
   it("keeps borrower verification totals independent from the visible page", () => {

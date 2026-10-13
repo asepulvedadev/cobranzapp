@@ -25,6 +25,7 @@ export function VerificationNetworkCard({
   const [result, setResult] = useState<SharedClientVerification | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [consentConfirmed, setConsentConfirmed] = useState(false);
 
   async function submit() {
     const normalized = documentNumber.trim();
@@ -32,11 +33,15 @@ export function VerificationNetworkCard({
       setMessage("Ingresa un número de cédula válido.");
       return;
     }
+    if (!consentConfirmed) {
+      setMessage("Confirma que el cliente autorizó esta consulta antes de continuar.");
+      return;
+    }
     setBusy(true);
     setMessage("");
     setResult(null);
     try {
-      setResult(await api.verifyClient(tenantId, normalized));
+      setResult(await api.verifyClient(tenantId, normalized, consentConfirmed));
     } catch (error) {
       if (error instanceof MobileApiError && error.status === 428) {
         onNeedsReauthentication();
@@ -68,6 +73,15 @@ export function VerificationNetworkCard({
         style={styles.input}
         value={documentNumber}
       />
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: consentConfirmed }}
+        onPress={() => setConsentConfirmed((current) => !current)}
+        style={styles.consentRow}
+      >
+        <Text style={styles.consentMark}>{consentConfirmed ? "☑" : "☐"}</Text>
+        <Text style={styles.help}>El cliente autorizó esta consulta compartida.</Text>
+      </Pressable>
       <Pressable disabled={busy} onPress={() => void submit()} style={styles.primaryButton}>
         <Text style={styles.primaryText}>{busy ? "Consultando…" : "Verificar"}</Text>
       </Pressable>
@@ -121,6 +135,8 @@ const styles = {
     fontSize: 16,
     padding: 12,
   },
+  consentRow: { alignItems: "center", flexDirection: "row", gap: 8, paddingVertical: 4 },
+  consentMark: { color: "#fbbf24", fontSize: 20 },
   primaryButton: {
     alignItems: "center",
     backgroundColor: "#fbbf24",

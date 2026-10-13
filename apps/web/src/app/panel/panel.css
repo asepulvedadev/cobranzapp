@@ -4780,6 +4780,21 @@ html:has(.panel-shell) {
   accent-color: var(--tenant-brand-primary, var(--panel-accent));
 }
 
+.verification-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--panel-ink-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.verification-consent input {
+  width: auto;
+  margin-top: 2px;
+  accent-color: var(--tenant-brand-primary, var(--panel-accent));
+}
+
 .borrower-details {
   margin-top: 8px;
 }

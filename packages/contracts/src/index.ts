@@ -1187,6 +1187,10 @@ export const borrowerDirectorySchema = z.object({
 
 export const sharedClientVerificationRequestSchema = z.object({
   documentNumber: z.string().trim().min(4).max(32),
+  // A query may only be sent after the operator confirms that the client
+  // authorized this lookup. Keeping this at the contract boundary prevents
+  // web, mobile, and future clients from silently bypassing the consent step.
+  consentConfirmed: z.literal(true),
 });
 
 export const sharedClientVerificationSchema = z.object({

@@ -1264,7 +1264,10 @@ export function createPostgresBorrowerService(
             tenantId,
             actor.userId,
             requestId,
-            JSON.stringify({ registered: verification.registered }),
+            JSON.stringify({
+              registered: verification.registered,
+              consentConfirmed: true,
+            }),
           ],
         );
         return verification;

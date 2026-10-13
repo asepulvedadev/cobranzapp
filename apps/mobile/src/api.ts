@@ -510,11 +510,15 @@ export class MobileApi {
     return verificationNetworkConsentSchema.parse((await response.json()).consent);
   }
 
-  async verifyClient(tenantId: string, documentNumber: string): Promise<SharedClientVerification> {
+  async verifyClient(
+    tenantId: string,
+    documentNumber: string,
+    consentConfirmed: boolean,
+  ): Promise<SharedClientVerification> {
     const response = await this.request(`/v1/tenants/${tenantId}/client-verification`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ documentNumber }),
+      body: JSON.stringify({ documentNumber, consentConfirmed }),
     });
     if (!response.ok) {
       throw new MobileApiError(

@@ -21,6 +21,7 @@ export function ClientVerificationSearch({ tenantId }: { tenantId: string }) {
   const [result, setResult] = useState<SharedClientVerification | null>(null);
   const [message, setMessage] = useState("");
   const [isBusy, setIsBusy] = useState(false);
+  const [consentConfirmed, setConsentConfirmed] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -29,10 +30,14 @@ export function ClientVerificationSearch({ tenantId }: { tenantId: string }) {
     setResult(null);
     const form = new FormData(event.currentTarget);
     const documentNumber = String(form.get("documentNumber") ?? "").trim();
+    if (!consentConfirmed) {
+      setMessage("Confirma que el cliente autorizó esta consulta antes de continuar.");
+      return;
+    }
     const response = await fetch(`/api/v1/tenants/${tenantId}/client-verification`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ documentNumber }),
+      body: JSON.stringify({ documentNumber, consentConfirmed }),
     }).catch(() => null);
     if (!response?.ok) {
       setMessage(await getError(response));
@@ -68,6 +73,14 @@ export function ClientVerificationSearch({ tenantId }: { tenantId: string }) {
             placeholder="Ej. 1020304050"
             required
           />
+        </label>
+        <label className="checkbox-row verification-consent">
+          <input
+            checked={consentConfirmed}
+            onChange={(event) => setConsentConfirmed(event.target.checked)}
+            type="checkbox"
+          />
+          <span>Confirmo que el cliente autorizó esta consulta compartida.</span>
         </label>
         <button disabled={isBusy} type="submit">
           {isBusy ? "Verificando…" : "Verificar"}
