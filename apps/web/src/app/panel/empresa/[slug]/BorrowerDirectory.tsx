@@ -48,6 +48,8 @@ export function BorrowerDirectory({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [includeSecondContact, setIncludeSecondContact] = useState(false);
+  const [homeAddressConfirmed, setHomeAddressConfirmed] = useState(false);
+  const [workAddressConfirmed, setWorkAddressConfirmed] = useState(false);
   const [createStep, setCreateStep] = useState(1);
   const createFormRef = useRef<HTMLFormElement>(null);
 
@@ -59,7 +61,7 @@ export function BorrowerDirectory({
   function validateCreateStep(step: number) {
     const errors: Record<number, string> = {
       1: "Completa el nombre, número y las imágenes del documento antes de continuar.",
-      2: "Completa el celular, WhatsApp y las dos direcciones antes de continuar.",
+      2: "Completa el celular, WhatsApp y las dos direcciones; luego confirma que fueron verificadas con el cliente.",
       3: "Registra al menos una referencia y el consentimiento del cliente.",
     };
     if (step === 1) {
@@ -80,7 +82,9 @@ export function BorrowerDirectory({
       (!fieldValue("phone") ||
         !fieldValue("whatsappPhone") ||
         !fieldValue("homeAddress") ||
-        !fieldValue("workAddress"))
+        !fieldValue("workAddress") ||
+        !homeAddressConfirmed ||
+        !workAddressConfirmed)
     ) {
       setMessage(errors[step]);
       setIsError(true);
@@ -136,6 +140,8 @@ export function BorrowerDirectory({
         whatsappPhone: String(form.get("whatsappPhone") ?? "").trim(),
         homeAddress: String(form.get("homeAddress") ?? "").trim(),
         workAddress: String(form.get("workAddress") ?? "").trim(),
+        homeAddressConfirmed,
+        workAddressConfirmed,
         profilePhotoObjectKey: null,
         consentVersion: "borrower-dossier-v1",
         consentEvidenceRef: String(form.get("consentEvidenceRef") ?? "").trim(),
@@ -199,6 +205,8 @@ export function BorrowerDirectory({
     }
     event.currentTarget.reset();
     setIncludeSecondContact(false);
+    setHomeAddressConfirmed(false);
+    setWorkAddressConfirmed(false);
     setCreateStep(1);
     setMessage(
       uploadFailure
@@ -276,6 +284,11 @@ export function BorrowerDirectory({
                           <div>
                             <span>Casa</span>
                             <strong>{borrower.homeAddress}</strong>
+                            <small>
+                              {borrower.homeAddressStatus === "confirmed"
+                                ? "Dirección confirmada"
+                                : "Pendiente de confirmar"}
+                            </small>
                             <a
                               href={wazeUrl(borrower.homeAddress)}
                               rel="noreferrer"
@@ -287,6 +300,11 @@ export function BorrowerDirectory({
                           <div>
                             <span>Trabajo</span>
                             <strong>{borrower.workAddress}</strong>
+                            <small>
+                              {borrower.workAddressStatus === "confirmed"
+                                ? "Dirección confirmada"
+                                : "Pendiente de confirmar"}
+                            </small>
                             <a
                               href={wazeUrl(borrower.workAddress)}
                               rel="noreferrer"
@@ -506,6 +524,27 @@ export function BorrowerDirectory({
                 maxLength={240}
                 placeholder="Ej. Carrera 5 # 12-40, Barrio La Playa, Cúcuta"
               />
+              <label className="checkbox-row address-confirmation">
+                <input
+                  checked={homeAddressConfirmed}
+                  onChange={(event) => setHomeAddressConfirmed(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>
+                  Confirmo que la dirección de casa está completa y fue verificada con el cliente.
+                </span>
+              </label>
+              <label className="checkbox-row address-confirmation">
+                <input
+                  checked={workAddressConfirmed}
+                  onChange={(event) => setWorkAddressConfirmed(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>
+                  Confirmo que la dirección de trabajo está completa y fue verificada con el
+                  cliente.
+                </span>
+              </label>
             </section>
 
             <section aria-labelledby="borrower-step-references" hidden={createStep !== 3}>

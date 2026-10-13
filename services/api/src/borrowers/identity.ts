@@ -13,6 +13,16 @@ export function normalizeBorrowerDocumentNumber(value: string) {
   return normalized;
 }
 
+/** Preserve the operator's address wording while removing accidental spacing
+ * and line breaks from mobile paste/autofill. */
+export function normalizeBorrowerAddress(value: string) {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (normalized.length < 3 || normalized.length > 240) {
+    throw new Error("INVALID_BORROWER_ADDRESS");
+  }
+  return normalized;
+}
+
 export function borrowerDocumentLookupHmac(
   secret: string,
   input: { tenantId: string; country: string; documentType: string; documentNumber: string },

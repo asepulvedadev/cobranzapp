@@ -970,6 +970,8 @@ export const borrowerCreateRequestSchema = z
     whatsappPhone: z.string().trim().min(7).max(30).nullable().optional(),
     homeAddress: z.string().trim().min(3).max(240),
     workAddress: z.string().trim().min(3).max(240),
+    homeAddressConfirmed: z.boolean().optional(),
+    workAddressConfirmed: z.boolean().optional(),
     profilePhotoObjectKey: z.string().trim().min(1).max(500).nullable(),
     consentVersion: z.string().trim().min(1).max(40),
     consentEvidenceRef: z.string().trim().min(1).max(240),
@@ -1007,6 +1009,8 @@ export const borrowerIdentitySchema = z.object({
   verificationState: z.enum(["manual_pending", "reviewed", "rejected"]),
 });
 
+export const borrowerAddressStatusSchema = z.enum(["pending", "confirmed"]);
+
 export const borrowerSchema = z.object({
   id: z.uuid(),
   fullName: z.string().min(2),
@@ -1015,6 +1019,8 @@ export const borrowerSchema = z.object({
   whatsappPhone: z.string().min(7).nullable().optional(),
   homeAddress: z.string().min(3),
   workAddress: z.string().min(3),
+  homeAddressStatus: borrowerAddressStatusSchema,
+  workAddressStatus: borrowerAddressStatusSchema,
   profilePhotoObjectKey: z.string().nullable(),
   consentVersion: z.string().min(1),
   identity: borrowerIdentitySchema,

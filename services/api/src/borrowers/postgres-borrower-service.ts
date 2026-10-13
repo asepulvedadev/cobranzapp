@@ -7,6 +7,7 @@ import {
   borrowerSharedDocumentLookupHmac,
   decryptBorrowerOcrFields,
   encryptBorrowerDocumentNumber,
+  normalizeBorrowerAddress,
   normalizeBorrowerDocumentNumber,
 } from "./identity.js";
 import type {
@@ -28,6 +29,8 @@ type BorrowerRow = {
   whatsapp_phone: string | null;
   home_address: string;
   work_address: string;
+  home_address_status: Borrower["homeAddressStatus"];
+  work_address_status: Borrower["workAddressStatus"];
   profile_photo_object_key: string | null;
   consent_version: string;
   country: string;
@@ -66,6 +69,7 @@ async function loadBorrower(
   const result = await client.query<BorrowerRow>(
     `SELECT borrower.id, borrower.full_name, borrower.status,
             borrower.phone, borrower.whatsapp_phone, borrower.home_address, borrower.work_address,
+            borrower.home_address_status, borrower.work_address_status,
             borrower.profile_photo_object_key, borrower.consent_version,
             identity.country, identity.document_type, identity.document_last4,
             identity.verification_state, borrower.created_at
@@ -114,6 +118,8 @@ async function loadBorrower(
     whatsappPhone: row.whatsapp_phone,
     homeAddress: row.home_address,
     workAddress: row.work_address,
+    homeAddressStatus: row.home_address_status,
+    workAddressStatus: row.work_address_status,
     profilePhotoObjectKey: row.profile_photo_object_key,
     consentVersion: row.consent_version,
     identity: {
@@ -302,6 +308,7 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
         const rows = await client.query<BorrowerRow>(
           `SELECT borrower.id, borrower.full_name, borrower.status,
                   borrower.phone, borrower.whatsapp_phone, borrower.home_address, borrower.work_address,
+                  borrower.home_address_status, borrower.work_address_status,
                   borrower.profile_photo_object_key, borrower.consent_version,
                   identity.country, identity.document_type, identity.document_last4,
                   identity.verification_state, borrower.created_at
@@ -333,6 +340,8 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
 
     async create(actor, tenantId, input: BorrowerCreateInput): Promise<BorrowerCreateResult> {
       const normalizedNumber = normalizeBorrowerDocumentNumber(input.documentNumber);
+      const homeAddress = normalizeBorrowerAddress(input.homeAddress);
+      const workAddress = normalizeBorrowerAddress(input.workAddress);
       try {
         return await withTransaction(actor, tenantId, async (client) => {
           const borrowerId = randomUUID();
@@ -370,20 +379,31 @@ export function createPostgresBorrowerService(pool: Pool, identitySecret: string
             await client.query(
               `INSERT INTO borrowers
                (tenant_id, id, full_name, phone, whatsapp_phone, home_address, work_address,
+                home_address_status, work_address_status, home_address_confirmed_at,
+                work_address_confirmed_at, home_address_confirmed_by, work_address_confirmed_by,
                 profile_photo_object_key, consent_version, consent_evidence_ref, created_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7,
+                     CASE WHEN $8 THEN 'confirmed' ELSE 'pending' END,
+                     CASE WHEN $9 THEN 'confirmed' ELSE 'pending' END,
+                     CASE WHEN $8 THEN now() ELSE NULL END,
+                     CASE WHEN $9 THEN now() ELSE NULL END,
+                     CASE WHEN $8 THEN $10 ELSE NULL END,
+                     CASE WHEN $9 THEN $10 ELSE NULL END,
+                     $11, $12, $13, $10)`,
               [
                 tenantId,
                 borrowerId,
                 input.fullName,
                 input.phone,
                 input.whatsappPhone ?? input.phone,
-                input.homeAddress,
-                input.workAddress,
+                homeAddress,
+                workAddress,
+                input.homeAddressConfirmed ?? false,
+                input.workAddressConfirmed ?? false,
+                actor.userId,
                 profileKey,
                 input.consentVersion,
                 input.consentEvidenceRef,
-                actor.userId,
               ],
             );
             await client.query(

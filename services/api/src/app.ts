@@ -2636,6 +2636,15 @@ export function buildApp(dependencies: AppDependencies) {
           request.id,
         );
       }
+      if (error instanceof Error && error.message === "INVALID_BORROWER_ADDRESS") {
+        return sendError(
+          reply,
+          400,
+          "INVALID_BORROWER_ADDRESS",
+          "Escribe una dirección completa de casa y trabajo.",
+          request.id,
+        );
+      }
       throw error;
     }
   });
