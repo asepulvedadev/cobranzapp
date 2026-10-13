@@ -35,8 +35,10 @@ La proyección configurable ya está disponible para comparar escenarios, pero n
 
 - `pnpm check` pasa formato, tipos, pruebas y compilación.
 - Contratos: 30 pruebas aprobadas.
+- Financiero: 8 pruebas aprobadas.
+- Worker: 2 pruebas aprobadas y 5 omitidas cuando no hay PostgreSQL de CI.
 - Web: 40 pruebas aprobadas.
-- API: 90 pruebas aprobadas y 2 suites de integración omitidas cuando no hay PostgreSQL de CI.
+- API: 94 pruebas aprobadas y 2 suites de integración omitidas cuando no hay PostgreSQL de CI.
 - Producción: `https://cobranzaap.tech/api/health` responde con la versión desplegada y los servicios API, web, worker y PostgreSQL están activos.
 
 ## Próximo desbloqueo
