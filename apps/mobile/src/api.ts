@@ -227,6 +227,13 @@ export class MobileApi {
     return tenantOverviewSchema.parse((await response.json()).overview);
   }
 
+  brandLogoSource(tenantId: string) {
+    return {
+      uri: `${apiBaseUrl}/api/v1/tenants/${tenantId}/brand-logo`,
+      ...(this.sessionCookie ? { headers: { Cookie: this.sessionCookie } } : {}),
+    };
+  }
+
   async createMember(tenantId: string, input: TenantMemberCreateRequest) {
     const response = await this.request(`/v1/tenants/${tenantId}/members`, {
       method: "POST",

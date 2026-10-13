@@ -11,6 +11,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -381,11 +382,35 @@ function DeveloperHome({
   );
 }
 
-function TenantHome({ overview }: { overview: TenantOverview }) {
+function TenantBrandMark({ api, overview }: { api: MobileApi; overview: TenantOverview }) {
+  const [hasError, setHasError] = useState(false);
+  if (!overview.settings.logoObjectKey || hasError) {
+    return (
+      <View
+        style={[styles.tenantLogoFallback, { backgroundColor: overview.settings.primaryColor }]}
+      >
+        <Text style={styles.tenantLogoFallbackText}>
+          {overview.tenant.displayName.slice(0, 1).toUpperCase()}
+        </Text>
+      </View>
+    );
+  }
+  return (
+    <Image
+      accessibilityLabel={`Logo de ${overview.tenant.displayName}`}
+      onError={() => setHasError(true)}
+      source={api.brandLogoSource(overview.tenant.id)}
+      style={styles.tenantLogo}
+    />
+  );
+}
+
+function TenantHome({ api, overview }: { api: MobileApi; overview: TenantOverview }) {
   const metrics = [["Personal", overview.metrics.members]] as const;
   return (
     <View style={styles.stack}>
       <View style={[styles.tenantAccent, { backgroundColor: overview.settings.primaryColor }]} />
+      <TenantBrandMark api={api} overview={overview} />
       <Text style={styles.eyebrow}>ESPACIO DE TRABAJO</Text>
       <Text style={styles.sectionTitle}>{overview.tenant.displayName}</Text>
       <Text style={styles.body}>
@@ -1250,7 +1275,7 @@ function AuthenticatedHome({
                 ) : tenantSection === "routes" ? (
                   <TenantRoutes routes={routes} />
                 ) : (
-                  <TenantHome overview={tenant} />
+                  <TenantHome api={api} overview={tenant} />
                 )}
               </>
             ) : (
@@ -1627,4 +1652,20 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   tenantAccent: { height: 5, borderRadius: 999, width: 70, marginBottom: 4 },
+  tenantLogo: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    backgroundColor: "#202523",
+    borderWidth: 1,
+    borderColor: "#343b36",
+  },
+  tenantLogoFallback: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tenantLogoFallbackText: { color: "#151817", fontSize: 30, fontWeight: "900" },
 });
