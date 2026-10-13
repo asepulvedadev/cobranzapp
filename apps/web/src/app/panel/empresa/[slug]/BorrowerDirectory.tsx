@@ -35,6 +35,10 @@ function wazeUrl(address: string, location: Borrower["addressLocations"]["home"]
   return `https://www.waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes`;
 }
 
+function composeAddress(street: string, locality: string) {
+  return [street.trim(), locality.trim()].filter(Boolean).join(", ");
+}
+
 export function BorrowerDirectory({
   tenantId,
   directory,
@@ -90,7 +94,7 @@ export function BorrowerDirectory({
   function validateCreateStep(step: number) {
     const errors: Record<number, string> = {
       1: "Completa el nombre, número y las imágenes del documento antes de continuar.",
-      2: "Completa el celular, WhatsApp y las dos direcciones; luego confirma que fueron verificadas con el cliente.",
+      2: "Completa el celular, WhatsApp, cada dirección y su barrio/municipio; luego confirma que fueron verificadas con el cliente.",
       3: "Registra al menos una referencia y el consentimiento del cliente.",
     };
     if (step === 1) {
@@ -111,7 +115,9 @@ export function BorrowerDirectory({
       (!fieldValue("phone") ||
         !fieldValue("whatsappPhone") ||
         !fieldValue("homeAddress") ||
+        !fieldValue("homeAddressLocality") ||
         !fieldValue("workAddress") ||
+        !fieldValue("workAddressLocality") ||
         !homeAddressConfirmed ||
         !workAddressConfirmed)
     ) {
@@ -274,8 +280,14 @@ export function BorrowerDirectory({
         documentNumber: String(form.get("documentNumber") ?? "").trim(),
         phone: String(form.get("phone") ?? "").trim(),
         whatsappPhone: String(form.get("whatsappPhone") ?? "").trim(),
-        homeAddress: String(form.get("homeAddress") ?? "").trim(),
-        workAddress: String(form.get("workAddress") ?? "").trim(),
+        homeAddress: composeAddress(
+          String(form.get("homeAddress") ?? ""),
+          String(form.get("homeAddressLocality") ?? ""),
+        ),
+        workAddress: composeAddress(
+          String(form.get("workAddress") ?? ""),
+          String(form.get("workAddressLocality") ?? ""),
+        ),
         homeAddressConfirmed,
         workAddressConfirmed,
         profilePhotoObjectKey: null,
@@ -746,12 +758,26 @@ export function BorrowerDirectory({
                 maxLength={240}
                 placeholder="Ej. Calle 10 # 20-30, Barrio Centro, Cúcuta"
               />
+              <label htmlFor="borrower-home-locality">Barrio y municipio de casa</label>
+              <input
+                id="borrower-home-locality"
+                name="homeAddressLocality"
+                maxLength={100}
+                placeholder="Ej. Barrio Centro, Cúcuta"
+              />
               <label htmlFor="borrower-work">Dirección de trabajo</label>
               <input
                 id="borrower-work"
                 name="workAddress"
                 maxLength={240}
                 placeholder="Ej. Carrera 5 # 12-40, Barrio La Playa, Cúcuta"
+              />
+              <label htmlFor="borrower-work-locality">Barrio y municipio de trabajo</label>
+              <input
+                id="borrower-work-locality"
+                name="workAddressLocality"
+                maxLength={100}
+                placeholder="Ej. Barrio La Playa, Cúcuta"
               />
               <label className="checkbox-row address-confirmation">
                 <input
@@ -851,7 +877,7 @@ export function BorrowerDirectory({
               </p>
               <ul className="borrower-confirmation-list">
                 <li>Documento frente y reverso en almacenamiento privado.</li>
-                <li>Celular, WhatsApp y direcciones de casa y trabajo.</li>
+                <li>Celular, WhatsApp y direcciones completas con barrio y municipio.</li>
                 <li>Una o dos referencias de contacto.</li>
               </ul>
             </section>

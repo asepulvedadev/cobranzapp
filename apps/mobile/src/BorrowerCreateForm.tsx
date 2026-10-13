@@ -26,6 +26,10 @@ function fileName(uri: string, fallback: string) {
   return lastPart?.includes(".") ? lastPart : fallback;
 }
 
+function composeAddress(street: string, locality: string) {
+  return [street.trim(), locality.trim()].filter(Boolean).join(", ");
+}
+
 export function BorrowerCreateForm({
   api,
   tenantId,
@@ -38,7 +42,9 @@ export function BorrowerCreateForm({
   const [phone, setPhone] = useState("");
   const [whatsappPhone, setWhatsappPhone] = useState("");
   const [homeAddress, setHomeAddress] = useState("");
+  const [homeAddressLocality, setHomeAddressLocality] = useState("");
   const [workAddress, setWorkAddress] = useState("");
+  const [workAddressLocality, setWorkAddressLocality] = useState("");
   const [homeAddressConfirmed, setHomeAddressConfirmed] = useState(false);
   const [workAddressConfirmed, setWorkAddressConfirmed] = useState(false);
   const [contactName, setContactName] = useState("");
@@ -119,8 +125,13 @@ export function BorrowerCreateForm({
     }
     if (stepToValidate === 2) {
       if (!phone.trim() || !whatsappPhone.trim()) return "Completa el celular y WhatsApp.";
-      if (!homeAddress.trim() || !workAddress.trim()) {
-        return "Registra la dirección completa de casa y trabajo.";
+      if (
+        !homeAddress.trim() ||
+        !homeAddressLocality.trim() ||
+        !workAddress.trim() ||
+        !workAddressLocality.trim()
+      ) {
+        return "Registra la dirección, barrio y municipio de casa y trabajo.";
       }
       if (!homeAddressConfirmed || !workAddressConfirmed) {
         return "Confirma que ambas direcciones fueron verificadas con el cliente.";
@@ -179,8 +190,8 @@ export function BorrowerCreateForm({
           documentNumber: documentNumber.trim(),
           phone: phone.trim(),
           whatsappPhone: whatsappPhone.trim(),
-          homeAddress: homeAddress.trim(),
-          workAddress: workAddress.trim(),
+          homeAddress: composeAddress(homeAddress, homeAddressLocality),
+          workAddress: composeAddress(workAddress, workAddressLocality),
           homeAddressConfirmed,
           workAddressConfirmed,
           profilePhotoObjectKey: null,
@@ -244,7 +255,9 @@ export function BorrowerCreateForm({
       setPhone("");
       setWhatsappPhone("");
       setHomeAddress("");
+      setHomeAddressLocality("");
       setWorkAddress("");
+      setWorkAddressLocality("");
       setHomeAddressConfirmed(false);
       setWorkAddressConfirmed(false);
       setContactName("");
@@ -412,10 +425,17 @@ export function BorrowerCreateForm({
                   <Text style={styles.label}>Dirección de casa</Text>
                   <TextInput
                     onChangeText={setHomeAddress}
-                    placeholder="Dirección completa, barrio y ciudad"
+                    placeholder="Calle/carrera y nomenclatura"
                     placeholderTextColor="#77817a"
                     style={styles.input}
                     value={homeAddress}
+                  />
+                  <TextInput
+                    onChangeText={setHomeAddressLocality}
+                    placeholder="Barrio y municipio"
+                    placeholderTextColor="#77817a"
+                    style={styles.input}
+                    value={homeAddressLocality}
                   />
                   <Pressable
                     onPress={() => setHomeAddressConfirmed((current) => !current)}
@@ -430,10 +450,17 @@ export function BorrowerCreateForm({
                   <Text style={styles.label}>Dirección de trabajo</Text>
                   <TextInput
                     onChangeText={setWorkAddress}
-                    placeholder="Dirección completa, barrio y ciudad"
+                    placeholder="Calle/carrera y nomenclatura"
                     placeholderTextColor="#77817a"
                     style={styles.input}
                     value={workAddress}
+                  />
+                  <TextInput
+                    onChangeText={setWorkAddressLocality}
+                    placeholder="Barrio y municipio"
+                    placeholderTextColor="#77817a"
+                    style={styles.input}
+                    value={workAddressLocality}
                   />
                   <Pressable
                     onPress={() => setWorkAddressConfirmed((current) => !current)}
@@ -536,8 +563,12 @@ export function BorrowerCreateForm({
                     <Text style={styles.reviewText}>
                       WhatsApp: {whatsappPhone || "Sin registrar"}
                     </Text>
-                    <Text style={styles.reviewText}>Casa: {homeAddress || "Sin registrar"}</Text>
-                    <Text style={styles.reviewText}>Trabajo: {workAddress || "Sin registrar"}</Text>
+                    <Text style={styles.reviewText}>
+                      Casa: {composeAddress(homeAddress, homeAddressLocality) || "Sin registrar"}
+                    </Text>
+                    <Text style={styles.reviewText}>
+                      Trabajo: {composeAddress(workAddress, workAddressLocality) || "Sin registrar"}
+                    </Text>
                     <Text style={styles.reviewText}>
                       Referencias: {secondContact ? "2" : "1"} · Documentos: 3
                     </Text>
