@@ -83,6 +83,28 @@ export function BorrowerCreateForm({
     });
   }
 
+  async function captureImage(setImage: (image: SelectedImage) => void, fallback: string) {
+    setMessage("");
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      setMessage("Permite el acceso a la cámara para escanear el documento.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.85,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    setImage({
+      uri: asset.uri,
+      name: asset.fileName ?? fileName(asset.uri, fallback),
+      type: asset.mimeType ?? "image/jpeg",
+      file: asset.file,
+    });
+  }
+
   function stepError(stepToValidate: number) {
     if (stepToValidate === 1) {
       if (!fullName.trim() || !documentNumber.trim()) return "Completa el nombre y la cédula.";
@@ -304,12 +326,14 @@ export function BorrowerCreateForm({
                       identityFront ? `✓ Frente · ${identityFront.name}` : "Cargar cédula · frente"
                     }
                     onPress={() => void pickImage(setIdentityFront, "cedula-frente.jpg")}
+                    onCamera={() => void captureImage(setIdentityFront, "cedula-frente.jpg")}
                   />
                   <ImageButton
                     label={
                       identityBack ? `✓ Reverso · ${identityBack.name}` : "Cargar cédula · reverso"
                     }
                     onPress={() => void pickImage(setIdentityBack, "cedula-reverso.jpg")}
+                    onCamera={() => void captureImage(setIdentityBack, "cedula-reverso.jpg")}
                   />
                   <ImageButton
                     label={
@@ -318,6 +342,7 @@ export function BorrowerCreateForm({
                         : "Cargar foto designada de perfil"
                     }
                     onPress={() => void pickImage(setProfilePhoto, "foto-perfil.jpg")}
+                    onCamera={() => void captureImage(setProfilePhoto, "foto-perfil.jpg")}
                   />
                 </>
               ) : null}
@@ -523,11 +548,24 @@ export function BorrowerCreateForm({
   );
 }
 
-function ImageButton({ label, onPress }: { label: string; onPress: () => void }) {
+function ImageButton({
+  label,
+  onCamera,
+  onPress,
+}: {
+  label: string;
+  onCamera: () => void;
+  onPress: () => void;
+}) {
   return (
-    <Pressable onPress={onPress} style={styles.imageButton}>
-      <Text style={styles.imageButtonText}>{label}</Text>
-    </Pressable>
+    <View style={styles.imageActions}>
+      <Pressable onPress={onPress} style={styles.imageButton}>
+        <Text style={styles.imageButtonText}>{label}</Text>
+      </Pressable>
+      <Pressable onPress={onCamera} style={styles.cameraButton}>
+        <Text style={styles.cameraButtonText}>Tomar foto</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -600,6 +638,7 @@ const styles = {
   toggle: { paddingVertical: 6 },
   toggleText: { color: "#fbbf24", fontSize: 14, fontWeight: "700" as const },
   imageButton: {
+    flex: 1,
     minHeight: 46,
     borderRadius: 12,
     borderWidth: 1,
@@ -608,6 +647,16 @@ const styles = {
     paddingHorizontal: 12,
   },
   imageButtonText: { color: "#f6f7f5", fontSize: 14, fontWeight: "700" as const },
+  imageActions: { flexDirection: "row" as const, gap: 8, alignItems: "center" as const },
+  cameraButton: {
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#fbbf24",
+    justifyContent: "center" as const,
+    paddingHorizontal: 10,
+  },
+  cameraButtonText: { color: "#fbbf24", fontSize: 12, fontWeight: "800" as const },
   consentRow: {
     flexDirection: "row" as const,
     gap: 8,
