@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import type { LoanProduct } from "../../../../lib/platform";
+import { Modal } from "../../Modal";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
 
 const frequencyLabels: Record<LoanProduct["paymentFrequency"], string> = {
@@ -69,48 +70,57 @@ export function LoanProductDraftEditor({
     router.refresh();
   }
 
-  if (!open) {
-    return (
+  return (
+    <>
       <button className="secondary-action-button" onClick={() => setOpen(true)} type="button">
         Ajustar intereses y cobro
       </button>
-    );
-  }
-
-  return (
-    <form className="tenant-form compact-form credit-product-editor" onSubmit={submit}>
-      <div className="credit-product-editor-heading">
-        <strong>Ajustar producto</strong>
-        <small>
-          {frequencyLabels[product.paymentFrequency]} · {rateBasisLabels[product.rateBasis]}
-        </small>
-      </div>
-      <label>
-        Monto máximo por crédito (COP)
-        <input
-          defaultValue={product.principalMax}
-          inputMode="decimal"
-          name="principalMax"
-          required
-        />
-      </label>
-      <label>
-        Porcentaje de interés total
-        <input defaultValue={product.nominalRate} inputMode="decimal" name="nominalRate" required />
-      </label>
-      {message ? (
-        <p className={`tenant-form-message${error ? " form-message-error" : ""}`} role="status">
-          {message}
-        </p>
+      {open ? (
+        <Modal onClose={() => setOpen(false)} title="Ajustar producto de crédito">
+          <form className="tenant-form compact-form credit-product-editor" onSubmit={submit}>
+            <div className="credit-product-editor-heading">
+              <strong>Ajustar producto</strong>
+              <small>
+                {frequencyLabels[product.paymentFrequency]} · {rateBasisLabels[product.rateBasis]}
+              </small>
+            </div>
+            <label>
+              Monto máximo por crédito (COP)
+              <input
+                defaultValue={product.principalMax}
+                inputMode="decimal"
+                name="principalMax"
+                required
+              />
+            </label>
+            <label>
+              Porcentaje de interés total
+              <input
+                defaultValue={product.nominalRate}
+                inputMode="decimal"
+                name="nominalRate"
+                required
+              />
+            </label>
+            {message ? (
+              <p
+                className={`tenant-form-message${error ? " form-message-error" : ""}`}
+                role="status"
+              >
+                {message}
+              </p>
+            ) : null}
+            <div className="credit-product-editor-actions">
+              <button disabled={busy} type="submit">
+                {busy ? "Guardando…" : "Guardar ajustes"}
+              </button>
+              <button disabled={busy} onClick={() => setOpen(false)} type="button">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </Modal>
       ) : null}
-      <div className="credit-product-editor-actions">
-        <button disabled={busy} type="submit">
-          {busy ? "Guardando…" : "Guardar ajustes"}
-        </button>
-        <button disabled={busy} onClick={() => setOpen(false)} type="button">
-          Cancelar
-        </button>
-      </div>
-    </form>
+    </>
   );
 }

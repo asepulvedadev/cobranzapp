@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import type { LoanProduct } from "../../../../lib/platform";
+import { Modal } from "../../Modal";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
 import { LoanProductDraftEditor } from "./LoanProductDraftEditor";
 import { LoanSchedulePreview } from "./LoanSchedulePreview";
@@ -51,6 +52,7 @@ export function CreditProductCatalog({
   const [isError, setIsError] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [reviewingProductId, setReviewingProductId] = useState<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -80,6 +82,7 @@ export function CreditProductCatalog({
       return;
     }
     event.currentTarget.reset();
+    setIsCreateOpen(false);
     setMessage("Regla guardada. Los cobradores podrán elegir la frecuencia al crear cada crédito.");
     setIsBusy(false);
     router.refresh();
@@ -111,7 +114,14 @@ export function CreditProductCatalog({
           <span className="panel-eyebrow">Núcleo financiero</span>
           <h2>Productos de crédito</h2>
         </div>
-        <span>{products.length} configurados</span>
+        <div className="directory-header-actions">
+          <span>{products.length} configurados</span>
+          {canConfigure ? (
+            <button className="primary-action" onClick={() => setIsCreateOpen(true)} type="button">
+              Nuevo producto
+            </button>
+          ) : null}
+        </div>
       </div>
       <p className="operational-note">
         El propietario solo define el monto máximo y el porcentaje. El equipo elige la frecuencia y
@@ -182,35 +192,37 @@ export function CreditProductCatalog({
         </div>
       ) : null}
       {canConfigure ? (
-        <form className="tenant-form credit-product-form" onSubmit={submit}>
-          <h3>Regla de crédito</h3>
-          <p className="form-help">
-            Solo debes indicar el monto máximo y el porcentaje de interés.
-          </p>
-          <label>
-            Monto máximo por crédito (COP)
-            <input
-              inputMode="decimal"
-              name="principalMax"
-              pattern="[0-9]+(\\.[0-9]{1,2})?"
-              required
-            />
-          </label>
-          <div className="borrower-form-row">
-            <label>
-              Porcentaje de interés total
-              <input
-                inputMode="decimal"
-                name="nominalRate"
-                pattern="[0-9]+(\\.[0-9]{1,8})?"
-                required
-              />
-            </label>
-          </div>
-          <button disabled={isBusy} type="submit">
-            {isBusy ? "Guardando…" : "Guardar regla"}
-          </button>
-        </form>
+        isCreateOpen ? (
+          <Modal onClose={() => setIsCreateOpen(false)} title="Nuevo producto de crédito">
+            <form className="tenant-form credit-product-form" onSubmit={submit}>
+              <p className="form-help">
+                Solo debes indicar el monto máximo y el porcentaje de interés. La frecuencia y el
+                plazo se eligen al crear cada crédito.
+              </p>
+              <label>
+                Monto máximo por crédito (COP)
+                <input
+                  inputMode="decimal"
+                  name="principalMax"
+                  pattern="[0-9]+(\\.[0-9]{1,2})?"
+                  required
+                />
+              </label>
+              <label>
+                Porcentaje de interés total
+                <input
+                  inputMode="decimal"
+                  name="nominalRate"
+                  pattern="[0-9]+(\\.[0-9]{1,8})?"
+                  required
+                />
+              </label>
+              <button disabled={isBusy} type="submit">
+                {isBusy ? "Guardando…" : "Guardar regla"}
+              </button>
+            </form>
+          </Modal>
+        ) : null
       ) : (
         <p className="operational-note">Solo el propietario puede ajustar monto y porcentaje.</p>
       )}
