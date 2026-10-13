@@ -651,7 +651,13 @@ function TenantSectionNav({
   canViewRoutes: boolean;
 }) {
   return (
-    <View style={styles.sectionNav}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.sectionNavScroller}
+      contentContainerStyle={styles.sectionNav}
+      keyboardShouldPersistTaps="handled"
+    >
       <Pressable
         accessibilityRole="button"
         onPress={() => onChange("home")}
@@ -727,7 +733,7 @@ function TenantSectionNav({
           </Text>
         </Pressable>
       ) : null}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -1298,11 +1304,14 @@ const styles = StyleSheet.create({
   sectionNav: {
     flexDirection: "row",
     gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#343b36",
     paddingBottom: 8,
   },
+  sectionNavScroller: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#343b36",
+  },
   sectionNavItem: {
+    flexShrink: 0,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#343b36",
