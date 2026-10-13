@@ -52,10 +52,12 @@ export function BorrowerCreateForm({
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState(1);
 
   function close() {
     if (busy) return;
     setOpen(false);
+    setStep(1);
     setMessage("");
   }
 
@@ -81,26 +83,51 @@ export function BorrowerCreateForm({
     });
   }
 
+  function stepError(stepToValidate: number) {
+    if (stepToValidate === 1) {
+      if (!fullName.trim() || !documentNumber.trim()) return "Completa el nombre y la cédula.";
+      if (!identityFront || !identityBack || !profilePhoto) {
+        return "Carga el frente, reverso y foto de perfil del cliente.";
+      }
+    }
+    if (stepToValidate === 2) {
+      if (!phone.trim() || !whatsappPhone.trim()) return "Completa el celular y WhatsApp.";
+      if (!homeAddress.trim() || !workAddress.trim()) {
+        return "Registra la dirección completa de casa y trabajo.";
+      }
+      if (!homeAddressConfirmed || !workAddressConfirmed) {
+        return "Confirma que ambas direcciones fueron verificadas con el cliente.";
+      }
+    }
+    if (stepToValidate === 3) {
+      if (!contactName.trim() || !contactRelationship.trim() || !contactPhone.trim()) {
+        return "Registra al menos un contacto de emergencia completo.";
+      }
+      if (
+        secondContact &&
+        (!secondContactName.trim() ||
+          !secondContactRelationship.trim() ||
+          !secondContactPhone.trim())
+      ) {
+        return "Completa los datos del segundo contacto o quítalo.";
+      }
+      if (!consent) return "Confirma el consentimiento del cliente.";
+    }
+    return "";
+  }
+
   function missingFields() {
-    if (!fullName.trim() || !documentNumber.trim() || !phone.trim() || !whatsappPhone.trim()) {
-      return true;
+    return [1, 2, 3].some((stepToValidate) => Boolean(stepError(stepToValidate)));
+  }
+
+  function nextStep() {
+    const error = stepError(step);
+    if (error) {
+      setMessage(error);
+      return;
     }
-    if (
-      !homeAddress.trim() ||
-      !workAddress.trim() ||
-      !homeAddressConfirmed ||
-      !workAddressConfirmed
-    ) {
-      return true;
-    }
-    if (!contactName.trim() || !contactRelationship.trim() || !contactPhone.trim()) return true;
-    if (
-      secondContact &&
-      (!secondContactName.trim() || !secondContactRelationship.trim() || !secondContactPhone.trim())
-    ) {
-      return true;
-    }
-    return !identityFront || !identityBack || !profilePhoto || !consent;
+    setMessage("");
+    setStep((current) => Math.min(4, current + 1));
   }
 
   async function submit() {
@@ -178,6 +205,7 @@ export function BorrowerCreateForm({
       setIdentityFront(null);
       setIdentityBack(null);
       setProfilePhoto(null);
+      setStep(1);
       onCreated();
     } catch (error) {
       if (error instanceof MobileApiError && error.status === 428) {
@@ -202,7 +230,14 @@ export function BorrowerCreateForm({
             Registra un cliente por pasos. Las direcciones de casa y trabajo deben confirmarse con
             la persona.
           </Text>
-          <Pressable onPress={() => setOpen(true)} style={styles.openButton}>
+          <Pressable
+            onPress={() => {
+              setMessage("");
+              setStep(1);
+              setOpen(true);
+            }}
+            style={styles.openButton}
+          >
             <Text style={styles.openButtonText}>Crear cliente</Text>
           </Pressable>
         </View>
@@ -220,189 +255,266 @@ export function BorrowerCreateForm({
                   <Text style={styles.closeButtonText}>Cerrar</Text>
                 </Pressable>
               </View>
-              <Text style={styles.help}>
-                Captura rápida con OCR asistivo en segundo plano. Las sugerencias requieren revisión
-                humana y las imágenes quedan privadas.
-              </Text>
-              <Text style={styles.label}>Nombre completo</Text>
-              <TextInput
-                onChangeText={setFullName}
-                placeholder="Nombre y apellidos"
-                placeholderTextColor="#77817a"
-                style={styles.input}
-                value={fullName}
-              />
-              <View style={styles.row}>
-                <View style={styles.half}>
-                  <Text style={styles.label}>Tipo</Text>
-                  <TextInput
-                    autoCapitalize="characters"
-                    maxLength={4}
-                    onChangeText={setDocumentType}
-                    style={styles.input}
-                    value={documentType}
-                  />
-                </View>
-                <View style={styles.half}>
-                  <Text style={styles.label}>Número de cédula</Text>
-                  <TextInput
-                    keyboardType="number-pad"
-                    onChangeText={setDocumentNumber}
-                    style={styles.input}
-                    value={documentNumber}
-                  />
-                </View>
+              <Text style={styles.stepIndicator}>Paso {step} de 4</Text>
+              <View style={styles.stepTrack}>
+                {[1, 2, 3, 4].map((item) => (
+                  <View key={item} style={[styles.stepDot, item <= step && styles.stepDotActive]} />
+                ))}
               </View>
-              <Text style={styles.label}>Celular</Text>
-              <TextInput
-                keyboardType="phone-pad"
-                onChangeText={setPhone}
-                placeholder="300 000 0000"
-                placeholderTextColor="#77817a"
-                style={styles.input}
-                value={phone}
-              />
-              <Text style={styles.label}>WhatsApp</Text>
-              <TextInput
-                keyboardType="phone-pad"
-                onChangeText={setWhatsappPhone}
-                placeholder="Número de WhatsApp"
-                placeholderTextColor="#77817a"
-                style={styles.input}
-                value={whatsappPhone}
-              />
-              <Text style={styles.label}>Dirección de casa</Text>
-              <TextInput
-                onChangeText={setHomeAddress}
-                placeholder="Dirección completa"
-                placeholderTextColor="#77817a"
-                style={styles.input}
-                value={homeAddress}
-              />
-              <Text style={styles.label}>Dirección de trabajo</Text>
-              <TextInput
-                onChangeText={setWorkAddress}
-                placeholder="Dirección completa"
-                placeholderTextColor="#77817a"
-                style={styles.input}
-                value={workAddress}
-              />
-              <Pressable
-                onPress={() => setHomeAddressConfirmed((current) => !current)}
-                style={styles.consentRow}
-              >
-                <Text style={styles.checkbox}>{homeAddressConfirmed ? "☑" : "☐"}</Text>
-                <Text style={styles.consentText}>
-                  Confirmo que la dirección de casa está completa y fue verificada con el cliente.
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setWorkAddressConfirmed((current) => !current)}
-                style={styles.consentRow}
-              >
-                <Text style={styles.checkbox}>{workAddressConfirmed ? "☑" : "☐"}</Text>
-                <Text style={styles.consentText}>
-                  Confirmo que la dirección de trabajo está completa y fue verificada con el
-                  cliente.
-                </Text>
-              </Pressable>
-              <Text style={styles.label}>Contacto de emergencia</Text>
-              <TextInput
-                onChangeText={setContactName}
-                placeholder="Nombre completo"
-                placeholderTextColor="#77817a"
-                style={styles.input}
-                value={contactName}
-              />
-              <TextInput
-                onChangeText={setContactRelationship}
-                placeholder="Relación"
-                placeholderTextColor="#77817a"
-                style={styles.input}
-                value={contactRelationship}
-              />
-              <TextInput
-                keyboardType="phone-pad"
-                onChangeText={setContactPhone}
-                placeholder="Celular"
-                placeholderTextColor="#77817a"
-                style={styles.input}
-                value={contactPhone}
-              />
-              <Pressable
-                onPress={() => setSecondContact((current) => !current)}
-                style={styles.toggle}
-              >
-                <Text style={styles.toggleText}>
-                  {secondContact ? "− Quitar segundo contacto" : "+ Agregar segundo contacto"}
-                </Text>
-              </Pressable>
-              {secondContact ? (
+              <Text style={styles.help}>
+                Captura rápida con OCR asistivo. Revisa cada dato antes de guardar; las imágenes y
+                las direcciones quedan privadas.
+              </Text>
+
+              {step === 1 ? (
                 <>
+                  <Text style={styles.sectionTitle}>Identidad</Text>
+                  <Text style={styles.label}>Nombre completo</Text>
                   <TextInput
-                    onChangeText={setSecondContactName}
-                    placeholder="Segundo contacto · nombre"
+                    onChangeText={setFullName}
+                    placeholder="Nombre y apellidos"
                     placeholderTextColor="#77817a"
                     style={styles.input}
-                    value={secondContactName}
+                    value={fullName}
                   />
-                  <TextInput
-                    onChangeText={setSecondContactRelationship}
-                    placeholder="Segundo contacto · relación"
-                    placeholderTextColor="#77817a"
-                    style={styles.input}
-                    value={secondContactRelationship}
+                  <View style={styles.row}>
+                    <View style={styles.half}>
+                      <Text style={styles.label}>Tipo</Text>
+                      <TextInput
+                        autoCapitalize="characters"
+                        maxLength={4}
+                        onChangeText={setDocumentType}
+                        style={styles.input}
+                        value={documentType}
+                      />
+                    </View>
+                    <View style={styles.half}>
+                      <Text style={styles.label}>Número de cédula</Text>
+                      <TextInput
+                        keyboardType="number-pad"
+                        onChangeText={setDocumentNumber}
+                        style={styles.input}
+                        value={documentNumber}
+                      />
+                    </View>
+                  </View>
+                  <Text style={styles.label}>Documentos privados</Text>
+                  <ImageButton
+                    label={
+                      identityFront ? `✓ Frente · ${identityFront.name}` : "Cargar cédula · frente"
+                    }
+                    onPress={() => void pickImage(setIdentityFront, "cedula-frente.jpg")}
                   />
-                  <TextInput
-                    keyboardType="phone-pad"
-                    onChangeText={setSecondContactPhone}
-                    placeholder="Segundo contacto · celular"
-                    placeholderTextColor="#77817a"
-                    style={styles.input}
-                    value={secondContactPhone}
+                  <ImageButton
+                    label={
+                      identityBack ? `✓ Reverso · ${identityBack.name}` : "Cargar cédula · reverso"
+                    }
+                    onPress={() => void pickImage(setIdentityBack, "cedula-reverso.jpg")}
+                  />
+                  <ImageButton
+                    label={
+                      profilePhoto
+                        ? `✓ Foto · ${profilePhoto.name}`
+                        : "Cargar foto designada de perfil"
+                    }
+                    onPress={() => void pickImage(setProfilePhoto, "foto-perfil.jpg")}
                   />
                 </>
               ) : null}
-              <Text style={styles.label}>Documentos privados</Text>
-              <ImageButton
-                label={
-                  identityFront ? `✓ Frente · ${identityFront.name}` : "Cargar cédula · frente"
-                }
-                onPress={() => void pickImage(setIdentityFront, "cedula-frente.jpg")}
-              />
-              <ImageButton
-                label={
-                  identityBack ? `✓ Reverso · ${identityBack.name}` : "Cargar cédula · reverso"
-                }
-                onPress={() => void pickImage(setIdentityBack, "cedula-reverso.jpg")}
-              />
-              <ImageButton
-                label={
-                  profilePhoto ? `✓ Foto · ${profilePhoto.name}` : "Cargar foto designada de perfil"
-                }
-                onPress={() => void pickImage(setProfilePhoto, "foto-perfil.jpg")}
-              />
-              <Pressable
-                onPress={() => setConsent((current) => !current)}
-                style={styles.consentRow}
-              >
-                <Text style={styles.checkbox}>{consent ? "☑" : "☐"}</Text>
-                <Text style={styles.consentText}>
-                  Confirmo que el cliente autorizó el registro de sus datos y documentos.
-                </Text>
-              </Pressable>
+
+              {step === 2 ? (
+                <>
+                  <Text style={styles.sectionTitle}>Contacto y direcciones</Text>
+                  <Text style={styles.label}>Celular</Text>
+                  <TextInput
+                    keyboardType="phone-pad"
+                    onChangeText={setPhone}
+                    placeholder="300 000 0000"
+                    placeholderTextColor="#77817a"
+                    style={styles.input}
+                    value={phone}
+                  />
+                  <Text style={styles.label}>WhatsApp</Text>
+                  <TextInput
+                    keyboardType="phone-pad"
+                    onChangeText={setWhatsappPhone}
+                    placeholder="Número de WhatsApp"
+                    placeholderTextColor="#77817a"
+                    style={styles.input}
+                    value={whatsappPhone}
+                  />
+                  <Text style={styles.label}>Dirección de casa</Text>
+                  <TextInput
+                    onChangeText={setHomeAddress}
+                    placeholder="Dirección completa, barrio y ciudad"
+                    placeholderTextColor="#77817a"
+                    style={styles.input}
+                    value={homeAddress}
+                  />
+                  <Pressable
+                    onPress={() => setHomeAddressConfirmed((current) => !current)}
+                    style={styles.consentRow}
+                  >
+                    <Text style={styles.checkbox}>{homeAddressConfirmed ? "☑" : "☐"}</Text>
+                    <Text style={styles.consentText}>
+                      Confirmo que la dirección de casa está completa y fue verificada con el
+                      cliente.
+                    </Text>
+                  </Pressable>
+                  <Text style={styles.label}>Dirección de trabajo</Text>
+                  <TextInput
+                    onChangeText={setWorkAddress}
+                    placeholder="Dirección completa, barrio y ciudad"
+                    placeholderTextColor="#77817a"
+                    style={styles.input}
+                    value={workAddress}
+                  />
+                  <Pressable
+                    onPress={() => setWorkAddressConfirmed((current) => !current)}
+                    style={styles.consentRow}
+                  >
+                    <Text style={styles.checkbox}>{workAddressConfirmed ? "☑" : "☐"}</Text>
+                    <Text style={styles.consentText}>
+                      Confirmo que la dirección de trabajo está completa y fue verificada con el
+                      cliente.
+                    </Text>
+                  </Pressable>
+                  <Text style={styles.addressHint}>
+                    Guarda ambas direcciones tal como las confirmó el cliente. Luego podrás
+                    ubicarlas en el mapa para las rutas.
+                  </Text>
+                </>
+              ) : null}
+
+              {step === 3 ? (
+                <>
+                  <Text style={styles.sectionTitle}>Referencias y autorización</Text>
+                  <Text style={styles.label}>Contacto de emergencia</Text>
+                  <TextInput
+                    onChangeText={setContactName}
+                    placeholder="Nombre completo"
+                    placeholderTextColor="#77817a"
+                    style={styles.input}
+                    value={contactName}
+                  />
+                  <TextInput
+                    onChangeText={setContactRelationship}
+                    placeholder="Relación"
+                    placeholderTextColor="#77817a"
+                    style={styles.input}
+                    value={contactRelationship}
+                  />
+                  <TextInput
+                    keyboardType="phone-pad"
+                    onChangeText={setContactPhone}
+                    placeholder="Celular"
+                    placeholderTextColor="#77817a"
+                    style={styles.input}
+                    value={contactPhone}
+                  />
+                  <Pressable
+                    onPress={() => setSecondContact((current) => !current)}
+                    style={styles.toggle}
+                  >
+                    <Text style={styles.toggleText}>
+                      {secondContact ? "− Quitar segundo contacto" : "+ Agregar segundo contacto"}
+                    </Text>
+                  </Pressable>
+                  {secondContact ? (
+                    <>
+                      <TextInput
+                        onChangeText={setSecondContactName}
+                        placeholder="Segundo contacto · nombre"
+                        placeholderTextColor="#77817a"
+                        style={styles.input}
+                        value={secondContactName}
+                      />
+                      <TextInput
+                        onChangeText={setSecondContactRelationship}
+                        placeholder="Segundo contacto · relación"
+                        placeholderTextColor="#77817a"
+                        style={styles.input}
+                        value={secondContactRelationship}
+                      />
+                      <TextInput
+                        keyboardType="phone-pad"
+                        onChangeText={setSecondContactPhone}
+                        placeholder="Segundo contacto · celular"
+                        placeholderTextColor="#77817a"
+                        style={styles.input}
+                        value={secondContactPhone}
+                      />
+                    </>
+                  ) : null}
+                  <Pressable
+                    onPress={() => setConsent((current) => !current)}
+                    style={styles.consentRow}
+                  >
+                    <Text style={styles.checkbox}>{consent ? "☑" : "☐"}</Text>
+                    <Text style={styles.consentText}>
+                      Confirmo que el cliente autorizó el registro de sus datos y documentos.
+                    </Text>
+                  </Pressable>
+                </>
+              ) : null}
+
+              {step === 4 ? (
+                <>
+                  <Text style={styles.sectionTitle}>Revisa antes de guardar</Text>
+                  <View style={styles.reviewBox}>
+                    <Text style={styles.reviewText}>Cliente: {fullName || "Sin nombre"}</Text>
+                    <Text style={styles.reviewText}>
+                      Cédula: {documentType.toUpperCase()} {documentNumber || "Sin número"}
+                    </Text>
+                    <Text style={styles.reviewText}>Celular: {phone || "Sin registrar"}</Text>
+                    <Text style={styles.reviewText}>
+                      WhatsApp: {whatsappPhone || "Sin registrar"}
+                    </Text>
+                    <Text style={styles.reviewText}>Casa: {homeAddress || "Sin registrar"}</Text>
+                    <Text style={styles.reviewText}>Trabajo: {workAddress || "Sin registrar"}</Text>
+                    <Text style={styles.reviewText}>
+                      Referencias: {secondContact ? "2" : "1"} · Documentos: 3
+                    </Text>
+                  </View>
+                  <Text style={styles.addressHint}>
+                    Las direcciones se guardarán con la confirmación del cliente y quedarán listas
+                    para geocodificación y rutas.
+                  </Text>
+                </>
+              ) : null}
+
               {message ? (
                 <Text accessibilityRole="alert" style={styles.message}>
                   {message}
                 </Text>
               ) : null}
-              <Pressable
-                disabled={busy}
-                onPress={() => void submit()}
-                style={[styles.submit, busy && styles.disabled]}
-              >
-                <Text style={styles.submitText}>{busy ? "Guardando…" : "Crear cliente"}</Text>
-              </Pressable>
+              <View style={styles.stepActions}>
+                {step > 1 ? (
+                  <Pressable
+                    disabled={busy}
+                    onPress={() => {
+                      setMessage("");
+                      setStep((current) => Math.max(1, current - 1));
+                    }}
+                    style={styles.backButton}
+                  >
+                    <Text style={styles.backButtonText}>Atrás</Text>
+                  </Pressable>
+                ) : null}
+                {step < 4 ? (
+                  <Pressable disabled={busy} onPress={nextStep} style={styles.submit}>
+                    <Text style={styles.submitText}>Continuar</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    disabled={busy}
+                    onPress={() => void submit()}
+                    style={[styles.submit, busy && styles.disabled]}
+                  >
+                    <Text style={styles.submitText}>{busy ? "Guardando…" : "Crear cliente"}</Text>
+                  </Pressable>
+                )}
+              </View>
             </View>
           </ScrollView>
         </View>
@@ -442,6 +554,26 @@ const styles = {
   },
   closeButton: { paddingHorizontal: 10, paddingVertical: 8 },
   closeButtonText: { color: "#fbbf24", fontWeight: "800" as const, fontSize: 13 },
+  stepIndicator: { color: "#fbbf24", fontSize: 12, fontWeight: "800" as const },
+  stepTrack: { flexDirection: "row" as const, gap: 6, marginBottom: 2 },
+  stepDot: {
+    flex: 1,
+    height: 4,
+    borderRadius: 4,
+    backgroundColor: "#414a44",
+  },
+  stepDotActive: { backgroundColor: "#fbbf24" },
+  sectionTitle: { color: "#eef2ee", fontWeight: "800" as const, fontSize: 16, marginTop: 4 },
+  addressHint: { color: "#99a39c", fontSize: 12, lineHeight: 18 },
+  reviewBox: {
+    gap: 6,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "#151817",
+    borderWidth: 1,
+    borderColor: "#414a44",
+  },
+  reviewText: { color: "#dce2dd", fontSize: 14, lineHeight: 20 },
   openButton: {
     minHeight: 48,
     borderRadius: 12,
@@ -486,6 +618,7 @@ const styles = {
   consentText: { flex: 1, color: "#b9c1bb", fontSize: 13, lineHeight: 19 },
   message: { color: "#ffbf75", fontSize: 14, lineHeight: 20 },
   submit: {
+    flex: 1,
     minHeight: 52,
     borderRadius: 14,
     backgroundColor: "#fbbf24",
@@ -494,5 +627,16 @@ const styles = {
     marginTop: 4,
   },
   submitText: { color: "#151817", fontWeight: "800" as const, fontSize: 16 },
+  stepActions: { flexDirection: "row" as const, gap: 8, marginTop: 4 },
+  backButton: {
+    minHeight: 52,
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#59645c",
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  backButtonText: { color: "#dce2dd", fontWeight: "800" as const, fontSize: 15 },
   disabled: { opacity: 0.5 },
 };
