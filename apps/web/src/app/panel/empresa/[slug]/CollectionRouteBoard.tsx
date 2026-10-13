@@ -26,17 +26,17 @@ async function errorMessage(response: Response | null, fallback: string) {
 }
 
 export function CollectionRouteBoard({
-  branches,
   borrowers,
   canManage,
   collectors,
+  onChanged,
   routes,
   tenantId,
 }: {
-  branches: TenantOverview["branches"];
   borrowers: Borrower[];
   canManage: boolean;
   collectors: TenantOverview["members"];
+  onChanged?: () => void;
   routes: Route[];
   tenantId: string;
 }) {
@@ -47,6 +47,11 @@ export function CollectionRouteBoard({
   const [isBusy, setIsBusy] = useState(false);
   const [assignmentBusyRouteId, setAssignmentBusyRouteId] = useState<string | null>(null);
   const [selectedRouteId, setSelectedRouteId] = useState(routes[0]?.id ?? "");
+
+  function refreshData() {
+    if (onChanged) onChanged();
+    else router.refresh();
+  }
 
   async function createRoute(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -74,7 +79,7 @@ export function CollectionRouteBoard({
     event.currentTarget.reset();
     setMessage("Ruta creada como borrador. Agrega sus paradas antes de activarla.");
     setIsBusy(false);
-    router.refresh();
+    refreshData();
   }
 
   async function addStop(event: FormEvent<HTMLFormElement>) {
@@ -107,7 +112,7 @@ export function CollectionRouteBoard({
     event.currentTarget.reset();
     setMessage("Cliente agregado a la ruta.");
     setIsBusy(false);
-    router.refresh();
+    refreshData();
   }
 
   async function updateStatus(route: Route, status: "active" | "archived") {
@@ -134,7 +139,7 @@ export function CollectionRouteBoard({
     }
     setMessage(status === "active" ? "Ruta activada." : "Ruta archivada.");
     setIsBusy(false);
-    router.refresh();
+    refreshData();
   }
 
   async function assignCollector(event: FormEvent<HTMLFormElement>, route: Route) {
@@ -160,7 +165,7 @@ export function CollectionRouteBoard({
     }
     setMessage(collectorId ? "Cobrador asignado a la ruta." : "Asignación retirada.");
     setAssignmentBusyRouteId(null);
-    router.refresh();
+    refreshData();
   }
 
   async function reorderStops(route: Route, index: number, direction: -1 | 1) {
@@ -187,7 +192,7 @@ export function CollectionRouteBoard({
     }
     setMessage("Orden de paradas actualizado.");
     setIsBusy(false);
-    router.refresh();
+    refreshData();
   }
 
   async function updateStopVisit(
@@ -216,7 +221,7 @@ export function CollectionRouteBoard({
       status === "visited" ? "Visita marcada como realizada." : "Estado de visita actualizado.",
     );
     setIsBusy(false);
-    router.refresh();
+    refreshData();
   }
 
   async function optimizeRoute(route: Route) {
@@ -241,7 +246,7 @@ export function CollectionRouteBoard({
     }
     setMessage("Ruta ordenada por cercanía.");
     setIsBusy(false);
-    router.refresh();
+    refreshData();
   }
 
   return (
@@ -265,9 +270,7 @@ export function CollectionRouteBoard({
               <div className="route-board-item-heading">
                 <div>
                   <strong>{route.name}</strong>
-                  <small>
-                    {route.branchName ?? "Sin sede"} · {route.stops.length} parada(s)
-                  </small>
+                  <small>{route.stops.length} parada(s)</small>
                   <small>
                     {route.assignedCollectorName
                       ? `Cobrador: ${route.assignedCollectorName}`
@@ -454,17 +457,6 @@ export function CollectionRouteBoard({
               name="description"
               placeholder="Zona y horario"
             />
-            <label htmlFor="route-branch">Sede</label>
-            <select defaultValue="" id="route-branch" name="branchId">
-              <option value="">Sin sede asignada</option>
-              {branches
-                .filter((branch) => branch.status === "active")
-                .map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.displayName}
-                  </option>
-                ))}
-            </select>
             <button disabled={isBusy} type="submit">
               {isBusy ? "Guardando…" : "Crear borrador"}
             </button>

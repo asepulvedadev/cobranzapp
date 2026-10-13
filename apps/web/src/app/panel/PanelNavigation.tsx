@@ -3,6 +3,7 @@
 import {
   Buildings,
   Gauge,
+  MapPin,
   Pulse,
   ShieldCheck,
   SlidersHorizontal,
@@ -86,6 +87,9 @@ export function PanelNavigation({
     { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },
     { href: `${effectiveDashboardHref}/equipo`, label: "Personal", icon: UsersThree },
     { href: `${effectiveDashboardHref}/clientes`, label: "Clientes", icon: Buildings },
+    ...(currentMembership && ["owner", "supervisor", "collector"].includes(currentMembership.role)
+      ? [{ href: `${effectiveDashboardHref}/rutas`, label: "Rutas", icon: MapPin }]
+      : []),
     ...(currentMembership && ["owner", "supervisor", "collector"].includes(currentMembership.role)
       ? [
           {

@@ -40,6 +40,8 @@ guardan direcciones y coordenadas, pero Waze sigue siendo la navegación final.
 - La creación exige confirmar por separado que casa y trabajo fueron verificadas con el cliente;
   cada confirmación queda fechada y asociada al usuario que la hizo.
 - El tablero muestra la dirección y un enlace Waze por parada.
+- La vista independiente **Rutas** está enlazada desde el sidebar para propietarios,
+  supervisores y cobradores; carga clientes y rutas después de la reautenticación necesaria.
 - Se puede asignar la ruta a un cobrador y activar/archivar la ruta.
 - Se puede reordenar manualmente cada parada con controles subir/bajar.
 - Se puede marcar cada parada como pendiente, realizada u omitida, con auditoría.
@@ -69,3 +71,4 @@ guardan direcciones y coordenadas, pero Waze sigue siendo la navegación final.
 - Un usuario puede corregir antes de guardar.
 - Una parada abre Waze en móvil y web.
 - La ruta conserva el orden y el responsable incluso si Waze no está instalado.
+- Si se corrige una dirección, sus coordenadas anteriores se invalidan antes de volver a ubicarla.

@@ -2181,7 +2181,7 @@ export function buildApp(dependencies: AppDependencies) {
         reply,
         400,
         "INVALID_ROUTE",
-        "Revisa el nombre y la sucursal de la ruta.",
+        "Revisa el nombre y la descripción de la ruta.",
         request.id,
       );
     }

@@ -91,7 +91,8 @@ de consentimiento y los archivos de frente, reverso y foto designada de perfil. 
 en reposo y se busca mediante HMAC con alcance de tenant; las respuestas solo muestran los últimos
 cuatro dígitos. La captura crea primero el expediente y luego carga cada archivo al prefijo privado
 del cliente; si una carga falla, la ficha queda disponible para reintento y nunca se presenta como
-identidad revisada. Esta etapa no hace OCR ni afirma autenticidad documental.
+identidad revisada. El OCR asistivo descrito más abajo no afirma autenticidad documental ni
+reemplaza esta revisión humana.
 
 La revisión manual ya cuenta con un historial append-only por cliente. Propietario o supervisor
 deben confirmar por separado el nombre, frente, reverso y foto designada antes de marcar la

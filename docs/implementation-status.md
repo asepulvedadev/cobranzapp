@@ -7,14 +7,14 @@
 | Bloque | Estado | Evidencia |
 |---|---|---|
 | Plataforma y autenticación | Completado | Inicio por usuario o correo, sesiones HttpOnly, cambio obligatorio de contraseña inicial, MFA y reautenticación |
-| Multitenencia | Completado | Empresas, membresías, roles, sedes, equipos, invitaciones, RLS y claves compuestas por empresa |
+| Multitenencia | Completado | Empresas, membresías, roles, RLS y claves compuestas por empresa; la operación del propietario se presenta como una empresa con empleados, sin sedes ni equipos en el flujo principal |
 | Alta comercial | Completado | El desarrollador registra propietarios, emite códigos únicos por suscripción y cada propietario crea varias empresas desde su panel |
 | Consola de desarrollador | Completado | Directorios paginados, registro de propietarios, emisión de códigos, planes, cupos, estados, actividad, estado técnico y soporte temporal auditado |
 | Expediente de cliente | Completado | Identidad manual, teléfonos, direcciones, contactos de emergencia, foto designada y documentos privados |
 | OCR asistivo de documentos | Completado con revisión humana | Tesseract en el worker, imágenes/PDF privados, sugerencias cifradas, reintento y confirmación auditada |
 | Personal operativo | Completado | Perfil de supervisores y cobradores, identidad cifrada, últimos cuatro dígitos, tipo de sangre con consentimiento y documentos privados |
 | Verificación compartida | Completado con activación controlada | Consentimiento, propósito, vencimiento, consulta mínima, nombre, créditos vigentes y calificación derivada de pagos; correcciones, disputas y auditoría; no es lista negra |
-| Rutas de cobranza | Completado | Plantillas, geocodificación bajo demanda, optimización por cercanía, visitas auditadas y asignación por empresa |
+| Rutas de cobranza | Completado | Vista independiente en sidebar, direcciones geocodificadas bajo demanda, Waze, optimización por cercanía, visitas auditadas y asignación por empresa |
 | Originación operativa protegida | Completado como piloto | Catálogo configurable, reglas de monto/interés, frecuencias y plazos de un mes/5 semanas, calendario determinista, renovación desde la segunda cuota y marcadores de cuotas; no aprueba contabilidad, desembolsa ni registra recibos financieros |
 | Entrega VPS | Completado para el entorno actual | Imágenes inmutables transferidas por SSH, orden estricto de despliegue, health/readiness, Caddy y roles PostgreSQL separados |
 
