@@ -196,6 +196,11 @@ export default async function TenantDashboard({
           <strong>{overview.metrics.creditApplicationsInReview ?? 0}</strong>
           <small>Requieren seguimiento del equipo</small>
         </article>
+        <article>
+          <span>Cuotas vencidas</span>
+          <strong>{overview.metrics.overdueInstallments ?? 0}</strong>
+          <small>Proyección operativa, no saldo contable</small>
+        </article>
       </section>
 
       <div className="dashboard-columns">

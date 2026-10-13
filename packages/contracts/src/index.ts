@@ -450,6 +450,7 @@ export const tenantOverviewSchema = z.object({
     /** Operational credit counters; they never represent accounting balances. */
     activeCredits: z.number().int().nonnegative().optional(),
     creditApplicationsInReview: z.number().int().nonnegative().optional(),
+    overdueInstallments: z.number().int().nonnegative().optional(),
   }),
   membershipEntitlement: membershipEntitlementSchema
     .extend({ availableEmployeeSeats: z.number().int().nonnegative() })

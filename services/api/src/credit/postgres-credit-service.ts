@@ -2,6 +2,7 @@ import type { LoanApplication, LoanProduct } from "@cobranzapp/contracts";
 import { buildSchedulePreview } from "@cobranzapp/financial";
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
+import { operationalPaymentState } from "./operational-schedule.js";
 import type {
   CreditService,
   LoanApplicationResult,
@@ -86,7 +87,13 @@ function mapProduct(row: LoanProductRow): LoanProduct {
 }
 
 function mapApplication(row: LoanApplicationRow): LoanApplication {
-  const operationalState = operationalPaymentState(row);
+  const operationalState = operationalPaymentState({
+    status: row.status,
+    paymentFrequency: row.payment_frequency,
+    requestedTermCount: row.requested_term_count,
+    paidInstallments: row.paid_installments,
+    createdAt: row.created_at,
+  });
   return {
     id: row.id,
     borrowerId: row.borrower_id,
@@ -121,52 +128,6 @@ function parseCents(value: string) {
 
 function formatCents(value: bigint) {
   return `${value / 100n}.${(value % 100n).toString().padStart(2, "0")}`;
-}
-
-function addMonths(date: Date, months: number) {
-  const result = new Date(date.getTime());
-  const originalDay = result.getUTCDate();
-  result.setUTCDate(1);
-  result.setUTCMonth(result.getUTCMonth() + months);
-  const lastDay = new Date(
-    Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0),
-  ).getUTCDate();
-  result.setUTCDate(Math.min(originalDay, lastDay));
-  return result;
-}
-
-function dueDateFor(
-  startDate: Date,
-  frequency: LoanApplication["paymentFrequency"],
-  period: number,
-) {
-  const result = new Date(startDate.getTime());
-  if (frequency === "daily") result.setUTCDate(result.getUTCDate() + period);
-  if (frequency === "weekly") result.setUTCDate(result.getUTCDate() + period * 7);
-  if (frequency === "fortnightly") result.setUTCDate(result.getUTCDate() + period * 14);
-  if (frequency === "monthly") return addMonths(startDate, period);
-  return result;
-}
-
-function operationalPaymentState(row: LoanApplicationRow) {
-  if (row.status !== "active" || row.paid_installments >= row.requested_term_count) {
-    return { nextDueDate: null, overdueInstallments: 0 };
-  }
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  const nextPeriod = row.paid_installments + 1;
-  let overdueInstallments = 0;
-  for (let period = nextPeriod; period <= row.requested_term_count; period += 1) {
-    if (dueDateFor(row.created_at, row.payment_frequency, period).getTime() < today.getTime()) {
-      overdueInstallments += 1;
-    }
-  }
-  return {
-    nextDueDate: dueDateFor(row.created_at, row.payment_frequency, nextPeriod)
-      .toISOString()
-      .slice(0, 10),
-    overdueInstallments,
-  };
 }
 
 async function setActorContext(client: PoolClient, actor: TenantActor, tenantId: string) {

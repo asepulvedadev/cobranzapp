@@ -8,6 +8,7 @@ import {
   encryptBorrowerDocumentNumber,
   normalizeBorrowerDocumentNumber,
 } from "../borrowers/identity.js";
+import { operationalPaymentState } from "../credit/operational-schedule.js";
 import { buildMembershipEntitlement, membershipCatalog } from "../memberships/catalog.js";
 import type {
   InvitationAcceptanceResult,
@@ -535,6 +536,29 @@ export function createPostgresTenancyService(
                 WHERE tenant_id = $1 AND status IN ('submitted', 'under_review')) AS credit_applications_in_review`,
           [tenantId],
         );
+        const activeCreditRows = await client.query<{
+          payment_frequency: "daily" | "weekly" | "fortnightly" | "monthly";
+          requested_term_count: number;
+          paid_installments: number;
+          created_at: Date;
+        }>(
+          `SELECT payment_frequency, requested_term_count, paid_installments, created_at
+             FROM loan_applications
+            WHERE tenant_id = $1 AND status = 'active'`,
+          [tenantId],
+        );
+        const overdueInstallments = activeCreditRows.rows.reduce(
+          (total, row) =>
+            total +
+            operationalPaymentState({
+              status: "active",
+              paymentFrequency: row.payment_frequency,
+              requestedTermCount: row.requested_term_count,
+              paidInstallments: row.paid_installments,
+              createdAt: row.created_at,
+            }).overdueInstallments,
+          0,
+        );
         const settings = await client.query<{
           primary_color: string;
           accent_color: string;
@@ -697,6 +721,7 @@ export function createPostgresTenancyService(
             activeEmployeeSeats: maySeeOrganization ? activeEmployeeSeats : 0,
             activeCredits: Number(counts?.active_credits ?? 0),
             creditApplicationsInReview: Number(counts?.credit_applications_in_review ?? 0),
+            overdueInstallments,
           },
           membershipEntitlement: entitlement
             ? {

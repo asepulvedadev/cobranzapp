@@ -15,7 +15,7 @@
 | Personal operativo | Completado | Perfil de supervisores y cobradores, identidad cifrada, últimos cuatro dígitos, tipo de sangre con consentimiento y documentos privados; propietarios pueden crear empleados desde un modal con usuario/teléfono/clave y toda edición de perfil se abre en una ventana independiente |
 | Verificación compartida | Completado con activación controlada | Vista independiente para propietario, supervisor y cobrador con búsqueda simple por cédula; exige confirmar que el cliente autorizó la consulta y deja esa confirmación en auditoría; devuelve únicamente nombre, créditos vigentes, calificación derivada de pagos y reporte negativo; la red consentida avanzada, correcciones, disputas y auditoría permanecen controladas; no es lista negra |
 | Rutas de cobranza | Completado | Vista independiente en sidebar, direcciones geocodificadas bajo demanda, Waze, optimización por cercanía, visitas auditadas y asignación por empresa; móvil puede ubicar casa/trabajo desde el expediente |
-| Originación operativa protegida | Completado como piloto | Catálogo configurable en vista independiente de Créditos, reglas de monto/interés desde modales, frecuencias y plazos de un mes/5 semanas, calendario determinista, próxima cuota y cuotas vencidas como proyección operativa, renovación desde la segunda cuota y marcadores de cuotas; el inicio muestra créditos activos y solicitudes en revisión; disponible en web y móvil; los créditos piloto se activan operacionalmente sin registrar dinero; no aprueba contabilidad, desembolsa ni registra recibos financieros |
+| Originación operativa protegida | Completado como piloto | Catálogo configurable en vista independiente de Créditos, reglas de monto/interés desde modales, frecuencias y plazos de un mes/5 semanas, calendario determinista, próxima cuota y cuotas vencidas como proyección operativa, renovación desde la segunda cuota y marcadores de cuotas; el inicio muestra créditos activos, solicitudes en revisión y cuotas vencidas acumuladas; disponible en web y móvil; los créditos piloto se activan operacionalmente sin registrar dinero; no aprueba contabilidad, desembolsa ni registra recibos financieros |
 | Entrega VPS | Completado para el entorno actual | Imágenes inmutables transferidas por SSH, orden estricto de despliegue, health/readiness, Caddy, roles PostgreSQL separados, timer diario de respaldo local y verificación mensual de restauración aislada |
 
 ## Bloques deliberadamente protegidos
@@ -38,7 +38,7 @@ La proyección configurable ya está disponible para comparar escenarios, pero n
 - Financiero: 8 pruebas aprobadas.
 - Worker: 2 pruebas aprobadas y 5 omitidas cuando no hay PostgreSQL de CI.
 - Web: 42 pruebas aprobadas.
-- API: 99 pruebas aprobadas y 2 suites de integración omitidas cuando no hay PostgreSQL de CI.
+- API: 102 pruebas aprobadas y 2 suites de integración omitidas cuando no hay PostgreSQL de CI.
 - Integración PostgreSQL de aislamiento: 1 escenario aprobado localmente con las migraciones completas; CI lo omite cuando no hay `TEST_DATABASE_URL`.
 - Producción: `https://cobranzaap.tech/api/health` responde con la versión desplegada y los servicios API, web, worker y PostgreSQL están activos.
 
