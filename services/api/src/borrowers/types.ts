@@ -82,7 +82,8 @@ export type BorrowerAddressUpdateInput = BorrowerAddressUpdateRequest & { reques
 export type BorrowerAddressUpdateResult =
   | { status: "updated"; borrower: Borrower }
   | { status: "not_found" }
-  | { status: "forbidden" };
+  | { status: "forbidden" }
+  | { status: "addresses_unconfirmed" };
 
 export type SharedClientVerification = {
   registered: boolean;

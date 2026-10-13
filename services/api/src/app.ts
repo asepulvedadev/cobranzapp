@@ -2889,6 +2889,15 @@ export function buildApp(dependencies: AppDependencies) {
           request.id,
         );
       }
+      if (result.status === "addresses_unconfirmed") {
+        return sendError(
+          reply,
+          400,
+          "BORROWER_ADDRESSES_UNCONFIRMED",
+          "Confirma con el cliente las direcciones completas de casa y trabajo antes de guardar.",
+          request.id,
+        );
+      }
       return reply.send({ borrower: result.borrower });
     } catch (error) {
       if (error instanceof Error && error.message === "INVALID_BORROWER_ADDRESS") {

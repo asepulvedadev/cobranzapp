@@ -643,6 +643,36 @@ describe("borrower creation security", () => {
     );
   });
 
+  it("maps a service-level address confirmation rejection", async () => {
+    const updateAddresses = vi.fn(async () => ({ status: "addresses_unconfirmed" as const }));
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => tenantOwner) },
+        borrowerService: { updateAddresses } as unknown as BorrowerService,
+      }),
+    );
+    apps.push(app);
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/v1/tenants/${tenantOwner.memberships[0]?.tenantId}/borrowers/193a2db4-2349-4a48-8833-746a2a334260/addresses`,
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+      },
+      payload: {
+        homeAddress: "Calle 10 # 20-30, Bogotá",
+        workAddress: "Carrera 7 # 80-10, Bogotá",
+        homeAddressConfirmed: true,
+        workAddressConfirmed: true,
+      },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: { code: "BORROWER_ADDRESSES_UNCONFIRMED" },
+    });
+    expect(updateAddresses).toHaveBeenCalled();
+  });
+
   it("does not geocode an address that has not been confirmed", async () => {
     const geocodeAddress = vi.fn(async () => ({ status: "unconfirmed" as const }));
     const app = buildApp(

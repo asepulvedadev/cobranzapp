@@ -42,9 +42,9 @@ La proyección configurable ya está disponible para comparar escenarios, pero n
 - Contratos: 38 pruebas aprobadas.
 - Financiero: 8 pruebas aprobadas.
 - Worker: 2 pruebas aprobadas y 5 omitidas cuando no hay PostgreSQL de CI.
-- Web: 45 pruebas aprobadas.
+- Web: 47 pruebas aprobadas.
 - Móvil: 4 pruebas aprobadas.
-- API: 105 pruebas aprobadas y 2 suites de integración omitidas cuando no hay PostgreSQL de CI.
+- API: 106 pruebas aprobadas y 2 suites de integración omitidas cuando no hay PostgreSQL de CI.
 - Integración PostgreSQL de aislamiento: 1 escenario aprobado localmente con las migraciones completas; CI lo omite cuando no hay `TEST_DATABASE_URL`.
 - Producción: `https://cobranzaap.tech/api/health` responde con la versión desplegada y los servicios API, web, worker y PostgreSQL están activos.
 

@@ -1218,6 +1218,12 @@ export function createPostgresBorrowerService(
       if (!actor.tenantRole || !["owner", "supervisor", "collector"].includes(actor.tenantRole)) {
         return { status: "forbidden" };
       }
+      // Keep the confirmation invariant at the service boundary as well as in
+      // the HTTP schema. Background jobs and future callers must not be able
+      // to persist an address that the client has not confirmed.
+      if (input.homeAddressConfirmed !== true || input.workAddressConfirmed !== true) {
+        return { status: "addresses_unconfirmed" };
+      }
       const homeAddress = normalizeBorrowerAddress(input.homeAddress);
       const workAddress = normalizeBorrowerAddress(input.workAddress);
       return withTransaction(actor, tenantId, async (client) => {
