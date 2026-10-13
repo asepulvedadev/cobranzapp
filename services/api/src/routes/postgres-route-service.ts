@@ -5,6 +5,7 @@ import type {
   RouteStatusUpdateRequest,
   RouteStopCreateRequest,
   RouteStopReorderRequest,
+  RouteStopVisitRequest,
 } from "@cobranzapp/contracts";
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
@@ -14,6 +15,7 @@ import type {
   RouteService,
   RouteStopReorderResult,
   RouteStopResult,
+  RouteStopVisitResult,
 } from "./types.js";
 
 type RouteRow = {
@@ -36,6 +38,9 @@ type StopRow = {
   address_kind: Route["stops"][number]["addressKind"];
   address: string;
   position: number;
+  visit_status: Route["stops"][number]["visitStatus"];
+  visited_at: Date | null;
+  visit_notes: string | null;
 };
 
 function canManage(actor: TenantActor) {
@@ -80,7 +85,7 @@ async function loadRoute(client: Pick<PoolClient, "query">, tenantId: string, ro
     `SELECT stop.id, stop.borrower_id, borrower.full_name AS borrower_name,
             stop.address_kind,
             CASE stop.address_kind WHEN 'home' THEN borrower.home_address ELSE borrower.work_address END AS address,
-            stop.position
+            stop.position, stop.visit_status, stop.visited_at, stop.visit_notes
        FROM collection_route_stops stop
        JOIN borrowers borrower
          ON borrower.tenant_id = stop.tenant_id AND borrower.id = stop.borrower_id
@@ -104,6 +109,9 @@ async function loadRoute(client: Pick<PoolClient, "query">, tenantId: string, ro
       addressKind: stop.address_kind,
       address: stop.address,
       position: stop.position,
+      visitStatus: stop.visit_status,
+      visitedAt: stop.visited_at?.toISOString() ?? null,
+      visitNotes: stop.visit_notes,
     })),
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
@@ -287,6 +295,70 @@ export function createPostgresRouteService(pool: Pool): RouteService {
             routeId,
             input.requestId,
             JSON.stringify({ stopIds: input.stopIds }),
+          ],
+        );
+        const updated = await loadRoute(client, tenantId, routeId);
+        return updated ? { status: "updated", route: updated } : { status: "not_found" };
+      });
+    },
+
+    async updateStopVisit(
+      actor,
+      tenantId,
+      routeId,
+      stopId,
+      input: RouteStopVisitRequest & { requestId: string },
+    ): Promise<RouteStopVisitResult> {
+      if (!canRead(actor)) return { status: "forbidden" };
+      return withTransaction(actor, tenantId, async (client) => {
+        const routeResult = await client.query<{
+          id: string;
+          assigned_collector_id: string | null;
+        }>(
+          `SELECT id, assigned_collector_id
+             FROM collection_routes
+            WHERE tenant_id = $1 AND id = $2
+            FOR UPDATE`,
+          [tenantId, routeId],
+        );
+        const route = routeResult.rows[0];
+        if (!route) return { status: "not_found" };
+        if (actor.tenantRole === "collector" && route.assigned_collector_id !== actor.userId) {
+          return { status: "forbidden" };
+        }
+        const stop = await client.query<{ id: string }>(
+          `SELECT id
+             FROM collection_route_stops
+            WHERE tenant_id = $1 AND route_id = $2 AND id = $3
+            FOR UPDATE`,
+          [tenantId, routeId, stopId],
+        );
+        if (!stop.rows[0]) return { status: "not_found" };
+        const notes = input.notes?.trim() || null;
+        await client.query(
+          `UPDATE collection_route_stops
+              SET visit_status = $4,
+                  visited_at = CASE WHEN $4 = 'pending' THEN NULL ELSE now() END,
+                  visited_by = CASE WHEN $4 = 'pending' THEN NULL ELSE $5 END,
+                  visit_notes = $6,
+                  updated_at = now()
+            WHERE tenant_id = $1 AND route_id = $2 AND id = $3`,
+          [tenantId, routeId, stopId, input.status, actor.userId, notes],
+        );
+        await client.query(
+          `UPDATE collection_routes SET updated_at = now() WHERE tenant_id = $1 AND id = $2`,
+          [tenantId, routeId],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'collection_route.stop_visit_updated', 'collection_route_stop', $3, $4, $5::jsonb)`,
+          [
+            tenantId,
+            actor.userId,
+            stopId,
+            input.requestId,
+            JSON.stringify({ routeId, status: input.status, hasNotes: Boolean(notes) }),
           ],
         );
         const updated = await loadRoute(client, tenantId, routeId);

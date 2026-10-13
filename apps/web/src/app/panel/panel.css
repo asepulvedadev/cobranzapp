@@ -2151,6 +2151,35 @@ html:has(.panel-shell) {
   font-weight: 700;
 }
 
+.route-visit-status {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 5px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-line) 60%, transparent);
+  color: var(--panel-ink-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.route-visit-visited {
+  background: #d9f7e6;
+  color: #17663a;
+}
+
+.route-visit-skipped {
+  background: #fff0d7;
+  color: #8b5b00;
+}
+
+.route-stop-visit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
 .route-stop-order-actions {
   display: inline-flex;
   gap: 4px;

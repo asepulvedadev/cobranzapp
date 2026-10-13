@@ -187,6 +187,35 @@ export function CollectionRouteBoard({
     router.refresh();
   }
 
+  async function updateStopVisit(
+    route: Route,
+    stopId: string,
+    status: "pending" | "visited" | "skipped",
+  ) {
+    setIsBusy(true);
+    setMessage("");
+    setIsError(false);
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/routes/${route.id}/stops/${stopId}/visit`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status }),
+      },
+    ).catch(() => null);
+    if (!response?.ok) {
+      setMessage(await errorMessage(response, "No fue posible actualizar la visita."));
+      setIsError(true);
+      setIsBusy(false);
+      return;
+    }
+    setMessage(
+      status === "visited" ? "Visita marcada como realizada." : "Estado de visita actualizado.",
+    );
+    setIsBusy(false);
+    router.refresh();
+  }
+
   return (
     <section className="dashboard-card route-board-card" id="rutas">
       <div className="card-heading">
@@ -197,7 +226,7 @@ export function CollectionRouteBoard({
         <span>{routes.length} configuradas</span>
       </div>
       <p className="operational-note">
-        Organiza visitas por empresa y dirección. Esta versión solo planifica: no registra pagos,
+        Organiza visitas por empresa y dirección. Registra el estado de cada visita, pero no pagos,
         efectivo, geolocalización ni operación sin conexión.
       </p>
 
@@ -240,6 +269,48 @@ export function CollectionRouteBoard({
                         >
                           Navegar en Waze
                         </a>
+                        <span className={`route-visit-status route-visit-${stop.visitStatus}`}>
+                          {stop.visitStatus === "visited"
+                            ? "Visita realizada"
+                            : stop.visitStatus === "skipped"
+                              ? "Visita omitida"
+                              : "Pendiente"}
+                        </span>
+                        <div className="route-stop-visit-actions">
+                          <button
+                            className="button-link"
+                            disabled={isBusy}
+                            onClick={() =>
+                              void updateStopVisit(
+                                route,
+                                stop.id,
+                                stop.visitStatus === "visited" ? "pending" : "visited",
+                              )
+                            }
+                            type="button"
+                          >
+                            {stop.visitStatus === "visited" ? "Deshacer visita" : "Marcar visita"}
+                          </button>
+                          {stop.visitStatus !== "skipped" ? (
+                            <button
+                              className="button-link"
+                              disabled={isBusy}
+                              onClick={() => void updateStopVisit(route, stop.id, "skipped")}
+                              type="button"
+                            >
+                              Omitir
+                            </button>
+                          ) : (
+                            <button
+                              className="button-link"
+                              disabled={isBusy}
+                              onClick={() => void updateStopVisit(route, stop.id, "pending")}
+                              type="button"
+                            >
+                              Reabrir
+                            </button>
+                          )}
+                        </div>
                         {canManage ? (
                           <div className="route-stop-order-actions">
                             <button

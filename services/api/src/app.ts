@@ -33,6 +33,7 @@ import {
   routeStatusUpdateRequestSchema,
   routeStopCreateRequestSchema,
   routeStopReorderRequestSchema,
+  routeStopVisitRequestSchema,
   type ServiceStatus,
   sharedClientVerificationRequestSchema,
   tenantInvitationRequestSchema,
@@ -74,6 +75,11 @@ const tenantLoanApplicationParamsSchema = z.object({
   applicationId: z.uuid(),
 });
 const tenantRouteParamsSchema = z.object({ tenantId: z.uuid(), routeId: z.uuid() });
+const tenantRouteStopParamsSchema = z.object({
+  tenantId: z.uuid(),
+  routeId: z.uuid(),
+  stopId: z.uuid(),
+});
 const tenantInvitationParamsSchema = z.object({ tenantId: z.uuid(), invitationId: z.uuid() });
 const tenantMemberParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
 const tenantMemberProfileParamsSchema = z.object({ tenantId: z.uuid(), userId: z.uuid() });
@@ -2369,6 +2375,57 @@ export function buildApp(dependencies: AppDependencies) {
         "Debes incluir todas las paradas una sola vez.",
         request.id,
       );
+    }
+    return reply.send({ route: result.route });
+  });
+
+  app.patch("/v1/tenants/:tenantId/routes/:routeId/stops/:stopId/visit", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantRouteStopParamsSchema.safeParse(request.params);
+    const body = routeStopVisitRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_ROUTE_VISIT",
+        "El estado de visita no es válido.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (!membership || !["owner", "supervisor", "collector"].includes(membership.role)) {
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a esta ruta.", request.id);
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    if (!dependencies.routeService) {
+      return sendError(
+        reply,
+        503,
+        "ROUTES_UNAVAILABLE",
+        "Las rutas todavía no están configuradas.",
+        request.id,
+      );
+    }
+    const result = await dependencies.routeService.updateStopVisit(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.routeId,
+      params.data.stopId,
+      { ...body.data, requestId: request.id },
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "ROUTE_STOP_NOT_FOUND", "La parada no existe.", request.id);
+    }
+    if (result.status === "forbidden") {
+      return sendError(reply, 403, "SCOPE_DENIED", "No puedes actualizar esta parada.", request.id);
     }
     return reply.send({ route: result.route });
   });

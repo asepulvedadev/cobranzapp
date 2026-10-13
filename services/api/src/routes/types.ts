@@ -5,6 +5,7 @@ import type {
   RouteStatusUpdateRequest,
   RouteStopCreateRequest,
   RouteStopReorderRequest,
+  RouteStopVisitRequest,
 } from "@cobranzapp/contracts";
 import type { TenantActor } from "../tenancy/types.js";
 
@@ -25,6 +26,11 @@ export type RouteStopReorderResult =
   | { status: "not_found" }
   | { status: "forbidden" }
   | { status: "invalid_order" };
+
+export type RouteStopVisitResult =
+  | { status: "updated"; route: Route }
+  | { status: "not_found" }
+  | { status: "forbidden" };
 
 export type RouteStatusUpdateResult =
   | { status: "updated"; route: Route }
@@ -58,6 +64,13 @@ export interface RouteService {
     routeId: string,
     input: RouteStopReorderRequest & { requestId: string },
   ): Promise<RouteStopReorderResult>;
+  updateStopVisit(
+    actor: TenantActor,
+    tenantId: string,
+    routeId: string,
+    stopId: string,
+    input: RouteStopVisitRequest & { requestId: string },
+  ): Promise<RouteStopVisitResult>;
   updateStatus(
     actor: TenantActor,
     tenantId: string,
