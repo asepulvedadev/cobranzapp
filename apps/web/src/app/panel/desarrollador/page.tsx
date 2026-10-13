@@ -478,9 +478,11 @@ export default async function DeveloperDashboard({
                         <span className="table-muted">Cuenta protegida</span>
                       ) : (
                         <UserMembershipControl
+                          availableSubscriptions={user.availableSubscriptions}
                           disabled={user.status !== "active"}
                           membershipActivatedAt={user.membershipActivatedAt}
                           membershipPlan={user.membershipPlan}
+                          subscriptionCount={user.subscriptionCount}
                           userId={user.id}
                         />
                       )}

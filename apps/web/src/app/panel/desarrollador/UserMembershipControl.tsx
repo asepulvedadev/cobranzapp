@@ -9,11 +9,15 @@ export function UserMembershipControl({
   userId,
   membershipPlan,
   membershipActivatedAt,
+  subscriptionCount,
+  availableSubscriptions,
   disabled,
 }: {
   userId: string;
   membershipPlan: MembershipId | null;
   membershipActivatedAt: string | null;
+  subscriptionCount: number;
+  availableSubscriptions: number;
   disabled?: boolean;
 }) {
   const router = useRouter();
@@ -72,6 +76,11 @@ export function UserMembershipControl({
           }).format(new Date(membershipActivatedAt))}
         </small>
       ) : null}
+      <small>
+        {availableSubscriptions}{" "}
+        {availableSubscriptions === 1 ? "suscripción disponible" : "suscripciones disponibles"}
+        {subscriptionCount > 0 ? ` · ${subscriptionCount} asignadas` : ""}
+      </small>
       {message ? <small role="status">{message}</small> : null}
     </div>
   );
