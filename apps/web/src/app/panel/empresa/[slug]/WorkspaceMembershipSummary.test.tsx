@@ -29,7 +29,7 @@ describe("WorkspaceMembershipSummary", () => {
     expect(html).toContain("Cupos disponibles");
     expect(html).toContain("Hasta 100");
     expect(html).toContain("3/4");
-    expect(html).toContain("Las invitaciones no reservan cupos ni generan cobros automáticos");
+    expect(html).toContain("Los cupos se validan al activar cada empleado");
   });
 
   it("renders an explicit pending state when a legacy tenant has no assigned plan", () => {

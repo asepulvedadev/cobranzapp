@@ -57,8 +57,8 @@ export function WorkspaceMembershipSummary({ overview }: { overview: TenantOverv
           </dl>
         ) : null}
         <small>
-          Las invitaciones no reservan cupos ni generan cobros automáticos. La capacidad se valida
-          al activar cada empleado.
+          Los cupos se validan al activar cada empleado. No se generan cobros automáticos por
+          accesos sin activar.
         </small>
       </article>
 
