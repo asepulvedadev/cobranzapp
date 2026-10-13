@@ -1,9 +1,9 @@
 # Technology Stack and Tradeoffs
 
-> **Status:** Engineering foundation v0.5; business stack validation remains gated.
-> **Updated:** 2026-10-11.
+> **Status:** Engineering foundation v0.6; the current web/API/worker/VPS stack is installed and deployed.
+> **Updated:** 2026-10-13.
 
-Owns technology choices, alternatives, compatibility constraints and distribution boundaries. The Node/TypeScript, Next.js, Fastify, Expo, PostgreSQL, Docker Compose, and nginx-compatible foundation is installed; identity, encrypted native persistence, object storage, maps, and notifications remain unselected or unimplemented.
+Owns technology choices, alternatives, compatibility constraints and distribution boundaries. The Node/TypeScript, Next.js, Fastify, Expo, PostgreSQL, Docker Compose, and Caddy-compatible foundation is installed. The production pilot uses private VPS file storage, deterministic Tesseract OCR, on-demand Nominatim geocoding and Waze links; native offline encrypted persistence, external route optimization and notifications remain optional work.
 
 ## Proposed technology stack and tradeoffs
 
@@ -19,8 +19,8 @@ These are recommendations, not installations or final commitments. Pin supported
 | Data layer | PostgreSQL + Drizzle with reviewed SQL migrations | Relational integrity, explicit queries, and typed access; RLS and accounting constraints still need SQL/testing |
 | Identity | Self-hosted Keycloak via OIDC | Avoid custom password/MFA implementation; adds memory, patching, email, and operational work |
 | Background work | PostgreSQL outbox/job tables + dedicated worker | Durable tasks without an initial Redis dependency; retries, leases, and dead-letter handling require design |
-| Document capture | Camera/file acquisition + manual structured entry and review | No OCR models or document-reading AI; slower entry in exchange for a clear no-AI boundary |
-| Document storage | Private object storage through an S3-compatible adapter | Keep binaries out of relational tables; provider, region, retention, and cost remain open |
+| Document capture | Camera/file acquisition + deterministic Tesseract assistive OCR + manual review | OCR only suggests fields; human confirmation remains mandatory and it is not an authenticity decision |
+| Document storage | Private VPS object/file storage with scoped keys and quarantine | Keeps binaries out of relational tables while the pilot runs on one VPS; off-host replication remains a launch hardening item |
 | Business automation | Typed application rules + schedules + PostgreSQL outbox/jobs | Reproducible conditions/actions with audit, approvals and limits; no agent runtime |
 | VPS | Docker Compose + Caddy + dedicated PostgreSQL volume | Simple initial operations; a single VPS is a failure domain, not high availability |
 | Verification | Unit/property tests, real-Postgres integration, browser E2E, native device E2E | Financial and tenant guarantees need realistic tests, not ORM mocks alone |

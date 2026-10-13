@@ -51,8 +51,9 @@ export function calculateMembershipMonthlyPrice(
 export const membershipFeatures = [
   {
     id: "risk-registry",
-    label: "Lista negra interna de clientes",
-    detail: "Registro privado de riesgo, con información y calificación para el equipo autorizado.",
+    label: "Verificación compartida con consentimiento",
+    detail:
+      "Consulta mínima y explicable de clientes, con autorización, corrección y acceso restringido.",
   },
   {
     id: "analytics",
