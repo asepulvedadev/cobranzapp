@@ -7,6 +7,20 @@ const roleLabels: Record<TenantOverview["members"][number]["role"], string> = {
   customer: "Cliente",
 };
 
+const statusLabels: Record<TenantOverview["members"][number]["status"], string> = {
+  invited: "Invitación pendiente",
+  active: "Activo",
+  suspended: "Suspendido",
+  revoked: "Revocado",
+};
+
+const statusClasses: Record<TenantOverview["members"][number]["status"], string> = {
+  invited: "draft",
+  active: "active",
+  suspended: "suspended",
+  revoked: "archived",
+};
+
 export function MemberProfileDirectory({
   members,
   profiles,
@@ -42,7 +56,9 @@ export function MemberProfileDirectory({
                   <strong>{member.displayName}</strong>
                   <small>{roleLabels[member.role]}</small>
                 </div>
-                <span className={`status status-${member.status}`}>{member.status}</span>
+                <span className={`status status-${statusClasses[member.status]}`}>
+                  {statusLabels[member.status]}
+                </span>
               </div>
               {profile ? (
                 <dl>

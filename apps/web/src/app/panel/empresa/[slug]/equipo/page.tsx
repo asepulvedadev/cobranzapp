@@ -9,6 +9,27 @@ import { loadTenantContext } from "../tenant-context";
 
 export const metadata: Metadata = { title: "Personal" };
 
+const roleLabels = {
+  owner: "Propietario",
+  supervisor: "Supervisor",
+  collector: "Cobrador",
+  customer: "Cliente",
+} as const;
+
+const statusLabels = {
+  invited: "Invitación pendiente",
+  active: "Activo",
+  suspended: "Suspendido",
+  revoked: "Revocado",
+} as const;
+
+const statusClasses = {
+  invited: "draft",
+  active: "active",
+  suspended: "suspended",
+  revoked: "archived",
+} as const;
+
 export default async function TeamPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { user, overview } = await loadTenantContext(slug);
@@ -69,9 +90,11 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
                         <strong>{member.displayName}</strong>
                         <small>{member.phone ?? "Sin teléfono registrado"}</small>
                       </td>
-                      <td data-label="Rol">{member.role}</td>
+                      <td data-label="Rol">{roleLabels[member.role]}</td>
                       <td data-label="Estado">
-                        <span className={`status status-${member.status}`}>{member.status}</span>
+                        <span className={`status status-${statusClasses[member.status]}`}>
+                          {statusLabels[member.status]}
+                        </span>
                       </td>
                       <td data-label="Administrar">
                         {member.userId === user.id ? (

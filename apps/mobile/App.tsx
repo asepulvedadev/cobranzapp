@@ -61,6 +61,13 @@ const roleLabels: Record<
   support: "Soporte temporal",
 };
 
+const memberStatusLabels: Record<TenantOverview["members"][number]["status"], string> = {
+  invited: "Invitación pendiente",
+  active: "Activo",
+  suspended: "Suspendido",
+  revoked: "Revocado",
+};
+
 function errorText(error: unknown, fallback: string) {
   return error instanceof MobileApiError ? error.message : fallback;
 }
@@ -709,9 +716,7 @@ function TenantPersonnel({
             </Text>
             <Text style={styles.muted}>{member.phone ?? "Sin teléfono"}</Text>
           </View>
-          <Text style={styles.personnelStatus}>
-            {member.status === "active" ? "Activo" : member.status}
-          </Text>
+          <Text style={styles.personnelStatus}>{memberStatusLabels[member.status]}</Text>
         </View>
       ))}
     </View>
