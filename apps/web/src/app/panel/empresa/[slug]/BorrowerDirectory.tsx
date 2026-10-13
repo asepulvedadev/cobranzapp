@@ -22,7 +22,10 @@ function documentLabel(category: Borrower["documents"][number]["category"], side
   return side === "front" ? "Documento · frente" : "Documento · reverso";
 }
 
-function wazeUrl(address: string) {
+function wazeUrl(address: string, location: Borrower["addressLocations"]["home"]) {
+  if (location.status === "ready" && location.latitude !== null && location.longitude !== null) {
+    return `https://www.waze.com/ul?ll=${location.latitude},${location.longitude}&navigate=yes`;
+  }
   return `https://www.waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes`;
 }
 
@@ -332,7 +335,7 @@ export function BorrowerDirectory({
                                   : "Ubicar dirección"}
                             </button>
                             <a
-                              href={wazeUrl(borrower.homeAddress)}
+                              href={wazeUrl(borrower.homeAddress, borrower.addressLocations.home)}
                               rel="noreferrer"
                               target="_blank"
                             >
@@ -367,7 +370,7 @@ export function BorrowerDirectory({
                                   : "Ubicar dirección"}
                             </button>
                             <a
-                              href={wazeUrl(borrower.workAddress)}
+                              href={wazeUrl(borrower.workAddress, borrower.addressLocations.work)}
                               rel="noreferrer"
                               target="_blank"
                             >
