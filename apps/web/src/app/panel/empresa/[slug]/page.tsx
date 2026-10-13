@@ -7,13 +7,11 @@ import type {
   CurrentUser,
   LoanApplication,
   LoanProduct,
-  Route,
   SupportAccessRecord,
   TenantOverview,
 } from "../../../../lib/platform";
 import { serverApi } from "../../../../lib/server-api";
 import { ActivityFeed } from "../../ActivityFeed";
-import { CollectionRouteBoard } from "./CollectionRouteBoard";
 import { CreditProductCatalog } from "./CreditProductCatalog";
 import { CustomerWorkspace } from "./CustomerWorkspace";
 import { LoanApplicationBoard } from "./LoanApplicationBoard";
@@ -86,7 +84,6 @@ export default async function TenantDashboard({
   let loanProducts: LoanProduct[] | null = null;
   let loanApplications: LoanApplication[] | null = null;
   let borrowerDirectory: BorrowerDirectory | null = null;
-  let routes: Route[] | null = null;
   if (overview.actorRole !== "customer" && overview.actorRole !== "support") {
     const borrowerQuery = new URLSearchParams({ page: String(borrowerPage), pageSize: "20" });
     if (borrowerSearch) borrowerQuery.set("q", borrowerSearch);
@@ -97,10 +94,6 @@ export default async function TenantDashboard({
       borrowerDirectory = (await borrowersResponse.json()) as BorrowerDirectory;
     }
     if (["owner", "supervisor", "collector"].includes(overview.actorRole)) {
-      const routesResponse = await serverApi(`/v1/tenants/${membership.tenantId}/routes`);
-      if (routesResponse.ok) {
-        ({ routes } = (await routesResponse.json()) as { routes: Route[] });
-      }
       const productsResponse = await serverApi(`/v1/tenants/${membership.tenantId}/loan-products`);
       if (productsResponse.ok) {
         ({ products: loanProducts } = (await productsResponse.json()) as {
@@ -330,19 +323,6 @@ export default async function TenantDashboard({
           products={loanProducts}
           tenantId={overview.tenant.id}
           canReview={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
-        />
-      ) : null}
-
-      {routes && borrowerDirectory ? (
-        <CollectionRouteBoard
-          branches={overview.branches}
-          borrowers={borrowerDirectory.borrowers}
-          canManage={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
-          collectors={overview.members.filter(
-            (member) => member.role === "collector" && member.status === "active",
-          )}
-          routes={routes}
-          tenantId={overview.tenant.id}
         />
       ) : null}
 
