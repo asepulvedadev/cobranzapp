@@ -16,6 +16,8 @@ import {
   type RouteDirectory,
   reauthenticationResponseSchema,
   routeDirectorySchema,
+  type SharedClientVerification,
+  sharedClientVerificationResponseSchema,
   type TenantMemberProfile,
   type TenantOverview,
   tenantMemberProfileSchema,
@@ -386,6 +388,21 @@ export class MobileApi {
       );
     }
     return verificationNetworkConsentSchema.parse((await response.json()).consent);
+  }
+
+  async verifyClient(tenantId: string, documentNumber: string): Promise<SharedClientVerification> {
+    const response = await this.request(`/v1/tenants/${tenantId}/client-verification`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ documentNumber }),
+    });
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible verificar el cliente."),
+        response.status,
+      );
+    }
+    return sharedClientVerificationResponseSchema.parse(await response.json()).verification;
   }
 
   async queryVerificationNetwork(tenantId: string, input: VerificationNetworkQueryRequest) {

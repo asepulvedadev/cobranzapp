@@ -31,6 +31,8 @@ type Screen =
   | { kind: "mfa" }
   | { kind: "authenticated"; user: CurrentUser };
 
+type TenantSection = "home" | "verification";
+
 const roleLabels: Record<
   CurrentUser["memberships"][number]["role"] | TenantOverview["actorRole"],
   string
@@ -447,14 +449,6 @@ function TenantHome({
           tenantId={overview.tenant.id}
         />
       ) : null}
-      {overview.actorRole !== "customer" && overview.actorRole !== "support" ? (
-        <VerificationNetworkCard
-          api={api}
-          canPublish={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
-          onNeedsReauthentication={onNeedsReauthentication}
-          tenantId={overview.tenant.id}
-        />
-      ) : null}
       <Text style={styles.cardTitle}>Estructura operativa</Text>
       {overview.branches.slice(0, 4).map((branch) => (
         <View key={branch.id} style={styles.listRow}>
@@ -590,6 +584,46 @@ function TenantHome({
   );
 }
 
+function TenantSectionNav({
+  active,
+  onChange,
+  canVerify,
+}: {
+  active: TenantSection;
+  onChange: (section: TenantSection) => void;
+  canVerify: boolean;
+}) {
+  return (
+    <View style={styles.sectionNav}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => onChange("home")}
+        style={[styles.sectionNavItem, active === "home" && styles.sectionNavItemActive]}
+      >
+        <Text style={[styles.sectionNavText, active === "home" && styles.sectionNavTextActive]}>
+          Inicio
+        </Text>
+      </Pressable>
+      {canVerify ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onChange("verification")}
+          style={[styles.sectionNavItem, active === "verification" && styles.sectionNavItemActive]}
+        >
+          <Text
+            style={[
+              styles.sectionNavText,
+              active === "verification" && styles.sectionNavTextActive,
+            ]}
+          >
+            Verificar cliente
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 function AuthenticatedHome({
   api,
   onLogout,
@@ -614,6 +648,7 @@ function AuthenticatedHome({
   const [refreshing, setRefreshing] = useState(false);
   const [directorySearch, setDirectorySearch] = useState("");
   const [directoryPage, setDirectoryPage] = useState(1);
+  const [tenantSection, setTenantSection] = useState<TenantSection>("home");
   const selectedMembershipRole = user.memberships.find(
     (membership) => membership.tenantId === tenantId,
   )?.role;
@@ -770,6 +805,7 @@ function AuthenticatedHome({
                   key={membership.tenantId}
                   onPress={() => {
                     setTenantId(membership.tenantId);
+                    setTenantSection("home");
                     setDirectorySearch("");
                     setDirectoryPage(1);
                   }}
@@ -787,24 +823,46 @@ function AuthenticatedHome({
               ))}
             </View>
             {tenant ? (
-              <TenantHome
-                api={api}
-                directory={directory}
-                directorySearch={directorySearch}
-                memberProfile={memberProfile}
-                onBorrowerCreated={() => setReloadKey((current) => current + 1)}
-                onDirectoryPageChange={setDirectoryPage}
-                onDirectorySearch={(search) => {
-                  setDirectorySearch(search);
-                  setDirectoryPage(1);
-                }}
-                onNeedsReauthentication={() => {
-                  setNeedsReauthentication(true);
-                  setMessage("Confirma tu contraseña para continuar con esta acción.");
-                }}
-                overview={tenant}
-                routes={routes}
-              />
+              <>
+                <TenantSectionNav
+                  active={tenantSection}
+                  canVerify={
+                    selectedMembershipRole
+                      ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
+                      : false
+                  }
+                  onChange={setTenantSection}
+                />
+                {tenantSection === "verification" ? (
+                  <VerificationNetworkCard
+                    api={api}
+                    onNeedsReauthentication={() => {
+                      setNeedsReauthentication(true);
+                      setMessage("Confirma tu contraseña para continuar con esta acción.");
+                    }}
+                    tenantId={tenant.tenant.id}
+                  />
+                ) : (
+                  <TenantHome
+                    api={api}
+                    directory={directory}
+                    directorySearch={directorySearch}
+                    memberProfile={memberProfile}
+                    onBorrowerCreated={() => setReloadKey((current) => current + 1)}
+                    onDirectoryPageChange={setDirectoryPage}
+                    onDirectorySearch={(search) => {
+                      setDirectorySearch(search);
+                      setDirectoryPage(1);
+                    }}
+                    onNeedsReauthentication={() => {
+                      setNeedsReauthentication(true);
+                      setMessage("Confirma tu contraseña para continuar con esta acción.");
+                    }}
+                    overview={tenant}
+                    routes={routes}
+                  />
+                )}
+              </>
             ) : (
               <ActivityIndicator color="#fbbf24" />
             )}
@@ -1083,6 +1141,23 @@ const styles = StyleSheet.create({
   },
   workspaceOptionActive: { borderColor: "#fbbf24", backgroundColor: "#2c2b20" },
   radio: { color: "#fbbf24", fontSize: 20 },
+  sectionNav: {
+    flexDirection: "row",
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#343b36",
+    paddingBottom: 8,
+  },
+  sectionNavItem: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#343b36",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  sectionNavItemActive: { borderColor: "#fbbf24", backgroundColor: "#2c2b20" },
+  sectionNavText: { color: "#99a39c", fontSize: 13, fontWeight: "700" },
+  sectionNavTextActive: { color: "#fbbf24" },
   boundaryCard: {
     padding: 16,
     borderRadius: 18,

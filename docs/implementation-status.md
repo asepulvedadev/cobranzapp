@@ -13,7 +13,7 @@
 | Expediente de cliente | Completado | Identidad manual, teléfonos, direcciones, contactos de emergencia, foto designada y documentos privados |
 | OCR asistivo de documentos | Completado con revisión humana | Tesseract en el worker, imágenes/PDF privados, sugerencias cifradas, reintento y confirmación auditada |
 | Personal operativo | Completado | Perfil de supervisores y cobradores, identidad cifrada, últimos cuatro dígitos, tipo de sangre con consentimiento y documentos privados |
-| Verificación compartida | Completado con activación controlada | Consentimiento, propósito, vencimiento, consulta mínima, nombre, créditos vigentes y calificación derivada de pagos; correcciones, disputas y auditoría; no es lista negra |
+| Verificación compartida | Completado con activación controlada | Vista independiente para propietario, supervisor y cobrador con búsqueda simple por cédula; devuelve únicamente nombre, créditos vigentes, calificación derivada de pagos y reporte negativo; la red consentida avanzada, correcciones, disputas y auditoría permanecen controladas; no es lista negra |
 | Rutas de cobranza | Completado | Vista independiente en sidebar, direcciones geocodificadas bajo demanda, Waze, optimización por cercanía, visitas auditadas y asignación por empresa |
 | Originación operativa protegida | Completado como piloto | Catálogo configurable, reglas de monto/interés, frecuencias y plazos de un mes/5 semanas, calendario determinista, renovación desde la segunda cuota y marcadores de cuotas; no aprueba contabilidad, desembolsa ni registra recibos financieros |
 | Entrega VPS | Completado para el entorno actual | Imágenes inmutables transferidas por SSH, orden estricto de despliegue, health/readiness, Caddy y roles PostgreSQL separados |
@@ -36,7 +36,7 @@ La proyección configurable ya está disponible para comparar escenarios, pero n
 - `pnpm check` pasa formato, tipos, pruebas y compilación.
 - Contratos: 30 pruebas aprobadas.
 - Web: 40 pruebas aprobadas.
-- API: 88 pruebas aprobadas y 2 suites de integración omitidas cuando no hay PostgreSQL de CI.
+- API: 90 pruebas aprobadas y 2 suites de integración omitidas cuando no hay PostgreSQL de CI.
 - Producción: `https://cobranzaap.tech/api/health` responde con la versión desplegada y los servicios API, web, worker y PostgreSQL están activos.
 
 ## Próximo desbloqueo

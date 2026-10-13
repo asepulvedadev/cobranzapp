@@ -48,7 +48,7 @@ guardan direcciones y coordenadas, pero Waze sigue siendo la navegación final.
 - La ubicación se puede consultar bajo demanda y queda cacheada por dirección; Waze usa
   coordenadas cuando existen y conserva el texto completo como respaldo.
 
-### 5. Optimización opcional
+### 6. Optimización opcional
 
 - Si se requiere ordenar automáticamente las visitas: integrar Google Routes API
   con `optimizeWaypointOrder`, o desplegar OSRM/GraphHopper en el VPS.
@@ -72,3 +72,11 @@ guardan direcciones y coordenadas, pero Waze sigue siendo la navegación final.
 - Una parada abre Waze en móvil y web.
 - La ruta conserva el orden y el responsable incluso si Waze no está instalado.
 - Si se corrige una dirección, sus coordenadas anteriores se invalidan antes de volver a ubicarla.
+
+### 5. Verificación operativa — implementada
+
+- La verificación vive en una vista independiente del inicio.
+- Propietarios, supervisores y cobradores consultan únicamente con el número de cédula.
+- La respuesta se limita al nombre, créditos vigentes, calificación de pago y reporte negativo.
+- En móvil se usa la misma búsqueda rápida; no se expone el flujo avanzado de tokens y propósitos
+  de la red consentida, que permanece reservado para una activación legal posterior.
