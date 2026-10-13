@@ -33,6 +33,7 @@ import {
   routeCreateRequestSchema,
   routeStatusUpdateRequestSchema,
   routeStopCreateRequestSchema,
+  routeStopOptimizeRequestSchema,
   routeStopReorderRequestSchema,
   routeStopVisitRequestSchema,
   type ServiceStatus,
@@ -2427,6 +2428,71 @@ export function buildApp(dependencies: AppDependencies) {
     }
     if (result.status === "forbidden") {
       return sendError(reply, 403, "SCOPE_DENIED", "No puedes actualizar esta parada.", request.id);
+    }
+    return reply.send({ route: result.route });
+  });
+
+  app.post("/v1/tenants/:tenantId/routes/:routeId/stops/optimize", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantRouteParamsSchema.safeParse(request.params);
+    const body = routeStopOptimizeRequestSchema.safeParse(request.body ?? {});
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_ROUTE_OPTIMIZATION",
+        "El punto de inicio no es válido.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo propietarios y supervisores pueden optimizar rutas.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    if (!dependencies.routeService) {
+      return sendError(
+        reply,
+        503,
+        "ROUTES_UNAVAILABLE",
+        "Las rutas todavía no están configuradas.",
+        request.id,
+      );
+    }
+    const result = await dependencies.routeService.optimizeStops(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.routeId,
+      { ...body.data, requestId: request.id },
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "ROUTE_NOT_FOUND", "La ruta no existe.", request.id);
+    }
+    if (result.status === "forbidden") {
+      return sendError(reply, 403, "SCOPE_DENIED", "No puedes optimizar esta ruta.", request.id);
+    }
+    if (result.status === "missing_coordinates") {
+      return sendError(
+        reply,
+        409,
+        "ROUTE_COORDINATES_REQUIRED",
+        "Ubica todas las direcciones antes de optimizar la ruta.",
+        request.id,
+      );
     }
     return reply.send({ route: result.route });
   });

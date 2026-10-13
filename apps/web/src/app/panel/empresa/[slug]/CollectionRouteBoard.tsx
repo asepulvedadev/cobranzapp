@@ -219,6 +219,31 @@ export function CollectionRouteBoard({
     router.refresh();
   }
 
+  async function optimizeRoute(route: Route) {
+    setIsBusy(true);
+    setMessage("");
+    setIsError(false);
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/routes/${route.id}/stops/optimize`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      },
+    ).catch(() => null);
+    if (!response?.ok) {
+      setMessage(
+        await errorMessage(response, "Ubica todas las direcciones antes de optimizar la ruta."),
+      );
+      setIsError(true);
+      setIsBusy(false);
+      return;
+    }
+    setMessage("Ruta ordenada por cercanía.");
+    setIsBusy(false);
+    router.refresh();
+  }
+
   return (
     <section className="dashboard-card route-board-card" id="rutas">
       <div className="card-heading">
@@ -381,6 +406,16 @@ export function CollectionRouteBoard({
                       type="button"
                     >
                       Activar ruta
+                    </button>
+                  ) : null}
+                  {route.stops.length > 1 ? (
+                    <button
+                      className="button-link"
+                      disabled={isBusy}
+                      onClick={() => void optimizeRoute(route)}
+                      type="button"
+                    >
+                      Optimizar por cercanía
                     </button>
                   ) : null}
                   {route.status === "active" ? (

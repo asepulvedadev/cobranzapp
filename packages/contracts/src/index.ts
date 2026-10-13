@@ -752,6 +752,9 @@ export const routeStopVisitRequestSchema = z.object({
   status: routeStopVisitStatusSchema,
   notes: z.string().trim().max(500).nullable().optional(),
 });
+export const routeStopOptimizeRequestSchema = z.object({
+  startStopId: z.uuid().nullable().optional(),
+});
 export const routeStopSchema = z.object({
   id: z.uuid(),
   borrowerId: z.uuid(),
@@ -1264,6 +1267,7 @@ export type RouteCreateRequest = z.infer<typeof routeCreateRequestSchema>;
 export type RouteStopCreateRequest = z.infer<typeof routeStopCreateRequestSchema>;
 export type RouteStopReorderRequest = z.infer<typeof routeStopReorderRequestSchema>;
 export type RouteStopVisitRequest = z.infer<typeof routeStopVisitRequestSchema>;
+export type RouteStopOptimizeRequest = z.infer<typeof routeStopOptimizeRequestSchema>;
 export type RouteStop = z.infer<typeof routeStopSchema>;
 export type BorrowerAddressLocation = z.infer<typeof borrowerAddressLocationSchema>;
 export type BorrowerAddressGeocodeRequest = z.infer<typeof borrowerAddressGeocodeRequestSchema>;

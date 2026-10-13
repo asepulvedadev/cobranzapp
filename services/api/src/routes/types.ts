@@ -4,6 +4,7 @@ import type {
   RouteCreateRequest,
   RouteStatusUpdateRequest,
   RouteStopCreateRequest,
+  RouteStopOptimizeRequest,
   RouteStopReorderRequest,
   RouteStopVisitRequest,
 } from "@cobranzapp/contracts";
@@ -31,6 +32,12 @@ export type RouteStopVisitResult =
   | { status: "updated"; route: Route }
   | { status: "not_found" }
   | { status: "forbidden" };
+
+export type RouteStopOptimizeResult =
+  | { status: "updated"; route: Route }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "missing_coordinates" };
 
 export type RouteStatusUpdateResult =
   | { status: "updated"; route: Route }
@@ -71,6 +78,12 @@ export interface RouteService {
     stopId: string,
     input: RouteStopVisitRequest & { requestId: string },
   ): Promise<RouteStopVisitResult>;
+  optimizeStops(
+    actor: TenantActor,
+    tenantId: string,
+    routeId: string,
+    input: RouteStopOptimizeRequest & { requestId: string },
+  ): Promise<RouteStopOptimizeResult>;
   updateStatus(
     actor: TenantActor,
     tenantId: string,

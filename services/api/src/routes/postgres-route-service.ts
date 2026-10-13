@@ -4,6 +4,7 @@ import type {
   RouteCreateRequest,
   RouteStatusUpdateRequest,
   RouteStopCreateRequest,
+  RouteStopOptimizeRequest,
   RouteStopReorderRequest,
   RouteStopVisitRequest,
 } from "@cobranzapp/contracts";
@@ -13,6 +14,7 @@ import type {
   RouteAssignmentResult,
   RouteResult,
   RouteService,
+  RouteStopOptimizeResult,
   RouteStopReorderResult,
   RouteStopResult,
   RouteStopVisitResult,
@@ -368,6 +370,108 @@ export function createPostgresRouteService(pool: Pool): RouteService {
             stopId,
             input.requestId,
             JSON.stringify({ routeId, status: input.status, hasNotes: Boolean(notes) }),
+          ],
+        );
+        const updated = await loadRoute(client, tenantId, routeId);
+        return updated ? { status: "updated", route: updated } : { status: "not_found" };
+      });
+    },
+
+    async optimizeStops(
+      actor,
+      tenantId,
+      routeId,
+      input: RouteStopOptimizeRequest & { requestId: string },
+    ): Promise<RouteStopOptimizeResult> {
+      if (!canManage(actor)) return { status: "forbidden" };
+      return withTransaction(actor, tenantId, async (client) => {
+        const route = await client.query<{ id: string }>(
+          `SELECT id FROM collection_routes WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
+          [tenantId, routeId],
+        );
+        if (!route.rows[0]) return { status: "not_found" };
+        const stops = await client.query<{
+          id: string;
+          latitude: number | string | null;
+          longitude: number | string | null;
+        }>(
+          `SELECT stop.id, location.latitude, location.longitude
+             FROM collection_route_stops stop
+             LEFT JOIN borrower_address_locations location
+               ON location.tenant_id = stop.tenant_id
+              AND location.borrower_id = stop.borrower_id
+              AND location.address_kind = stop.address_kind
+            WHERE stop.tenant_id = $1 AND stop.route_id = $2
+            ORDER BY stop.position ASC, stop.id ASC
+            FOR UPDATE`,
+          [tenantId, routeId],
+        );
+        if (stops.rows.some((stop) => stop.latitude === null || stop.longitude === null)) {
+          return { status: "missing_coordinates" };
+        }
+        if (stops.rows.length < 2) {
+          const current = await loadRoute(client, tenantId, routeId);
+          return current ? { status: "updated", route: current } : { status: "not_found" };
+        }
+        const points = stops.rows.map((stop) => ({
+          id: stop.id,
+          latitude: Number(stop.latitude),
+          longitude: Number(stop.longitude),
+        }));
+        const first = points[0];
+        if (!first) return { status: "not_found" };
+        const startId =
+          input.startStopId && points.some((point) => point.id === input.startStopId)
+            ? input.startStopId
+            : first.id;
+        const startPoint = points.find((point) => point.id === startId) ?? first;
+        const ordered = [startPoint];
+        const remaining = points.filter((point) => point.id !== startPoint.id);
+        while (remaining.length) {
+          const current = ordered[ordered.length - 1];
+          if (!current) break;
+          let nearestIndex = 0;
+          let nearestDistance = Number.POSITIVE_INFINITY;
+          for (const [index, candidate] of remaining.entries()) {
+            const distance =
+              (candidate.latitude - current.latitude) ** 2 +
+              (candidate.longitude - current.longitude) ** 2;
+            if (distance < nearestDistance) {
+              nearestDistance = distance;
+              nearestIndex = index;
+            }
+          }
+          const next = remaining.splice(nearestIndex, 1)[0];
+          if (next) ordered.push(next);
+        }
+        await client.query(
+          `UPDATE collection_route_stops
+              SET position = position + 10000, updated_at = now()
+            WHERE tenant_id = $1 AND route_id = $2`,
+          [tenantId, routeId],
+        );
+        for (const [index, stop] of ordered.entries()) {
+          await client.query(
+            `UPDATE collection_route_stops
+                SET position = $4, updated_at = now()
+              WHERE tenant_id = $1 AND route_id = $2 AND id = $3`,
+            [tenantId, routeId, stop.id, index + 1],
+          );
+        }
+        await client.query(
+          `UPDATE collection_routes SET updated_at = now() WHERE tenant_id = $1 AND id = $2`,
+          [tenantId, routeId],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'collection_route.stops_optimized', 'collection_route', $3, $4, $5::jsonb)`,
+          [
+            tenantId,
+            actor.userId,
+            routeId,
+            input.requestId,
+            JSON.stringify({ strategy: "nearest_neighbor", startStopId: startPoint.id }),
           ],
         );
         const updated = await loadRoute(client, tenantId, routeId);
