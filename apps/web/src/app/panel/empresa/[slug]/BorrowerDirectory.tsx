@@ -484,7 +484,8 @@ export function BorrowerDirectory({
             <section aria-labelledby="borrower-step-contact" hidden={createStep !== 2}>
               <h3 id="borrower-step-contact">Contacto y direcciones</h3>
               <p className="operational-note">
-                Puedes pegar la dirección o abrirla después en Waze para iniciar la ruta.
+                Guarda la dirección completa: calle/carrera, número, barrio y municipio. Así se
+                conserva correctamente en el expediente y Waze puede ubicarla mejor.
               </p>
               <label htmlFor="borrower-phone">Celular principal</label>
               <input id="borrower-phone" name="phone" maxLength={30} type="tel" />
@@ -492,9 +493,19 @@ export function BorrowerDirectory({
               <input id="borrower-whatsapp" name="whatsappPhone" maxLength={30} type="tel" />
               <small>Si usa el mismo número, escríbelo nuevamente para dejarlo confirmado.</small>
               <label htmlFor="borrower-home">Dirección de casa</label>
-              <input id="borrower-home" name="homeAddress" maxLength={240} />
+              <input
+                id="borrower-home"
+                name="homeAddress"
+                maxLength={240}
+                placeholder="Ej. Calle 10 # 20-30, Barrio Centro, Cúcuta"
+              />
               <label htmlFor="borrower-work">Dirección de trabajo</label>
-              <input id="borrower-work" name="workAddress" maxLength={240} />
+              <input
+                id="borrower-work"
+                name="workAddress"
+                maxLength={240}
+                placeholder="Ej. Carrera 5 # 12-40, Barrio La Playa, Cúcuta"
+              />
             </section>
 
             <section aria-labelledby="borrower-step-references" hidden={createStep !== 3}>
