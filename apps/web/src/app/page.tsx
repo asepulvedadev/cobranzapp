@@ -18,14 +18,14 @@ import {
 export const metadata: Metadata = {
   title: "Control de cartera y cobranza en Colombia | cobranzapp",
   description:
-    "Organiza cartera, rutas, recaudo y cierres diarios con trazabilidad para propietarios y equipos de cobranza en Colombia.",
+    "Organiza clientes, rutas, verificación y seguimiento operativo de créditos para propietarios y equipos de cobranza en Colombia.",
 };
 
 const features = [
   {
     number: "01",
-    title: "Cartera que sí puedes explicar",
-    text: "Consulta obligaciones, cuotas, abonos y novedades desde un historial común, sin reconstruir cada caso desde conversaciones sueltas.",
+    title: "Fichas de cliente completas",
+    text: "Consulta identidad, documentos privados, teléfonos, direcciones confirmadas y novedades desde un historial común.",
     tone: "dark",
   },
   {
@@ -36,14 +36,14 @@ const features = [
   },
   {
     number: "03",
-    title: "Recaudo con trazabilidad",
-    text: "Registra el cobro, conserva su estado y genera un comprobante digital sin perder quién hizo cada movimiento.",
+    title: "Seguimiento de cuotas",
+    text: "Consulta el avance operativo de las cuotas y las gestiones de cada cliente, sin presentar proyecciones como recibos financieros.",
     tone: "mint",
   },
   {
     number: "04",
-    title: "Cierres sin adivinar",
-    text: "Compara pagos, efectivo, transferencias y novedades antes de dar por terminada la operación del día.",
+    title: "Prioridades sin adivinar",
+    text: "Identifica créditos activos, cuotas vencidas, solicitudes en revisión y novedades que necesitan atención.",
     tone: "yellow",
   },
   {
@@ -54,8 +54,8 @@ const features = [
   },
   {
     number: "06",
-    title: "Reportes con contexto",
-    text: "Lee cartera, recaudo, mora y diferencias con fecha de corte, responsables y filtros útiles para decidir.",
+    title: "Reportes operativos con contexto",
+    text: "Lee prioridades de cobranza, frecuencias, vencimientos y responsables sin confundir la operación con contabilidad.",
     tone: "dark",
   },
 ];
@@ -64,7 +64,7 @@ const roles = [
   {
     name: "Propietario",
     label: "Cliente de cobranzapp",
-    text: "Administra su empresa, configura el equipo y revisa cartera, caja y decisiones sensibles.",
+    text: "Administra su empresa, configura el equipo y revisa cartera operativa, créditos activos y decisiones sensibles.",
   },
   {
     name: "Supervisor",
@@ -74,12 +74,7 @@ const roles = [
   {
     name: "Cobrador",
     label: "Trabajo en campo",
-    text: "Consulta su jornada, registra gestiones y entrega comprobantes de los cobros realizados.",
-  },
-  {
-    name: "Cliente",
-    label: "Consulta personal",
-    text: "Revisa sus obligaciones, comprobantes y canales autorizados sin acceder a la operación interna.",
+    text: "Consulta su jornada, verifica clientes, registra gestiones y trabaja con direcciones confirmadas.",
   },
 ];
 
@@ -87,13 +82,13 @@ const useCases = [
   {
     number: "01",
     title: "Propietario con cartera propia",
-    text: "Centraliza clientes, obligaciones y recaudo para dejar de reconstruir saldos desde varios archivos.",
+    text: "Centraliza clientes, direcciones, documentos y seguimiento de créditos para dejar de reconstruir cada caso desde varios archivos.",
     signal: "Control directo",
   },
   {
     number: "02",
     title: "Comercio que vende a crédito",
-    text: "Relaciona cada plan de pago con el cliente, sus abonos y los comprobantes que respaldan la operación.",
+    text: "Relaciona cada producto de crédito con el cliente, su calendario operativo y las gestiones realizadas.",
     signal: "Ventas en cuotas",
   },
   {
@@ -104,19 +99,19 @@ const useCases = [
   },
   {
     number: "04",
-    title: "Operación con varias zonas",
-    text: "Separa equipos y alcances por sucursal, zona o ruta mientras el propietario conserva una lectura común.",
-    signal: "Crecimiento ordenado",
+    title: "Propietario con varias empresas",
+    text: "Cambia de empresa desde el mismo acceso y conserva una lectura independiente de empleados, clientes y operación.",
+    signal: "Multiempresa",
   },
 ];
 
 const comparisonRows = [
-  ["Historial común por cliente", "Previsto", "Manual", "Depende del archivo"],
-  ["Responsable visible por gestión", "Previsto", "No", "Configuración adicional"],
-  ["Permisos según el perfil", "Previsto", "No", "Limitado"],
-  ["Comprobante relacionado con el pago", "Previsto", "Manual", "Manual"],
-  ["Cierre y diferencias de la jornada", "Previsto", "Suma manual", "Fórmulas"],
-  ["Consulta personal del cliente", "Previsto", "No", "No"],
+  ["Historial común por cliente", "Disponible", "Manual", "Depende del archivo"],
+  ["Responsable visible por gestión", "Disponible", "No", "Configuración adicional"],
+  ["Permisos según el perfil", "Disponible", "No", "Limitado"],
+  ["Dirección confirmada para la ruta", "Disponible", "Manual", "Depende del archivo"],
+  ["Prioridades de la jornada", "Disponible", "Suma manual", "Fórmulas"],
+  ["Verificación compartida con consentimiento", "Disponible", "No", "No"],
 ];
 
 const faqs = [
@@ -141,7 +136,7 @@ const faqs = [
   {
     question: "¿Quién contrata el servicio?",
     answer:
-      "El propietario de cada empresa es el cliente de cobranzapp. Supervisores, cobradores y clientes finales acceden como perfiles operativos vinculados a esa empresa.",
+      "El propietario de cada empresa es el cliente de cobranzapp. Supervisores y cobradores acceden como perfiles operativos vinculados a esa empresa.",
   },
   {
     question: "¿Ya está disponible?",
@@ -221,10 +216,10 @@ export default function Home() {
             <span>02</span> Rutas
           </div>
           <div>
-            <span>03</span> Recaudo
+            <span>03</span> Verificación
           </div>
           <div>
-            <span>04</span> Conciliación
+            <span>04</span> Reportes
           </div>
         </section>
 
@@ -247,15 +242,15 @@ export default function Home() {
               <span className="card-kicker">Con cobranzapp</span>
               <h3>Una operación donde cada movimiento conserva su contexto.</h3>
               <div className="control-row">
-                <span>Abono registrado</span>
+                <span>Cuota priorizada</span>
                 <strong>08:42</strong>
               </div>
               <div className="control-row">
-                <span>Comprobante generado</span>
+                <span>Dirección confirmada</span>
                 <strong>08:43</strong>
               </div>
               <div className="control-row">
-                <span>Cierre por revisar</span>
+                <span>Caso por revisar</span>
                 <strong>Hoy</strong>
               </div>
             </article>
@@ -264,8 +259,8 @@ export default function Home() {
 
         <section className="tagline-section section-shell">
           <WordReveal>
-            Cada cobro deja de ser un dato suelto y se convierte en una operación que puedes seguir,
-            revisar y explicar.
+            Cada gestión deja de ser un dato suelto y se convierte en una operación que puedes
+            seguir, revisar y explicar.
           </WordReveal>
         </section>
 
@@ -358,7 +353,7 @@ export default function Home() {
         <section className="roles-section" id="roles">
           <div className="section-shell roles-layout">
             <div className="roles-copy" data-reveal>
-              <span className="eyebrow">Cuatro perfiles, una empresa</span>
+              <span className="eyebrow">Tres perfiles, una empresa</span>
               <h2>El propietario contrata. Cada persona entra a su espacio de trabajo.</h2>
               <p>
                 La plataforma pública y el sistema privado permanecen separados. Dentro del sistema,

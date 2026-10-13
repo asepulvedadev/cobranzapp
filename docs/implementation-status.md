@@ -7,6 +7,7 @@
 | Bloque | Estado | Evidencia |
 |---|---|---|
 | Plataforma y autenticación | Completado | Inicio por usuario o correo, sesiones HttpOnly, cambio obligatorio de contraseña inicial, MFA y reautenticación |
+| Sitio público | Completado para el alcance operativo actual | Landing en español con recorrido, planes, multiempresa, verificación y seguimiento operativo; no promete recibos financieros, caja ni portal de cliente mientras esos bloques sigan protegidos |
 | Multitenencia | Completado | Empresas, membresías, roles, RLS y claves compuestas por empresa; la operación del propietario se presenta como una empresa con empleados, sin sedes ni equipos en el flujo principal |
 | Marca y cambio de empresa | Completado | El propietario puede alternar empresas desde el sidebar; el logo, nombre, colores y acentos se recargan según la empresa activa sin mezclar la configuración de otra |
 | Alta comercial | Completado | El desarrollador registra propietarios, emite códigos únicos por suscripción y cada propietario crea varias empresas desde su panel; el onboarding informa cuántas suscripciones siguen disponibles y bloquea la creación cuando no queda ninguna |

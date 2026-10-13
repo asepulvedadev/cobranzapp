@@ -29,9 +29,9 @@ const scenes = [
   {
     time: "18:05",
     eyebrow: "Conciliar",
-    title: "El cierre muestra dónde quedó el recaudo",
-    text: "Pagos, efectivo, transferencias y novedades se comparan antes de dar la jornada por terminada.",
-    detail: "Cierre diario · sin diferencias abiertas",
+    title: "La jornada queda lista para revisar",
+    text: "El propietario revisa gestiones, cuotas vencidas y novedades antes de cerrar la operación del día.",
+    detail: "Jornada · sin casos sin asignar",
   },
 ];
 
@@ -112,7 +112,7 @@ export function ScrollWorldExperience() {
         <div className="scroll-world-camera" ref={imageRef}>
           <Image
             src="/images/cobranzaap-world.webp"
-            alt="Recorrido ilustrado por la oficina, la ruta, la supervisión y el cierre de cobranza"
+            alt="Recorrido ilustrado por la oficina, la ruta, la supervisión y el seguimiento operativo"
             fill
             priority
             unoptimized
