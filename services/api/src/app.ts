@@ -2950,6 +2950,24 @@ export function buildApp(dependencies: AppDependencies) {
     if (result.status === "forbidden") {
       return sendError(reply, 403, "SCOPE_DENIED", "No puedes ubicar esta dirección.", request.id);
     }
+    if (result.status === "unconfirmed") {
+      return sendError(
+        reply,
+        409,
+        "BORROWER_ADDRESSES_UNCONFIRMED",
+        "Confirma esta dirección con el cliente antes de ubicarla.",
+        request.id,
+      );
+    }
+    if (result.status === "stale") {
+      return sendError(
+        reply,
+        409,
+        "BORROWER_ADDRESS_CHANGED",
+        "La dirección cambió mientras se ubicaba. Vuelve a intentarlo con la dirección actual.",
+        request.id,
+      );
+    }
     if (result.status === "unavailable") {
       return reply.code(502).send({ location: result.location });
     }

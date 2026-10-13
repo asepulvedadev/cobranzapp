@@ -74,6 +74,8 @@ export type BorrowerAddressGeocodeResult =
   | { status: "updated"; borrower: Borrower }
   | { status: "not_found" }
   | { status: "forbidden" }
+  | { status: "unconfirmed" }
+  | { status: "stale" }
   | { status: "unavailable"; location: BorrowerAddressLocation };
 
 export type BorrowerAddressUpdateInput = BorrowerAddressUpdateRequest & { requestId: string };

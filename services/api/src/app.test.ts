@@ -642,6 +642,55 @@ describe("borrower creation security", () => {
       }),
     );
   });
+
+  it("does not geocode an address that has not been confirmed", async () => {
+    const geocodeAddress = vi.fn(async () => ({ status: "unconfirmed" as const }));
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => tenantOwner) },
+        borrowerService: { geocodeAddress } as unknown as BorrowerService,
+      }),
+    );
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/tenants/${tenantOwner.memberships[0]?.tenantId}/borrowers/193a2db4-2349-4a48-8833-746a2a334260/geocode`,
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+      },
+      payload: { addressKind: "home" },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      error: { code: "BORROWER_ADDRESSES_UNCONFIRMED" },
+    });
+    expect(geocodeAddress).toHaveBeenCalled();
+  });
+
+  it("rejects a geocode result when the address changed during lookup", async () => {
+    const geocodeAddress = vi.fn(async () => ({ status: "stale" as const }));
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => tenantOwner) },
+        borrowerService: { geocodeAddress } as unknown as BorrowerService,
+      }),
+    );
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/tenants/${tenantOwner.memberships[0]?.tenantId}/borrowers/193a2db4-2349-4a48-8833-746a2a334260/geocode`,
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+      },
+      payload: { addressKind: "work" },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      error: { code: "BORROWER_ADDRESS_CHANGED" },
+    });
+  });
 });
 
 describe("loan application review queue", () => {

@@ -1054,18 +1054,31 @@ export function createPostgresBorrowerService(
       if (!["owner", "supervisor", "collector"].includes(actor.tenantRole ?? "")) {
         return { status: "forbidden" };
       }
-      const address = await withTransaction(actor, tenantId, async (client) => {
-        const result = await client.query<{ home_address: string; work_address: string }>(
-          `SELECT home_address, work_address
+      const addressSnapshot = await withTransaction(actor, tenantId, async (client) => {
+        const result = await client.query<{
+          home_address: string;
+          work_address: string;
+          home_address_status: "pending" | "confirmed";
+          work_address_status: "pending" | "confirmed";
+        }>(
+          `SELECT home_address, work_address, home_address_status, work_address_status
              FROM borrowers
             WHERE tenant_id = $1 AND id = $2 AND status = 'active'`,
           [tenantId, borrowerId],
         );
         const row = result.rows[0];
         if (!row) return null;
-        return input.addressKind === "home" ? row.home_address : row.work_address;
+        return {
+          address: input.addressKind === "home" ? row.home_address : row.work_address,
+          confirmed:
+            input.addressKind === "home"
+              ? row.home_address_status === "confirmed"
+              : row.work_address_status === "confirmed",
+        };
       });
-      if (!address) return { status: "not_found" };
+      if (!addressSnapshot) return { status: "not_found" };
+      if (!addressSnapshot.confirmed) return { status: "unconfirmed" };
+      const address = addressSnapshot.address;
 
       let geocoded: GeocodedAddress;
       const provider = input.latitude !== undefined ? "device" : "nominatim";
@@ -1085,19 +1098,38 @@ export function createPostgresBorrowerService(
         const errorCode = (error instanceof Error ? error.message : "GEOCODER_FAILED")
           .replaceAll(/[^A-Z0-9_]+/g, "_")
           .slice(0, 120);
-        const location = await withTransaction(actor, tenantId, async (client) => {
+        const outcome = await withTransaction(actor, tenantId, async (client) => {
           const result = await client.query<AddressLocationRow>(
             `UPDATE borrower_address_locations
                 SET status = 'failed', latitude = NULL, longitude = NULL,
                     formatted_address = NULL, provider = 'nominatim', precision = NULL,
                     error_code = $4, geocoded_at = NULL, updated_at = now()
               WHERE tenant_id = $1 AND borrower_id = $2 AND address_kind = $3
+                AND EXISTS (
+                  SELECT 1 FROM borrowers borrower
+                   WHERE borrower.tenant_id = $1 AND borrower.id = $2
+                     AND borrower.status = 'active'
+                     AND (
+                       ($3 = 'home' AND borrower.home_address = $5
+                        AND borrower.home_address_status = 'confirmed')
+                       OR ($3 = 'work' AND borrower.work_address = $5
+                           AND borrower.work_address_status = 'confirmed')
+                     )
+                )
               RETURNING address_kind, status, latitude, longitude, formatted_address,
                         provider, precision, error_code, geocoded_at`,
-            [tenantId, borrowerId, input.addressKind, errorCode],
+            [tenantId, borrowerId, input.addressKind, errorCode, address],
           );
           const row = result.rows[0];
-          if (!row) return null;
+          if (!row) {
+            const current = await client.query<{ id: string }>(
+              `SELECT id FROM borrowers WHERE tenant_id = $1 AND id = $2`,
+              [tenantId, borrowerId],
+            );
+            return current.rows[0]
+              ? ({ status: "stale" } as const)
+              : ({ status: "not_found" } as const);
+          }
           await client.query(
             `INSERT INTO audit_events
                (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
@@ -1110,9 +1142,9 @@ export function createPostgresBorrowerService(
               JSON.stringify({ addressKind: input.addressKind, errorCode }),
             ],
           );
-          return mapAddressLocation(row);
+          return { status: "unavailable", location: mapAddressLocation(row) } as const;
         });
-        return location ? { status: "unavailable", location } : { status: "not_found" };
+        return outcome;
       }
 
       return withTransaction(actor, tenantId, async (client) => {
@@ -1122,6 +1154,17 @@ export function createPostgresBorrowerService(
                   formatted_address = $6, provider = $8, precision = $7,
                   error_code = NULL, geocoded_at = now(), updated_at = now()
             WHERE tenant_id = $1 AND borrower_id = $2 AND address_kind = $3
+              AND EXISTS (
+                SELECT 1 FROM borrowers borrower
+                 WHERE borrower.tenant_id = $1 AND borrower.id = $2
+                   AND borrower.status = 'active'
+                   AND (
+                     ($3 = 'home' AND borrower.home_address = $9
+                      AND borrower.home_address_status = 'confirmed')
+                     OR ($3 = 'work' AND borrower.work_address = $9
+                         AND borrower.work_address_status = 'confirmed')
+                   )
+              )
             RETURNING address_kind, status, latitude, longitude, formatted_address,
                       provider, precision, error_code, geocoded_at`,
           [
@@ -1133,9 +1176,18 @@ export function createPostgresBorrowerService(
             geocoded.formattedAddress,
             geocoded.precision,
             provider,
+            address,
           ],
         );
-        if (!result.rows[0]) return { status: "not_found" } as const;
+        if (!result.rows[0]) {
+          const current = await client.query<{ id: string }>(
+            `SELECT id FROM borrowers WHERE tenant_id = $1 AND id = $2`,
+            [tenantId, borrowerId],
+          );
+          return current.rows[0]
+            ? ({ status: "stale" } as const)
+            : ({ status: "not_found" } as const);
+        }
         await client.query(
           `INSERT INTO audit_events
              (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
