@@ -229,6 +229,11 @@ function dependencies(overrides?: {
       userStatus: status,
       revokedSessions: status === "disabled" ? 1 : 0,
     })),
+    updateUserMembership: vi.fn(async (_actor, _userId, input) => ({
+      status: "updated" as const,
+      membershipPlan: input.membershipPlan,
+      activatedAt: "2026-10-11T02:00:00.000Z",
+    })),
   };
   const tenancyService: TenancyService = {
     createInvitation: vi.fn(async (_actor, _tenantId, input) => ({
@@ -1333,6 +1338,33 @@ describe("developer platform", () => {
     });
     expect(response.statusCode).toBe(409);
     expect(response.json()).toMatchObject({ error: { code: "USER_PROTECTED" } });
+  });
+
+  it("activates a second owner subscription and returns its activation timestamp", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const userId = "164bf50a-2098-4acc-a250-6ad21df83e40";
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/v1/platform/users/${userId}/membership`,
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: { membershipPlan: "ultra" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      membershipPlan: "ultra",
+      activatedAt: "2026-10-11T02:00:00.000Z",
+    });
+    expect(deps.platformService.updateUserMembership).toHaveBeenCalledWith(
+      developer.id,
+      userId,
+      { membershipPlan: "ultra" },
+      expect.any(String),
+    );
   });
 
   it("creates a draft tenant", async () => {
