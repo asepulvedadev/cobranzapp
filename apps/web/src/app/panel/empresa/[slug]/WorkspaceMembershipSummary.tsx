@@ -9,7 +9,7 @@ export function WorkspaceMembershipSummary({ overview }: { overview: TenantOverv
     { label: "Plan comercial asignado", complete: plan !== null },
     { label: "Propietario con acceso activo", complete: true },
     { label: "Correo operativo registrado", complete: overview.settings.contactEmail !== null },
-    { label: "Primer empleado activo", complete: overview.metrics.activeEmployeeSeats > 0 },
+    { label: "Operación preparada", complete: overview.metrics.branches > 0 },
   ];
   const completedSteps = steps.filter((step) => step.complete).length;
 
