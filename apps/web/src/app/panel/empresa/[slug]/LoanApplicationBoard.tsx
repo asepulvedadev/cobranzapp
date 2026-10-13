@@ -72,10 +72,7 @@ export function LoanApplicationBoard({
       { value: 4, label: "1 mes · 4 cuotas semanales" },
       { value: 5, label: "5 semanas · 5 cuotas semanales" },
     ],
-    fortnightly: [
-      { value: 2, label: "1 mes · 2 cuotas quincenales" },
-      { value: 3, label: "5 semanas · 3 cuotas quincenales" },
-    ],
+    fortnightly: [{ value: 2, label: "1 mes · 2 cuotas quincenales" }],
     monthly: [{ value: 1, label: "1 mes · 1 cuota mensual" }],
   };
 

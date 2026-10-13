@@ -802,7 +802,7 @@ export const loanProductCreateRequestSchema = z
     const allowedTerms: Record<"daily" | "weekly" | "fortnightly" | "monthly", number[]> = {
       daily: [30, 35],
       weekly: [4, 5],
-      fortnightly: [2, 3],
+      fortnightly: [2],
       monthly: [1],
     };
     if (!allowedTerms[value.paymentFrequency].includes(value.termCount)) {
@@ -891,7 +891,7 @@ export const loanApplicationCreateRequestSchema = z
     const allowedTerms: Record<"daily" | "weekly" | "fortnightly" | "monthly", number[]> = {
       daily: [30, 35],
       weekly: [4, 5],
-      fortnightly: [2, 3],
+      fortnightly: [2],
       monthly: [1],
     };
     if (!allowedTerms[value.paymentFrequency].includes(value.requestedTermCount)) {
