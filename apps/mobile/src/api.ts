@@ -20,6 +20,8 @@ import {
   loanProductDirectorySchema,
   messageResponseSchema,
   mfaLoginRequiredResponseSchema,
+  type OwnerSubscriptionSummary,
+  ownerSubscriptionSummarySchema,
   type PlatformOverview,
   type PlatformSystemStatus,
   platformOverviewSchema,
@@ -251,6 +253,16 @@ export class MobileApi {
         response.status,
       );
     return tenantOverviewSchema.parse((await response.json()).overview);
+  }
+
+  async ownerSubscriptions(): Promise<OwnerSubscriptionSummary> {
+    const response = await this.request("/v1/account/subscriptions");
+    if (!response.ok)
+      throw new MobileApiError(
+        await apiError(response, "No fue posible consultar tus suscripciones."),
+        response.status,
+      );
+    return ownerSubscriptionSummarySchema.parse(await response.json());
   }
 
   brandLogoSource(tenantId: string) {

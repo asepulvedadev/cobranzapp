@@ -1,6 +1,7 @@
 import type {
   BorrowerDirectory,
   CurrentUser,
+  OwnerSubscriptionSummary,
   PlatformOverview,
   PlatformSystemStatus,
   RouteDirectory,
@@ -1009,6 +1010,7 @@ function AuthenticatedHome({
   const [routes, setRoutes] = useState<RouteDirectory | null>(null);
   const [platform, setPlatform] = useState<PlatformOverview | null>(null);
   const [system, setSystem] = useState<PlatformSystemStatus | null>(null);
+  const [subscriptions, setSubscriptions] = useState<OwnerSubscriptionSummary | null>(null);
   const [accountProfile, setAccountProfile] = useState<UserProfile | null>(null);
   const [accountProfileOpen, setAccountProfileOpen] = useState(false);
   const [accountProfileLoading, setAccountProfileLoading] = useState(false);
@@ -1035,6 +1037,7 @@ function AuthenticatedHome({
     const shouldLoadDirectory =
       canReadBorrowers && (tenantSection === "clients" || tenantSection === "credits");
     const shouldLoadRoutes = canReadBorrowers && tenantSection === "routes";
+    const shouldLoadSubscriptions = user.platformRole === null && user.memberships.length === 0;
     Promise.all([
       user.platformRole === "developer" ? api.platformOverview() : Promise.resolve(null),
       user.platformRole === "developer" ? api.systemStatus() : Promise.resolve(null),
@@ -1044,6 +1047,7 @@ function AuthenticatedHome({
         ? api.borrowerDirectory(tenantId, { search: directorySearch, page: directoryPage })
         : Promise.resolve(null),
       tenantId && shouldLoadRoutes ? api.routeDirectory(tenantId) : Promise.resolve(null),
+      shouldLoadSubscriptions ? api.ownerSubscriptions() : Promise.resolve(null),
     ])
       .then(
         ([
@@ -1053,6 +1057,7 @@ function AuthenticatedHome({
           memberProfileResult,
           borrowerResult,
           routeResult,
+          subscriptionResult,
         ]) => {
           if (!mounted) return;
           setPlatform(platformResult);
@@ -1061,6 +1066,7 @@ function AuthenticatedHome({
           setMemberProfile(memberProfileResult);
           setDirectory(borrowerResult);
           setRoutes(routeResult);
+          setSubscriptions(subscriptionResult);
         },
       )
       .catch((error) => {
@@ -1087,6 +1093,7 @@ function AuthenticatedHome({
     tenantId,
     tenantSection,
     user.id,
+    user.memberships.length,
     user.platformRole,
   ]);
 
@@ -1402,6 +1409,13 @@ function AuthenticatedHome({
         ) : user.platformRole !== "developer" ? (
           <View style={styles.boundaryCard}>
             <Text style={styles.cardTitle}>Aún no tienes una empresa activa</Text>
+            {subscriptions ? (
+              <Text style={styles.muted}>
+                {subscriptions.availableCount > 0
+                  ? `Tienes ${subscriptions.availableCount} suscripción(es) disponible(s). Crea tu empresa desde el panel web.`
+                  : "No tienes suscripciones disponibles. Solicita al desarrollador que active una."}
+              </Text>
+            ) : null}
             <Text style={styles.muted}>
               Si eres propietario, crea la empresa desde el panel web. Si eres empleado, el
               propietario debe registrarte con tu usuario y teléfono.
