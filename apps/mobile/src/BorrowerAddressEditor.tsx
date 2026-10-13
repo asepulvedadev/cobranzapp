@@ -13,6 +13,19 @@ import {
 import type { MobileApi } from "./api";
 import { MobileApiError } from "./api";
 
+function splitAddress(value: string) {
+  const parts = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return { street: value, locality: "" };
+  return { street: parts.slice(0, -1).join(", "), locality: parts.at(-1) ?? "" };
+}
+
+function composeAddress(street: string, locality: string) {
+  return [street.trim(), locality.trim()].filter(Boolean).join(", ");
+}
+
 type BorrowerAddressEditorProps = {
   api: MobileApi;
   borrower: Borrower;
@@ -30,7 +43,9 @@ export function BorrowerAddressEditor({
 }: BorrowerAddressEditorProps) {
   const [open, setOpen] = useState(false);
   const [homeAddress, setHomeAddress] = useState(borrower.homeAddress);
+  const [homeAddressLocality, setHomeAddressLocality] = useState("");
   const [workAddress, setWorkAddress] = useState(borrower.workAddress);
+  const [workAddressLocality, setWorkAddressLocality] = useState("");
   const [homeConfirmed, setHomeConfirmed] = useState(borrower.homeAddressStatus === "confirmed");
   const [workConfirmed, setWorkConfirmed] = useState(borrower.workAddressStatus === "confirmed");
   const [busy, setBusy] = useState(false);
@@ -38,16 +53,25 @@ export function BorrowerAddressEditor({
 
   useEffect(() => {
     if (!open) return;
-    setHomeAddress(borrower.homeAddress);
-    setWorkAddress(borrower.workAddress);
+    const home = splitAddress(borrower.homeAddress);
+    const work = splitAddress(borrower.workAddress);
+    setHomeAddress(home.street);
+    setHomeAddressLocality(home.locality);
+    setWorkAddress(work.street);
+    setWorkAddressLocality(work.locality);
     setHomeConfirmed(borrower.homeAddressStatus === "confirmed");
     setWorkConfirmed(borrower.workAddressStatus === "confirmed");
     setMessage("");
   }, [borrower, open]);
 
   async function save() {
-    if (!homeAddress.trim() || !workAddress.trim()) {
-      setMessage("Escribe las direcciones completas de casa y trabajo.");
+    if (
+      !homeAddress.trim() ||
+      !homeAddressLocality.trim() ||
+      !workAddress.trim() ||
+      !workAddressLocality.trim()
+    ) {
+      setMessage("Completa la dirección, barrio y municipio de casa y trabajo.");
       return;
     }
     if (!homeConfirmed || !workConfirmed) {
@@ -57,8 +81,8 @@ export function BorrowerAddressEditor({
     setBusy(true);
     setMessage("");
     const input: BorrowerAddressUpdateRequest = {
-      homeAddress: homeAddress.trim(),
-      workAddress: workAddress.trim(),
+      homeAddress: composeAddress(homeAddress, homeAddressLocality),
+      workAddress: composeAddress(workAddress, workAddressLocality),
       homeAddressConfirmed: true,
       workAddressConfirmed: true,
     };
@@ -136,6 +160,19 @@ export function BorrowerAddressEditor({
                 style={styles.textarea}
                 value={homeAddress}
               />
+              <Text style={styles.label}>Barrio y municipio de casa</Text>
+              <TextInput
+                autoCapitalize="sentences"
+                editable={!busy}
+                onChangeText={(value) => {
+                  setHomeAddressLocality(value);
+                  setHomeConfirmed(false);
+                }}
+                placeholder="Ej. Barrio Centro, Cúcuta"
+                placeholderTextColor="#77817a"
+                style={styles.input}
+                value={homeAddressLocality}
+              />
               <Pressable
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: homeConfirmed }}
@@ -159,6 +196,19 @@ export function BorrowerAddressEditor({
                 placeholderTextColor="#77817a"
                 style={styles.textarea}
                 value={workAddress}
+              />
+              <Text style={styles.label}>Barrio y municipio de trabajo</Text>
+              <TextInput
+                autoCapitalize="sentences"
+                editable={!busy}
+                onChangeText={(value) => {
+                  setWorkAddressLocality(value);
+                  setWorkConfirmed(false);
+                }}
+                placeholder="Ej. Barrio La Playa, Cúcuta"
+                placeholderTextColor="#77817a"
+                style={styles.input}
+                value={workAddressLocality}
               />
               <Pressable
                 accessibilityRole="checkbox"
@@ -220,6 +270,15 @@ const styles = {
     backgroundColor: "#151817",
     color: "#f4f6f4",
     textAlignVertical: "top" as const,
+  },
+  input: {
+    minHeight: 46,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#465149",
+    backgroundColor: "#151817",
+    color: "#f4f6f4",
   },
   checkRow: { flexDirection: "row" as const, alignItems: "center" as const, gap: 8 },
   checkbox: { color: "#fbbf24", fontSize: 20 },

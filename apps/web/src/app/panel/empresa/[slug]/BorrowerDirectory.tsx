@@ -39,6 +39,15 @@ function composeAddress(street: string, locality: string) {
   return [street.trim(), locality.trim()].filter(Boolean).join(", ");
 }
 
+function splitAddress(value: string) {
+  const parts = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return { street: value, locality: "" };
+  return { street: parts.slice(0, -1).join(", "), locality: parts.at(-1) ?? "" };
+}
+
 export function BorrowerDirectory({
   tenantId,
   directory,
@@ -62,7 +71,9 @@ export function BorrowerDirectory({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [addressEditBorrower, setAddressEditBorrower] = useState<Borrower | null>(null);
   const [addressEditHome, setAddressEditHome] = useState("");
+  const [addressEditHomeLocality, setAddressEditHomeLocality] = useState("");
   const [addressEditWork, setAddressEditWork] = useState("");
+  const [addressEditWorkLocality, setAddressEditWorkLocality] = useState("");
   const [addressEditHomeConfirmed, setAddressEditHomeConfirmed] = useState(false);
   const [addressEditWorkConfirmed, setAddressEditWorkConfirmed] = useState(false);
   const [isAddressSaving, setIsAddressSaving] = useState(false);
@@ -201,9 +212,13 @@ export function BorrowerDirectory({
   }
 
   function openAddressEditor(borrower: Borrower) {
+    const home = splitAddress(borrower.homeAddress);
+    const work = splitAddress(borrower.workAddress);
     setAddressEditBorrower(borrower);
-    setAddressEditHome(borrower.homeAddress);
-    setAddressEditWork(borrower.workAddress);
+    setAddressEditHome(home.street);
+    setAddressEditHomeLocality(home.locality);
+    setAddressEditWork(work.street);
+    setAddressEditWorkLocality(work.locality);
     setAddressEditHomeConfirmed(borrower.homeAddressStatus === "confirmed");
     setAddressEditWorkConfirmed(borrower.workAddressStatus === "confirmed");
     setMessage("");
@@ -213,14 +228,19 @@ export function BorrowerDirectory({
   async function saveAddresses(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!addressEditBorrower) return;
-    if (!addressEditHome.trim() || !addressEditWork.trim()) {
-      setMessage("Escribe las dos direcciones completas antes de guardar.");
+    if (
+      !addressEditHome.trim() ||
+      !addressEditHomeLocality.trim() ||
+      !addressEditWork.trim() ||
+      !addressEditWorkLocality.trim()
+    ) {
+      setMessage("Completa la dirección, barrio y municipio de casa y trabajo antes de guardar.");
       setIsError(true);
       return;
     }
     const addressPayload = {
-      homeAddress: addressEditHome.trim(),
-      workAddress: addressEditWork.trim(),
+      homeAddress: composeAddress(addressEditHome, addressEditHomeLocality),
+      workAddress: composeAddress(addressEditWork, addressEditWorkLocality),
       homeAddressConfirmed: addressEditHomeConfirmed,
       workAddressConfirmed: addressEditWorkConfirmed,
     };
@@ -938,6 +958,17 @@ export function BorrowerDirectory({
               rows={3}
               value={addressEditHome}
             />
+            <label htmlFor="edit-borrower-home-locality">Barrio y municipio de casa</label>
+            <input
+              id="edit-borrower-home-locality"
+              maxLength={100}
+              onChange={(event) => {
+                setAddressEditHomeLocality(event.target.value);
+                setAddressEditHomeConfirmed(false);
+              }}
+              required
+              value={addressEditHomeLocality}
+            />
             <label className="checkbox-row address-confirmation">
               <input
                 checked={addressEditHomeConfirmed}
@@ -959,6 +990,17 @@ export function BorrowerDirectory({
               required
               rows={3}
               value={addressEditWork}
+            />
+            <label htmlFor="edit-borrower-work-locality">Barrio y municipio de trabajo</label>
+            <input
+              id="edit-borrower-work-locality"
+              maxLength={100}
+              onChange={(event) => {
+                setAddressEditWorkLocality(event.target.value);
+                setAddressEditWorkConfirmed(false);
+              }}
+              required
+              value={addressEditWorkLocality}
             />
             <label className="checkbox-row address-confirmation">
               <input
