@@ -44,12 +44,10 @@ import {
 } from "@cobranzapp/contracts";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+import { buildBrandLogoSource, mobileApiBaseUrl } from "./brand-assets";
 
 const sessionStorageKey = "cobranzapp.mobile.session";
-const apiBaseUrl = (process.env.EXPO_PUBLIC_API_URL ?? "https://cobranzaap.tech").replace(
-  /\/$/,
-  "",
-);
+const apiBaseUrl = mobileApiBaseUrl;
 const usesBrowserCookies = Platform.OS === "web";
 
 function cookieValue(setCookie: string | null, name: string) {
@@ -228,10 +226,7 @@ export class MobileApi {
   }
 
   brandLogoSource(tenantId: string) {
-    return {
-      uri: `${apiBaseUrl}/api/v1/tenants/${tenantId}/brand-logo`,
-      ...(this.sessionCookie ? { headers: { Cookie: this.sessionCookie } } : {}),
-    };
+    return buildBrandLogoSource(tenantId, this.sessionCookie);
   }
 
   async createMember(tenantId: string, input: TenantMemberCreateRequest) {
