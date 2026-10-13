@@ -990,8 +990,9 @@ export const borrowerCreateRequestSchema = z
     whatsappPhone: z.string().trim().min(7).max(30).nullable().optional(),
     homeAddress: z.string().trim().min(3).max(240),
     workAddress: z.string().trim().min(3).max(240),
-    homeAddressConfirmed: z.boolean().optional(),
-    workAddressConfirmed: z.boolean().optional(),
+    /** The operator must verify both addresses with the client before saving the dossier. */
+    homeAddressConfirmed: z.literal(true),
+    workAddressConfirmed: z.literal(true),
     profilePhotoObjectKey: z.string().trim().min(1).max(500).nullable(),
     consentVersion: z.string().trim().min(1).max(40),
     consentEvidenceRef: z.string().trim().min(1).max(240),
@@ -1064,8 +1065,9 @@ export const borrowerAddressGeocodeRequestSchema = z
 export const borrowerAddressUpdateRequestSchema = z.object({
   homeAddress: z.string().trim().min(3).max(240),
   workAddress: z.string().trim().min(3).max(240),
-  homeAddressConfirmed: z.boolean(),
-  workAddressConfirmed: z.boolean(),
+  /** Corrections are accepted only after both addresses are confirmed again. */
+  homeAddressConfirmed: z.literal(true),
+  workAddressConfirmed: z.literal(true),
 });
 export const borrowerAddressLocationResponseSchema = z.object({
   location: borrowerAddressLocationSchema,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   borrowerAddressGeocodeRequestSchema,
+  borrowerAddressUpdateRequestSchema,
   borrowerCreateRequestSchema,
   borrowerDirectorySchema,
   borrowerReviewRequestSchema,
@@ -142,6 +143,8 @@ describe("shared API contracts", () => {
       phone: "+57 300 111 2233",
       homeAddress: "Calle 1 # 2-3",
       workAddress: "Carrera 4 # 5-6",
+      homeAddressConfirmed: true,
+      workAddressConfirmed: true,
       profilePhotoObjectKey: null,
       consentVersion: "borrower-dossier-v1",
       consentEvidenceRef: "form-001",
@@ -158,6 +161,38 @@ describe("shared API contracts", () => {
         ],
       }).success,
     ).toBe(true);
+    expect(
+      borrowerCreateRequestSchema.safeParse({
+        ...base,
+        homeAddressConfirmed: false,
+        emergencyContacts: [
+          { fullName: "Contacto", relationship: "Hermano", phone: "+57 300 444 5566" },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      borrowerCreateRequestSchema.safeParse({
+        ...base,
+        workAddressConfirmed: undefined,
+        emergencyContacts: [
+          { fullName: "Contacto", relationship: "Hermano", phone: "+57 300 444 5566" },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("only accepts address corrections after both addresses are confirmed", () => {
+    const payload = {
+      homeAddress: "Calle 10 # 20-30, Cúcuta",
+      workAddress: "Carrera 5 # 6-7, Cúcuta",
+      homeAddressConfirmed: true,
+      workAddressConfirmed: true,
+    };
+    expect(borrowerAddressUpdateRequestSchema.safeParse(payload).success).toBe(true);
+    expect(
+      borrowerAddressUpdateRequestSchema.safeParse({ ...payload, workAddressConfirmed: false })
+        .success,
+    ).toBe(false);
   });
 
   it("requires the full checklist before approving a borrower identity", () => {
