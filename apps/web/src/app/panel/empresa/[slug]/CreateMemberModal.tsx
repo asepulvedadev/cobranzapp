@@ -3,6 +3,7 @@
 import { tenantMemberCreateRequestSchema } from "@cobranzapp/contracts";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { formatApiError } from "../../api-error";
 import { Modal } from "../../Modal";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
 import { usePanelUiStore } from "../../ui-store";
@@ -66,13 +67,11 @@ export function CreateMemberModal({
       body: JSON.stringify(parsed.data),
     }).catch(() => null);
     if (!response?.ok) {
-      const body = (await response?.json().catch(() => ({}))) as {
-        error?: { message?: string };
-      };
+      const body = await response?.json().catch(() => ({}));
       setMessage(
         response?.status === 428
           ? "La confirmación de seguridad tardó demasiado. Inténtalo de nuevo."
-          : (body.error?.message ?? "No fue posible crear el empleado."),
+          : formatApiError(body, "No fue posible crear el empleado."),
       );
       setIsError(true);
       setIsSubmitting(false);

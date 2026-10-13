@@ -8,6 +8,7 @@ import {
 } from "@cobranzapp/contracts";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useRef, useState } from "react";
+import { formatApiError } from "../../api-error";
 import { Modal } from "../../Modal";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
 import { BorrowerDocumentUpload } from "./BorrowerDocumentUpload";
@@ -222,8 +223,8 @@ export function BorrowerDirectory({
     ).catch(() => null);
     setIsAddressSaving(false);
     if (!response?.ok) {
-      const body = (await response?.json().catch(() => ({}))) as { error?: { message?: string } };
-      setMessage(body.error?.message ?? "No fue posible actualizar las direcciones.");
+      const body = await response?.json().catch(() => ({}));
+      setMessage(formatApiError(body, "No fue posible actualizar las direcciones."));
       setIsError(true);
       return;
     }
@@ -296,8 +297,8 @@ export function BorrowerDirectory({
       body: JSON.stringify(parsedPayload.data),
     }).catch(() => null);
     if (!response?.ok) {
-      const body = (await response?.json().catch(() => ({}))) as { error?: { message?: string } };
-      setMessage(body.error?.message ?? "No fue posible crear el cliente.");
+      const body = await response?.json().catch(() => ({}));
+      setMessage(formatApiError(body, "No fue posible crear el cliente."));
       setIsError(true);
       setIsSubmitting(false);
       return;

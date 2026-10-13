@@ -3,6 +3,7 @@
 import type { ApiError } from "@cobranzapp/contracts";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { formatApiError } from "../api-error";
 
 export function CreateCompanyOnboarding() {
   const router = useRouter();
@@ -24,7 +25,7 @@ export function CreateCompanyOnboarding() {
     }).catch(() => null);
     if (!response?.ok) {
       const body = (await response?.json().catch(() => ({}))) as ApiError | undefined;
-      setMessage(body?.error?.message ?? "No fue posible crear la empresa.");
+      setMessage(formatApiError(body, "No fue posible crear la empresa."));
       setBusy(false);
       return;
     }

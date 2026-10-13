@@ -8,6 +8,7 @@ import type {
   LoanApplication,
   LoanProduct,
 } from "../../../../lib/platform";
+import { formatApiError } from "../../api-error";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
 
 const statusLabels: Record<LoanApplication["status"], string> = {
@@ -29,10 +30,8 @@ const frequencyLabels: Record<LoanApplication["paymentFrequency"], string> = {
 };
 
 async function errorMessage(response: Response | null) {
-  const body = (await response?.json().catch(() => ({}))) as {
-    error?: { message?: string };
-  };
-  return body.error?.message ?? "No fue posible operar el crédito.";
+  const body = await response?.json().catch(() => ({}));
+  return formatApiError(body, "No fue posible operar el crédito.");
 }
 
 export function LoanApplicationBoard({
