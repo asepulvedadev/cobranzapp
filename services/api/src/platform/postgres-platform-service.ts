@@ -956,11 +956,10 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
              FROM tenant_settings WHERE tenant_id = $1`,
           [tenant.id],
         );
-        await client.query(
-          `INSERT INTO branches (tenant_id, code, display_name, status, created_by)
-           VALUES ($1, 'principal', 'Sede principal', 'active', $2)`,
-          [tenant.id, actorUserId],
-        );
+        // A company is intentionally created without a branch/team hierarchy.
+        // Employees operate directly in the tenant; branch records remain
+        // available only for legacy/support data and are created explicitly
+        // when a future tenant needs that optional structure.
         await client.query(
           `INSERT INTO audit_events (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
            VALUES ($1, $2, 'tenant.created_by_owner', 'tenant', $1, $3,
