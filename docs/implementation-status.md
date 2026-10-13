@@ -34,7 +34,7 @@ La proyección configurable ya está disponible para comparar escenarios, pero n
 ## Evidencia de calidad de la última entrega
 
 - `pnpm check` pasa formato, tipos, pruebas y compilación.
-- Contratos: 37 pruebas aprobadas.
+- Contratos: 38 pruebas aprobadas.
 - Financiero: 8 pruebas aprobadas.
 - Worker: 2 pruebas aprobadas y 5 omitidas cuando no hay PostgreSQL de CI.
 - Web: 42 pruebas aprobadas.
