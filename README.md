@@ -36,7 +36,7 @@ Plataforma móvil y multiempresa para gestionar créditos y cobranzas de prestam
 
 - El nombre de la aplicación es **cobranzapp**. El isotipo y el logotipo geométrico están aprobados. Los archivos transparentes están en `assets/brand-app/`.
 - El mercado inicial es Colombia, la moneda de referencia es COP, el idioma público es español colombiano (`es-CO`) y la zona horaria es `America/Bogota`.
-- No se usarán Hermes, asistentes, modelos de lenguaje, aprendizaje automático ni OCR basado en modelos. El ingreso y la revisión de datos son manuales; la automatización usa reglas explícitas.
+- No se usarán Hermes, asistentes, modelos de lenguaje ni decisiones automatizadas. El alta y la revisión siguen siendo manuales; el worker puede proponer campos mediante Tesseract OCR determinista, siempre con confirmación humana.
 - Ejemplo reportado: COP 100.000 nominales, COP 10.000 retenidos por documentación, COP 90.000 entregados y COP 130.000 de pago futuro total.
 - Frecuencias reportadas: 30 cuotas diarias, dos cuotas quincenales o un pago al final del mes.
 - Cobradores y supervisores trabajan en campo y necesitan acceso limitado a la información del cliente y sus direcciones.

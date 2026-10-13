@@ -1,6 +1,6 @@
 # Estado de implementación
 
-> **Actualizado:** 2026-10-12. Este documento refleja el estado real del repositorio y no sustituye las autorizaciones de [la hoja de ruta](roadmap.md).
+> **Actualizado:** 2026-10-13. Este documento refleja el estado real del repositorio y no sustituye las autorizaciones de [la hoja de ruta](roadmap.md).
 
 ## Entregas verificadas
 
@@ -11,9 +11,10 @@
 | Alta comercial | Completado | El desarrollador registra propietarios, emite códigos únicos por suscripción y cada propietario crea varias empresas desde su panel |
 | Consola de desarrollador | Completado | Directorios paginados, registro de propietarios, emisión de códigos, planes, cupos, estados, actividad, estado técnico y soporte temporal auditado |
 | Expediente de cliente | Completado | Identidad manual, teléfonos, direcciones, contactos de emergencia, foto designada y documentos privados |
+| OCR asistivo de documentos | Completado con revisión humana | Tesseract en el worker, imágenes/PDF privados, sugerencias cifradas, reintento y confirmación auditada |
 | Personal operativo | Completado | Perfil de supervisores y cobradores, identidad cifrada, últimos cuatro dígitos, tipo de sangre con consentimiento y documentos privados |
 | Verificación compartida | Completado con activación controlada | Consentimiento, propósito, vencimiento, consulta mínima, correcciones, disputas y auditoría; no es lista negra |
-| Rutas de cobranza | Completado | Plantillas, paradas, estados y asignación de cobradores con alcance por empresa |
+| Rutas de cobranza | Completado | Plantillas, geocodificación bajo demanda, optimización por cercanía, visitas auditadas y asignación por empresa |
 | Originación preliminar | Completado como borrador | Catálogo configurable, edición por propietario/supervisor, proyección de cuotas y solicitudes; no aprueba, desembolsa ni registra obligaciones |
 | Entrega VPS | Completado para el entorno actual | Imágenes inmutables transferidas por SSH, orden estricto de despliegue, health/readiness, Caddy y roles PostgreSQL separados |
 

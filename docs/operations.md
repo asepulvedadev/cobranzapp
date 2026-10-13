@@ -134,19 +134,21 @@ queda auditado. La interfaz deja claro que esto no aprueba,
 desembolsa, calcula cuotas ni registra pagos; esas decisiones requieren los controles legales,
 contables y de calendario de las siguientes fases.
 
-## Document capture and manual identity review — no AI
+## Document capture and deterministic OCR
 
-The latest instruction supersedes the earlier OCR/Hermes request. The baseline contains **no OCR/AI extraction**. Model-based OCR, such as the models documented for ML Kit, is excluded from a strict no-AI product. This is a conservative scope boundary, not a claim that all text recognition is AI. [ML Kit model deployment documentation](https://developers.google.com/ml-kit/vision/text-recognition/v2/android)
+The web and VPS worker now support **deterministic Tesseract OCR** for the first page of an
+identity image or PDF. This is an assistive extraction only: it is not a generative model,
+does not assert authenticity and never changes identity fields without a human confirmation.
 
-Proposed flow: `Authorized camera/file capture → Private quarantine → File checks → Manual structured entry → Human review → Verified fields`.
+Flow: `Authorized camera/file capture → Private quarantine → File checks → Tesseract suggestion → Manual correction → Human review → Verified fields`.
 
 - Support guided front/back camera capture and file upload, crop/rotation, explicit reshoot, and manual entry. No model-based blur/glare detection is assumed.
-- Capture document country/type/number and required legal-name fields by hand; keep original document and corrected-field history with restricted access.
+- Capture document country/type/number and required legal-name fields; OCR suggestions remain encrypted and editable until confirmation.
 - Require a second reviewer where the approved risk/identity policy calls for one; apply normalization and tenant-local exact duplicate checks deterministically.
 - Barcode/QR parsing is a possible non-AI convenience only if the target document exposes a supported format and its use is approved. Use a selected non-model decoder and explicit field mapping; never assume jurisdiction-wide coverage or identity authenticity.
 - Minimize collected fields; avoid face matching, biometrics, document fraud models, and third-party AI extraction services.
 - File integrity, actual content-type validation, size limits, quarantine/scanning, private access and retention remain mandatory without AI.
-- Pilot validation measures entry errors, correction frequency, capture failure rate, and reviewer time. No “confidence score” is fabricated.
+- Pilot validation measures entry errors, correction frequency, capture failure rate, OCR confidence and reviewer time. Confidence is only a heuristic for prioritization, never proof of identity.
 
 ## Confirmed fieldwork and access requirements
 
