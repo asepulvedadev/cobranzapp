@@ -35,6 +35,14 @@ function wazeUrl(address: string, location: Borrower["addressLocations"]["home"]
   return `https://www.waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes`;
 }
 
+function whatsappUrl(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  // Colombian numbers are stored as entered by the operator. Add the country
+  // code only when a local ten-digit number was provided.
+  const normalized = digits.length === 10 && digits.startsWith("3") ? `57${digits}` : digits;
+  return normalized ? `https://wa.me/${normalized}` : null;
+}
+
 function composeAddress(street: string, locality: string) {
   return [street.trim(), locality.trim()].filter(Boolean).join(", ");
 }
@@ -606,6 +614,15 @@ export function BorrowerDirectory({
                     <td data-label="Contacto">
                       <strong>{borrower.phone}</strong>
                       <small>WhatsApp: {borrower.whatsappPhone ?? borrower.phone}</small>
+                      {whatsappUrl(borrower.whatsappPhone ?? borrower.phone) ? (
+                        <a
+                          href={whatsappUrl(borrower.whatsappPhone ?? borrower.phone) ?? undefined}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          Abrir WhatsApp
+                        </a>
+                      ) : null}
                       <small>{borrower.documents.length} documento(s) privado(s)</small>
                     </td>
                     <td data-label="Estado de identidad">

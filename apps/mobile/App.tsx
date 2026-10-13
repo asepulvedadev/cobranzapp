@@ -77,6 +77,12 @@ function errorText(error: unknown, fallback: string) {
   return error instanceof MobileApiError ? error.message : fallback;
 }
 
+function whatsappUrl(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  const normalized = digits.length === 10 && digits.startsWith("3") ? `57${digits}` : digits;
+  return normalized ? `https://wa.me/${normalized}` : null;
+}
+
 function PrimaryButton({
   disabled,
   label,
@@ -621,6 +627,27 @@ function TenantClients({
                     ? "Identidad revisada"
                     : "Pendiente de revisión"}
                 </Text>
+                <View style={styles.contactActions}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => void Linking.openURL(`tel:${borrower.phone}`)}
+                    style={styles.inlineAction}
+                  >
+                    <Text style={styles.inlineActionText}>Llamar</Text>
+                  </Pressable>
+                  {whatsappUrl(borrower.whatsappPhone ?? borrower.phone) ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => {
+                        const url = whatsappUrl(borrower.whatsappPhone ?? borrower.phone);
+                        if (url) void Linking.openURL(url);
+                      }}
+                      style={styles.inlineAction}
+                    >
+                      <Text style={styles.inlineActionText}>WhatsApp</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
                 <BorrowerOcrControl
                   api={api}
                   borrowerId={borrower.id}
@@ -1660,6 +1687,9 @@ const styles = StyleSheet.create({
   avatarText: { color: "#151817", fontWeight: "900" },
   listCopy: { flex: 1, gap: 2 },
   listTitle: { color: "#eef2ee", fontWeight: "700", fontSize: 15 },
+  contactActions: { flexDirection: "row" as const, gap: 12, marginTop: 4 },
+  inlineAction: { paddingVertical: 3 },
+  inlineActionText: { color: "#fbbf24", fontWeight: "800" as const, fontSize: 12 },
   chevron: { color: "#8d978f", fontSize: 26 },
   directoryHeading: {
     flexDirection: "row",
