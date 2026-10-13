@@ -1,5 +1,6 @@
 import {
   borrowerAddressGeocodeRequestSchema,
+  borrowerAddressUpdateRequestSchema,
   borrowerCreateRequestSchema,
   borrowerDirectoryQuerySchema,
   borrowerOcrConfirmRequestSchema,
@@ -2805,6 +2806,73 @@ export function buildApp(dependencies: AppDependencies) {
     if (!borrower)
       return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
     return reply.send({ borrower });
+  });
+
+  app.patch("/v1/tenants/:tenantId/borrowers/:borrowerId/addresses", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantBorrowerParamsSchema.safeParse(request.params);
+    const body = borrowerAddressUpdateRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_BORROWER_ADDRESSES",
+        "Escribe y confirma las direcciones completas de casa y trabajo.",
+        request.id,
+      );
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !canManageBorrowers(membership.role)) {
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a este cliente.", request.id);
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    if (!dependencies.borrowerService) {
+      return sendError(
+        reply,
+        503,
+        "BORROWER_DOSSIER_UNAVAILABLE",
+        "El módulo de clientes requiere configurar su clave de protección.",
+        request.id,
+      );
+    }
+    try {
+      const result = await dependencies.borrowerService.updateAddresses(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.borrowerId,
+        { ...body.data, requestId: request.id },
+      );
+      if (result.status === "not_found") {
+        return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
+      }
+      if (result.status === "forbidden") {
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "No puedes actualizar este cliente.",
+          request.id,
+        );
+      }
+      return reply.send({ borrower: result.borrower });
+    } catch (error) {
+      if (error instanceof Error && error.message === "INVALID_BORROWER_ADDRESS") {
+        return sendError(
+          reply,
+          400,
+          "INVALID_BORROWER_ADDRESS",
+          "Escribe una dirección completa de casa y trabajo.",
+          request.id,
+        );
+      }
+      throw error;
+    }
   });
 
   app.post("/v1/tenants/:tenantId/borrowers/:borrowerId/geocode", async (request, reply) => {

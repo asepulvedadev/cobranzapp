@@ -50,6 +50,12 @@ export function BorrowerDirectory({
   const [isError, setIsError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [addressEditBorrower, setAddressEditBorrower] = useState<Borrower | null>(null);
+  const [addressEditHome, setAddressEditHome] = useState("");
+  const [addressEditWork, setAddressEditWork] = useState("");
+  const [addressEditHomeConfirmed, setAddressEditHomeConfirmed] = useState(false);
+  const [addressEditWorkConfirmed, setAddressEditWorkConfirmed] = useState(false);
+  const [isAddressSaving, setIsAddressSaving] = useState(false);
   const [geocodeBusy, setGeocodeBusy] = useState("");
   const [includeSecondContact, setIncludeSecondContact] = useState(false);
   const [homeAddressConfirmed, setHomeAddressConfirmed] = useState(false);
@@ -132,6 +138,52 @@ export function BorrowerDirectory({
       return;
     }
     setMessage("Dirección ubicada y guardada para las rutas.");
+    setIsError(false);
+    router.refresh();
+  }
+
+  function openAddressEditor(borrower: Borrower) {
+    setAddressEditBorrower(borrower);
+    setAddressEditHome(borrower.homeAddress);
+    setAddressEditWork(borrower.workAddress);
+    setAddressEditHomeConfirmed(borrower.homeAddressStatus === "confirmed");
+    setAddressEditWorkConfirmed(borrower.workAddressStatus === "confirmed");
+    setMessage("");
+    setIsError(false);
+  }
+
+  async function saveAddresses(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!addressEditBorrower) return;
+    if (!addressEditHome.trim() || !addressEditWork.trim()) {
+      setMessage("Escribe las dos direcciones completas antes de guardar.");
+      setIsError(true);
+      return;
+    }
+    setIsAddressSaving(true);
+    setMessage("");
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/borrowers/${addressEditBorrower.id}/addresses`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          homeAddress: addressEditHome.trim(),
+          workAddress: addressEditWork.trim(),
+          homeAddressConfirmed: addressEditHomeConfirmed,
+          workAddressConfirmed: addressEditWorkConfirmed,
+        }),
+      },
+    ).catch(() => null);
+    setIsAddressSaving(false);
+    if (!response?.ok) {
+      const body = (await response?.json().catch(() => ({}))) as { error?: { message?: string } };
+      setMessage(body.error?.message ?? "No fue posible actualizar las direcciones.");
+      setIsError(true);
+      return;
+    }
+    setAddressEditBorrower(null);
+    setMessage("Direcciones actualizadas. Vuelve a ubicarlas para usar Waze con precisión.");
     setIsError(false);
     router.refresh();
   }
@@ -377,6 +429,13 @@ export function BorrowerDirectory({
                               Abrir en Waze
                             </a>
                           </div>
+                          <button
+                            className="button-secondary borrower-address-edit-button"
+                            onClick={() => openAddressEditor(borrower)}
+                            type="button"
+                          >
+                            Corregir direcciones
+                          </button>
                           <div>
                             <span>Contactos de emergencia</span>
                             {borrower.emergencyContacts.map((contact) => (
@@ -715,6 +774,57 @@ export function BorrowerDirectory({
                 </button>
               )}
             </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      {addressEditBorrower ? (
+        <Modal
+          onClose={() => setAddressEditBorrower(null)}
+          title={`Corregir direcciones de ${addressEditBorrower.fullName}`}
+        >
+          <form className="tenant-form borrower-address-edit-form" onSubmit={saveAddresses}>
+            <p className="operational-note">
+              Al guardar se eliminan las coordenadas anteriores para evitar enviar al cobrador a una
+              ubicación desactualizada. Confirma cada dirección con el cliente.
+            </p>
+            <label htmlFor="edit-borrower-home">Dirección de casa</label>
+            <textarea
+              id="edit-borrower-home"
+              maxLength={240}
+              onChange={(event) => setAddressEditHome(event.target.value)}
+              required
+              rows={3}
+              value={addressEditHome}
+            />
+            <label className="checkbox-row address-confirmation">
+              <input
+                checked={addressEditHomeConfirmed}
+                onChange={(event) => setAddressEditHomeConfirmed(event.target.checked)}
+                type="checkbox"
+              />
+              <span>Confirmo que la dirección de casa está completa y fue verificada.</span>
+            </label>
+            <label htmlFor="edit-borrower-work">Dirección de trabajo</label>
+            <textarea
+              id="edit-borrower-work"
+              maxLength={240}
+              onChange={(event) => setAddressEditWork(event.target.value)}
+              required
+              rows={3}
+              value={addressEditWork}
+            />
+            <label className="checkbox-row address-confirmation">
+              <input
+                checked={addressEditWorkConfirmed}
+                onChange={(event) => setAddressEditWorkConfirmed(event.target.checked)}
+                type="checkbox"
+              />
+              <span>Confirmo que la dirección de trabajo está completa y fue verificada.</span>
+            </label>
+            <button disabled={isAddressSaving} type="submit">
+              {isAddressSaving ? "Guardando…" : "Guardar direcciones"}
+            </button>
           </form>
         </Modal>
       ) : null}

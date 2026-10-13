@@ -1036,6 +1036,17 @@ export const borrowerAddressLocationSchema = z.object({
 export const borrowerAddressGeocodeRequestSchema = z.object({
   addressKind: z.enum(["home", "work"]),
 });
+/**
+ * Corrects both operational addresses in one atomic action. Requiring both
+ * confirmations prevents a stale address from being silently left behind
+ * when a field operator corrects a client's record.
+ */
+export const borrowerAddressUpdateRequestSchema = z.object({
+  homeAddress: z.string().trim().min(3).max(240),
+  workAddress: z.string().trim().min(3).max(240),
+  homeAddressConfirmed: z.boolean(),
+  workAddressConfirmed: z.boolean(),
+});
 export const borrowerAddressLocationResponseSchema = z.object({
   location: borrowerAddressLocationSchema,
 });
@@ -1271,6 +1282,7 @@ export type RouteStopOptimizeRequest = z.infer<typeof routeStopOptimizeRequestSc
 export type RouteStop = z.infer<typeof routeStopSchema>;
 export type BorrowerAddressLocation = z.infer<typeof borrowerAddressLocationSchema>;
 export type BorrowerAddressGeocodeRequest = z.infer<typeof borrowerAddressGeocodeRequestSchema>;
+export type BorrowerAddressUpdateRequest = z.infer<typeof borrowerAddressUpdateRequestSchema>;
 export type BorrowerAddressLocationResponse = z.infer<typeof borrowerAddressLocationResponseSchema>;
 export type Route = z.infer<typeof routeSchema>;
 export type RouteDirectory = z.infer<typeof routeDirectorySchema>;

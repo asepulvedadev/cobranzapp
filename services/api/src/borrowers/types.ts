@@ -1,6 +1,7 @@
 import type {
   Borrower,
   BorrowerAddressLocation,
+  BorrowerAddressUpdateRequest,
   BorrowerCreateRequest,
   BorrowerDirectory,
   BorrowerDocument,
@@ -69,6 +70,12 @@ export type BorrowerAddressGeocodeResult =
   | { status: "forbidden" }
   | { status: "unavailable"; location: BorrowerAddressLocation };
 
+export type BorrowerAddressUpdateInput = BorrowerAddressUpdateRequest & { requestId: string };
+export type BorrowerAddressUpdateResult =
+  | { status: "updated"; borrower: Borrower }
+  | { status: "not_found" }
+  | { status: "forbidden" };
+
 export type SharedClientVerification = {
   registered: boolean;
   fullName: string | null;
@@ -126,6 +133,12 @@ export interface BorrowerService {
     addressKind: BorrowerAddressKind,
     requestId: string,
   ): Promise<BorrowerAddressGeocodeResult>;
+  updateAddresses(
+    actor: TenantActor,
+    tenantId: string,
+    borrowerId: string,
+    input: BorrowerAddressUpdateInput,
+  ): Promise<BorrowerAddressUpdateResult>;
   verifyShared(
     actor: TenantActor,
     tenantId: string,

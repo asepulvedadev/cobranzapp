@@ -18,6 +18,8 @@ import {
 import type {
   BorrowerAddressGeocodeResult,
   BorrowerAddressKind,
+  BorrowerAddressUpdateInput,
+  BorrowerAddressUpdateResult,
   BorrowerCreateInput,
   BorrowerCreateResult,
   BorrowerDocumentInput,
@@ -1130,6 +1132,76 @@ export function createPostgresBorrowerService(
         );
         const borrower = await loadBorrower(client, tenantId, borrowerId);
         return borrower ? { status: "updated", borrower } : { status: "not_found" };
+      });
+    },
+
+    async updateAddresses(
+      actor,
+      tenantId,
+      borrowerId,
+      input: BorrowerAddressUpdateInput,
+    ): Promise<BorrowerAddressUpdateResult> {
+      if (!actor.tenantRole || !["owner", "supervisor", "collector"].includes(actor.tenantRole)) {
+        return { status: "forbidden" };
+      }
+      const homeAddress = normalizeBorrowerAddress(input.homeAddress);
+      const workAddress = normalizeBorrowerAddress(input.workAddress);
+      return withTransaction(actor, tenantId, async (client) => {
+        const borrower = await client.query<{ id: string }>(
+          `SELECT id FROM borrowers WHERE tenant_id = $1 AND id = $2`,
+          [tenantId, borrowerId],
+        );
+        if (!borrower.rows[0]) return { status: "not_found" };
+
+        await client.query(
+          `UPDATE borrowers
+              SET home_address = $3,
+                  work_address = $4,
+                  home_address_status = CASE WHEN $5 THEN 'confirmed' ELSE 'pending' END,
+                  work_address_status = CASE WHEN $6 THEN 'confirmed' ELSE 'pending' END,
+                  home_address_confirmed_at = CASE WHEN $5 THEN now() ELSE NULL END,
+                  work_address_confirmed_at = CASE WHEN $6 THEN now() ELSE NULL END,
+                  home_address_confirmed_by = CASE WHEN $5 THEN $7 ELSE NULL END,
+                  work_address_confirmed_by = CASE WHEN $6 THEN $7 ELSE NULL END,
+                  updated_at = now()
+            WHERE tenant_id = $1 AND id = $2`,
+          [
+            tenantId,
+            borrowerId,
+            homeAddress,
+            workAddress,
+            input.homeAddressConfirmed,
+            input.workAddressConfirmed,
+            actor.userId,
+          ],
+        );
+        // Coordinates belong to a specific address string. Any correction must
+        // invalidate both cached locations before a user asks to geocode again.
+        await client.query(
+          `UPDATE borrower_address_locations
+              SET status = 'pending', latitude = NULL, longitude = NULL,
+                  formatted_address = NULL, provider = NULL, precision = NULL,
+                  error_code = NULL, geocoded_at = NULL, updated_at = now()
+            WHERE tenant_id = $1 AND borrower_id = $2`,
+          [tenantId, borrowerId],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'borrower.addresses_updated', 'borrower', $3, $4, $5::jsonb)`,
+          [
+            tenantId,
+            actor.userId,
+            borrowerId,
+            input.requestId,
+            JSON.stringify({
+              homeAddressConfirmed: input.homeAddressConfirmed,
+              workAddressConfirmed: input.workAddressConfirmed,
+            }),
+          ],
+        );
+        const updated = await loadBorrower(client, tenantId, borrowerId);
+        return updated ? { status: "updated", borrower: updated } : { status: "not_found" };
       });
     },
 
