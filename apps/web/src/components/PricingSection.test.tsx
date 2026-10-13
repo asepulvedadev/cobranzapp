@@ -29,6 +29,8 @@ describe("membership landing presentation", () => {
     expect(html).toContain("nunca al enlace del cliente");
     expect(html).toContain("El dueño controla los porcentajes");
     expect(html).toContain("supervisor o el dueño autoriza");
+    expect(html).toContain("Registro operativo diario por cliente");
+    expect(html).toContain("no es facturación ni recibo financiero");
     expect(html).toContain("/contacto?plan=Pro&amp;source=planes");
     expect(html).toContain("/contacto?plan=Ultra&amp;source=planes");
     expect(html).not.toContain("La plataforma y las funciones operativas están en desarrollo");

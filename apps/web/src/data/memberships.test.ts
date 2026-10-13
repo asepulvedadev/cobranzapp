@@ -61,11 +61,17 @@ describe("approved membership catalog", () => {
     expect(memberships.map((plan) => plan.prioritySupport)).toEqual([false, true]);
   });
 
-  it("shares all core features without exposing internal ratings in the customer-link copy", () => {
+  it("shares only capabilities that are available in the operational pilot", () => {
     expect(membershipFeatures).toHaveLength(8);
     expect(new Set(membershipFeatures.map((feature) => feature.id)).size).toBe(8);
     expect(membershipFeatures.find((feature) => feature.id === "customer-link")?.detail).toContain(
-      "sin datos internos",
+      "sin exponer datos internos",
+    );
+    expect(membershipFeatures.find((feature) => feature.id === "daily-receipt")?.label).toContain(
+      "Registro operativo",
+    );
+    expect(membershipFeatures.find((feature) => feature.id === "daily-receipt")?.detail).toContain(
+      "no es facturación",
     );
     expect(membershipFeatures.find((feature) => feature.id === "business-rules")?.detail).toContain(
       "El dueño controla los porcentajes",

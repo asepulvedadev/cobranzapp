@@ -67,8 +67,9 @@ export const membershipFeatures = [
   },
   {
     id: "daily-receipt",
-    label: "Factura / comprobante diario por cliente",
-    detail: "Consulta el registro de la jornada y los movimientos de cada cliente.",
+    label: "Registro operativo diario por cliente",
+    detail:
+      "Consulta el avance de cuotas operativas y gestiones de la jornada; no es facturación ni recibo financiero.",
   },
   {
     id: "internal-profile",
@@ -78,9 +79,9 @@ export const membershipFeatures = [
   },
   {
     id: "customer-link",
-    label: "Link único para cada cliente, sin contraseña",
+    label: "Ficha de cliente con acceso restringido",
     detail:
-      "Comparte una consulta de su préstamo, saldo, pagos y comprobantes, sin datos internos.",
+      "El equipo autorizado consulta la ficha y el historial operativo sin exponer datos internos.",
   },
   {
     id: "business-rules",
