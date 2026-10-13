@@ -902,7 +902,12 @@ export function BorrowerDirectory({
             <textarea
               id="edit-borrower-home"
               maxLength={240}
-              onChange={(event) => setAddressEditHome(event.target.value)}
+              onChange={(event) => {
+                setAddressEditHome(event.target.value);
+                // A correction must be confirmed again with the client. Keeping the
+                // previous confirmation would allow a stale location to be saved.
+                setAddressEditHomeConfirmed(false);
+              }}
               required
               rows={3}
               value={addressEditHome}
@@ -919,7 +924,12 @@ export function BorrowerDirectory({
             <textarea
               id="edit-borrower-work"
               maxLength={240}
-              onChange={(event) => setAddressEditWork(event.target.value)}
+              onChange={(event) => {
+                setAddressEditWork(event.target.value);
+                // A correction must be confirmed again with the client. Keeping the
+                // previous confirmation would allow a stale location to be saved.
+                setAddressEditWorkConfirmed(false);
+              }}
               required
               rows={3}
               value={addressEditWork}
