@@ -35,7 +35,7 @@ type Screen =
   | { kind: "mfa" }
   | { kind: "authenticated"; user: CurrentUser };
 
-type TenantSection = "home" | "clients" | "verification" | "credits" | "routes";
+type TenantSection = "home" | "profile" | "clients" | "verification" | "credits" | "routes";
 
 const roleLabels: Record<
   CurrentUser["memberships"][number]["role"] | TenantOverview["actorRole"],
@@ -369,17 +369,7 @@ function DeveloperHome({
   );
 }
 
-function TenantHome({
-  api,
-  overview,
-  memberProfile,
-  onNeedsReauthentication,
-}: {
-  api: MobileApi;
-  overview: TenantOverview;
-  memberProfile: TenantMemberProfile | null;
-  onNeedsReauthentication: () => void;
-}) {
+function TenantHome({ overview }: { overview: TenantOverview }) {
   const metrics = [["Personal", overview.metrics.members]] as const;
   return (
     <View style={styles.stack}>
@@ -404,7 +394,34 @@ function TenantHome({
           recaudo se habilitarán después de la aprobación legal y contable.
         </Text>
       </View>
-      {overview.actorRole !== "customer" && overview.actorRole !== "support" && memberProfile ? (
+    </View>
+  );
+}
+
+function TenantProfile({
+  api,
+  memberProfile,
+  onNeedsReauthentication,
+  overview,
+}: {
+  api: MobileApi;
+  memberProfile: TenantMemberProfile | null;
+  onNeedsReauthentication: () => void;
+  overview: TenantOverview;
+}) {
+  return (
+    <View style={styles.stack}>
+      <View style={styles.directoryHeading}>
+        <View>
+          <Text style={styles.eyebrow}>CONFIGURACIÓN PERSONAL</Text>
+          <Text style={styles.sectionTitle}>Mi perfil</Text>
+        </View>
+      </View>
+      <Text style={styles.body}>
+        Actualiza tus datos, documento, tipo de sangre con consentimiento y foto privada para esta
+        empresa.
+      </Text>
+      {memberProfile ? (
         <MemberProfileForm
           api={api}
           onNeedsReauthentication={onNeedsReauthentication}
@@ -412,7 +429,9 @@ function TenantHome({
           tenantId={overview.tenant.id}
           userId={memberProfile.userId}
         />
-      ) : null}
+      ) : (
+        <ActivityIndicator color="#fbbf24" />
+      )}
     </View>
   );
 }
@@ -618,6 +637,7 @@ function TenantSectionNav({
   active,
   onChange,
   canVerify,
+  canViewProfile,
   canViewClients,
   canViewCredits,
   canViewRoutes,
@@ -625,6 +645,7 @@ function TenantSectionNav({
   active: TenantSection;
   onChange: (section: TenantSection) => void;
   canVerify: boolean;
+  canViewProfile: boolean;
   canViewClients: boolean;
   canViewCredits: boolean;
   canViewRoutes: boolean;
@@ -640,6 +661,19 @@ function TenantSectionNav({
           Inicio
         </Text>
       </Pressable>
+      {canViewProfile ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onChange("profile")}
+          style={[styles.sectionNavItem, active === "profile" && styles.sectionNavItemActive]}
+        >
+          <Text
+            style={[styles.sectionNavText, active === "profile" && styles.sectionNavTextActive]}
+          >
+            Mi perfil
+          </Text>
+        </Pressable>
+      ) : null}
       {canViewClients ? (
         <Pressable
           accessibilityRole="button"
@@ -732,7 +766,7 @@ function AuthenticatedHome({
     const canReadBorrowers = selectedMembershipRole
       ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
       : false;
-    const shouldLoadProfile = canReadBorrowers && tenantSection === "home";
+    const shouldLoadProfile = canReadBorrowers && tenantSection === "profile";
     const shouldLoadDirectory =
       canReadBorrowers && (tenantSection === "clients" || tenantSection === "credits");
     const shouldLoadRoutes = canReadBorrowers && tenantSection === "routes";
@@ -909,6 +943,11 @@ function AuthenticatedHome({
                       ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
                       : false
                   }
+                  canViewProfile={
+                    selectedMembershipRole
+                      ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
+                      : false
+                  }
                   canViewClients={
                     selectedMembershipRole
                       ? ["owner", "supervisor", "collector"].includes(selectedMembershipRole)
@@ -926,7 +965,17 @@ function AuthenticatedHome({
                   }
                   onChange={setTenantSection}
                 />
-                {tenantSection === "verification" ? (
+                {tenantSection === "profile" ? (
+                  <TenantProfile
+                    api={api}
+                    memberProfile={memberProfile}
+                    onNeedsReauthentication={() => {
+                      setNeedsReauthentication(true);
+                      setMessage("Confirma tu contraseña para continuar con esta acción.");
+                    }}
+                    overview={tenant}
+                  />
+                ) : tenantSection === "verification" ? (
                   <VerificationNetworkCard
                     api={api}
                     onNeedsReauthentication={() => {
@@ -965,15 +1014,7 @@ function AuthenticatedHome({
                 ) : tenantSection === "routes" ? (
                   <TenantRoutes routes={routes} />
                 ) : (
-                  <TenantHome
-                    api={api}
-                    memberProfile={memberProfile}
-                    onNeedsReauthentication={() => {
-                      setNeedsReauthentication(true);
-                      setMessage("Confirma tu contraseña para continuar con esta acción.");
-                    }}
-                    overview={tenant}
-                  />
+                  <TenantHome overview={tenant} />
                 )}
               </>
             ) : (
