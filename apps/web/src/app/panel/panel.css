@@ -202,6 +202,29 @@ html:has(.panel-shell) {
   gap: 18px;
 }
 
+.account-profile-summary {
+  align-items: start;
+  display: grid;
+  gap: 22px;
+  grid-template-columns: auto minmax(0, 1fr);
+  max-width: 760px;
+}
+
+.account-profile-summary h2,
+.account-profile-summary p {
+  margin: 0;
+}
+
+.account-profile-summary p {
+  color: var(--panel-muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.account-profile-summary .settings-summary {
+  margin: 18px 0;
+}
+
 .account-profile-photo-card,
 .account-profile-form {
   display: grid;
@@ -262,7 +285,8 @@ html:has(.panel-shell) {
 }
 
 @media (max-width: 760px) {
-  .account-profile-grid {
+  .account-profile-grid,
+  .account-profile-summary {
     grid-template-columns: 1fr;
   }
 }

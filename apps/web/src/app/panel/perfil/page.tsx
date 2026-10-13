@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { serverApi } from "../../../lib/server-api";
-import { type AccountProfile, AccountProfileForm } from "./AccountProfileForm";
+import { type AccountProfile, AccountProfileModal } from "./AccountProfileForm";
 
 export const metadata: Metadata = { title: "Mi perfil" };
 
@@ -16,10 +16,10 @@ export default async function ProfilePage() {
         <div>
           <span className="panel-eyebrow">Cuenta</span>
           <h1>Mi perfil</h1>
-          <p>Actualiza tus datos personales y la foto que verán tus equipos.</p>
+          <p>Consulta tus datos y edítalos en una ventana segura.</p>
         </div>
       </header>
-      <AccountProfileForm profile={profile} />
+      <AccountProfileModal profile={profile} />
     </div>
   );
 }

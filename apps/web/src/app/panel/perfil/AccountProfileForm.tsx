@@ -4,6 +4,7 @@ import { UserCircle } from "@phosphor-icons/react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { Modal } from "../Modal";
 import { useSensitiveFetch } from "../ReauthenticationProvider";
 
 export type AccountProfile = {
@@ -16,6 +17,30 @@ export type AccountProfile = {
   workAddress: string | null;
   profilePhotoObjectKey: string | null;
 };
+
+function ProfileAvatar({
+  profile,
+  version,
+}: {
+  profile: AccountProfile;
+  version?: string | number;
+}) {
+  return (
+    <div className="account-profile-avatar">
+      {profile.profilePhotoObjectKey ? (
+        <Image
+          src={`/api/v1/account/profile-photo?v=${encodeURIComponent(String(version ?? profile.profilePhotoObjectKey))}`}
+          alt="Foto de perfil"
+          width={112}
+          height={112}
+          unoptimized
+        />
+      ) : (
+        <UserCircle aria-hidden="true" size={72} weight="duotone" />
+      )}
+    </div>
+  );
+}
 
 async function messageFrom(response: Response | null, fallback: string) {
   const body = (await response?.json().catch(() => ({}))) as { error?: { message?: string } };
@@ -91,20 +116,7 @@ export function AccountProfileForm({ profile }: { profile: AccountProfile }) {
   return (
     <div className="account-profile-grid">
       <section className="dashboard-card account-profile-photo-card">
-        <div className="account-profile-avatar">
-          {profile.profilePhotoObjectKey ? (
-            // The endpoint verifies the authenticated session before serving the private object.
-            <Image
-              src={`/api/v1/account/profile-photo?v=${photoVersion}`}
-              alt="Foto de perfil"
-              width={112}
-              height={112}
-              unoptimized
-            />
-          ) : (
-            <UserCircle aria-hidden="true" size={72} weight="duotone" />
-          )}
-        </div>
+        <ProfileAvatar profile={profile} version={photoVersion} />
         <h2>{profile.displayName}</h2>
         <p>
           @{profile.username} · {profile.email}
@@ -159,5 +171,46 @@ export function AccountProfileForm({ profile }: { profile: AccountProfile }) {
         ) : null}
       </form>
     </div>
+  );
+}
+
+export function AccountProfileModal({ profile }: { profile: AccountProfile }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <section className="dashboard-card account-profile-summary">
+        <ProfileAvatar profile={profile} />
+        <div>
+          <span className="panel-eyebrow">Perfil de cuenta</span>
+          <h2>{profile.displayName}</h2>
+          <p>
+            @{profile.username} · {profile.email}
+          </p>
+          <dl className="settings-summary">
+            <div>
+              <dt>Celular</dt>
+              <dd>{profile.phone ?? "Sin registrar"}</dd>
+            </div>
+            <div>
+              <dt>Dirección de casa</dt>
+              <dd>{profile.homeAddress ?? "Sin registrar"}</dd>
+            </div>
+            <div>
+              <dt>Dirección de trabajo</dt>
+              <dd>{profile.workAddress ?? "Sin registrar"}</dd>
+            </div>
+          </dl>
+          <button className="secondary-action-button" onClick={() => setOpen(true)} type="button">
+            Editar perfil
+          </button>
+        </div>
+      </section>
+      {open ? (
+        <Modal onClose={() => setOpen(false)} title="Editar mi perfil">
+          <AccountProfileForm profile={profile} />
+        </Modal>
+      ) : null}
+    </>
   );
 }
