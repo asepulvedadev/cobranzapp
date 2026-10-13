@@ -2,6 +2,7 @@
 
 import {
   Buildings,
+  ChartBar,
   CurrencyDollar,
   Gauge,
   MapPin,
@@ -90,6 +91,9 @@ export function PanelNavigation({
     { href: `${effectiveDashboardHref}/clientes`, label: "Clientes", icon: Buildings },
     ...(currentMembership && ["owner", "supervisor", "collector"].includes(currentMembership.role)
       ? [{ href: `${effectiveDashboardHref}/creditos`, label: "Créditos", icon: CurrencyDollar }]
+      : []),
+    ...(currentMembership && ["owner", "supervisor", "collector"].includes(currentMembership.role)
+      ? [{ href: `${effectiveDashboardHref}/reportes`, label: "Reportes", icon: ChartBar }]
       : []),
     ...(currentMembership && ["owner", "supervisor", "collector"].includes(currentMembership.role)
       ? [{ href: `${effectiveDashboardHref}/rutas`, label: "Rutas", icon: MapPin }]
