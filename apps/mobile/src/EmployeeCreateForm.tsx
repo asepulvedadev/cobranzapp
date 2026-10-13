@@ -3,7 +3,16 @@ import {
   tenantMemberCreateRequestSchema,
 } from "@cobranzapp/contracts";
 import { useState } from "react";
-import { Modal, Pressable, Text, TextInput, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import type { MobileApi } from "./api";
 import { MobileApiError } from "./api";
 
@@ -87,100 +96,115 @@ export function EmployeeCreateForm({
         transparent
         visible={open}
       >
-        <View style={styles.backdrop}>
-          <View style={styles.card}>
-            <View style={styles.heading}>
-              <View style={styles.headingCopy}>
-                <Text style={styles.eyebrow}>ACCESO OPERATIVO</Text>
-                <Text style={styles.title}>{created ? "Empleado creado" : "Crear empleado"}</Text>
-              </View>
-              <Pressable disabled={busy} onPress={reset} style={styles.closeButton}>
-                <Text style={styles.closeText}>×</Text>
-              </Pressable>
-            </View>
-            {created ? (
-              <View style={styles.result}>
-                <Text style={styles.muted}>Guarda estos datos ahora. No se envían por correo.</Text>
-                <Text style={styles.resultLabel}>Usuario</Text>
-                <Text style={styles.resultValue}>{created.username}</Text>
-                <Text style={styles.resultLabel}>Teléfono</Text>
-                <Text style={styles.resultValue}>{created.phone}</Text>
-                <Text style={styles.resultLabel}>Contraseña inicial</Text>
-                <Text selectable style={styles.resultValue}>
-                  {created.password}
-                </Text>
-                <Pressable onPress={reset} style={styles.saveButton}>
-                  <Text style={styles.saveText}>Cerrar</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <>
-                <Text style={styles.muted}>
-                  Crea el acceso con usuario, teléfono y contraseña. El empleado no necesita correo.
-                </Text>
-                {availableSeats !== null ? (
-                  <Text style={styles.seats}>
-                    {availableSeats} cupo(s) disponibles según el plan.
-                  </Text>
-                ) : null}
-                <Text style={styles.label}>Nombre completo</Text>
-                <TextInput
-                  editable={!busy}
-                  onChangeText={setDisplayName}
-                  style={styles.input}
-                  value={displayName}
-                />
-                <Text style={styles.label}>Nombre de usuario</Text>
-                <TextInput
-                  autoCapitalize="none"
-                  editable={!busy}
-                  onChangeText={setUsername}
-                  placeholder="ej. maria.gomez"
-                  placeholderTextColor="#77817a"
-                  style={styles.input}
-                  value={username}
-                />
-                <Text style={styles.hint}>Minúsculas, números, punto, guion o guion bajo.</Text>
-                <Text style={styles.label}>Teléfono</Text>
-                <TextInput
-                  editable={!busy}
-                  keyboardType="phone-pad"
-                  onChangeText={setPhone}
-                  style={styles.input}
-                  value={phone}
-                />
-                <Text style={styles.label}>Rol</Text>
-                <View style={styles.choiceRow}>
-                  {(["collector", "supervisor"] as const).map((value) => (
-                    <Pressable
-                      key={value}
-                      onPress={() => setRole(value)}
-                      style={[styles.choice, role === value && styles.choiceActive]}
-                    >
-                      <Text style={styles.choiceText}>
-                        {value === "collector" ? "Cobrador" : "Supervisor"}
-                      </Text>
-                    </Pressable>
-                  ))}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.backdrop}
+        >
+          <ScrollView
+            contentContainerStyle={styles.modalScroll}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.card}>
+              <View style={styles.heading}>
+                <View style={styles.headingCopy}>
+                  <Text style={styles.eyebrow}>ACCESO OPERATIVO</Text>
+                  <Text style={styles.title}>{created ? "Empleado creado" : "Crear empleado"}</Text>
                 </View>
-                <Text style={styles.label}>Contraseña inicial</Text>
-                <TextInput
-                  autoCapitalize="none"
-                  editable={!busy}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  style={styles.input}
-                  value={password}
-                />
-                <Text style={styles.hint}>Usa al menos 12 caracteres.</Text>
-                {message ? <Text style={styles.message}>{message}</Text> : null}
-                <Pressable disabled={busy} onPress={() => void submit()} style={styles.saveButton}>
-                  <Text style={styles.saveText}>{busy ? "Creando…" : "Crear empleado"}</Text>
+                <Pressable disabled={busy} onPress={reset} style={styles.closeButton}>
+                  <Text style={styles.closeText}>×</Text>
                 </Pressable>
-              </>
-            )}
-          </View>
-        </View>
+              </View>
+              {created ? (
+                <View style={styles.result}>
+                  <Text style={styles.muted}>
+                    Guarda estos datos ahora. No se envían por correo.
+                  </Text>
+                  <Text style={styles.resultLabel}>Usuario</Text>
+                  <Text style={styles.resultValue}>{created.username}</Text>
+                  <Text style={styles.resultLabel}>Teléfono</Text>
+                  <Text style={styles.resultValue}>{created.phone}</Text>
+                  <Text style={styles.resultLabel}>Contraseña inicial</Text>
+                  <Text selectable style={styles.resultValue}>
+                    {created.password}
+                  </Text>
+                  <Pressable onPress={reset} style={styles.saveButton}>
+                    <Text style={styles.saveText}>Cerrar</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.muted}>
+                    Crea el acceso con usuario, teléfono y contraseña. El empleado no necesita
+                    correo.
+                  </Text>
+                  {availableSeats !== null ? (
+                    <Text style={styles.seats}>
+                      {availableSeats} cupo(s) disponibles según el plan.
+                    </Text>
+                  ) : null}
+                  <Text style={styles.label}>Nombre completo</Text>
+                  <TextInput
+                    editable={!busy}
+                    onChangeText={setDisplayName}
+                    style={styles.input}
+                    value={displayName}
+                  />
+                  <Text style={styles.label}>Nombre de usuario</Text>
+                  <TextInput
+                    autoCapitalize="none"
+                    editable={!busy}
+                    onChangeText={setUsername}
+                    placeholder="ej. maria.gomez"
+                    placeholderTextColor="#77817a"
+                    style={styles.input}
+                    value={username}
+                  />
+                  <Text style={styles.hint}>Minúsculas, números, punto, guion o guion bajo.</Text>
+                  <Text style={styles.label}>Teléfono</Text>
+                  <TextInput
+                    editable={!busy}
+                    keyboardType="phone-pad"
+                    onChangeText={setPhone}
+                    style={styles.input}
+                    value={phone}
+                  />
+                  <Text style={styles.label}>Rol</Text>
+                  <View style={styles.choiceRow}>
+                    {(["collector", "supervisor"] as const).map((value) => (
+                      <Pressable
+                        key={value}
+                        onPress={() => setRole(value)}
+                        style={[styles.choice, role === value && styles.choiceActive]}
+                      >
+                        <Text style={styles.choiceText}>
+                          {value === "collector" ? "Cobrador" : "Supervisor"}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <Text style={styles.label}>Contraseña inicial</Text>
+                  <TextInput
+                    autoCapitalize="none"
+                    editable={!busy}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                    style={styles.input}
+                    value={password}
+                  />
+                  <Text style={styles.hint}>Usa al menos 12 caracteres.</Text>
+                  {message ? <Text style={styles.message}>{message}</Text> : null}
+                  <Pressable
+                    disabled={busy}
+                    onPress={() => void submit()}
+                    style={styles.saveButton}
+                  >
+                    <Text style={styles.saveText}>{busy ? "Creando…" : "Crear empleado"}</Text>
+                  </Pressable>
+                </>
+              )}
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );
@@ -197,8 +221,11 @@ const styles = {
   openButtonText: { color: "#171a18", fontSize: 14, fontWeight: "800" as const },
   backdrop: {
     flex: 1,
-    justifyContent: "flex-end" as const,
     backgroundColor: "rgba(0,0,0,0.72)",
+  },
+  modalScroll: {
+    flexGrow: 1,
+    justifyContent: "flex-end" as const,
     padding: 14,
   },
   card: {
