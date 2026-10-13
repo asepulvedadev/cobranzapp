@@ -114,8 +114,8 @@ html:has(.panel-shell) {
   bottom: 0;
   left: 0;
   z-index: 50;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  overflow-x: auto;
   gap: 4px;
   min-height: calc(68px + var(--panel-safe-bottom));
   padding: 6px 8px calc(6px + var(--panel-safe-bottom));
@@ -125,6 +125,11 @@ html:has(.panel-shell) {
   background: rgba(21, 24, 23, 0.97);
   box-shadow: 0 -12px 36px rgba(21, 24, 23, 0.18);
   backdrop-filter: blur(14px);
+  scrollbar-width: none;
+}
+
+.panel-mobile-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .panel-mobile-nav.panel-nav-count-2 {
@@ -144,7 +149,8 @@ html:has(.panel-shell) {
 .panel-mobile-nav a {
   position: relative;
   display: flex;
-  min-width: 0;
+  min-width: 78px;
+  flex: 0 0 78px;
   min-height: 52px;
   align-items: center;
   justify-content: center;
