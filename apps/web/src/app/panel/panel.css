@@ -2657,6 +2657,12 @@ html:has(.panel-shell) {
   min-width: 0;
 }
 
+.sidebar-company-stack {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
 .sidebar-company-brand strong {
   overflow: hidden;
   text-overflow: ellipsis;

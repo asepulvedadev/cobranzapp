@@ -8,6 +8,7 @@ import { LogoutButton } from "./LogoutButton";
 import { PanelNavigation } from "./PanelNavigation";
 import { ReauthenticationProvider } from "./ReauthenticationProvider";
 import { PasswordForm } from "./seguridad/PasswordForm";
+import { TenantBrandRuntime } from "./TenantBrandRuntime";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import "./panel.css";
 
@@ -88,23 +89,16 @@ export default async function PanelLayout({ children }: { children: ReactNode })
             <span>{user.platformRole === "developer" ? "Plataforma" : "Empresa"}</span>
             {user.platformRole === "developer" ? (
               <strong>Administración</strong>
-            ) : canSwitchCompanies ? (
-              <WorkspaceSwitcher
-                className="workspace-switcher-desktop"
+            ) : primaryMembership ? (
+              <TenantBrandRuntime
+                initialBrand={{
+                  primaryColor: brandPrimary,
+                  accentColor: brandAccent,
+                  logoObjectKey: brandOverview?.settings?.logoObjectKey ?? null,
+                }}
+                initialLogo={brandLogo}
                 memberships={user.memberships}
               />
-            ) : primaryMembership ? (
-              <div className="sidebar-company-brand">
-                {brandLogo ? (
-                  // biome-ignore lint/performance/noImgElement: Private API image is not externally optimizable.
-                  <img alt="" className="sidebar-company-logo" src={brandLogo} />
-                ) : (
-                  <span className="sidebar-company-mark" aria-hidden="true">
-                    {primaryMembership.tenantName.slice(0, 1).toUpperCase()}
-                  </span>
-                )}
-                <strong>{primaryMembership.tenantName}</strong>
-              </div>
             ) : (
               <strong>Crear empresa</strong>
             )}
