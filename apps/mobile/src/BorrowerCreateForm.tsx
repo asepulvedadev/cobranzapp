@@ -430,6 +430,7 @@ export function BorrowerCreateForm({
                     style={styles.input}
                     value={homeAddress}
                   />
+                  <Text style={styles.label}>Barrio y municipio de casa</Text>
                   <TextInput
                     onChangeText={setHomeAddressLocality}
                     placeholder="Barrio y municipio"
@@ -455,6 +456,7 @@ export function BorrowerCreateForm({
                     style={styles.input}
                     value={workAddress}
                   />
+                  <Text style={styles.label}>Barrio y municipio de trabajo</Text>
                   <TextInput
                     onChangeText={setWorkAddressLocality}
                     placeholder="Barrio y municipio"
