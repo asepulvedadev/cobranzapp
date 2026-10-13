@@ -10,6 +10,7 @@ import type {
   LoanProduct,
 } from "../../../../lib/platform";
 import { formatApiError } from "../../api-error";
+import { Modal } from "../../Modal";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
 
 const statusLabels: Record<LoanApplication["status"], string> = {
@@ -56,6 +57,7 @@ export function LoanApplicationBoard({
   const [reviewingApplicationId, setReviewingApplicationId] = useState<string | null>(null);
   const [startingReviewId, setStartingReviewId] = useState<string | null>(null);
   const [paymentApplicationId, setPaymentApplicationId] = useState<string | null>(null);
+  const [paymentConfirmation, setPaymentConfirmation] = useState<LoanApplication | null>(null);
   const [renewingApplicationId, setRenewingApplicationId] = useState<string | null>(null);
   const [schedulePreview, setSchedulePreview] = useState<FinancialSchedulePreview | null>(null);
   const [frequency, setFrequency] = useState<LoanProduct["paymentFrequency"]>("daily");
@@ -272,7 +274,7 @@ export function LoanApplicationBoard({
                 <div className="loan-application-actions">
                   <button
                     disabled={paymentApplicationId !== null}
-                    onClick={() => void recordPayment(application)}
+                    onClick={() => setPaymentConfirmation(application)}
                     type="button"
                   >
                     {paymentApplicationId === application.id
@@ -404,6 +406,34 @@ export function LoanApplicationBoard({
             {schedulePreview.periods[0]?.installment}
           </span>
         </div>
+      ) : null}
+      {paymentConfirmation ? (
+        <Modal onClose={() => setPaymentConfirmation(null)} title="Confirmar avance de cuota">
+          <p className="operational-note">
+            Vas a registrar la cuota {paymentConfirmation.paidInstallments + 1} de{" "}
+            {paymentConfirmation.requestedTermCount} para {paymentConfirmation.borrowerName}.
+          </p>
+          <p className="operational-note">
+            Esta acción actualiza el avance operativo del crédito. No genera recibo financiero ni
+            confirma la recepción de dinero.
+          </p>
+          <div className="borrower-step-actions">
+            <button onClick={() => setPaymentConfirmation(null)} type="button">
+              Cancelar
+            </button>
+            <button
+              disabled={paymentApplicationId !== null}
+              onClick={() => {
+                const application = paymentConfirmation;
+                setPaymentConfirmation(null);
+                void recordPayment(application);
+              }}
+              type="button"
+            >
+              Confirmar avance
+            </button>
+          </div>
+        </Modal>
       ) : null}
     </section>
   );

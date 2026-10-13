@@ -5,7 +5,7 @@ import type {
   LoanProduct,
 } from "@cobranzapp/contracts";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, Text, TextInput, View } from "react-native";
 import { type MobileApi, MobileApiError } from "./api";
 
 const frequencyLabels: Record<LoanProduct["paymentFrequency"], string> = {
@@ -322,7 +322,16 @@ export function CreditWorkspace({
             <>
               <Pressable
                 disabled={busyAction !== null}
-                onPress={() => void recordPayment(application)}
+                onPress={() =>
+                  Alert.alert(
+                    "Confirmar avance de cuota",
+                    `Se registrará la cuota ${application.paidInstallments + 1} de ${application.requestedTermCount} para ${application.borrowerName}. Esta acción solo actualiza el avance operativo; no es un recibo financiero ni confirma la recepción de dinero.`,
+                    [
+                      { text: "Cancelar", style: "cancel" },
+                      { text: "Confirmar", onPress: () => void recordPayment(application) },
+                    ],
+                  )
+                }
                 style={styles.secondaryButton}
               >
                 <Text style={styles.secondaryText}>
