@@ -40,4 +40,17 @@ El despliegue no depende de GitHub Actions. Desde una máquina autorizada, `pnpm
 
 El entorno desplegado está disponible en `https://cobranzaap.tech`. La dirección técnica `https://cobranzapp.2.24.115.58.sslip.io` se conserva únicamente como respaldo operativo.
 
+## Validar el cliente móvil
+
+El cliente Expo usa el mismo API público y conserva el locale `es-CO`:
+
+```bash
+pnpm --filter @cobranzapp/mobile typecheck
+pnpm build:mobile:web
+```
+
+El segundo comando genera un bundle web local en `apps/mobile/dist/` (ignorado por Git). Para
+distribuir Android/iOS se requiere ejecutar el build nativo con las cuentas de firma de Expo o de
+las tiendas; el VPS no sustituye esa firma.
+
 Los comandos operativos y los límites de recuperación están documentados en el [manual de operaciones](operations-runbook.md).
