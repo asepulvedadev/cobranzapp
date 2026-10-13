@@ -116,14 +116,27 @@ export function extractOcrFields(text: string): {
 }
 
 async function recognizeImage(bytes: Buffer, mediaType: string) {
-  if (!mediaType.startsWith("image/")) throw new Error("UNSUPPORTED_OCR_MEDIA_TYPE");
+  if (!mediaType.startsWith("image/") && mediaType !== "application/pdf") {
+    throw new Error("UNSUPPORTED_OCR_MEDIA_TYPE");
+  }
   const directory = await mkdtemp(path.join("/tmp", "cobranzapp-ocr-"));
-  const inputPath = path.join(directory, "document.bin");
+  const inputPath = path.join(
+    directory,
+    mediaType === "application/pdf" ? "document.pdf" : "document.bin",
+  );
+  let ocrInputPath = inputPath;
   try {
     await writeFile(inputPath, bytes, { mode: 0o600 });
+    if (mediaType === "application/pdf") {
+      const outputBase = path.join(directory, "page");
+      await execFileAsync("pdftoppm", ["-f", "1", "-singlefile", "-png", inputPath, outputBase], {
+        timeout: 20_000,
+      });
+      ocrInputPath = `${outputBase}.png`;
+    }
     const result = await execFileAsync(
       "tesseract",
-      [inputPath, "stdout", "--dpi", "300", "--psm", "6", "-l", "spa"],
+      [ocrInputPath, "stdout", "--dpi", "300", "--psm", "6", "-l", "spa"],
       { maxBuffer: 1_000_000, timeout: 25_000 },
     );
     return extractOcrFields(result.stdout);
