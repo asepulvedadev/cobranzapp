@@ -35,3 +35,8 @@ entregar el token, consultar el resultado mínimo, publicar una observación con
 abrir una corrección. El panel no persiste el token en el navegador y muestra un mensaje de
 funcionalidad pendiente cuando la clave operativa todavía no está configurada. La activación
 de producción sigue siendo una decisión separada de la entrega de la interfaz.
+
+La búsqueda rápida de cliente por cédula usa un flujo separado y reducido: antes de consultar,
+el propietario, supervisor o cobrador debe marcar que el cliente autorizó la consulta; esa
+confirmación queda registrada en la auditoría. Esta búsqueda no habilita la red avanzada ni
+comparte datos adicionales.
