@@ -3,6 +3,9 @@ set -euo pipefail
 
 release=${1:-}
 archive=${2:-}
+backup_script=${3:-}
+backup_service=${4:-}
+backup_timer=${5:-}
 
 if [[ ! "$release" =~ ^[0-9a-f]{40}$ ]]; then
   echo "Invalid release" >&2
@@ -12,9 +15,20 @@ if [[ ! -f "$archive" ]]; then
   echo "Image archive not found" >&2
   exit 66
 fi
+for file in "$backup_script" "$backup_service" "$backup_timer"; do
+  if [[ ! -f "$file" ]]; then
+    echo "Required backup file not found: $file" >&2
+    exit 66
+  fi
+done
 
 cd /srv/cobranzapp
 umask 077
+install -m 0700 "$backup_script" /srv/cobranzapp/backup-cobranzapp.sh
+install -m 0644 "$backup_service" /etc/systemd/system/cobranzapp-backup.service
+install -m 0644 "$backup_timer" /etc/systemd/system/cobranzapp-backup.timer
+systemctl daemon-reload
+systemctl enable cobranzapp-backup.timer >/dev/null
 timestamp=$(date -u +%Y%m%d%H%M%S)
 previous=""
 if [[ -f .release.env ]]; then
@@ -55,6 +69,7 @@ set +a
   'mkdir -p /var/lib/cobranzapp/documents && chown -R 10001:10001 /var/lib/cobranzapp/documents && chmod 750 /var/lib/cobranzapp/documents'
 "${compose[@]}" up -d --wait --remove-orphans
 ./smoke-test.sh http://127.0.0.1:13200 http://127.0.0.1:18200
+systemctl start cobranzapp-backup.timer
 
 printf '%s\n' "$release" > .deployed-release
 chmod 600 .deployed-release

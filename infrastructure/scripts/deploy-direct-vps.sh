@@ -60,8 +60,17 @@ sshpass -e scp "${ssh_opts[@]}" "$local_archive" "${user}@${host}:${archive}"
 sshpass -e scp "${ssh_opts[@]}" \
   infrastructure/scripts/deploy-direct-remote.sh \
   "${user}@${host}:${remote_tmp}.sh"
+sshpass -e scp "${ssh_opts[@]}" \
+  infrastructure/scripts/backup-cobranzapp.sh \
+  "${user}@${host}:${remote_tmp}.backup.sh"
+sshpass -e scp "${ssh_opts[@]}" \
+  infrastructure/systemd/cobranzapp-backup.service \
+  "${user}@${host}:${remote_tmp}.backup.service"
+sshpass -e scp "${ssh_opts[@]}" \
+  infrastructure/systemd/cobranzapp-backup.timer \
+  "${user}@${host}:${remote_tmp}.backup.timer"
 
 sshpass -e ssh "${ssh_opts[@]}" "${user}@${host}" \
-  "chmod 700 '${remote_tmp}.sh' && '${remote_tmp}.sh' '${release}' '${archive}' && rm -f '${remote_tmp}.sh'"
+  "chmod 700 '${remote_tmp}.sh' '${remote_tmp}.backup.sh' && '${remote_tmp}.sh' '${release}' '${archive}' '${remote_tmp}.backup.sh' '${remote_tmp}.backup.service' '${remote_tmp}.backup.timer' && rm -f '${remote_tmp}.sh' '${remote_tmp}.backup.sh' '${remote_tmp}.backup.service' '${remote_tmp}.backup.timer'"
 
 echo "Direct deployment completed: ${release}"
