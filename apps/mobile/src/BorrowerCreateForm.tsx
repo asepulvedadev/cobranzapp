@@ -1,3 +1,4 @@
+import { borrowerCreateRequestSchema } from "@cobranzapp/contracts";
 import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
@@ -10,6 +11,8 @@ type SelectedImage = {
   type: string;
   file?: Blob;
 };
+
+type UploadKey = "identity-front" | "identity-back" | "profile-photo";
 
 type BorrowerCreateFormProps = {
   api: MobileApi;
@@ -53,6 +56,8 @@ export function BorrowerCreateForm({
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
+  const [createdBorrowerId, setCreatedBorrowerId] = useState<string | null>(null);
+  const [uploadedUploads, setUploadedUploads] = useState<UploadKey[]>([]);
 
   function close() {
     if (busy) return;
@@ -161,51 +166,77 @@ export function BorrowerCreateForm({
     }
     setBusy(true);
     setMessage("");
+    let borrowerIdForRetry = createdBorrowerId;
     try {
-      const borrower = await api.createBorrower(tenantId, {
-        fullName: fullName.trim(),
-        country: "CO",
-        documentType: documentType.trim().toUpperCase(),
-        documentNumber: documentNumber.trim(),
-        phone: phone.trim(),
-        whatsappPhone: whatsappPhone.trim(),
-        homeAddress: homeAddress.trim(),
-        workAddress: workAddress.trim(),
-        homeAddressConfirmed,
-        workAddressConfirmed,
-        profilePhotoObjectKey: null,
-        consentVersion: "borrower-dossier-v1",
-        consentEvidenceRef: `mobile-consent-${Date.now()}`,
-        emergencyContacts: [
-          {
-            fullName: contactName.trim(),
-            relationship: contactRelationship.trim(),
-            phone: contactPhone.trim(),
-          },
-          ...(secondContact
-            ? [
-                {
-                  fullName: secondContactName.trim(),
-                  relationship: secondContactRelationship.trim(),
-                  phone: secondContactPhone.trim(),
-                },
-              ]
-            : []),
-        ],
-        documents: [],
-      });
+      let borrower: { id: string };
+      if (borrowerIdForRetry) {
+        borrower = { id: borrowerIdForRetry };
+      } else {
+        const payload = {
+          fullName: fullName.trim(),
+          country: "CO",
+          documentType: documentType.trim().toUpperCase(),
+          documentNumber: documentNumber.trim(),
+          phone: phone.trim(),
+          whatsappPhone: whatsappPhone.trim(),
+          homeAddress: homeAddress.trim(),
+          workAddress: workAddress.trim(),
+          homeAddressConfirmed,
+          workAddressConfirmed,
+          profilePhotoObjectKey: null,
+          consentVersion: "borrower-dossier-v1",
+          consentEvidenceRef: `mobile-consent-${Date.now()}`,
+          emergencyContacts: [
+            {
+              fullName: contactName.trim(),
+              relationship: contactRelationship.trim(),
+              phone: contactPhone.trim(),
+            },
+            ...(secondContact
+              ? [
+                  {
+                    fullName: secondContactName.trim(),
+                    relationship: secondContactRelationship.trim(),
+                    phone: secondContactPhone.trim(),
+                  },
+                ]
+              : []),
+          ],
+          documents: [],
+        };
+        const parsed = borrowerCreateRequestSchema.safeParse(payload);
+        if (!parsed.success) {
+          setMessage(parsed.error.issues[0]?.message ?? "Revisa los datos del cliente.");
+          return;
+        }
+        borrower = await api.createBorrower(tenantId, parsed.data);
+        borrowerIdForRetry = borrower.id;
+        setCreatedBorrowerId(borrower.id);
+      }
       const uploads = [
-        { image: identityFront, category: "identity" as const, side: "front" as const },
-        { image: identityBack, category: "identity" as const, side: "back" as const },
-        { image: profilePhoto, category: "profile_photo" as const },
+        {
+          key: "identity-front" as const,
+          image: identityFront,
+          category: "identity" as const,
+          side: "front" as const,
+        },
+        {
+          key: "identity-back" as const,
+          image: identityBack,
+          category: "identity" as const,
+          side: "back" as const,
+        },
+        { key: "profile-photo" as const, image: profilePhoto, category: "profile_photo" as const },
       ];
       for (const upload of uploads) {
+        if (uploadedUploads.includes(upload.key)) continue;
         if (!upload.image) throw new Error("MISSING_BORROWER_IMAGE");
         await api.uploadBorrowerDocument(tenantId, borrower.id, {
           ...upload.image,
           category: upload.category,
           ...(upload.side ? { side: upload.side } : {}),
         });
+        setUploadedUploads((current) => [...current, upload.key]);
       }
       setMessage("Cliente creado. Sus documentos quedaron en revisión humana.");
       setFullName("");
@@ -228,6 +259,8 @@ export function BorrowerCreateForm({
       setIdentityBack(null);
       setProfilePhoto(null);
       setStep(1);
+      setCreatedBorrowerId(null);
+      setUploadedUploads([]);
       onCreated();
     } catch (error) {
       if (error instanceof MobileApiError && error.status === 428) {
@@ -235,7 +268,15 @@ export function BorrowerCreateForm({
         setMessage("Confirma tu contraseña actual para continuar.");
       } else {
         setMessage(
-          error instanceof MobileApiError ? error.message : "No fue posible crear el cliente.",
+          borrowerIdForRetry
+            ? `Cliente creado, pero faltan documentos por guardar. ${
+                error instanceof MobileApiError
+                  ? error.message
+                  : "Reintenta para completar el expediente."
+              }`
+            : error instanceof MobileApiError
+              ? error.message
+              : "No fue posible crear el cliente.",
         );
       }
     } finally {
