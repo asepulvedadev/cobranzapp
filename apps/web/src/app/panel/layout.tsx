@@ -28,14 +28,12 @@ export default async function PanelLayout({ children }: { children: ReactNode })
     : null;
   const brandOverview = brandResponse?.ok
     ? ((await brandResponse.json()) as {
-        overview?: {
-          settings?: { primaryColor?: string; accentColor?: string; logoObjectKey?: string | null };
-        };
+        settings?: { primaryColor?: string; accentColor?: string; logoObjectKey?: string | null };
       })
     : null;
-  const brandPrimary = brandOverview?.overview?.settings?.primaryColor ?? "#fbbf24";
-  const brandAccent = brandOverview?.overview?.settings?.accentColor ?? "#151817";
-  const brandLogo = brandOverview?.overview?.settings?.logoObjectKey
+  const brandPrimary = brandOverview?.settings?.primaryColor ?? "#fbbf24";
+  const brandAccent = brandOverview?.settings?.accentColor ?? "#151817";
+  const brandLogo = brandOverview?.settings?.logoObjectKey
     ? `/api/v1/tenants/${primaryMembership?.tenantId}/brand-logo`
     : null;
   if (user.mustChangePassword) {
