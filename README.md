@@ -28,6 +28,7 @@ Plataforma móvil y multiempresa para gestionar créditos y cobranzas de prestam
 | [Plan de desarrollo](docs/development-plan.md) | Fases, unidades de trabajo, controles de calidad, lanzamiento en VPS y finalización del piloto |
 | [Estado de implementación](docs/implementation-status.md) | Entregas verificadas, límites actuales y bloques protegidos |
 | [Manual de operaciones](docs/operations-runbook.md) | Repositorio, despliegue directo al VPS, verificaciones de salud, copias de seguridad e incidentes |
+| [Lanzamiento móvil](docs/mobile-release.md) | Compilaciones Expo/EAS, permisos nativos y distribución interna/producción |
 | [Dominio y correo](docs/domain-email-setup.md) | Registros DNS, Hostinger Email y activación TLS |
 | [Hoja de ruta](docs/roadmap.md) | Decisiones pendientes, evidencia, riesgos y autorización de construcción |
 | [Referencias](docs/references.md) | Registro de fuentes primarias y procedencia |
