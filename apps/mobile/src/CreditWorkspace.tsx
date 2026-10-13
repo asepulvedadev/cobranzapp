@@ -307,6 +307,14 @@ export function CreditWorkspace({
                 {frequencyLabels[application.paymentFrequency]} · {application.paidInstallments}/
                 {application.requestedTermCount} cuotas
               </Text>
+              <Text
+                style={(application.overdueInstallments ?? 0) > 0 ? styles.overdue : styles.muted}
+              >
+                Próxima: {application.nextDueDate ?? "Sin fecha"}
+                {(application.overdueInstallments ?? 0) > 0
+                  ? ` · ${application.overdueInstallments} vencida(s)`
+                  : " · Al día"}
+              </Text>
             </View>
             <Text style={styles.status}>{statusLabels[application.status]}</Text>
           </View>
@@ -368,6 +376,7 @@ const styles = {
   copy: { flex: 1, gap: 3 },
   help: { color: "#b9c2bc", fontSize: 14, lineHeight: 20 },
   muted: { color: "#99a39c", fontSize: 13, lineHeight: 19 },
+  overdue: { color: "#ff9d93", fontSize: 13, lineHeight: 19 },
   label: { color: "#dce2dd", fontSize: 13, fontWeight: "700", marginTop: 3 },
   input: {
     minHeight: 48,

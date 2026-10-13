@@ -928,6 +928,13 @@ export const loanApplicationSchema = z.object({
   paymentFrequency: loanProductFrequencySchema,
   requestedTermCount: z.number().int().positive(),
   paidInstallments: z.number().int().nonnegative().default(0),
+  /** Operational projection only; it is not a posted financial balance. */
+  nextDueDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional(),
+  overdueInstallments: z.number().int().nonnegative().optional(),
   purpose: z.string().nullable(),
   status: loanApplicationStatusSchema,
   createdAt: z.iso.datetime(),

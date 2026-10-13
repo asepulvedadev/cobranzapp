@@ -237,6 +237,12 @@ export function LoanApplicationBoard({
                     {frequencyLabels[application.paymentFrequency]} · {application.paidInstallments}
                     /{application.requestedTermCount} cuotas
                   </small>
+                  <small>
+                    Próxima cuota: {application.nextDueDate ?? "Sin fecha"}
+                    {(application.overdueInstallments ?? 0) > 0
+                      ? ` · ${application.overdueInstallments} vencida(s)`
+                      : " · Al día"}
+                  </small>
                 </div>
                 <span className={`status status-${application.status}`}>
                   {statusLabels[application.status]}
