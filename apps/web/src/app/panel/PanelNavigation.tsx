@@ -2,6 +2,7 @@
 
 import {
   Buildings,
+  CurrencyDollar,
   Gauge,
   MapPin,
   Pulse,
@@ -87,6 +88,9 @@ export function PanelNavigation({
     { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },
     { href: `${effectiveDashboardHref}/equipo`, label: "Personal", icon: UsersThree },
     { href: `${effectiveDashboardHref}/clientes`, label: "Clientes", icon: Buildings },
+    ...(currentMembership && ["owner", "supervisor", "collector"].includes(currentMembership.role)
+      ? [{ href: `${effectiveDashboardHref}/creditos`, label: "Créditos", icon: CurrencyDollar }]
+      : []),
     ...(currentMembership && ["owner", "supervisor", "collector"].includes(currentMembership.role)
       ? [{ href: `${effectiveDashboardHref}/rutas`, label: "Rutas", icon: MapPin }]
       : []),

@@ -5,16 +5,12 @@ import type { CSSProperties } from "react";
 import type {
   BorrowerDirectory,
   CurrentUser,
-  LoanApplication,
-  LoanProduct,
   SupportAccessRecord,
   TenantOverview,
 } from "../../../../lib/platform";
 import { serverApi } from "../../../../lib/server-api";
 import { ActivityFeed } from "../../ActivityFeed";
-import { CreditProductCatalog } from "./CreditProductCatalog";
 import { CustomerWorkspace } from "./CustomerWorkspace";
-import { LoanApplicationBoard } from "./LoanApplicationBoard";
 import { MemberAccessControl } from "./MemberAccessControl";
 import { SupportAccessReview } from "./SupportAccessReview";
 import { WorkspaceMembershipSummary } from "./WorkspaceMembershipSummary";
@@ -81,8 +77,6 @@ export default async function TenantDashboard({
   if (!response.ok) throw new Error("No fue posible cargar la empresa");
   const overview = (await response.json()) as TenantOverview;
   const canSeeTeam = overview.actorRole === "owner" || overview.actorRole === "supervisor";
-  let loanProducts: LoanProduct[] | null = null;
-  let loanApplications: LoanApplication[] | null = null;
   let borrowerDirectory: BorrowerDirectory | null = null;
   if (overview.actorRole !== "customer" && overview.actorRole !== "support") {
     const borrowerQuery = new URLSearchParams({ page: String(borrowerPage), pageSize: "20" });
@@ -92,22 +86,6 @@ export default async function TenantDashboard({
     );
     if (borrowersResponse.ok) {
       borrowerDirectory = (await borrowersResponse.json()) as BorrowerDirectory;
-    }
-    if (["owner", "supervisor", "collector"].includes(overview.actorRole)) {
-      const productsResponse = await serverApi(`/v1/tenants/${membership.tenantId}/loan-products`);
-      if (productsResponse.ok) {
-        ({ products: loanProducts } = (await productsResponse.json()) as {
-          products: LoanProduct[];
-        });
-      }
-      const applicationsResponse = await serverApi(
-        `/v1/tenants/${membership.tenantId}/loan-applications`,
-      );
-      if (applicationsResponse.ok) {
-        ({ applications: loanApplications } = (await applicationsResponse.json()) as {
-          applications: LoanApplication[];
-        });
-      }
     }
   }
   let supportAccess: SupportAccessRecord[] = [];
@@ -204,20 +182,6 @@ export default async function TenantDashboard({
             <strong>{borrowerDirectory.identitySummary.reviewed}</strong>
             <small>Con evidencia documental completa</small>
           </article>
-          {loanApplications ? (
-            <article className="metric-accent">
-              <span>Solicitudes en revisión</span>
-              <strong>
-                {
-                  loanApplications.filter(
-                    (application) =>
-                      application.status === "submitted" || application.status === "under_review",
-                  ).length
-                }
-              </strong>
-              <small>{loanApplications.length} solicitudes registradas</small>
-            </article>
-          ) : null}
         </section>
       ) : null}
 
@@ -309,27 +273,6 @@ export default async function TenantDashboard({
           </aside>
         )}
       </div>
-
-      {loanProducts ? (
-        overview.actorRole === "owner" || overview.actorRole === "supervisor" ? (
-          <CreditProductCatalog
-            canConfigure={overview.actorRole === "owner"}
-            canReview={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
-            products={loanProducts}
-            tenantId={overview.tenant.id}
-          />
-        ) : null
-      ) : null}
-
-      {loanProducts && loanApplications && borrowerDirectory ? (
-        <LoanApplicationBoard
-          applications={loanApplications}
-          borrowers={borrowerDirectory.borrowers}
-          products={loanProducts}
-          tenantId={overview.tenant.id}
-          canReview={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
-        />
-      ) : null}
 
       {canSeeTeam ? (
         <section className="dashboard-card activity-card">

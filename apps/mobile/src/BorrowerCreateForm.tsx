@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import type { MobileApi } from "./api";
 import { MobileApiError } from "./api";
 
@@ -51,6 +51,13 @@ export function BorrowerCreateForm({
   const [profilePhoto, setProfilePhoto] = useState<SelectedImage | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  function close() {
+    if (busy) return;
+    setOpen(false);
+    setMessage("");
+  }
 
   async function pickImage(setImage: (image: SelectedImage) => void, fallback: string) {
     setMessage("");
@@ -187,179 +194,220 @@ export function BorrowerCreateForm({
   }
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Alta rápida de cliente</Text>
-      <Text style={styles.help}>
-        Captura rápida con OCR asistivo en segundo plano. Las sugerencias requieren revisión humana
-        y las imágenes quedan privadas.
-      </Text>
-      <Text style={styles.label}>Nombre completo</Text>
-      <TextInput
-        onChangeText={setFullName}
-        placeholder="Nombre y apellidos"
-        placeholderTextColor="#77817a"
-        style={styles.input}
-        value={fullName}
-      />
-      <View style={styles.row}>
-        <View style={styles.half}>
-          <Text style={styles.label}>Tipo</Text>
-          <TextInput
-            autoCapitalize="characters"
-            maxLength={4}
-            onChangeText={setDocumentType}
-            style={styles.input}
-            value={documentType}
-          />
+    <>
+      {!open ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Clientes</Text>
+          <Text style={styles.help}>
+            Registra un cliente por pasos. Las direcciones de casa y trabajo deben confirmarse con
+            la persona.
+          </Text>
+          <Pressable onPress={() => setOpen(true)} style={styles.openButton}>
+            <Text style={styles.openButtonText}>Crear cliente</Text>
+          </Pressable>
         </View>
-        <View style={styles.half}>
-          <Text style={styles.label}>Número de cédula</Text>
-          <TextInput
-            keyboardType="number-pad"
-            onChangeText={setDocumentNumber}
-            style={styles.input}
-            value={documentNumber}
-          />
+      ) : null}
+      <Modal animationType="slide" onRequestClose={close} transparent visible={open}>
+        <View style={styles.modalBackdrop}>
+          <ScrollView
+            contentContainerStyle={styles.modalScroll}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.card}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.cardTitle}>Alta rápida de cliente</Text>
+                <Pressable disabled={busy} onPress={close} style={styles.closeButton}>
+                  <Text style={styles.closeButtonText}>Cerrar</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.help}>
+                Captura rápida con OCR asistivo en segundo plano. Las sugerencias requieren revisión
+                humana y las imágenes quedan privadas.
+              </Text>
+              <Text style={styles.label}>Nombre completo</Text>
+              <TextInput
+                onChangeText={setFullName}
+                placeholder="Nombre y apellidos"
+                placeholderTextColor="#77817a"
+                style={styles.input}
+                value={fullName}
+              />
+              <View style={styles.row}>
+                <View style={styles.half}>
+                  <Text style={styles.label}>Tipo</Text>
+                  <TextInput
+                    autoCapitalize="characters"
+                    maxLength={4}
+                    onChangeText={setDocumentType}
+                    style={styles.input}
+                    value={documentType}
+                  />
+                </View>
+                <View style={styles.half}>
+                  <Text style={styles.label}>Número de cédula</Text>
+                  <TextInput
+                    keyboardType="number-pad"
+                    onChangeText={setDocumentNumber}
+                    style={styles.input}
+                    value={documentNumber}
+                  />
+                </View>
+              </View>
+              <Text style={styles.label}>Celular</Text>
+              <TextInput
+                keyboardType="phone-pad"
+                onChangeText={setPhone}
+                placeholder="300 000 0000"
+                placeholderTextColor="#77817a"
+                style={styles.input}
+                value={phone}
+              />
+              <Text style={styles.label}>WhatsApp</Text>
+              <TextInput
+                keyboardType="phone-pad"
+                onChangeText={setWhatsappPhone}
+                placeholder="Número de WhatsApp"
+                placeholderTextColor="#77817a"
+                style={styles.input}
+                value={whatsappPhone}
+              />
+              <Text style={styles.label}>Dirección de casa</Text>
+              <TextInput
+                onChangeText={setHomeAddress}
+                placeholder="Dirección completa"
+                placeholderTextColor="#77817a"
+                style={styles.input}
+                value={homeAddress}
+              />
+              <Text style={styles.label}>Dirección de trabajo</Text>
+              <TextInput
+                onChangeText={setWorkAddress}
+                placeholder="Dirección completa"
+                placeholderTextColor="#77817a"
+                style={styles.input}
+                value={workAddress}
+              />
+              <Pressable
+                onPress={() => setHomeAddressConfirmed((current) => !current)}
+                style={styles.consentRow}
+              >
+                <Text style={styles.checkbox}>{homeAddressConfirmed ? "☑" : "☐"}</Text>
+                <Text style={styles.consentText}>
+                  Confirmo que la dirección de casa está completa y fue verificada con el cliente.
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setWorkAddressConfirmed((current) => !current)}
+                style={styles.consentRow}
+              >
+                <Text style={styles.checkbox}>{workAddressConfirmed ? "☑" : "☐"}</Text>
+                <Text style={styles.consentText}>
+                  Confirmo que la dirección de trabajo está completa y fue verificada con el
+                  cliente.
+                </Text>
+              </Pressable>
+              <Text style={styles.label}>Contacto de emergencia</Text>
+              <TextInput
+                onChangeText={setContactName}
+                placeholder="Nombre completo"
+                placeholderTextColor="#77817a"
+                style={styles.input}
+                value={contactName}
+              />
+              <TextInput
+                onChangeText={setContactRelationship}
+                placeholder="Relación"
+                placeholderTextColor="#77817a"
+                style={styles.input}
+                value={contactRelationship}
+              />
+              <TextInput
+                keyboardType="phone-pad"
+                onChangeText={setContactPhone}
+                placeholder="Celular"
+                placeholderTextColor="#77817a"
+                style={styles.input}
+                value={contactPhone}
+              />
+              <Pressable
+                onPress={() => setSecondContact((current) => !current)}
+                style={styles.toggle}
+              >
+                <Text style={styles.toggleText}>
+                  {secondContact ? "− Quitar segundo contacto" : "+ Agregar segundo contacto"}
+                </Text>
+              </Pressable>
+              {secondContact ? (
+                <>
+                  <TextInput
+                    onChangeText={setSecondContactName}
+                    placeholder="Segundo contacto · nombre"
+                    placeholderTextColor="#77817a"
+                    style={styles.input}
+                    value={secondContactName}
+                  />
+                  <TextInput
+                    onChangeText={setSecondContactRelationship}
+                    placeholder="Segundo contacto · relación"
+                    placeholderTextColor="#77817a"
+                    style={styles.input}
+                    value={secondContactRelationship}
+                  />
+                  <TextInput
+                    keyboardType="phone-pad"
+                    onChangeText={setSecondContactPhone}
+                    placeholder="Segundo contacto · celular"
+                    placeholderTextColor="#77817a"
+                    style={styles.input}
+                    value={secondContactPhone}
+                  />
+                </>
+              ) : null}
+              <Text style={styles.label}>Documentos privados</Text>
+              <ImageButton
+                label={
+                  identityFront ? `✓ Frente · ${identityFront.name}` : "Cargar cédula · frente"
+                }
+                onPress={() => void pickImage(setIdentityFront, "cedula-frente.jpg")}
+              />
+              <ImageButton
+                label={
+                  identityBack ? `✓ Reverso · ${identityBack.name}` : "Cargar cédula · reverso"
+                }
+                onPress={() => void pickImage(setIdentityBack, "cedula-reverso.jpg")}
+              />
+              <ImageButton
+                label={
+                  profilePhoto ? `✓ Foto · ${profilePhoto.name}` : "Cargar foto designada de perfil"
+                }
+                onPress={() => void pickImage(setProfilePhoto, "foto-perfil.jpg")}
+              />
+              <Pressable
+                onPress={() => setConsent((current) => !current)}
+                style={styles.consentRow}
+              >
+                <Text style={styles.checkbox}>{consent ? "☑" : "☐"}</Text>
+                <Text style={styles.consentText}>
+                  Confirmo que el cliente autorizó el registro de sus datos y documentos.
+                </Text>
+              </Pressable>
+              {message ? (
+                <Text accessibilityRole="alert" style={styles.message}>
+                  {message}
+                </Text>
+              ) : null}
+              <Pressable
+                disabled={busy}
+                onPress={() => void submit()}
+                style={[styles.submit, busy && styles.disabled]}
+              >
+                <Text style={styles.submitText}>{busy ? "Guardando…" : "Crear cliente"}</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
         </View>
-      </View>
-      <Text style={styles.label}>Celular</Text>
-      <TextInput
-        keyboardType="phone-pad"
-        onChangeText={setPhone}
-        placeholder="300 000 0000"
-        placeholderTextColor="#77817a"
-        style={styles.input}
-        value={phone}
-      />
-      <Text style={styles.label}>WhatsApp</Text>
-      <TextInput
-        keyboardType="phone-pad"
-        onChangeText={setWhatsappPhone}
-        placeholder="Número de WhatsApp"
-        placeholderTextColor="#77817a"
-        style={styles.input}
-        value={whatsappPhone}
-      />
-      <Text style={styles.label}>Dirección de casa</Text>
-      <TextInput
-        onChangeText={setHomeAddress}
-        placeholder="Dirección completa"
-        placeholderTextColor="#77817a"
-        style={styles.input}
-        value={homeAddress}
-      />
-      <Text style={styles.label}>Dirección de trabajo</Text>
-      <TextInput
-        onChangeText={setWorkAddress}
-        placeholder="Dirección completa"
-        placeholderTextColor="#77817a"
-        style={styles.input}
-        value={workAddress}
-      />
-      <Pressable
-        onPress={() => setHomeAddressConfirmed((current) => !current)}
-        style={styles.consentRow}
-      >
-        <Text style={styles.checkbox}>{homeAddressConfirmed ? "☑" : "☐"}</Text>
-        <Text style={styles.consentText}>
-          Confirmo que la dirección de casa está completa y fue verificada con el cliente.
-        </Text>
-      </Pressable>
-      <Pressable
-        onPress={() => setWorkAddressConfirmed((current) => !current)}
-        style={styles.consentRow}
-      >
-        <Text style={styles.checkbox}>{workAddressConfirmed ? "☑" : "☐"}</Text>
-        <Text style={styles.consentText}>
-          Confirmo que la dirección de trabajo está completa y fue verificada con el cliente.
-        </Text>
-      </Pressable>
-      <Text style={styles.label}>Contacto de emergencia</Text>
-      <TextInput
-        onChangeText={setContactName}
-        placeholder="Nombre completo"
-        placeholderTextColor="#77817a"
-        style={styles.input}
-        value={contactName}
-      />
-      <TextInput
-        onChangeText={setContactRelationship}
-        placeholder="Relación"
-        placeholderTextColor="#77817a"
-        style={styles.input}
-        value={contactRelationship}
-      />
-      <TextInput
-        keyboardType="phone-pad"
-        onChangeText={setContactPhone}
-        placeholder="Celular"
-        placeholderTextColor="#77817a"
-        style={styles.input}
-        value={contactPhone}
-      />
-      <Pressable onPress={() => setSecondContact((current) => !current)} style={styles.toggle}>
-        <Text style={styles.toggleText}>
-          {secondContact ? "− Quitar segundo contacto" : "+ Agregar segundo contacto"}
-        </Text>
-      </Pressable>
-      {secondContact ? (
-        <>
-          <TextInput
-            onChangeText={setSecondContactName}
-            placeholder="Segundo contacto · nombre"
-            placeholderTextColor="#77817a"
-            style={styles.input}
-            value={secondContactName}
-          />
-          <TextInput
-            onChangeText={setSecondContactRelationship}
-            placeholder="Segundo contacto · relación"
-            placeholderTextColor="#77817a"
-            style={styles.input}
-            value={secondContactRelationship}
-          />
-          <TextInput
-            keyboardType="phone-pad"
-            onChangeText={setSecondContactPhone}
-            placeholder="Segundo contacto · celular"
-            placeholderTextColor="#77817a"
-            style={styles.input}
-            value={secondContactPhone}
-          />
-        </>
-      ) : null}
-      <Text style={styles.label}>Documentos privados</Text>
-      <ImageButton
-        label={identityFront ? `✓ Frente · ${identityFront.name}` : "Cargar cédula · frente"}
-        onPress={() => void pickImage(setIdentityFront, "cedula-frente.jpg")}
-      />
-      <ImageButton
-        label={identityBack ? `✓ Reverso · ${identityBack.name}` : "Cargar cédula · reverso"}
-        onPress={() => void pickImage(setIdentityBack, "cedula-reverso.jpg")}
-      />
-      <ImageButton
-        label={profilePhoto ? `✓ Foto · ${profilePhoto.name}` : "Cargar foto designada de perfil"}
-        onPress={() => void pickImage(setProfilePhoto, "foto-perfil.jpg")}
-      />
-      <Pressable onPress={() => setConsent((current) => !current)} style={styles.consentRow}>
-        <Text style={styles.checkbox}>{consent ? "☑" : "☐"}</Text>
-        <Text style={styles.consentText}>
-          Confirmo que el cliente autorizó el registro de sus datos y documentos.
-        </Text>
-      </Pressable>
-      {message ? (
-        <Text accessibilityRole="alert" style={styles.message}>
-          {message}
-        </Text>
-      ) : null}
-      <Pressable
-        disabled={busy}
-        onPress={() => void submit()}
-        style={[styles.submit, busy && styles.disabled]}
-      >
-        <Text style={styles.submitText}>{busy ? "Guardando…" : "Crear cliente"}</Text>
-      </Pressable>
-    </View>
+      </Modal>
+    </>
   );
 }
 
@@ -380,6 +428,28 @@ const styles = {
     borderWidth: 1,
     borderColor: "#343b36",
   },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.78)",
+    justifyContent: "flex-end" as const,
+  },
+  modalScroll: { padding: 12, paddingTop: 44 },
+  modalHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-between" as const,
+    gap: 8,
+  },
+  closeButton: { paddingHorizontal: 10, paddingVertical: 8 },
+  closeButtonText: { color: "#fbbf24", fontWeight: "800" as const, fontSize: 13 },
+  openButton: {
+    minHeight: 48,
+    borderRadius: 12,
+    backgroundColor: "#fbbf24",
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  openButtonText: { color: "#151817", fontWeight: "800" as const, fontSize: 15 },
   cardTitle: { color: "#eef2ee", fontWeight: "800" as const, fontSize: 17 },
   help: { color: "#99a39c", fontSize: 13, lineHeight: 19 },
   label: { color: "#dce2dd", fontSize: 13, fontWeight: "700" as const, marginTop: 4 },
