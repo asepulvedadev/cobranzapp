@@ -1,9 +1,11 @@
 "use client";
 
+import { tenantMemberCreateRequestSchema } from "@cobranzapp/contracts";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { Modal } from "../../Modal";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
+import { usePanelUiStore } from "../../ui-store";
 
 type CreatedCredentials = {
   username: string;
@@ -20,7 +22,9 @@ export function CreateMemberModal({
 }) {
   const router = useRouter();
   const sensitiveFetch = useSensitiveFetch();
-  const [open, setOpen] = useState(false);
+  const open = usePanelUiStore((state) => state.isCreateMemberModalOpen);
+  const openModal = usePanelUiStore((state) => state.openCreateMemberModal);
+  const closeModal = usePanelUiStore((state) => state.closeCreateMemberModal);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,7 +32,7 @@ export function CreateMemberModal({
 
   function close() {
     if (isSubmitting) return;
-    setOpen(false);
+    closeModal();
     setMessage("");
     setIsError(false);
     setCreated(null);
@@ -49,16 +53,27 @@ export function CreateMemberModal({
       password: String(form.get("password") ?? ""),
       role: String(form.get("role") ?? "collector"),
     };
+    const parsed = tenantMemberCreateRequestSchema.safeParse(payload);
+    if (!parsed.success) {
+      setMessage(parsed.error.issues[0]?.message ?? "Revisa los datos del empleado.");
+      setIsError(true);
+      setIsSubmitting(false);
+      return;
+    }
     const response = await sensitiveFetch(`/api/v1/tenants/${tenantId}/members`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(parsed.data),
     }).catch(() => null);
     if (!response?.ok) {
       const body = (await response?.json().catch(() => ({}))) as {
         error?: { message?: string };
       };
-      setMessage(body.error?.message ?? "No fue posible crear el empleado.");
+      setMessage(
+        response?.status === 428
+          ? "La confirmación de seguridad tardó demasiado. Inténtalo de nuevo."
+          : (body.error?.message ?? "No fue posible crear el empleado."),
+      );
       setIsError(true);
       setIsSubmitting(false);
       return;
@@ -71,7 +86,16 @@ export function CreateMemberModal({
 
   return (
     <>
-      <button className="primary-action" onClick={() => setOpen(true)} type="button">
+      <button
+        className="primary-action"
+        onClick={() => {
+          setMessage("");
+          setIsError(false);
+          setCreated(null);
+          openModal();
+        }}
+        type="button"
+      >
         Crear empleado
       </button>
       {open ? (

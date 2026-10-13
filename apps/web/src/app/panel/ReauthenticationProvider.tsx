@@ -8,6 +8,7 @@ type PendingRequest = {
   init?: RequestInit;
   initialResponse: Response;
   resolve: (response: Response | null) => void;
+  timeoutId: ReturnType<typeof setTimeout>;
 };
 
 type SensitiveFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response | null>;
@@ -39,7 +40,27 @@ export function ReauthenticationProvider({
     if (response?.status !== 428) return response;
 
     return new Promise<Response | null>((resolve) => {
-      pendingRequests.current.push({ input, init, initialResponse: response, resolve });
+      const pendingRequest: PendingRequest = {
+        input,
+        init,
+        initialResponse: response,
+        resolve,
+        timeoutId: setTimeout(() => {
+          pendingRequests.current = pendingRequests.current.filter(
+            (request) => request !== pendingRequest,
+          );
+          resolve(
+            new Response(
+              JSON.stringify({
+                error: { message: "La confirmación de seguridad expiró. Inténtalo de nuevo." },
+              }),
+              { status: 408, headers: { "content-type": "application/json" } },
+            ),
+          );
+          setHasPendingRequest(pendingRequests.current.length > 0);
+        }, 30_000),
+      };
+      pendingRequests.current.push(pendingRequest);
       setMessage("");
       setHasPendingRequest(true);
     });
@@ -47,6 +68,7 @@ export function ReauthenticationProvider({
 
   function closeDialog() {
     for (const request of pendingRequests.current.splice(0)) {
+      clearTimeout(request.timeoutId);
       request.resolve(request.initialResponse);
     }
     setPassword("");
@@ -74,6 +96,7 @@ export function ReauthenticationProvider({
     setHasPendingRequest(false);
     await Promise.all(
       requests.map(async (request) => {
+        clearTimeout(request.timeoutId);
         const retried = await fetch(request.input, request.init).catch(() => null);
         request.resolve(retried);
       }),

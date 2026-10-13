@@ -2481,6 +2481,18 @@ html:has(.panel-shell) {
   margin: 0.3rem 0 0;
 }
 
+.panel-modal-layer {
+  align-items: center;
+  background: rgb(0 0 0 / 0.68);
+  backdrop-filter: blur(4px);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1rem;
+  position: fixed;
+  z-index: 200;
+}
+
 .panel-modal {
   background: var(--panel-surface, #1b1b1b);
   border: 1px solid var(--panel-border, rgb(255 255 255 / 0.16));
@@ -2491,11 +2503,6 @@ html:has(.panel-shell) {
   overflow: auto;
   padding: 1.25rem;
   width: 100%;
-}
-
-.panel-modal::backdrop {
-  background: rgb(0 0 0 / 0.68);
-  backdrop-filter: blur(4px);
 }
 
 .panel-modal-heading {
@@ -2644,7 +2651,7 @@ html:has(.panel-shell) {
 .reauthentication-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 300;
   display: grid;
   align-items: end;
   padding: 12px 12px max(12px, var(--panel-safe-bottom));
