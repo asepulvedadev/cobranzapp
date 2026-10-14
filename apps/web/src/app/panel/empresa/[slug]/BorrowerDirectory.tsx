@@ -63,6 +63,80 @@ const CREATE_STEPS = [
   { label: "Revisión", detail: "Confirma y guarda" },
 ] as const;
 
+const OCR_LABELS = new Set([
+  "REPUBLICA",
+  "REPUBLICA DE COLOMBIA",
+  "COLOMBIA",
+  "CEDULA",
+  "CEDULA DE CIUDADANIA",
+  "CIUDADANIA",
+  "IDENTIFICACION",
+  "IDENTIDAD",
+  "APELLIDOS",
+  "NOMBRES",
+  "SEXO",
+  "FECHA DE NACIMIENTO",
+  "LUGAR DE NACIMIENTO",
+  "FECHA DE EXPEDICION",
+  "LUGAR DE EXPEDICION",
+]);
+
+function cleanOcrLine(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+export function extractOcrIdentityFields(text: string) {
+  const normalized = text.replace(/\r/g, "\n");
+  const lines = normalized
+    .split("\n")
+    .map((line) => cleanOcrLine(line))
+    .filter(Boolean);
+  const numberCandidates = [
+    ...Array.from(
+      normalized.matchAll(
+        /(?:CC|CEDULA|CEDULA DE CIUDADANIA|DOCUMENTO|IDENTIFICACION|NUIP|NO\.?|NRO\.?)\s*[:#.-]?\s*([0-9][0-9 .-]{5,})/gi,
+      ),
+    ).map((match) => match[1] ?? ""),
+    ...Array.from(normalized.matchAll(/\b[0-9][0-9 .-]{6,12}[0-9]\b/g)).map((match) => match[0]),
+  ]
+    .map((value) => value.replace(/\D/g, ""))
+    .filter((value) => value.length >= 7 && value.length <= 12);
+
+  const afterLabel = (label: string) => {
+    const lineIndex = lines.findIndex((line) => line.includes(label));
+    if (lineIndex < 0) return "";
+    const sameLine = lines[lineIndex].replace(label, "").trim();
+    return sameLine || lines[lineIndex + 1] || "";
+  };
+  const surnames = afterLabel("APELLIDOS");
+  const names = afterLabel("NOMBRES");
+  const labelledName = [names, surnames].filter(Boolean).join(" ").trim();
+  const fallbackName = lines
+    .filter((line) => {
+      const words = line.split(" ");
+      return (
+        words.length >= 2 &&
+        words.length <= 6 &&
+        line.length >= 5 &&
+        !OCR_LABELS.has(line) &&
+        !/\d/.test(line) &&
+        !line.includes("REPUBLICA")
+      );
+    })
+    .sort((left, right) => right.length - left.length)[0];
+
+  return {
+    fullName: (labelledName || fallbackName || "").trim(),
+    documentNumber: numberCandidates[0] ?? "",
+  };
+}
+
 export function BorrowerDirectory({
   tenantId,
   directory,
@@ -101,14 +175,24 @@ export function BorrowerDirectory({
   const [createdBorrowerId, setCreatedBorrowerId] = useState<string | null>(null);
   const [uploadedDocumentFields, setUploadedDocumentFields] = useState<string[]>([]);
   const [selectedUploadNames, setSelectedUploadNames] = useState<Record<string, string>>({});
+  const [ocrStatus, setOcrStatus] = useState<"idle" | "processing" | "ready" | "partial" | "error">(
+    "idle",
+  );
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [ocrMessage, setOcrMessage] = useState("");
+  const ocrRunRef = useRef(0);
   const createFormRef = useRef<HTMLFormElement>(null);
 
   function closeCreateModal(force = false) {
     if (isSubmitting && !force) return;
+    ocrRunRef.current += 1;
     setIsCreateOpen(false);
     setCreatedBorrowerId(null);
     setUploadedDocumentFields([]);
     setSelectedUploadNames({});
+    setOcrStatus("idle");
+    setOcrProgress(0);
+    setOcrMessage("");
     setIncludeSecondContact(false);
     setHomeAddressConfirmed(false);
     setWorkAddressConfirmed(false);
@@ -121,12 +205,79 @@ export function BorrowerDirectory({
   }
 
   function selectUpload(event: ChangeEvent<HTMLInputElement>, field: string) {
+    const file = event.currentTarget.files?.[0] ?? null;
     setSelectedUploadNames((current) => ({
       ...current,
-      [field]: event.currentTarget.files?.[0]?.name ?? "",
+      [field]: file?.name ?? "",
     }));
     setMessage("");
     setIsError(false);
+    if (file && (field === "identityFront" || field === "identityBack")) {
+      const otherField = field === "identityFront" ? "identityBack" : "identityFront";
+      const otherElement = createFormRef.current?.elements.namedItem(otherField);
+      const otherFile = otherElement instanceof HTMLInputElement ? otherElement.files?.[0] : null;
+      if (otherFile)
+        void scanIdentityDocuments(
+          field === "identityFront" ? file : otherFile,
+          field === "identityBack" ? file : otherFile,
+        );
+    }
+  }
+
+  async function scanIdentityDocuments(front: File, back: File) {
+    const run = ++ocrRunRef.current;
+    setOcrStatus("processing");
+    setOcrProgress(0);
+    setOcrMessage("Leyendo frente y reverso de la cédula…");
+    let worker: {
+      recognize: (image: File) => Promise<{ data: { text: string } }>;
+      terminate: () => Promise<unknown>;
+    } | null = null;
+    try {
+      const { createWorker } = await import("tesseract.js");
+      worker = await createWorker("spa", 1, {
+        logger: (progress) => {
+          if (run !== ocrRunRef.current) return;
+          setOcrProgress(Math.round(Math.max(0, Math.min(1, progress.progress ?? 0)) * 100));
+        },
+      });
+      const frontResult = await worker.recognize(front);
+      if (run !== ocrRunRef.current) return;
+      setOcrProgress(50);
+      const backResult = await worker.recognize(back);
+      if (run !== ocrRunRef.current) return;
+      const fields = extractOcrIdentityFields(`${frontResult.data.text}\n${backResult.data.text}`);
+      if (fields.fullName) {
+        const nameInput = createFormRef.current?.elements.namedItem("fullName");
+        if (nameInput instanceof HTMLInputElement && !nameInput.value.trim()) {
+          nameInput.value = fields.fullName;
+        }
+      }
+      if (fields.documentNumber) {
+        const numberInput = createFormRef.current?.elements.namedItem("documentNumber");
+        if (numberInput instanceof HTMLInputElement && !numberInput.value.trim()) {
+          numberInput.value = fields.documentNumber;
+        }
+      }
+      const foundCount = Number(Boolean(fields.fullName)) + Number(Boolean(fields.documentNumber));
+      setOcrStatus(foundCount === 2 ? "ready" : foundCount === 1 ? "partial" : "error");
+      setOcrMessage(
+        foundCount === 2
+          ? "Datos detectados automáticamente. Revísalos antes de continuar."
+          : foundCount === 1
+            ? "Detectamos un dato. Completa o corrige el otro antes de continuar."
+            : "No pudimos leer los datos. Toma fotos más nítidas o escríbelos manualmente.",
+      );
+      setOcrProgress(100);
+    } catch {
+      if (run !== ocrRunRef.current) return;
+      setOcrStatus("error");
+      setOcrMessage(
+        "No pudimos ejecutar la lectura automática. Puedes escribir los datos manualmente.",
+      );
+    } finally {
+      if (worker) await worker.terminate().catch(() => undefined);
+    }
   }
 
   function validateCreateStep(step: number) {
@@ -455,9 +606,13 @@ export function BorrowerDirectory({
               <button
                 className="primary-action"
                 onClick={() => {
+                  ocrRunRef.current += 1;
                   setCreatedBorrowerId(null);
                   setUploadedDocumentFields([]);
                   setSelectedUploadNames({});
+                  setOcrStatus("idle");
+                  setOcrProgress(0);
+                  setOcrMessage("");
                   setMessage("");
                   setIsError(false);
                   setToastMessage("");
@@ -872,6 +1027,23 @@ export function BorrowerDirectory({
                   </span>
                 </label>
               </div>
+              {ocrStatus !== "idle" ? (
+                <div className={`borrower-autofill-status is-${ocrStatus}`} role="status">
+                  <span className="borrower-autofill-icon" aria-hidden="true">
+                    {ocrStatus === "processing" ? "…" : ocrStatus === "ready" ? "✓" : "!"}
+                  </span>
+                  <div>
+                    <strong>
+                      {ocrStatus === "processing"
+                        ? `Leyendo documento${ocrProgress ? ` · ${ocrProgress}%` : ""}`
+                        : ocrStatus === "ready"
+                          ? "Lectura automática completada"
+                          : "Revisión necesaria"}
+                    </strong>
+                    <small>{ocrMessage}</small>
+                  </div>
+                </div>
+              ) : null}
               <div className="borrower-inline-tip">
                 <span aria-hidden="true">i</span>
                 <span>

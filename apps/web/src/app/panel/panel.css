@@ -5000,6 +5000,67 @@ html:has(.panel-shell) {
   font-weight: 850;
 }
 
+.borrower-autofill-status {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid #c9d9ce;
+  border-radius: 11px;
+  background: #f4faf5;
+  color: #176b43;
+}
+
+.borrower-autofill-status div {
+  display: grid;
+  gap: 2px;
+}
+
+.borrower-autofill-status strong {
+  font-size: 12px;
+}
+
+.borrower-autofill-status small {
+  color: #4f705d;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.borrower-autofill-icon {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border-radius: 50%;
+  background: #1b8a58;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.borrower-autofill-status.is-processing {
+  border-color: #e5d29b;
+  background: #fffaf0;
+  color: #8b5b00;
+}
+
+.borrower-autofill-status.is-processing .borrower-autofill-icon {
+  background: #d49a00;
+}
+
+.borrower-autofill-status.is-partial,
+.borrower-autofill-status.is-error {
+  border-color: #edc98e;
+  background: #fff8ed;
+  color: #8b5b00;
+}
+
+.borrower-autofill-status.is-partial .borrower-autofill-icon,
+.borrower-autofill-status.is-error .borrower-autofill-icon {
+  background: #c17e00;
+}
+
 .borrower-inline-tip {
   display: flex;
   align-items: flex-start;
