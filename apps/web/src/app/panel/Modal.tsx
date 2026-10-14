@@ -4,10 +4,12 @@ import type { ReactNode } from "react";
 
 export function Modal({
   children,
+  className,
   onClose,
   title,
 }: {
   children: ReactNode;
+  className?: string;
   onClose: () => void;
   title: string;
 }) {
@@ -16,7 +18,7 @@ export function Modal({
       <section
         aria-labelledby="modal-title"
         aria-modal="true"
-        className="panel-modal"
+        className={className ? `panel-modal ${className}` : "panel-modal"}
         role="dialog"
       >
         <div className="panel-modal-heading">

@@ -7,7 +7,7 @@ import {
   borrowerCreateRequestSchema,
 } from "@cobranzapp/contracts";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, useRef, useState } from "react";
 import { formatApiError } from "../../api-error";
 import { Modal } from "../../Modal";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
@@ -56,6 +56,13 @@ function splitAddress(value: string) {
   return { street: parts.slice(0, -1).join(", "), locality: parts.at(-1) ?? "" };
 }
 
+const CREATE_STEPS = [
+  { label: "Identidad", detail: "Datos y documentos" },
+  { label: "Contacto", detail: "Teléfonos y direcciones" },
+  { label: "Referencias", detail: "Personas de confianza" },
+  { label: "Revisión", detail: "Confirma y guarda" },
+] as const;
+
 export function BorrowerDirectory({
   tenantId,
   directory,
@@ -77,6 +84,7 @@ export function BorrowerDirectory({
   const [isError, setIsError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
   const [addressEditBorrower, setAddressEditBorrower] = useState<Borrower | null>(null);
   const [addressEditHome, setAddressEditHome] = useState("");
   const [addressEditHomeLocality, setAddressEditHomeLocality] = useState("");
@@ -92,6 +100,7 @@ export function BorrowerDirectory({
   const [createStep, setCreateStep] = useState(1);
   const [createdBorrowerId, setCreatedBorrowerId] = useState<string | null>(null);
   const [uploadedDocumentFields, setUploadedDocumentFields] = useState<string[]>([]);
+  const [selectedUploadNames, setSelectedUploadNames] = useState<Record<string, string>>({});
   const createFormRef = useRef<HTMLFormElement>(null);
 
   function closeCreateModal(force = false) {
@@ -99,6 +108,7 @@ export function BorrowerDirectory({
     setIsCreateOpen(false);
     setCreatedBorrowerId(null);
     setUploadedDocumentFields([]);
+    setSelectedUploadNames({});
     setIncludeSecondContact(false);
     setHomeAddressConfirmed(false);
     setWorkAddressConfirmed(false);
@@ -108,6 +118,15 @@ export function BorrowerDirectory({
   function fieldValue(name: string) {
     const element = createFormRef.current?.elements.namedItem(name);
     return element instanceof HTMLInputElement ? element.value : "";
+  }
+
+  function selectUpload(event: ChangeEvent<HTMLInputElement>, field: string) {
+    setSelectedUploadNames((current) => ({
+      ...current,
+      [field]: event.currentTarget.files?.[0]?.name ?? "",
+    }));
+    setMessage("");
+    setIsError(false);
   }
 
   function validateCreateStep(step: number) {
@@ -410,10 +429,12 @@ export function BorrowerDirectory({
       router.refresh();
       return;
     }
+    const createdName = String(form.get("fullName") ?? "").trim();
     event.currentTarget.reset();
     setMessage(
       "Cliente creado. Las imágenes quedaron privadas y el OCR se procesará en segundo plano para revisión humana.",
     );
+    setToastMessage(`${createdName || "Cliente"} creado correctamente.`);
     setIsError(false);
     setIsSubmitting(false);
     closeCreateModal(true);
@@ -436,8 +457,10 @@ export function BorrowerDirectory({
                 onClick={() => {
                   setCreatedBorrowerId(null);
                   setUploadedDocumentFields([]);
+                  setSelectedUploadNames({});
                   setMessage("");
                   setIsError(false);
+                  setToastMessage("");
                   setIsCreateOpen(true);
                 }}
                 type="button"
@@ -447,6 +470,18 @@ export function BorrowerDirectory({
             ) : null}
           </div>
         </div>
+        {toastMessage ? (
+          <div className="borrower-toast" role="status">
+            <span aria-hidden="true">✓</span>
+            <div>
+              <strong>{toastMessage}</strong>
+              <small>Ya puedes buscarlo en el directorio o crearle su primer crédito.</small>
+            </div>
+            <button aria-label="Cerrar aviso" onClick={() => setToastMessage("")} type="button">
+              ×
+            </button>
+          </div>
+        ) : null}
         <p className="operational-note">
           La búsqueda muestra el nombre y los últimos cuatro dígitos. Nunca se expone el número
           completo.
@@ -686,17 +721,21 @@ export function BorrowerDirectory({
       </section>
 
       {canCreate && isCreateOpen ? (
-        <Modal onClose={() => closeCreateModal()} title="Nuevo cliente">
-          <div className="card-heading">
+        <Modal
+          className="borrower-create-modal"
+          onClose={() => closeCreateModal()}
+          title="Crear cliente"
+        >
+          <div className="borrower-modal-intro">
             <div>
-              <span className="panel-eyebrow">Alta rápida</span>
-              <h2>Nuevo cliente</h2>
+              <span className="panel-eyebrow">Registro guiado · 4 pasos</span>
+              <p>
+                Completa lo esencial primero. Puedes volver atrás sin perder los datos y las
+                imágenes quedan privadas para revisión.
+              </p>
             </div>
+            <span className="borrower-step-counter">Paso {createStep} de 4</span>
           </div>
-          <p className="operational-note">
-            Las imágenes se guardan en cuarentena privada y el OCR propone datos para que un usuario
-            autorizado los revise antes de confirmarlos.
-          </p>
           <form
             className="tenant-form borrower-create-form"
             noValidate
@@ -704,36 +743,55 @@ export function BorrowerDirectory({
             ref={createFormRef}
           >
             <nav className="borrower-stepper" aria-label="Pasos para crear cliente">
-              {["Documento", "Contacto y direcciones", "Referencias", "Confirmar"].map(
-                (label, index) => {
-                  const step = index + 1;
-                  return (
-                    <button
-                      aria-current={createStep === step ? "step" : undefined}
-                      className={createStep === step ? "borrower-step is-active" : "borrower-step"}
-                      disabled={step > createStep}
-                      key={label}
-                      onClick={() => step < createStep && setCreateStep(step)}
-                      type="button"
-                    >
-                      <span>{step}</span>
-                      {label}
-                    </button>
-                  );
-                },
-              )}
+              {CREATE_STEPS.map((item, index) => {
+                const step = index + 1;
+                const completed = step < createStep;
+                return (
+                  <button
+                    aria-current={createStep === step ? "step" : undefined}
+                    className={`borrower-step${createStep === step ? " is-active" : ""}${completed ? " is-complete" : ""}`}
+                    disabled={step > createStep}
+                    key={item.label}
+                    onClick={() => step < createStep && setCreateStep(step)}
+                    type="button"
+                  >
+                    <span>{completed ? "✓" : step}</span>
+                    <strong>{item.label}</strong>
+                    <small>{item.detail}</small>
+                  </button>
+                );
+              })}
             </nav>
 
+            <div
+              aria-label={`Progreso: paso ${createStep} de 4`}
+              aria-valuemax={4}
+              aria-valuemin={1}
+              aria-valuenow={createStep}
+              className="borrower-progress"
+              role="progressbar"
+            >
+              <span style={{ width: `${(createStep / 4) * 100}%` }} />
+            </div>
+
             <section aria-labelledby="borrower-step-document" hidden={createStep !== 1}>
-              <h3 id="borrower-step-document">Documento de identidad</h3>
-              <p className="operational-note">
+              <div className="borrower-section-heading">
+                <div>
+                  <span className="borrower-section-kicker">Paso 1 · Identidad</span>
+                  <h3 id="borrower-step-document">¿Quién es tu cliente?</h3>
+                </div>
+                <span className="borrower-required-note">Todo es obligatorio</span>
+              </div>
+              <p className="borrower-section-help">
                 Captura frente y reverso desde el celular. El OCR se ejecutará en segundo plano; sus
                 sugerencias siempre deben confirmarse manualmente.
               </p>
-              <label htmlFor="borrower-full-name">Nombre completo</label>
-              <input id="borrower-full-name" name="fullName" maxLength={160} />
-              <div className="borrower-form-row">
-                <label>
+              <div className="borrower-form-grid borrower-form-grid-identity">
+                <label className="borrower-field borrower-field-wide" htmlFor="borrower-full-name">
+                  Nombre completo
+                  <input id="borrower-full-name" name="fullName" maxLength={160} />
+                </label>
+                <label className="borrower-field">
                   Tipo
                   <select defaultValue="CC" name="documentType">
                     <option value="CC">Cédula de ciudadanía</option>
@@ -741,107 +799,173 @@ export function BorrowerDirectory({
                     <option value="PPT">Permiso por protección temporal</option>
                   </select>
                 </label>
-                <label>
+                <label className="borrower-field">
                   Número de documento
                   <input name="documentNumber" inputMode="numeric" maxLength={32} />
                 </label>
               </div>
-              <div className="borrower-form-row borrower-document-fields">
-                <label>
-                  Cédula · frente
+              <div className="borrower-upload-grid">
+                <label
+                  className={`borrower-upload-card${selectedUploadNames.identityFront ? " is-selected" : ""}`}
+                >
+                  <span className="borrower-upload-icon" aria-hidden="true">
+                    1
+                  </span>
+                  <strong>
+                    {selectedUploadNames.identityFront ? "Frente listo" : "Frente de la cédula"}
+                  </strong>
+                  <small>{selectedUploadNames.identityFront ?? "Foto nítida, sin reflejos"}</small>
                   <input
                     accept="image/jpeg,image/png,image/webp,application/pdf"
                     capture="environment"
                     name="identityFront"
+                    onChange={(event) => selectUpload(event, "identityFront")}
                     type="file"
                   />
-                  <small>Usa la cámara trasera</small>
+                  <span className="borrower-upload-cta">
+                    {selectedUploadNames.identityFront ? "Cambiar archivo" : "Tomar o elegir foto"}
+                  </span>
                 </label>
-                <label>
-                  Cédula · reverso
+                <label
+                  className={`borrower-upload-card${selectedUploadNames.identityBack ? " is-selected" : ""}`}
+                >
+                  <span className="borrower-upload-icon" aria-hidden="true">
+                    2
+                  </span>
+                  <strong>
+                    {selectedUploadNames.identityBack ? "Reverso listo" : "Reverso de la cédula"}
+                  </strong>
+                  <small>
+                    {selectedUploadNames.identityBack ?? "Incluye todos los datos visibles"}
+                  </small>
                   <input
                     accept="image/jpeg,image/png,image/webp,application/pdf"
                     capture="environment"
                     name="identityBack"
+                    onChange={(event) => selectUpload(event, "identityBack")}
                     type="file"
                   />
-                  <small>Usa la cámara trasera</small>
+                  <span className="borrower-upload-cta">
+                    {selectedUploadNames.identityBack ? "Cambiar archivo" : "Tomar o elegir foto"}
+                  </span>
+                </label>
+                <label
+                  className={`borrower-upload-card${selectedUploadNames.profilePhoto ? " is-selected" : ""}`}
+                >
+                  <span className="borrower-upload-icon" aria-hidden="true">
+                    3
+                  </span>
+                  <strong>
+                    {selectedUploadNames.profilePhoto ? "Foto lista" : "Foto de perfil"}
+                  </strong>
+                  <small>
+                    {selectedUploadNames.profilePhoto ?? "La foto que el cliente designe"}
+                  </small>
+                  <input
+                    accept="image/jpeg,image/png,image/webp"
+                    name="profilePhoto"
+                    onChange={(event) => selectUpload(event, "profilePhoto")}
+                    type="file"
+                  />
+                  <span className="borrower-upload-cta">
+                    {selectedUploadNames.profilePhoto ? "Cambiar archivo" : "Tomar o elegir foto"}
+                  </span>
                 </label>
               </div>
-              <label>
-                Foto designada de perfil
-                <input accept="image/jpeg,image/png,image/webp" name="profilePhoto" type="file" />
-              </label>
-              <small>
-                No es una selfie obligatoria; es la foto que el cliente designe para su perfil.
-              </small>
+              <div className="borrower-inline-tip">
+                <span aria-hidden="true">i</span>
+                <span>
+                  No es una selfie obligatoria: usa la foto de perfil que el cliente designe.
+                </span>
+              </div>
             </section>
 
             <section aria-labelledby="borrower-step-contact" hidden={createStep !== 2}>
-              <h3 id="borrower-step-contact">Contacto y direcciones</h3>
-              <p className="operational-note">
+              <div className="borrower-section-heading">
+                <div>
+                  <span className="borrower-section-kicker">Paso 2 · Contacto</span>
+                  <h3 id="borrower-step-contact">¿Cómo lo contactas y dónde lo visitas?</h3>
+                </div>
+                <span className="borrower-required-note">Direcciones verificadas</span>
+              </div>
+              <p className="borrower-section-help">
                 Guarda la dirección completa: calle/carrera, número, barrio y municipio. Así se
                 conserva correctamente en el expediente y Waze puede ubicarla mejor.
               </p>
-              <label htmlFor="borrower-phone">Celular principal</label>
-              <input id="borrower-phone" name="phone" maxLength={30} type="tel" />
-              <label htmlFor="borrower-whatsapp">WhatsApp</label>
-              <input id="borrower-whatsapp" name="whatsappPhone" maxLength={30} type="tel" />
-              <small>Si usa el mismo número, escríbelo nuevamente para dejarlo confirmado.</small>
-              <label htmlFor="borrower-home">Dirección de casa</label>
-              <input
-                id="borrower-home"
-                name="homeAddress"
-                maxLength={240}
-                placeholder="Ej. Calle 10 # 20-30, Barrio Centro, Cúcuta"
-              />
-              <label htmlFor="borrower-home-locality">Barrio y municipio de casa</label>
-              <input
-                id="borrower-home-locality"
-                name="homeAddressLocality"
-                maxLength={100}
-                placeholder="Ej. Barrio Centro, Cúcuta"
-              />
-              <label htmlFor="borrower-work">Dirección de trabajo</label>
-              <input
-                id="borrower-work"
-                name="workAddress"
-                maxLength={240}
-                placeholder="Ej. Carrera 5 # 12-40, Barrio La Playa, Cúcuta"
-              />
-              <label htmlFor="borrower-work-locality">Barrio y municipio de trabajo</label>
-              <input
-                id="borrower-work-locality"
-                name="workAddressLocality"
-                maxLength={100}
-                placeholder="Ej. Barrio La Playa, Cúcuta"
-              />
-              <label className="checkbox-row address-confirmation">
-                <input
-                  checked={homeAddressConfirmed}
-                  onChange={(event) => setHomeAddressConfirmed(event.target.checked)}
-                  type="checkbox"
-                />
-                <span>
-                  Confirmo que la dirección de casa está completa y fue verificada con el cliente.
-                </span>
-              </label>
-              <label className="checkbox-row address-confirmation">
-                <input
-                  checked={workAddressConfirmed}
-                  onChange={(event) => setWorkAddressConfirmed(event.target.checked)}
-                  type="checkbox"
-                />
-                <span>
-                  Confirmo que la dirección de trabajo está completa y fue verificada con el
-                  cliente.
-                </span>
-              </label>
+              <div className="borrower-form-grid borrower-form-grid-contact">
+                <label className="borrower-field" htmlFor="borrower-phone">
+                  Celular principal
+                  <input id="borrower-phone" name="phone" maxLength={30} type="tel" />
+                </label>
+                <label className="borrower-field" htmlFor="borrower-whatsapp">
+                  WhatsApp
+                  <input id="borrower-whatsapp" name="whatsappPhone" maxLength={30} type="tel" />
+                  <small>Puede ser el mismo número</small>
+                </label>
+              </div>
+              <div className="borrower-address-grid">
+                <fieldset className="borrower-address-card">
+                  <legend>Casa</legend>
+                  <label htmlFor="borrower-home">Dirección completa</label>
+                  <input
+                    id="borrower-home"
+                    name="homeAddress"
+                    maxLength={240}
+                    placeholder="Calle 10 # 20-30"
+                  />
+                  <label htmlFor="borrower-home-locality">Barrio y municipio</label>
+                  <input
+                    id="borrower-home-locality"
+                    name="homeAddressLocality"
+                    maxLength={100}
+                    placeholder="Centro, Cúcuta"
+                  />
+                  <label className="checkbox-row address-confirmation">
+                    <input
+                      checked={homeAddressConfirmed}
+                      onChange={(event) => setHomeAddressConfirmed(event.target.checked)}
+                      type="checkbox"
+                    />
+                    <span>Verificada con el cliente</span>
+                  </label>
+                </fieldset>
+                <fieldset className="borrower-address-card">
+                  <legend>Trabajo</legend>
+                  <label htmlFor="borrower-work">Dirección completa</label>
+                  <input
+                    id="borrower-work"
+                    name="workAddress"
+                    maxLength={240}
+                    placeholder="Carrera 5 # 12-40"
+                  />
+                  <label htmlFor="borrower-work-locality">Barrio y municipio</label>
+                  <input
+                    id="borrower-work-locality"
+                    name="workAddressLocality"
+                    maxLength={100}
+                    placeholder="La Playa, Cúcuta"
+                  />
+                  <label className="checkbox-row address-confirmation">
+                    <input
+                      checked={workAddressConfirmed}
+                      onChange={(event) => setWorkAddressConfirmed(event.target.checked)}
+                      type="checkbox"
+                    />
+                    <span>Verificada con el cliente</span>
+                  </label>
+                </fieldset>
+              </div>
             </section>
 
             <section aria-labelledby="borrower-step-references" hidden={createStep !== 3}>
-              <h3 id="borrower-step-references">Referencias del cliente</h3>
-              <p className="operational-note">
+              <div className="borrower-section-heading">
+                <div>
+                  <span className="borrower-section-kicker">Paso 3 · Referencias</span>
+                  <h3 id="borrower-step-references">¿A quién podemos llamar?</h3>
+                </div>
+                <span className="borrower-required-note">Mínimo 1</span>
+              </div>
+              <p className="borrower-section-help">
                 Registra una referencia como mínimo. Puedes añadir una segunda si la necesitas.
               </p>
               <fieldset className="borrower-contact-fieldset">
@@ -907,8 +1031,14 @@ export function BorrowerDirectory({
             </section>
 
             <section aria-labelledby="borrower-step-confirm" hidden={createStep !== 4}>
-              <h3 id="borrower-step-confirm">Confirma antes de guardar</h3>
-              <p className="operational-note">
+              <div className="borrower-section-heading">
+                <div>
+                  <span className="borrower-section-kicker">Paso 4 · Revisión</span>
+                  <h3 id="borrower-step-confirm">Revisa y crea el cliente</h3>
+                </div>
+                <span className="borrower-required-note">Listo para guardar</span>
+              </div>
+              <p className="borrower-section-help">
                 Se guardarán los datos diligenciados, las dos caras del documento, la foto de perfil
                 y las referencias.
               </p>
@@ -938,7 +1068,7 @@ export function BorrowerDirectory({
                   Continuar
                 </button>
               ) : (
-                <button disabled={isSubmitting} type="submit">
+                <button className="borrower-submit-button" disabled={isSubmitting} type="submit">
                   {isSubmitting
                     ? "Guardando…"
                     : createdBorrowerId
