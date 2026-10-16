@@ -5,6 +5,7 @@ import Image from "next/image";
 import { type ReactNode, useState } from "react";
 import { Modal } from "../../Modal";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
+import { ClientPortalLink } from "./ClientPortalLink";
 
 function identityStatusLabel(status: Borrower["identity"]["verificationState"]) {
   return status === "reviewed" ? "Verificado" : status === "rejected" ? "Rechazado" : "En revisión";
@@ -169,6 +170,12 @@ export function CollectorBorrowerCard({
               WhatsApp
             </a>
           ) : null}
+          <ClientPortalLink
+            borrowerId={borrower.id}
+            borrowerName={borrower.fullName}
+            tenantId={tenantId}
+            whatsappPhone={borrower.whatsappPhone ?? borrower.phone}
+          />
           <a
             className="collector-client-action"
             href={homeWazeHref}

@@ -68,9 +68,9 @@ export const membershipFeatures = [
   },
   {
     id: "daily-receipt",
-    label: "Registro operativo diario por cliente",
+    label: "Pagos y comprobantes por cliente",
     detail:
-      "Consulta el avance de cuotas operativas y gestiones de la jornada; no es facturación ni recibo financiero.",
+      "Registra valor, medio de pago y evidencia de transferencia; genera un comprobante no tributario para compartir.",
   },
   {
     id: "internal-profile",
@@ -80,9 +80,9 @@ export const membershipFeatures = [
   },
   {
     id: "customer-link",
-    label: "Ficha de cliente con acceso restringido",
+    label: "Enlace privado para el cliente",
     detail:
-      "El equipo autorizado consulta la ficha y el historial operativo sin exponer datos internos.",
+      "El cliente consulta saldo, fechas y pagos confirmados sin contraseña y sin exponer documentos internos.",
   },
   {
     id: "business-rules",

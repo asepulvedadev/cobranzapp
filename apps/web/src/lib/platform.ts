@@ -8,6 +8,7 @@ export type {
   LoanAnalytics,
   LoanAnalyticsPreset,
   LoanApplication,
+  LoanPayment,
   LoanProduct,
   MembershipEntitlement,
   MembershipPlan,

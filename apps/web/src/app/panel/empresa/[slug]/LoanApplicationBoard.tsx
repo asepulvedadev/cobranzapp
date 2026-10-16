@@ -13,6 +13,7 @@ import type {
   Borrower,
   FinancialSchedulePreview,
   LoanApplication,
+  LoanPayment,
   LoanProduct,
 } from "../../../../lib/platform";
 import { formatApiError } from "../../api-error";
@@ -78,6 +79,15 @@ export function LoanApplicationBoard({
   const [approvalConfirmation, setApprovalConfirmation] = useState<LoanApplication | null>(null);
   const [paymentApplicationId, setPaymentApplicationId] = useState<string | null>(null);
   const [paymentConfirmation, setPaymentConfirmation] = useState<LoanApplication | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer">("cash");
+  const [paymentProof, setPaymentProof] = useState<File | null>(null);
+  const [paymentReceipt, setPaymentReceipt] = useState<
+    (LoanPayment & { borrowerName: string; whatsappPhone: string }) | null
+  >(null);
+  const [paymentHistoryApplication, setPaymentHistoryApplication] =
+    useState<LoanApplication | null>(null);
+  const [paymentHistory, setPaymentHistory] = useState<LoanPayment[]>([]);
+  const [paymentHistoryBusy, setPaymentHistoryBusy] = useState(false);
   const [renewingApplicationId, setRenewingApplicationId] = useState<string | null>(null);
   const [schedulePreview, setSchedulePreview] = useState<FinancialSchedulePreview | null>(null);
   const [createOpen, setCreateOpen] = useState(openCreate);
@@ -205,12 +215,16 @@ export function LoanApplicationBoard({
     setPaymentApplicationId(application.id);
     setMessage("");
     setIsError(false);
+    const form = new FormData();
+    form.set("installmentNumber", String(application.paidInstallments + 1));
+    form.set("amount", application.nextPaymentAmount ?? application.installmentAmount);
+    form.set("paymentMethod", paymentMethod);
+    if (paymentMethod === "transfer" && paymentProof) form.set("proof", paymentProof);
     const response = await sensitiveFetch(
       `/api/v1/tenants/${tenantId}/loan-applications/${application.id}/payments`,
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ installmentNumber: application.paidInstallments + 1 }),
+        body: form,
       },
     ).catch(() => null);
     if (!response?.ok) {
@@ -219,9 +233,35 @@ export function LoanApplicationBoard({
       setPaymentApplicationId(null);
       return;
     }
-    setMessage(`Cuota ${application.paidInstallments + 1} registrada.`);
+    const body = (await response.json()) as { payment?: LoanPayment };
+    const borrower = borrowers.find((item) => item.id === application.borrowerId);
+    if (body.payment) {
+      setPaymentReceipt({
+        ...body.payment,
+        borrowerName: application.borrowerName,
+        whatsappPhone: borrower?.whatsappPhone ?? borrower?.phone ?? "",
+      });
+    }
+    setPaymentMethod("cash");
+    setPaymentProof(null);
+    setMessage(`Pago de la cuota ${application.paidInstallments + 1} registrado.`);
     setPaymentApplicationId(null);
     router.refresh();
+  }
+
+  async function openPaymentHistory(application: LoanApplication) {
+    setPaymentHistoryApplication(application);
+    setPaymentHistory([]);
+    setPaymentHistoryBusy(true);
+    const response = await fetch(
+      `/api/v1/tenants/${tenantId}/loan-applications/${application.id}/payments`,
+      { cache: "no-store" },
+    ).catch(() => null);
+    if (response?.ok) {
+      const body = (await response.json()) as { payments?: LoanPayment[] };
+      setPaymentHistory(body.payments ?? []);
+    }
+    setPaymentHistoryBusy(false);
   }
 
   async function renewApplication(event: FormEvent<HTMLFormElement>, application: LoanApplication) {
@@ -364,7 +404,11 @@ export function LoanApplicationBoard({
                 <div className="loan-application-actions">
                   <button
                     disabled={paymentApplicationId !== null}
-                    onClick={() => setPaymentConfirmation(application)}
+                    onClick={() => {
+                      setPaymentMethod("cash");
+                      setPaymentProof(null);
+                      setPaymentConfirmation(application);
+                    }}
                     type="button"
                   >
                     {paymentApplicationId === application.id
@@ -402,6 +446,15 @@ export function LoanApplicationBoard({
                     </p>
                   )}
                 </div>
+              ) : null}
+              {application.paidInstallments > 0 ? (
+                <button
+                  className="loan-payment-history-button"
+                  onClick={() => void openPaymentHistory(application)}
+                  type="button"
+                >
+                  Ver pagos y comprobantes
+                </button>
               ) : null}
             </article>
           ))}
@@ -573,30 +626,169 @@ export function LoanApplicationBoard({
         </p>
       ) : null}
       {paymentConfirmation ? (
-        <Modal onClose={() => setPaymentConfirmation(null)} title="Confirmar avance de cuota">
-          <p className="operational-note">
-            Vas a registrar la cuota {paymentConfirmation.paidInstallments + 1} de{" "}
-            {paymentConfirmation.requestedTermCount} para {paymentConfirmation.borrowerName}.
-          </p>
-          <p className="operational-note">
-            Esta acción actualiza el avance operativo del crédito. No genera recibo financiero ni
-            confirma la recepción de dinero.
-          </p>
-          <div className="borrower-step-actions">
-            <button onClick={() => setPaymentConfirmation(null)} type="button">
-              Cancelar
-            </button>
-            <button
-              disabled={paymentApplicationId !== null}
-              onClick={() => {
-                const application = paymentConfirmation;
-                setPaymentConfirmation(null);
-                void recordPayment(application);
-              }}
-              type="button"
-            >
-              Confirmar avance
-            </button>
+        <Modal onClose={() => setPaymentConfirmation(null)} title="Registrar pago">
+          <form
+            className="payment-capture-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const application = paymentConfirmation;
+              setPaymentConfirmation(null);
+              void recordPayment(application);
+            }}
+          >
+            <header className="payment-capture-summary">
+              <span>
+                Cuota {paymentConfirmation.paidInstallments + 1} de{" "}
+                {paymentConfirmation.requestedTermCount}
+              </span>
+              <strong>
+                {formatCop(
+                  paymentConfirmation.nextPaymentAmount ?? paymentConfirmation.installmentAmount,
+                )}
+              </strong>
+              <small>{paymentConfirmation.borrowerName}</small>
+            </header>
+            <fieldset className="payment-method-picker">
+              <legend>¿Cómo pagó?</legend>
+              <label className={paymentMethod === "cash" ? "is-selected" : ""}>
+                <input
+                  checked={paymentMethod === "cash"}
+                  name="paymentMethod"
+                  onChange={() => {
+                    setPaymentMethod("cash");
+                    setPaymentProof(null);
+                  }}
+                  type="radio"
+                />
+                <strong>Efectivo</strong>
+                <small>Dinero recibido en persona</small>
+              </label>
+              <label className={paymentMethod === "transfer" ? "is-selected" : ""}>
+                <input
+                  checked={paymentMethod === "transfer"}
+                  name="paymentMethod"
+                  onChange={() => setPaymentMethod("transfer")}
+                  type="radio"
+                />
+                <strong>Transferencia</strong>
+                <small>Pago por banco o billetera</small>
+              </label>
+            </fieldset>
+            {paymentMethod === "transfer" ? (
+              <label className="payment-proof-picker">
+                <span>
+                  Imagen de la transferencia <small>Opcional</small>
+                </span>
+                <input
+                  accept="image/jpeg,image/png,image/webp"
+                  capture="environment"
+                  onChange={(event) => setPaymentProof(event.target.files?.[0] ?? null)}
+                  type="file"
+                />
+                <strong>{paymentProof ? paymentProof.name : "Tomar foto o elegir imagen"}</strong>
+              </label>
+            ) : null}
+            <div className="payment-capture-balance">
+              <span>Saldo después del pago</span>
+              <strong>
+                {formatCop(
+                  Math.max(
+                    0,
+                    Number(paymentConfirmation.remainingAmount ?? "0") -
+                      Number(
+                        paymentConfirmation.nextPaymentAmount ??
+                          paymentConfirmation.installmentAmount,
+                      ),
+                  ).toFixed(2),
+                )}
+              </strong>
+            </div>
+            <div className="borrower-step-actions">
+              <button onClick={() => setPaymentConfirmation(null)} type="button">
+                Cancelar
+              </button>
+              <button disabled={paymentApplicationId !== null} type="submit">
+                {paymentApplicationId ? "Registrando…" : "Confirmar pago"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+      {paymentReceipt ? (
+        <Modal onClose={() => setPaymentReceipt(null)} title="Pago confirmado">
+          <div className="payment-receipt-success">
+            <span aria-hidden="true">✓</span>
+            <h3>{formatCop(paymentReceipt.amount)}</h3>
+            <p>
+              Cuota {paymentReceipt.installmentNumber} · {paymentReceipt.receiptNumber}
+            </p>
+            <dl>
+              <div>
+                <dt>Forma de pago</dt>
+                <dd>{paymentReceipt.paymentMethod === "cash" ? "Efectivo" : "Transferencia"}</dd>
+              </div>
+              <div>
+                <dt>Saldo restante</dt>
+                <dd>{formatCop(paymentReceipt.remainingAmount)}</dd>
+              </div>
+            </dl>
+            <div className="payment-receipt-actions">
+              <a href={paymentReceipt.receiptUrl} rel="noreferrer" target="_blank">
+                Ver comprobante
+              </a>
+              <a
+                href={`https://wa.me/${paymentReceipt.whatsappPhone.replace(/\D/g, "").replace(/^(\d{10})$/, "57$1")}?text=${encodeURIComponent(`Hola ${paymentReceipt.borrowerName}, aquí está tu comprobante ${paymentReceipt.receiptNumber} por ${formatCop(paymentReceipt.amount)}. Saldo restante: ${formatCop(paymentReceipt.remainingAmount)}. ${paymentReceipt.receiptUrl}`)}`}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Enviar por WhatsApp
+              </a>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
+      {paymentHistoryApplication ? (
+        <Modal onClose={() => setPaymentHistoryApplication(null)} title="Pagos confirmados">
+          <div className="payment-history-modal">
+            <header>
+              <strong>{paymentHistoryApplication.borrowerName}</strong>
+              <span>{paymentHistoryApplication.loanProductName}</span>
+            </header>
+            {paymentHistoryBusy ? <p>Cargando pagos…</p> : null}
+            {!paymentHistoryBusy && !paymentHistory.length ? (
+              <p>No hay pagos registrados.</p>
+            ) : null}
+            {paymentHistory.map((payment) => (
+              <article key={payment.id}>
+                <div>
+                  <strong>Cuota {payment.installmentNumber}</strong>
+                  <small>
+                    {new Intl.DateTimeFormat("es-CO", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    }).format(new Date(payment.paidAt))}
+                  </small>
+                </div>
+                <div>
+                  <strong>{formatCop(payment.amount)}</strong>
+                  <small>{payment.paymentMethod === "cash" ? "Efectivo" : "Transferencia"}</small>
+                </div>
+                <div className="payment-history-links">
+                  <a href={payment.receiptUrl} rel="noreferrer" target="_blank">
+                    Ver recibo
+                  </a>
+                  {payment.hasTransferProof ? (
+                    <a
+                      href={`/api/v1/tenants/${tenantId}/loan-applications/${paymentHistoryApplication.id}/payments/${payment.id}/proof`}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Ver transferencia
+                    </a>
+                  ) : null}
+                </div>
+              </article>
+            ))}
           </div>
         </Modal>
       ) : null}

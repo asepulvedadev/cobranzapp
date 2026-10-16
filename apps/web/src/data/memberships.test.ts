@@ -65,13 +65,13 @@ describe("approved membership catalog", () => {
     expect(membershipFeatures).toHaveLength(8);
     expect(new Set(membershipFeatures.map((feature) => feature.id)).size).toBe(8);
     expect(membershipFeatures.find((feature) => feature.id === "customer-link")?.detail).toContain(
-      "sin exponer datos internos",
+      "sin contraseña",
     );
     expect(membershipFeatures.find((feature) => feature.id === "daily-receipt")?.label).toContain(
-      "Registro operativo",
+      "Pagos y comprobantes",
     );
     expect(membershipFeatures.find((feature) => feature.id === "daily-receipt")?.detail).toContain(
-      "no es facturación",
+      "comprobante no tributario",
     );
     expect(membershipFeatures.find((feature) => feature.id === "business-rules")?.detail).toContain(
       "El dueño controla los porcentajes",

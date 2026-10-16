@@ -26,11 +26,11 @@ describe("membership landing presentation", () => {
     const html = renderToStaticMarkup(<PricingSection />);
     expect(html).toContain("pago único");
     expect(html).toContain("Se cobra aparte de la mensualidad");
-    expect(html).toContain("nunca al enlace del cliente");
+    expect(html).toContain("sin contraseña");
     expect(html).toContain("El dueño controla los porcentajes");
     expect(html).toContain("supervisor o el dueño autoriza");
-    expect(html).toContain("Registro operativo diario por cliente");
-    expect(html).toContain("no es facturación ni recibo financiero");
+    expect(html).toContain("Pagos y comprobantes por cliente");
+    expect(html).toContain("comprobante no tributario");
     expect(html).toContain("/contacto?plan=Pro&amp;source=planes");
     expect(html).toContain("/contacto?plan=Ultra&amp;source=planes");
     expect(html).not.toContain("La plataforma y las funciones operativas están en desarrollo");

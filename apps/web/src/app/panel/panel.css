@@ -2350,6 +2350,239 @@ html:has(.panel-shell) {
   font-size: 15px;
 }
 
+.payment-capture-form,
+.client-link-panel,
+.payment-receipt-success {
+  display: grid;
+  gap: 1rem;
+}
+
+.payment-capture-summary {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1.15rem;
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--tenant-brand-primary, #15372b) 7%, white);
+}
+
+.payment-capture-summary span,
+.payment-capture-summary small {
+  color: var(--muted-text, #62706a);
+}
+
+.payment-capture-summary strong {
+  font-size: clamp(1.8rem, 7vw, 2.5rem);
+  letter-spacing: -0.04em;
+}
+
+.payment-method-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  padding: 0;
+  border: 0;
+}
+
+.payment-method-picker legend {
+  grid-column: 1 / -1;
+  margin-bottom: 0.55rem;
+  font-weight: 750;
+}
+
+.payment-method-picker label {
+  display: grid;
+  gap: 0.2rem;
+  min-height: 5.4rem;
+  padding: 0.9rem;
+  border: 1px solid #d8dfdb;
+  border-radius: 0.9rem;
+  cursor: pointer;
+}
+
+.payment-method-picker label.is-selected {
+  border-color: var(--tenant-brand-primary, #15372b);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tenant-brand-primary, #15372b) 18%, transparent);
+}
+
+.payment-method-picker input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0 0 0.25rem;
+}
+
+.payment-method-picker small,
+.payment-proof-picker small {
+  color: #68746e;
+}
+
+.payment-proof-picker {
+  display: grid;
+  gap: 0.55rem;
+  min-height: 5.5rem;
+  padding: 1rem;
+  border: 1px dashed #aebbb4;
+  border-radius: 0.9rem;
+  background: #fbfcfb;
+  cursor: pointer;
+}
+
+.payment-proof-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.payment-capture-balance,
+.payment-receipt-success dl > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 0;
+  border-top: 1px solid #e3e8e5;
+}
+
+.payment-receipt-success {
+  text-align: center;
+}
+
+.payment-receipt-success > span {
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: 0 auto;
+  border-radius: 999px;
+  background: #e2f5e9;
+  color: #18723e;
+  font-size: 1.7rem;
+  font-weight: 800;
+}
+
+.payment-receipt-success h3 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.payment-receipt-success p,
+.payment-receipt-success dl {
+  margin: 0;
+}
+
+.payment-receipt-actions,
+.client-link-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.payment-receipt-actions a,
+.client-link-actions a,
+.client-link-actions button {
+  display: grid;
+  place-items: center;
+  min-height: 2.9rem;
+  padding: 0.7rem 0.9rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: var(--tenant-brand-primary, #15372b);
+  color: white;
+  font-weight: 750;
+  text-align: center;
+  text-decoration: none;
+}
+
+.client-link-panel label {
+  display: grid;
+  gap: 0.45rem;
+  font-weight: 700;
+}
+
+.client-link-panel input {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.7rem;
+  border: 1px solid #ccd5d0;
+  border-radius: 0.7rem;
+  background: #f7f9f8;
+}
+
+.client-link-rotate {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: #4f5f57;
+  text-decoration: underline;
+}
+
+.loan-payment-history-button {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: var(--tenant-brand-primary, #15372b);
+  font-weight: 750;
+  text-decoration: underline;
+}
+
+.payment-history-modal {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.payment-history-modal > header {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.payment-history-modal > header span,
+.payment-history-modal article small {
+  color: #68746e;
+}
+
+.payment-history-modal article {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid #dce3df;
+  border-radius: 0.85rem;
+}
+
+.payment-history-modal article > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.payment-history-modal article > div:nth-child(2) {
+  text-align: right;
+}
+
+.payment-history-modal article > .payment-history-links {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.payment-history-links a {
+  min-height: 2.65rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.7rem;
+  background: #edf2ef;
+  color: #23372d;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (max-width: 520px) {
+  .payment-method-picker,
+  .payment-receipt-actions,
+  .client-link-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 .member-profile-fieldset {
   display: grid;
   gap: 8px;
