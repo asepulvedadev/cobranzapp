@@ -1,8 +1,22 @@
-import type { LoanAnalytics, LoanApplication, LoanProduct } from "@cobranzapp/contracts";
+import { randomUUID } from "node:crypto";
+import type {
+  BorrowerPortalProfile,
+  LoanAnalytics,
+  LoanApplication,
+  LoanPayment,
+  LoanProduct,
+  PaymentReceipt,
+} from "@cobranzapp/contracts";
 import { buildSchedulePreview } from "@cobranzapp/financial";
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
 import { operationalPaymentState } from "./operational-schedule.js";
+import {
+  createBorrowerPortalToken,
+  createPaymentReceiptToken,
+  parseBorrowerPortalToken,
+  parsePaymentReceiptToken,
+} from "./public-links.js";
 import { renewalPaymentProgress, renewedPrincipalFromSchedule } from "./renewal-policy.js";
 import type {
   CreditService,
@@ -143,6 +157,12 @@ function mapApplication(row: LoanApplicationRow): LoanApplication {
     interestTotal: schedule.interestTotal,
     scheduledTotal: schedule.scheduledTotal,
     installmentAmount: schedule.periods[0]?.installment ?? "0.00",
+    nextPaymentAmount: schedule.periods[row.paid_installments]?.installment ?? "0.00",
+    remainingAmount: formatCents(
+      schedule.periods
+        .slice(row.paid_installments)
+        .reduce((total, period) => total + parseCents(period.installment), 0n),
+    ),
     paidInstallments: row.paid_installments,
     paidAmount: renewalProgress.paidAmount,
     paidPercentage: renewalProgress.paidPercentage,
@@ -183,7 +203,16 @@ async function setActorContext(client: PoolClient, actor: TenantActor, tenantId:
   await client.query("SELECT set_config('app.tenant_role', $1, true)", [actor.tenantRole ?? ""]);
 }
 
-export function createPostgresCreditService(pool: Pool): CreditService {
+export function createPostgresCreditService(
+  pool: Pool,
+  publicLinkSecret?: string,
+  publicWebUrl = "http://localhost:3000",
+): CreditService {
+  const webBaseUrl = publicWebUrl.replace(/\/$/, "");
+  const receiptUrl = (paymentId: string) =>
+    publicLinkSecret
+      ? `${webBaseUrl}/recibo/${createPaymentReceiptToken(publicLinkSecret, paymentId)}`
+      : `${webBaseUrl}/recibo/no-disponible`;
   async function withTransaction<T>(
     actor: TenantActor,
     tenantId: string,
@@ -899,11 +928,44 @@ export function createPostgresCreditService(pool: Pool): CreditService {
         });
         const period = preview.periods[input.installmentNumber - 1];
         if (!period) return { status: "invalid_installment" };
-        await client.query(
+        if (parseCents(input.amount) !== parseCents(period.installment)) {
+          return { status: "invalid_installment" };
+        }
+        const paymentId = randomUUID();
+        const paidBefore = preview.periods
+          .slice(0, state.paid_installments)
+          .reduce((total, item) => total + parseCents(item.installment), 0n);
+        const remainingAmount = formatCents(
+          parseCents(preview.scheduledTotal) - paidBefore - parseCents(period.installment),
+        );
+        const receiptNumber = `REC-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${paymentId.slice(0, 8).toUpperCase()}`;
+        const insertedPayment = await client.query<{
+          id: string;
+          paid_at: Date;
+          recorded_by_name: string;
+        }>(
           `INSERT INTO loan_payments
-             (tenant_id, application_id, installment_number, amount, recorded_by)
-           VALUES ($1, $2, $3, $4::numeric, $5)`,
-          [tenantId, applicationId, input.installmentNumber, period.installment, actor.userId],
+             (tenant_id, id, application_id, installment_number, amount, payment_method,
+              transfer_proof_object_key, transfer_proof_media_type, transfer_proof_size_bytes,
+              transfer_proof_sha256, receipt_number, remaining_amount, recorded_by)
+           VALUES ($1, $2, $3, $4, $5::numeric, $6, $7, $8, $9, $10, $11, $12::numeric, $13)
+           RETURNING id, paid_at,
+             (SELECT display_name FROM users WHERE id = recorded_by) AS recorded_by_name`,
+          [
+            tenantId,
+            paymentId,
+            applicationId,
+            input.installmentNumber,
+            period.installment,
+            input.paymentMethod,
+            input.evidence?.objectKey ?? null,
+            input.evidence?.mediaType ?? null,
+            input.evidence?.sizeBytes ?? null,
+            input.evidence?.sha256 ?? null,
+            receiptNumber,
+            remainingAmount,
+            actor.userId,
+          ],
         );
         const nextPaid = state.paid_installments + 1;
         const nextStatus = nextPaid >= state.requested_term_count ? "paid" : "active";
@@ -950,7 +1012,9 @@ export function createPostgresCreditService(pool: Pool): CreditService {
              (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
            VALUES ($1, $2, 'loan_payment.recorded', 'loan_application', $3, $4,
                    jsonb_build_object('installmentNumber', $5::integer,
-                     'amount', $6::numeric, 'status', $7::text))`,
+                     'amount', $6::numeric, 'status', $7::text,
+                     'paymentMethod', $8::text, 'receiptNumber', $9::text,
+                     'hasTransferProof', $10::boolean))`,
           [
             tenantId,
             actor.userId,
@@ -959,14 +1023,323 @@ export function createPostgresCreditService(pool: Pool): CreditService {
             input.installmentNumber,
             period.installment,
             nextStatus,
+            input.paymentMethod,
+            receiptNumber,
+            Boolean(input.evidence),
           ],
         );
+        const storedPayment = insertedPayment.rows[0];
+        if (!storedPayment) throw new Error("LOAN_PAYMENT_NOT_FOUND_AFTER_INSERT");
         return {
           status: "recorded",
           application: mapApplication(application),
-          amount: period.installment,
+          payment: {
+            id: storedPayment.id,
+            installmentNumber: input.installmentNumber,
+            amount: period.installment,
+            paymentMethod: input.paymentMethod,
+            paidAt: storedPayment.paid_at.toISOString(),
+            receiptNumber,
+            remainingAmount,
+            recordedByName: storedPayment.recorded_by_name,
+            hasTransferProof: Boolean(input.evidence),
+            receiptUrl: receiptUrl(storedPayment.id),
+          },
         };
       });
+    },
+
+    async listPayments(actor, tenantId, applicationId) {
+      if (!canManageApplications(actor) || !publicLinkSecret) return [];
+      return withTransaction(actor, tenantId, async (client) => {
+        const result = await client.query<{
+          id: string;
+          installment_number: number;
+          amount: string;
+          payment_method: "cash" | "transfer";
+          paid_at: Date;
+          receipt_number: string;
+          remaining_amount: string | null;
+          recorded_by_name: string;
+          has_transfer_proof: boolean;
+        }>(
+          `SELECT payment.id, payment.installment_number, payment.amount::text,
+                  payment.payment_method, payment.paid_at, payment.receipt_number,
+                  payment.remaining_amount::text, users.display_name AS recorded_by_name,
+                  (payment.transfer_proof_object_key IS NOT NULL) AS has_transfer_proof
+             FROM loan_payments payment
+             JOIN users ON users.id = payment.recorded_by
+            WHERE payment.tenant_id = $1 AND payment.application_id = $2
+            ORDER BY payment.paid_at DESC, payment.id DESC`,
+          [tenantId, applicationId],
+        );
+        return result.rows.map(
+          (row): LoanPayment => ({
+            id: row.id,
+            installmentNumber: row.installment_number,
+            amount: row.amount,
+            paymentMethod: row.payment_method,
+            paidAt: row.paid_at.toISOString(),
+            receiptNumber: row.receipt_number,
+            remainingAmount: row.remaining_amount ?? "0.00",
+            recordedByName: row.recorded_by_name,
+            hasTransferProof: row.has_transfer_proof,
+            receiptUrl: receiptUrl(row.id),
+          }),
+        );
+      });
+    },
+
+    async getPaymentProof(actor, tenantId, applicationId, paymentId) {
+      if (!canManageApplications(actor)) return { status: "forbidden" } as const;
+      return withTransaction(actor, tenantId, async (client) => {
+        const result = await client.query<{ transfer_proof_object_key: string | null }>(
+          `SELECT transfer_proof_object_key
+             FROM loan_payments
+            WHERE tenant_id = $1 AND application_id = $2 AND id = $3`,
+          [tenantId, applicationId, paymentId],
+        );
+        const objectKey = result.rows[0]?.transfer_proof_object_key;
+        return objectKey
+          ? ({ status: "found", objectKey } as const)
+          : ({ status: "not_found" } as const);
+      });
+    },
+
+    async getBorrowerPortalLink(actor, tenantId, borrowerId) {
+      if (!canManageApplications(actor)) return { status: "forbidden" } as const;
+      if (!publicLinkSecret) return { status: "unavailable" } as const;
+      return withTransaction(actor, tenantId, async (client) => {
+        const result = await client.query<{ nonce: string; revoked_at: Date | null }>(
+          `SELECT nonce, revoked_at
+             FROM borrower_portal_links
+            WHERE tenant_id = $1 AND borrower_id = $2`,
+          [tenantId, borrowerId],
+        );
+        const row = result.rows[0];
+        if (!row) return { status: "not_found" } as const;
+        return {
+          status: "found",
+          url: `${webBaseUrl}/cliente/${createBorrowerPortalToken(publicLinkSecret, borrowerId, row.nonce)}`,
+          active: row.revoked_at === null,
+        } as const;
+      });
+    },
+
+    async rotateBorrowerPortalLink(actor, tenantId, borrowerId, requestId) {
+      if (!canManageApplications(actor)) return { status: "forbidden" } as const;
+      if (!publicLinkSecret) return { status: "unavailable" } as const;
+      return withTransaction(actor, tenantId, async (client) => {
+        const borrower = await client.query<{ id: string }>(
+          `SELECT id FROM borrowers WHERE tenant_id = $1 AND id = $2 AND status = 'active'`,
+          [tenantId, borrowerId],
+        );
+        if (!borrower.rows[0]) return { status: "not_found" } as const;
+        const nonce = randomUUID();
+        await client.query(
+          `INSERT INTO borrower_portal_links
+             (tenant_id, borrower_id, nonce, created_by)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (tenant_id, borrower_id) DO UPDATE
+             SET nonce = EXCLUDED.nonce, rotated_at = now(), revoked_at = NULL`,
+          [tenantId, borrowerId, nonce, actor.userId],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'borrower.portal_link_rotated', 'borrower', $3, $4,
+                   '{}'::jsonb)`,
+          [tenantId, actor.userId, borrowerId, requestId],
+        );
+        return {
+          status: "found",
+          url: `${webBaseUrl}/cliente/${createBorrowerPortalToken(publicLinkSecret, borrowerId, nonce)}`,
+          active: true,
+        } as const;
+      });
+    },
+
+    async revokeBorrowerPortalLink(actor, tenantId, borrowerId, requestId) {
+      if (!canManageApplications(actor)) return { status: "forbidden" } as const;
+      if (!publicLinkSecret) return { status: "unavailable" } as const;
+      return withTransaction(actor, tenantId, async (client) => {
+        const result = await client.query<{ nonce: string }>(
+          `UPDATE borrower_portal_links
+              SET revoked_at = now()
+            WHERE tenant_id = $1 AND borrower_id = $2
+            RETURNING nonce`,
+          [tenantId, borrowerId],
+        );
+        const row = result.rows[0];
+        if (!row) return { status: "not_found" } as const;
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'borrower.portal_link_revoked', 'borrower', $3, $4,
+                   '{}'::jsonb)`,
+          [tenantId, actor.userId, borrowerId, requestId],
+        );
+        return {
+          status: "found",
+          url: `${webBaseUrl}/cliente/${createBorrowerPortalToken(publicLinkSecret, borrowerId, row.nonce)}`,
+          active: false,
+        } as const;
+      });
+    },
+
+    async getPublicBorrowerPortal(token) {
+      if (!publicLinkSecret) return { status: "unavailable" } as const;
+      const parsed = parseBorrowerPortalToken(publicLinkSecret, token);
+      if (!parsed) return { status: "not_found" } as const;
+      const result = await pool.query<{ snapshot: unknown }>(
+        "SELECT public.borrower_portal_snapshot($1, $2) AS snapshot",
+        [parsed.borrowerId, parsed.nonce],
+      );
+      const raw = result.rows[0]?.snapshot as {
+        company: BorrowerPortalProfile["company"];
+        borrower: BorrowerPortalProfile["borrower"];
+        applications: Array<{
+          id: string;
+          productName: string;
+          requestedPrincipal: string;
+          paymentFrequency: LoanApplication["paymentFrequency"];
+          requestedTermCount: number;
+          paidInstallments: number;
+          rateBasis: LoanProduct["rateBasis"];
+          nominalRate: string;
+          documentationFeeRate: string;
+          status: "active" | "paid";
+          createdAt: string;
+        }>;
+        payments: Array<{
+          id: string;
+          applicationId: string;
+          installmentNumber: number;
+          amount: string;
+          paymentMethod: "cash" | "transfer";
+          paidAt: string;
+          receiptNumber: string;
+          remainingAmount: string | null;
+        }>;
+      } | null;
+      if (!raw) return { status: "not_found" } as const;
+      const paymentsByApplication = new Map<string, bigint>();
+      for (const payment of raw.payments) {
+        paymentsByApplication.set(
+          payment.applicationId,
+          (paymentsByApplication.get(payment.applicationId) ?? 0n) + parseCents(payment.amount),
+        );
+      }
+      const profile: BorrowerPortalProfile = {
+        company: raw.company,
+        borrower: raw.borrower,
+        credits: raw.applications.map((application) => {
+          const schedule = buildSchedulePreview({
+            principal: application.requestedPrincipal,
+            termCount: application.requestedTermCount,
+            paymentFrequency: application.paymentFrequency,
+            rateBasis: application.rateBasis,
+            nominalRate: application.nominalRate,
+            documentationFeeRate: application.documentationFeeRate,
+            startDate: application.createdAt.slice(0, 10),
+          });
+          const state = operationalPaymentState({
+            status: application.status,
+            paymentFrequency: application.paymentFrequency,
+            requestedTermCount: application.requestedTermCount,
+            paidInstallments: application.paidInstallments,
+            createdAt: new Date(application.createdAt),
+          });
+          const paid = paymentsByApplication.get(application.id) ?? 0n;
+          return {
+            id: application.id,
+            productName: application.productName,
+            requestedPrincipal: application.requestedPrincipal,
+            scheduledTotal: schedule.scheduledTotal,
+            remainingAmount: formatCents(
+              parseCents(schedule.scheduledTotal) > paid
+                ? parseCents(schedule.scheduledTotal) - paid
+                : 0n,
+            ),
+            paymentFrequency: application.paymentFrequency,
+            requestedTermCount: application.requestedTermCount,
+            paidInstallments: application.paidInstallments,
+            nominalRate: application.nominalRate,
+            status: application.status,
+            nextDueDate: state.nextDueDate ?? null,
+            overdueInstallments: state.overdueInstallments ?? 0,
+          };
+        }),
+        payments: raw.payments.map((payment) => ({
+          id: payment.id,
+          installmentNumber: payment.installmentNumber,
+          amount: payment.amount,
+          paymentMethod: payment.paymentMethod,
+          paidAt: new Date(payment.paidAt).toISOString(),
+          receiptNumber: payment.receiptNumber,
+          remainingAmount: payment.remainingAmount ?? "0.00",
+          receiptUrl: receiptUrl(payment.id),
+        })),
+      };
+      return { status: "found", profile } as const;
+    },
+
+    async getPublicPaymentReceipt(token) {
+      if (!publicLinkSecret) return { status: "unavailable" } as const;
+      const paymentId = parsePaymentReceiptToken(publicLinkSecret, token);
+      if (!paymentId) return { status: "not_found" } as const;
+      const result = await pool.query<{ snapshot: unknown }>(
+        "SELECT public.loan_payment_receipt_snapshot($1) AS snapshot",
+        [paymentId],
+      );
+      const raw = result.rows[0]?.snapshot as {
+        company: PaymentReceipt["company"];
+        borrower: PaymentReceipt["borrower"];
+        payment: Omit<
+          PaymentReceipt["payment"],
+          "recordedByName" | "paidAt" | "remainingAmount"
+        > & {
+          recordedBy: string;
+          paidAt: string;
+          remainingAmount: string | null;
+          paidThroughReceipt: string;
+        };
+        credit: PaymentReceipt["credit"] & {
+          rateBasis: LoanProduct["rateBasis"];
+          documentationFeeRate: string;
+          createdAt: string;
+        };
+      } | null;
+      if (!raw) return { status: "not_found" } as const;
+      const schedule = buildSchedulePreview({
+        principal: raw.credit.requestedPrincipal,
+        termCount: raw.credit.requestedTermCount,
+        paymentFrequency: raw.credit.paymentFrequency,
+        rateBasis: raw.credit.rateBasis,
+        nominalRate: raw.credit.nominalRate,
+        documentationFeeRate: raw.credit.documentationFeeRate,
+        startDate: raw.credit.createdAt.slice(0, 10),
+      });
+      const calculatedRemaining = formatCents(
+        parseCents(schedule.scheduledTotal) > parseCents(raw.payment.paidThroughReceipt)
+          ? parseCents(schedule.scheduledTotal) - parseCents(raw.payment.paidThroughReceipt)
+          : 0n,
+      );
+      const { paidThroughReceipt: _paidThroughReceipt, recordedBy, ...payment } = raw.payment;
+      return {
+        status: "found",
+        receipt: {
+          company: raw.company,
+          borrower: raw.borrower,
+          credit: raw.credit,
+          payment: {
+            ...payment,
+            paidAt: new Date(raw.payment.paidAt).toISOString(),
+            remainingAmount: raw.payment.remainingAmount ?? calculatedRemaining,
+            recordedByName: recordedBy,
+          },
+        },
+      } as const;
     },
 
     async renewApplication(actor, tenantId, applicationId, input): Promise<LoanRenewalResult> {

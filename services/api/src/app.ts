@@ -83,6 +83,9 @@ const tenantLoanApplicationParamsSchema = z.object({
   tenantId: z.uuid(),
   applicationId: z.uuid(),
 });
+const tenantLoanPaymentParamsSchema = tenantLoanApplicationParamsSchema.extend({
+  paymentId: z.uuid(),
+});
 const tenantRouteParamsSchema = z.object({ tenantId: z.uuid(), routeId: z.uuid() });
 const tenantRouteStopParamsSchema = z.object({
   tenantId: z.uuid(),
@@ -102,6 +105,7 @@ const tenantTeamMemberParamsSchema = z.object({
 const tenantBranchParamsSchema = z.object({ tenantId: z.uuid(), branchId: z.uuid() });
 const tenantTeamParamsSchema = z.object({ tenantId: z.uuid(), teamId: z.uuid() });
 const tenantBorrowerParamsSchema = z.object({ tenantId: z.uuid(), borrowerId: z.uuid() });
+const publicAccessTokenParamsSchema = z.object({ token: z.string().min(20).max(240) });
 const tenantBorrowerDocumentParamsSchema = tenantBorrowerParamsSchema.extend({
   documentId: z.uuid(),
 });
@@ -194,6 +198,7 @@ function expiredMfaChallengeCookie(secure: boolean) {
 export function buildApp(dependencies: AppDependencies) {
   const app = Fastify({
     logger: process.env.NODE_ENV !== "test",
+    routerOptions: { maxParamLength: 300 },
     trustProxy: true,
     requestIdHeader: "x-request-id",
   });
@@ -3299,6 +3304,242 @@ export function buildApp(dependencies: AppDependencies) {
     },
   );
 
+  app.get(
+    "/v1/tenants/:tenantId/loan-applications/:applicationId/payments",
+    async (request, reply) => {
+      const session = await requireUser(request, reply);
+      if (!session) return;
+      const params = tenantLoanApplicationParamsSchema.safeParse(request.params);
+      if (!params.success || !dependencies.creditService) {
+        return sendError(
+          reply,
+          404,
+          "LOAN_APPLICATION_NOT_FOUND",
+          "El crédito no existe.",
+          request.id,
+        );
+      }
+      const membership = tenantMembershipForSession(session, params.data.tenantId);
+      if (!membership || !["owner", "supervisor", "collector"].includes(membership.role)) {
+        return sendError(reply, 403, "SCOPE_DENIED", "No puedes consultar pagos.", request.id);
+      }
+      const payments = await dependencies.creditService.listPayments(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.applicationId,
+      );
+      return reply.header("cache-control", "private, no-store").send({ payments });
+    },
+  );
+
+  app.get(
+    "/v1/tenants/:tenantId/loan-applications/:applicationId/payments/:paymentId/proof",
+    async (request, reply) => {
+      const session = await requireUser(request, reply);
+      if (!session) return;
+      const params = tenantLoanPaymentParamsSchema.safeParse(request.params);
+      if (!params.success || !dependencies.creditService || !dependencies.documentStorage) {
+        return sendError(
+          reply,
+          404,
+          "PAYMENT_PROOF_NOT_FOUND",
+          "No hay comprobante adjunto.",
+          request.id,
+        );
+      }
+      const membership = tenantMembershipForSession(session, params.data.tenantId);
+      if (!membership || !["owner", "supervisor", "collector"].includes(membership.role)) {
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "No puedes consultar este comprobante.",
+          request.id,
+        );
+      }
+      const result = await dependencies.creditService.getPaymentProof(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.applicationId,
+        params.data.paymentId,
+      );
+      if (result.status !== "found") {
+        return sendError(
+          reply,
+          404,
+          "PAYMENT_PROOF_NOT_FOUND",
+          "No hay comprobante adjunto.",
+          request.id,
+        );
+      }
+      const stored = await dependencies.documentStorage.read(result.objectKey);
+      if (!stored) {
+        return sendError(
+          reply,
+          404,
+          "PAYMENT_PROOF_NOT_FOUND",
+          "No hay comprobante adjunto.",
+          request.id,
+        );
+      }
+      return reply
+        .type(stored.mediaType)
+        .header("cache-control", "private, no-store")
+        .header("content-security-policy", "sandbox; default-src 'none'")
+        .send(stored.bytes);
+    },
+  );
+
+  app.get("/v1/tenants/:tenantId/borrowers/:borrowerId/portal-link", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantBorrowerParamsSchema.safeParse(request.params);
+    if (!params.success || !dependencies.creditService) {
+      return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !canManageBorrowers(membership.role)) {
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a este cliente.", request.id);
+    }
+    const result = await dependencies.creditService.getBorrowerPortalLink(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.borrowerId,
+    );
+    if (result.status === "not_found") return reply.code(404).send({ active: false });
+    if (result.status !== "found") {
+      return sendError(
+        reply,
+        503,
+        "CLIENT_PORTAL_UNAVAILABLE",
+        "El enlace no está disponible.",
+        request.id,
+      );
+    }
+    return reply
+      .header("cache-control", "private, no-store")
+      .send({ url: result.url, active: result.active });
+  });
+
+  app.post("/v1/tenants/:tenantId/borrowers/:borrowerId/portal-link", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantBorrowerParamsSchema.safeParse(request.params);
+    if (!params.success || !dependencies.creditService) {
+      return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !canManageBorrowers(membership.role)) {
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a este cliente.", request.id);
+    }
+    const result = await dependencies.creditService.rotateBorrowerPortalLink(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.borrowerId,
+      request.id,
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
+    }
+    if (result.status !== "found") {
+      return sendError(
+        reply,
+        503,
+        "CLIENT_PORTAL_UNAVAILABLE",
+        "El enlace no está disponible.",
+        request.id,
+      );
+    }
+    return reply.send({ url: result.url, active: true });
+  });
+
+  app.delete("/v1/tenants/:tenantId/borrowers/:borrowerId/portal-link", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantBorrowerParamsSchema.safeParse(request.params);
+    if (!params.success || !dependencies.creditService) {
+      return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !canManageBorrowers(membership.role)) {
+      return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a este cliente.", request.id);
+    }
+    const result = await dependencies.creditService.revokeBorrowerPortalLink(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.borrowerId,
+      request.id,
+    );
+    if (result.status !== "found") {
+      return sendError(
+        reply,
+        404,
+        "CLIENT_PORTAL_LINK_NOT_FOUND",
+        "No hay enlace activo.",
+        request.id,
+      );
+    }
+    return reply.send({ url: result.url, active: false });
+  });
+
+  app.get("/v1/public/client/:token", async (request, reply) => {
+    const params = publicAccessTokenParamsSchema.safeParse(request.params);
+    if (!params.success || !dependencies.creditService) {
+      return sendError(
+        reply,
+        404,
+        "CLIENT_PORTAL_NOT_FOUND",
+        "El enlace no es válido.",
+        request.id,
+      );
+    }
+    const result = await dependencies.creditService.getPublicBorrowerPortal(params.data.token);
+    if (result.status !== "found") {
+      return sendError(
+        reply,
+        404,
+        "CLIENT_PORTAL_NOT_FOUND",
+        "El enlace no es válido o fue desactivado.",
+        request.id,
+      );
+    }
+    return reply.header("cache-control", "private, no-store").send({ profile: result.profile });
+  });
+
+  app.get("/v1/public/receipts/:token", async (request, reply) => {
+    const params = publicAccessTokenParamsSchema.safeParse(request.params);
+    if (!params.success || !dependencies.creditService) {
+      return sendError(reply, 404, "PAYMENT_RECEIPT_NOT_FOUND", "El recibo no existe.", request.id);
+    }
+    const result = await dependencies.creditService.getPublicPaymentReceipt(params.data.token);
+    if (result.status !== "found") {
+      return sendError(reply, 404, "PAYMENT_RECEIPT_NOT_FOUND", "El recibo no existe.", request.id);
+    }
+    return reply.header("cache-control", "private, no-store").send({ receipt: result.receipt });
+  });
+
   app.post(
     "/v1/tenants/:tenantId/borrowers/:borrowerId/ocr/:extractionId/retry",
     async (request, reply) => {
@@ -4928,8 +5169,7 @@ export function buildApp(dependencies: AppDependencies) {
       const session = await requireUser(request, reply);
       if (!session) return;
       const params = tenantLoanApplicationParamsSchema.safeParse(request.params);
-      const body = loanPaymentCreateRequestSchema.safeParse(request.body);
-      if (!params.success || !body.success) {
+      if (!params.success) {
         return sendError(reply, 400, "INVALID_LOAN_PAYMENT", "La cuota no es válida.", request.id);
       }
       const membership = session.user.memberships.find(
@@ -4938,7 +5178,6 @@ export function buildApp(dependencies: AppDependencies) {
       if (!membership || !["owner", "supervisor", "collector"].includes(membership.role)) {
         return sendError(reply, 403, "SCOPE_DENIED", "No puedes registrar pagos.", request.id);
       }
-      if (!(await requireRecentReauthentication(session, request, reply))) return;
       if (!dependencies.creditService) {
         return sendError(
           reply,
@@ -4948,16 +5187,122 @@ export function buildApp(dependencies: AppDependencies) {
           request.id,
         );
       }
-      const result = await dependencies.creditService.recordPayment(
-        {
-          userId: session.user.id,
-          platformRole: session.user.platformRole,
-          tenantRole: membership.role,
-        },
-        params.data.tenantId,
-        params.data.applicationId,
-        { ...body.data, requestId: request.id },
-      );
+      let paymentInput: unknown = request.body;
+      let proofBytes: Buffer | null = null;
+      let proofMediaType = "";
+      if (request.isMultipart()) {
+        const fields: Record<string, string> = {};
+        try {
+          for await (const part of request.parts()) {
+            if (part.type === "file") {
+              if (proofBytes) {
+                return sendError(
+                  reply,
+                  400,
+                  "TOO_MANY_PAYMENT_PROOFS",
+                  "Adjunta una sola imagen de la transferencia.",
+                  request.id,
+                );
+              }
+              proofMediaType = part.mimetype;
+              proofBytes = await part.toBuffer();
+            } else {
+              fields[part.fieldname] = String(part.value);
+            }
+          }
+        } catch (error) {
+          if (
+            error &&
+            typeof error === "object" &&
+            "code" in error &&
+            error.code === "FST_REQ_FILE_TOO_LARGE"
+          ) {
+            return sendError(
+              reply,
+              413,
+              "PAYMENT_PROOF_TOO_LARGE",
+              "La imagen supera el límite de 10 MB.",
+              request.id,
+            );
+          }
+          throw error;
+        }
+        paymentInput = {
+          installmentNumber: Number(fields.installmentNumber),
+          amount: fields.amount,
+          paymentMethod: fields.paymentMethod,
+        };
+      }
+      const body = loanPaymentCreateRequestSchema.safeParse(paymentInput);
+      if (!body.success) {
+        return sendError(
+          reply,
+          400,
+          "INVALID_LOAN_PAYMENT",
+          "Revisa el valor y la forma de pago.",
+          request.id,
+        );
+      }
+      if (proofBytes && body.data.paymentMethod !== "transfer") {
+        return sendError(
+          reply,
+          400,
+          "PAYMENT_PROOF_REQUIRES_TRANSFER",
+          "La imagen solo corresponde a pagos por transferencia.",
+          request.id,
+        );
+      }
+      let evidence:
+        | { objectKey: string; mediaType: string; sizeBytes: number; sha256: string }
+        | undefined;
+      if (proofBytes) {
+        if (!dependencies.documentStorage?.quarantineLoanPaymentProof) {
+          return sendError(
+            reply,
+            503,
+            "PAYMENT_PROOF_STORAGE_UNAVAILABLE",
+            "No fue posible guardar la imagen de la transferencia.",
+            request.id,
+          );
+        }
+        try {
+          evidence = await dependencies.documentStorage.quarantineLoanPaymentProof({
+            tenantId: params.data.tenantId,
+            applicationId: params.data.applicationId,
+            mediaType: proofMediaType,
+            bytes: proofBytes,
+          });
+        } catch {
+          return sendError(
+            reply,
+            400,
+            "INVALID_PAYMENT_PROOF",
+            "Usa una imagen JPG, PNG o WEBP de máximo 10 MB.",
+            request.id,
+          );
+        }
+      }
+      let result;
+      try {
+        result = await dependencies.creditService.recordPayment(
+          {
+            userId: session.user.id,
+            platformRole: session.user.platformRole,
+            tenantRole: membership.role,
+          },
+          params.data.tenantId,
+          params.data.applicationId,
+          { ...body.data, evidence, requestId: request.id },
+        );
+      } catch (error) {
+        if (evidence) {
+          await dependencies.documentStorage?.remove(evidence.objectKey).catch(() => undefined);
+        }
+        throw error;
+      }
+      if (result.status !== "recorded" && evidence) {
+        await dependencies.documentStorage?.remove(evidence.objectKey).catch(() => undefined);
+      }
       if (result.status === "forbidden") {
         return sendError(reply, 403, "SCOPE_DENIED", "No puedes registrar pagos.", request.id);
       }
@@ -4988,7 +5333,7 @@ export function buildApp(dependencies: AppDependencies) {
           request.id,
         );
       }
-      return reply.send({ application: result.application, amount: result.amount });
+      return reply.send({ application: result.application, payment: result.payment });
     },
   );
 

@@ -41,7 +41,11 @@ const app = buildApp({
   borrowerService: config.BORROWER_IDENTITY_KEY
     ? createPostgresBorrowerService(pool, config.BORROWER_IDENTITY_KEY, config.GEOCODING_ENDPOINT)
     : undefined,
-  creditService: createPostgresCreditService(pool),
+  creditService: createPostgresCreditService(
+    pool,
+    config.BORROWER_IDENTITY_KEY,
+    config.PUBLIC_WEB_URL,
+  ),
   routeService: createPostgresRouteService(pool),
   documentStorage: config.BORROWER_IDENTITY_KEY
     ? createLocalBorrowerDocumentStorage(config.BORROWER_DOCUMENTS_ROOT)

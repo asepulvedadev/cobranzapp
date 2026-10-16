@@ -127,7 +127,11 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
       }),
     ).resolves.toEqual({ status: "duplicate_identity" });
 
-    const creditService = createPostgresCreditService(runtimePool);
+    const creditService = createPostgresCreditService(
+      runtimePool,
+      "borrower-public-link-secret-1234567890",
+      "https://example.test",
+    );
     const product = await creditService.createProduct(actor, tenantId, {
       name: "Crédito de integración",
       principalMin: "1",
@@ -191,6 +195,55 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
     expect(application).toMatchObject({
       status: "created",
       application: { requestedPrincipal: "400000.00", status: "active" },
+    });
+    if (application.status !== "created") throw new Error("Loan application was not created");
+    const payment = await creditService.recordPayment(actor, tenantId, application.application.id, {
+      installmentNumber: 1,
+      amount:
+        application.application.nextPaymentAmount ?? application.application.installmentAmount,
+      paymentMethod: "cash",
+      requestId: "loan-payment-create-test",
+    });
+    expect(payment).toMatchObject({
+      status: "recorded",
+      payment: {
+        installmentNumber: 1,
+        paymentMethod: "cash",
+        remainingAmount: expect.any(String),
+        receiptUrl: expect.stringContaining("https://example.test/recibo/"),
+      },
+    });
+    if (payment.status !== "recorded") throw new Error("Loan payment was not recorded");
+    await expect(
+      creditService.getPublicPaymentReceipt(payment.payment.receiptUrl.split("/recibo/")[1] ?? ""),
+    ).resolves.toMatchObject({
+      status: "found",
+      receipt: {
+        borrower: { fullName: "Cliente de Integración" },
+        payment: { receiptNumber: payment.payment.receiptNumber },
+      },
+    });
+    const portalLink = await creditService.rotateBorrowerPortalLink(
+      actor,
+      tenantId,
+      created.borrower.id,
+      "borrower-portal-create-test",
+    );
+    expect(portalLink).toMatchObject({
+      status: "found",
+      active: true,
+      url: expect.stringContaining("https://example.test/cliente/"),
+    });
+    if (portalLink.status !== "found") throw new Error("Borrower portal was not created");
+    await expect(
+      creditService.getPublicBorrowerPortal(portalLink.url.split("/cliente/")[1] ?? ""),
+    ).resolves.toMatchObject({
+      status: "found",
+      profile: {
+        borrower: { fullName: "Cliente de Integración" },
+        credits: [{ paidInstallments: 1 }],
+        payments: [{ receiptNumber: payment.payment.receiptNumber }],
+      },
     });
     const applicationAudit = await ownerPool.query<{ metadata: Record<string, unknown> }>(
       `SELECT metadata FROM audit_events

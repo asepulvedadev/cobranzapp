@@ -1,13 +1,16 @@
 import type {
+  BorrowerPortalProfile,
   LoanAnalytics,
   LoanAnalyticsQuery,
   LoanApplication,
   LoanApplicationCreateRequest,
+  LoanPayment,
   LoanPaymentCreateRequest,
   LoanProduct,
   LoanProductCreateRequest,
   LoanProductUpdateRequest,
   LoanRenewalRequest,
+  PaymentReceipt,
 } from "@cobranzapp/contracts";
 import type { SchedulePreview } from "@cobranzapp/financial";
 import type { TenantActor } from "../tenancy/types.js";
@@ -67,12 +70,35 @@ export type LoanApplicationApprovalResult =
   | { status: "invalid_state" };
 
 export type LoanPaymentResult =
-  | { status: "recorded"; application: LoanApplication; amount: string }
+  | { status: "recorded"; application: LoanApplication; payment: LoanPayment }
   | { status: "not_found" }
   | { status: "forbidden" }
   | { status: "invalid_state" }
   | { status: "invalid_installment" }
   | { status: "already_paid" };
+
+export type PaymentEvidence = {
+  objectKey: string;
+  mediaType: string;
+  sizeBytes: number;
+  sha256: string;
+};
+
+export type BorrowerPortalLinkResult =
+  | { status: "found"; url: string; active: boolean }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "unavailable" };
+
+export type PublicBorrowerPortalResult =
+  | { status: "found"; profile: BorrowerPortalProfile }
+  | { status: "not_found" }
+  | { status: "unavailable" };
+
+export type PublicPaymentReceiptResult =
+  | { status: "found"; receipt: PaymentReceipt }
+  | { status: "not_found" }
+  | { status: "unavailable" };
 
 export type LoanRenewalResult =
   | {
@@ -136,8 +162,36 @@ export interface CreditService {
     actor: TenantActor,
     tenantId: string,
     applicationId: string,
-    input: LoanPaymentCreateRequest & { requestId: string },
+    input: LoanPaymentCreateRequest & { requestId: string; evidence?: PaymentEvidence },
   ): Promise<LoanPaymentResult>;
+  listPayments(actor: TenantActor, tenantId: string, applicationId: string): Promise<LoanPayment[]>;
+  getPaymentProof(
+    actor: TenantActor,
+    tenantId: string,
+    applicationId: string,
+    paymentId: string,
+  ): Promise<
+    { status: "found"; objectKey: string } | { status: "not_found" } | { status: "forbidden" }
+  >;
+  getBorrowerPortalLink(
+    actor: TenantActor,
+    tenantId: string,
+    borrowerId: string,
+  ): Promise<BorrowerPortalLinkResult>;
+  rotateBorrowerPortalLink(
+    actor: TenantActor,
+    tenantId: string,
+    borrowerId: string,
+    requestId: string,
+  ): Promise<BorrowerPortalLinkResult>;
+  revokeBorrowerPortalLink(
+    actor: TenantActor,
+    tenantId: string,
+    borrowerId: string,
+    requestId: string,
+  ): Promise<BorrowerPortalLinkResult>;
+  getPublicBorrowerPortal(token: string): Promise<PublicBorrowerPortalResult>;
+  getPublicPaymentReceipt(token: string): Promise<PublicPaymentReceiptResult>;
   renewApplication(
     actor: TenantActor,
     tenantId: string,

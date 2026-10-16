@@ -950,6 +950,8 @@ export const loanApplicationSchema = z.object({
   interestTotal: decimalAmountSchema,
   scheduledTotal: decimalAmountSchema,
   installmentAmount: decimalAmountSchema,
+  nextPaymentAmount: decimalAmountSchema.optional(),
+  remainingAmount: decimalAmountSchema.optional(),
   paidInstallments: z.number().int().nonnegative().default(0),
   paidAmount: decimalAmountSchema.optional(),
   paidPercentage: z.number().min(0).max(100).optional(),
@@ -974,6 +976,76 @@ export const loanApplicationResponseSchema = z.object({ application: loanApplica
 
 export const loanPaymentCreateRequestSchema = z.object({
   installmentNumber: z.number().int().min(1).max(365),
+  amount: decimalAmountSchema,
+  paymentMethod: z.enum(["cash", "transfer"]),
+});
+export const loanPaymentSchema = z.object({
+  id: z.uuid(),
+  installmentNumber: z.number().int().positive(),
+  amount: decimalAmountSchema,
+  paymentMethod: z.enum(["cash", "transfer"]),
+  paidAt: z.iso.datetime(),
+  receiptNumber: z.string().min(8),
+  remainingAmount: decimalAmountSchema,
+  recordedByName: z.string().min(2),
+  hasTransferProof: z.boolean(),
+  receiptUrl: z.url(),
+});
+export const loanPaymentDirectorySchema = z.object({ payments: z.array(loanPaymentSchema) });
+
+const publicCompanySchema = z.object({
+  name: z.string().min(2),
+  phone: z.string().nullable(),
+  address: z.string().nullable().optional(),
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+});
+const publicBorrowerSummarySchema = z.object({
+  fullName: z.string().min(2),
+  phone: z.string().min(7),
+  whatsappPhone: z.string().nullable(),
+  documentType: z.string().min(2),
+  documentLast4: z.string().min(2).max(4),
+});
+export const borrowerPortalProfileSchema = z.object({
+  company: publicCompanySchema,
+  borrower: publicBorrowerSummarySchema.extend({ id: z.uuid() }),
+  credits: z.array(
+    z.object({
+      id: z.uuid(),
+      productName: z.string().min(2),
+      requestedPrincipal: decimalAmountSchema,
+      scheduledTotal: decimalAmountSchema,
+      remainingAmount: decimalAmountSchema,
+      paymentFrequency: loanProductFrequencySchema,
+      requestedTermCount: z.number().int().positive(),
+      paidInstallments: z.number().int().nonnegative(),
+      nominalRate: decimalRateSchema,
+      status: z.enum(["active", "paid"]),
+      nextDueDate: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .nullable(),
+      overdueInstallments: z.number().int().nonnegative(),
+    }),
+  ),
+  payments: z.array(loanPaymentSchema.omit({ recordedByName: true, hasTransferProof: true })),
+});
+export const borrowerPortalLinkSchema = z.object({
+  url: z.url(),
+  active: z.boolean(),
+});
+export const paymentReceiptSchema = z.object({
+  company: publicCompanySchema,
+  borrower: publicBorrowerSummarySchema,
+  payment: loanPaymentSchema.omit({ receiptUrl: true, hasTransferProof: true }),
+  credit: z.object({
+    productName: z.string().min(2),
+    requestedPrincipal: decimalAmountSchema,
+    requestedTermCount: z.number().int().positive(),
+    paymentFrequency: loanProductFrequencySchema,
+    nominalRate: decimalRateSchema,
+  }),
 });
 export const loanRenewalRequestSchema = z.object({
   excessAmount: decimalAmountSchema,
@@ -1420,6 +1492,9 @@ export type LoanApplicationCreateRequest = z.infer<typeof loanApplicationCreateR
 export type LoanApplication = z.infer<typeof loanApplicationSchema>;
 export type LoanApplicationDirectory = z.infer<typeof loanApplicationDirectorySchema>;
 export type LoanPaymentCreateRequest = z.infer<typeof loanPaymentCreateRequestSchema>;
+export type LoanPayment = z.infer<typeof loanPaymentSchema>;
+export type BorrowerPortalProfile = z.infer<typeof borrowerPortalProfileSchema>;
+export type PaymentReceipt = z.infer<typeof paymentReceiptSchema>;
 export type LoanRenewalRequest = z.infer<typeof loanRenewalRequestSchema>;
 export type LoanAnalyticsPreset = z.infer<typeof loanAnalyticsPresetSchema>;
 export type LoanAnalyticsQuery = z.infer<typeof loanAnalyticsQuerySchema>;
