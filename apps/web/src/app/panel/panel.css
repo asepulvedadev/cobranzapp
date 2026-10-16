@@ -6395,6 +6395,145 @@ html:has(.panel-shell) {
   border-radius: 14px;
 }
 
+.collector-evidence-data {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--panel-line);
+  border-radius: 15px;
+  background: #fff;
+}
+
+.collector-evidence-data-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.collector-evidence-data-heading span {
+  color: var(--panel-muted);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.collector-evidence-data-heading h3 {
+  margin: 3px 0 0;
+  color: var(--panel-ink);
+  font-size: 16px;
+}
+
+.collector-evidence-data-heading button {
+  min-height: 44px;
+  flex: 0 0 auto;
+  padding: 0 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  background: var(--panel-soft);
+  color: var(--panel-ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.collector-evidence-data-heading button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.collector-evidence-data dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid var(--panel-line);
+  border-radius: 12px;
+  background: var(--panel-line);
+}
+
+.collector-evidence-data dl > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 11px;
+  background: #fff;
+}
+
+.collector-evidence-data dt {
+  color: var(--panel-muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.collector-evidence-data dd {
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: var(--panel-ink);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.collector-evidence-data details {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel-soft);
+}
+
+.collector-evidence-data summary {
+  color: var(--panel-ink);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.collector-evidence-data pre,
+.collector-evidence-data details p {
+  overflow-x: auto;
+  margin: 10px 0 0;
+  color: var(--panel-muted);
+  font-size: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.collector-evidence-message {
+  margin: 0;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--panel-soft);
+  color: var(--panel-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.collector-evidence-confidence {
+  color: var(--panel-muted);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+@media (max-width: 520px) {
+  .collector-evidence-gallery {
+    padding-inline: 12px;
+  }
+
+  .collector-evidence-data-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .collector-evidence-data dl {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* 2026 mobile-first role workspace refresh */
 .panel-mobile-nav {
   overflow-x: hidden;

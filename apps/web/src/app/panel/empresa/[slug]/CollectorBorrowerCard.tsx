@@ -1,9 +1,10 @@
 "use client";
 
-import type { Borrower } from "@cobranzapp/contracts";
+import type { Borrower, BorrowerOcrExtraction } from "@cobranzapp/contracts";
 import Image from "next/image";
 import { type ReactNode, useState } from "react";
 import { Modal } from "../../Modal";
+import { useSensitiveFetch } from "../../ReauthenticationProvider";
 
 function identityStatusLabel(status: Borrower["identity"]["verificationState"]) {
   return status === "reviewed" ? "Verificado" : status === "rejected" ? "Rechazado" : "En revisión";
@@ -15,6 +16,27 @@ function addressStatusLabel(location: Borrower["addressLocations"]["home"]) {
     : location.status === "failed"
       ? "Falta ubicar"
       : "Sin ubicación";
+}
+
+export function extractedIdentityRows(fields: NonNullable<BorrowerOcrExtraction["fields"]>) {
+  return [
+    ["Nombres", fields.firstNames],
+    ["Apellidos", fields.lastNames],
+    ["Nombre completo", fields.fullName],
+    ["Número de documento", fields.documentNumber],
+    ["Tipo de documento", fields.documentType],
+    ["País", fields.country],
+    ["Nacionalidad", fields.nationality],
+    ["Fecha de nacimiento", fields.birthDate],
+    ["Lugar de nacimiento", fields.birthPlace],
+    ["Sexo", fields.sex],
+    ["Estatura", fields.height],
+    ["Grupo sanguíneo / RH", fields.bloodType],
+    ["Fecha de expedición", fields.issueDate],
+    ["Lugar de expedición", fields.issuePlace],
+    ["Fecha de vencimiento", fields.expirationDate],
+    ["Número serial", fields.serialNumber],
+  ].filter((row): row is [string, string] => Boolean(row[1]));
 }
 
 export function CollectorBorrowerCard({
@@ -36,7 +58,10 @@ export function CollectorBorrowerCard({
   onEditAddresses: () => void;
   documentTools: ReactNode;
 }) {
+  const sensitiveFetch = useSensitiveFetch();
   const [isEvidenceOpen, setIsEvidenceOpen] = useState(false);
+  const [ocrState, setOcrState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [ocrExtractions, setOcrExtractions] = useState<BorrowerOcrExtraction[]>([]);
   const initials = borrower.fullName
     .split(/\s+/)
     .filter(Boolean)
@@ -52,6 +77,28 @@ export function CollectorBorrowerCard({
   const selfie = evidenceDocuments.find((document) => document.category === "profile_photo");
   const documentUrl = (documentId: string) =>
     `/api/v1/tenants/${tenantId}/borrowers/${borrower.id}/documents/${documentId}`;
+  const bestExtraction = ocrExtractions
+    .filter((extraction) => extraction.fields)
+    .sort((left, right) => (right.confidence ?? 0) - (left.confidence ?? 0))[0];
+
+  async function loadOcrEvidence() {
+    setOcrState("loading");
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/borrowers/${borrower.id}/ocr`,
+    ).catch(() => null);
+    if (!response?.ok) {
+      setOcrState("error");
+      return;
+    }
+    const body = (await response.json()) as { extractions?: BorrowerOcrExtraction[] };
+    setOcrExtractions(body.extractions ?? []);
+    setOcrState("ready");
+  }
+
+  function openEvidence() {
+    setIsEvidenceOpen(true);
+    if (ocrState === "idle" || ocrState === "error") void loadOcrEvidence();
+  }
 
   return (
     <>
@@ -60,7 +107,7 @@ export function CollectorBorrowerCard({
           <button
             aria-label={`Ver fotos de ${borrower.fullName}`}
             className="collector-client-avatar"
-            onClick={() => setIsEvidenceOpen(true)}
+            onClick={openEvidence}
             type="button"
           >
             {selfie ? (
@@ -211,6 +258,59 @@ export function CollectorBorrowerCard({
                 <p>Este cliente todavía no tiene selfie ni documento cargado.</p>
               </div>
             )}
+
+            <section className="collector-evidence-data">
+              <div className="collector-evidence-data-heading">
+                <div>
+                  <span>Lectura de Hermes</span>
+                  <h3>Datos extraídos de la cédula</h3>
+                </div>
+                <button
+                  disabled={ocrState === "loading"}
+                  onClick={() => void loadOcrEvidence()}
+                  type="button"
+                >
+                  {ocrState === "loading" ? "Consultando…" : "Actualizar"}
+                </button>
+              </div>
+
+              {ocrState === "loading" ? (
+                <p className="collector-evidence-message" role="status">
+                  Consultando los datos reconocidos por Hermes…
+                </p>
+              ) : bestExtraction?.fields ? (
+                <>
+                  <dl>
+                    {extractedIdentityRows(bestExtraction.fields).map(([label, value]) => (
+                      <div key={label}>
+                        <dt>{label}</dt>
+                        <dd>{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  {bestExtraction.fields.mrzLines.length || bestExtraction.fields.barcodeData ? (
+                    <details>
+                      <summary>Ver datos técnicos del documento</summary>
+                      {bestExtraction.fields.mrzLines.length ? (
+                        <pre>{bestExtraction.fields.mrzLines.join("\n")}</pre>
+                      ) : null}
+                      {bestExtraction.fields.barcodeData ? (
+                        <p>{bestExtraction.fields.barcodeData}</p>
+                      ) : null}
+                    </details>
+                  ) : null}
+                  <small className="collector-evidence-confidence">
+                    Confianza de lectura: {Math.round((bestExtraction.confidence ?? 0) * 100)}%
+                  </small>
+                </>
+              ) : (
+                <p className="collector-evidence-message" role="status">
+                  {ocrState === "error"
+                    ? "No fue posible consultar la lectura. Pulsa Actualizar para reintentar."
+                    : "Hermes todavía no ha generado datos para este documento."}
+                </p>
+              )}
+            </section>
           </div>
         </Modal>
       ) : null}

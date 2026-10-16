@@ -1,7 +1,8 @@
 import type { Borrower } from "@cobranzapp/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { CollectorBorrowerCard } from "./CollectorBorrowerCard";
+import { ReauthenticationProvider } from "../../ReauthenticationProvider";
+import { CollectorBorrowerCard, extractedIdentityRows } from "./CollectorBorrowerCard";
 
 const borrower: Borrower = {
   id: "2a1eeaa6-50b3-470d-b708-067207aacddd",
@@ -79,18 +80,50 @@ const borrower: Borrower = {
 };
 
 describe("CollectorBorrowerCard", () => {
+  it("organizes every identity field extracted by Hermes", () => {
+    const rows = Object.fromEntries(
+      extractedIdentityRows({
+        firstNames: "LAURA",
+        lastNames: "WALTEROS",
+        fullName: "LAURA WALTEROS",
+        documentNumber: "1234567890",
+        documentType: "CC",
+        country: "CO",
+        nationality: "COL",
+        birthDate: "1995-04-16",
+        birthPlace: "CARTAGENA",
+        sex: "F",
+        height: "1.67",
+        bloodType: "O+",
+        issueDate: "2022-04-20",
+        issuePlace: "CARTAGENA",
+        expirationDate: "2032-04-19",
+        serialNumber: "A123",
+        mrzLines: ["ICCOL1234567890"],
+        barcodeData: "PDF417",
+      }),
+    );
+
+    expect(rows["Número de documento"]).toBe("1234567890");
+    expect(rows["Fecha de nacimiento"]).toBe("1995-04-16");
+    expect(rows["Grupo sanguíneo / RH"]).toBe("O+");
+    expect(rows["Número serial"]).toBe("A123");
+  });
+
   it("prioritizes collector actions and protects the complete identity number", () => {
     const html = renderToStaticMarkup(
-      <CollectorBorrowerCard
-        borrower={borrower}
-        creditHref="/creditos?cliente=2a1eeaa6&amp;nuevo=1"
-        documentTools={<span>Agregar documento</span>}
-        homeWazeHref="https://waze.example/home"
-        onEditAddresses={vi.fn()}
-        tenantId="4cde1a7b-46d3-4405-914f-6e4b9aeed985"
-        whatsappHref="https://wa.me/573005551212"
-        workWazeHref="https://waze.example/work"
-      />,
+      <ReauthenticationProvider username="cobrador">
+        <CollectorBorrowerCard
+          borrower={borrower}
+          creditHref="/creditos?cliente=2a1eeaa6&amp;nuevo=1"
+          documentTools={<span>Agregar documento</span>}
+          homeWazeHref="https://waze.example/home"
+          onEditAddresses={vi.fn()}
+          tenantId="4cde1a7b-46d3-4405-914f-6e4b9aeed985"
+          whatsappHref="https://wa.me/573005551212"
+          workWazeHref="https://waze.example/work"
+        />
+      </ReauthenticationProvider>,
     );
 
     expect(html).toContain("Laura Walteros");
