@@ -29,8 +29,9 @@ ssh_opts=(-o StrictHostKeyChecking=no -o ConnectTimeout=15)
 remote_tmp="/tmp/cobranzapp-direct-${release}"
 archive="${remote_tmp}.tar.gz"
 local_archive=$(mktemp "${TMPDIR:-/tmp}/cobranzapp-direct.XXXXXX.tar.gz")
+routes_profile_archive=$(mktemp "${TMPDIR:-/tmp}/cobranzapp-routes.XXXXXX.tar.gz")
 cleanup() {
-  rm -f "$local_archive"
+  rm -f "$local_archive" "$routes_profile_archive"
 }
 trap cleanup EXIT
 
@@ -56,6 +57,7 @@ done
 
 echo "Transferring immutable images to ${user}@${host}"
 docker save "${images[@]}" | gzip -1 > "$local_archive"
+tar -czf "$routes_profile_archive" -C infrastructure/hermes-routes .
 sshpass -e scp "${ssh_opts[@]}" "$local_archive" "${user}@${host}:${archive}"
 sshpass -e scp "${ssh_opts[@]}" \
   infrastructure/scripts/deploy-direct-remote.sh \
@@ -81,8 +83,14 @@ sshpass -e scp "${ssh_opts[@]}" \
 sshpass -e scp "${ssh_opts[@]}" \
   infrastructure/compose.production.yaml \
   "${user}@${host}:${remote_tmp}.compose.yaml"
+sshpass -e scp "${ssh_opts[@]}" \
+  "$routes_profile_archive" \
+  "${user}@${host}:${remote_tmp}.routes-profile.tar.gz"
+sshpass -e scp "${ssh_opts[@]}" \
+  infrastructure/systemd/hermes-cobranzapp-routes.service \
+  "${user}@${host}:${remote_tmp}.routes.service"
 
 sshpass -e ssh "${ssh_opts[@]}" "${user}@${host}" \
-  "chmod 700 '${remote_tmp}.sh' '${remote_tmp}.backup.sh' '${remote_tmp}.backup-verify.sh' && '${remote_tmp}.sh' '${release}' '${archive}' '${remote_tmp}.backup.sh' '${remote_tmp}.backup.service' '${remote_tmp}.backup.timer' '${remote_tmp}.backup-verify.sh' '${remote_tmp}.backup-verify.service' '${remote_tmp}.backup-verify.timer' '${remote_tmp}.compose.yaml' && rm -f '${remote_tmp}.sh' '${remote_tmp}.backup.sh' '${remote_tmp}.backup.service' '${remote_tmp}.backup.timer' '${remote_tmp}.backup-verify.sh' '${remote_tmp}.backup-verify.service' '${remote_tmp}.backup-verify.timer' '${remote_tmp}.compose.yaml'"
+  "chmod 700 '${remote_tmp}.sh' '${remote_tmp}.backup.sh' '${remote_tmp}.backup-verify.sh' && '${remote_tmp}.sh' '${release}' '${archive}' '${remote_tmp}.backup.sh' '${remote_tmp}.backup.service' '${remote_tmp}.backup.timer' '${remote_tmp}.backup-verify.sh' '${remote_tmp}.backup-verify.service' '${remote_tmp}.backup-verify.timer' '${remote_tmp}.compose.yaml' '${remote_tmp}.routes-profile.tar.gz' '${remote_tmp}.routes.service' && rm -f '${remote_tmp}.sh' '${remote_tmp}.backup.sh' '${remote_tmp}.backup.service' '${remote_tmp}.backup.timer' '${remote_tmp}.backup-verify.sh' '${remote_tmp}.backup-verify.service' '${remote_tmp}.backup-verify.timer' '${remote_tmp}.compose.yaml' '${remote_tmp}.routes-profile.tar.gz' '${remote_tmp}.routes.service'"
 
 echo "Direct deployment completed: ${release}"

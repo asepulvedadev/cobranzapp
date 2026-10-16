@@ -1,0 +1,21 @@
+[Unit]
+Description=Hermes route planning agent for CobranzApp
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=HERMES_HOME=/root/.hermes-cobranzapp/profiles/cobranzapp-routes
+WorkingDirectory=/srv/cobranzapp
+ExecStart=/opt/hermes-cobranzapp/.hermes/bin/hermes gateway run --replace --external-supervisor --accept-hooks
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/root/.hermes-cobranzapp/profiles/cobranzapp-routes
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

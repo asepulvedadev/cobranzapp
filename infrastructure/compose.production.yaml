@@ -71,6 +71,9 @@ services:
       HERMES_OCR_URL: ${HERMES_OCR_URL:-http://host.docker.internal:8650/v1/chat/completions}
       HERMES_OCR_API_KEY: ${HERMES_OCR_API_KEY}
       HERMES_OCR_TIMEOUT_MS: ${HERMES_OCR_TIMEOUT_MS:-45000}
+      HERMES_ROUTES_URL: ${HERMES_ROUTES_URL:-http://host.docker.internal:8651/v1/chat/completions}
+      HERMES_ROUTES_API_KEY: ${HERMES_ROUTES_API_KEY}
+      HERMES_ROUTES_TIMEOUT_MS: ${HERMES_ROUTES_TIMEOUT_MS:-30000}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

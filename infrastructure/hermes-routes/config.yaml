@@ -1,0 +1,42 @@
+_config_version: 50
+database:
+  journal_mode: wal
+runtime:
+  nofile_soft_limit: 4096
+model:
+  default: "gpt-5.6-luna"
+  provider: "openai-api"
+toolsets: []
+platform_toolsets:
+  api_server: []
+agent:
+  disabled_toolsets:
+    - browser
+    - clarify
+    - code_execution
+    - connections
+    - cronjob
+    - delegation
+    - file
+    - image_gen
+    - memory
+    - search
+    - session_search
+    - skills
+    - terminal
+    - todo
+    - tts
+    - video
+    - video_gen
+    - vision
+    - web
+gateway:
+  standalone: true
+  api_server:
+    enabled: true
+    host: 0.0.0.0
+    port: 8651
+    model_name: cobranzapp-routes
+    max_concurrent_runs: 2
+security:
+  protected_instruction_files: true
