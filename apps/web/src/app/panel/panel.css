@@ -6717,3 +6717,136 @@ html:has(.panel-shell) {
     max-width: none;
   }
 }
+
+.owner-analytics-card {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.owner-analytics-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.owner-analytics-heading h2,
+.owner-analytics-heading p {
+  margin: 0;
+}
+
+.owner-analytics-heading p {
+  color: var(--panel-muted);
+  font-size: 0.84rem;
+  margin-top: 4px;
+}
+
+.analytics-period-control {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-line);
+  border-radius: 14px;
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  min-width: 0;
+  padding: 4px;
+}
+
+.analytics-period-legend {
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.analytics-period-control button {
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  color: var(--panel-muted);
+  cursor: pointer;
+  min-height: 44px;
+  padding: 0 13px;
+}
+
+.analytics-period-control button[aria-pressed="true"] {
+  background: var(--panel-dark);
+  color: #fff;
+}
+
+.analytics-period-control button:focus-visible,
+.renewal-team-details summary:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--tenant-brand-accent), transparent 45%);
+  outline-offset: 2px;
+}
+
+.owner-money-grid strong {
+  font-size: clamp(1.2rem, 2.2vw, 1.7rem);
+  overflow-wrap: anywhere;
+}
+
+.renewal-team-details {
+  border-top: 1px solid var(--panel-line);
+  padding-top: 12px;
+}
+
+.renewal-team-details summary {
+  cursor: pointer;
+  font-weight: 750;
+  min-height: 44px;
+  padding: 11px 2px;
+}
+
+.renewal-team-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.renewal-team-list > div {
+  align-items: center;
+  background: var(--panel-bg);
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.renewal-team-list span {
+  display: grid;
+  gap: 2px;
+}
+
+.renewal-team-list span:last-child {
+  text-align: right;
+}
+
+.renewal-team-list small,
+.renewal-progress-note {
+  color: var(--panel-muted);
+  font-size: 0.8rem;
+}
+
+.analytics-date-form {
+  display: grid;
+  gap: 14px;
+}
+
+@media (max-width: 820px) {
+  .owner-analytics-heading {
+    display: grid;
+  }
+
+  .analytics-period-control {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .analytics-period-control button {
+    padding: 0 6px;
+  }
+}

@@ -5,6 +5,8 @@ export type {
   BorrowerDirectory,
   CurrentUser,
   FinancialSchedulePreview,
+  LoanAnalytics,
+  LoanAnalyticsPreset,
   LoanApplication,
   LoanProduct,
   MembershipEntitlement,
