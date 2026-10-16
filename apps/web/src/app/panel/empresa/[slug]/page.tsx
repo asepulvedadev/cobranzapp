@@ -98,7 +98,7 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
             value: overdueInstallments,
             label: "Cuotas vencidas",
             detail: "Revisa a quién contactar primero.",
-            href: `${basePath}/reportes`,
+            href: `${basePath}/creditos`,
             tone: "danger",
           },
         ]
@@ -154,7 +154,6 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
           detail: "Solicitudes y productos",
         },
         { label: "Ver rutas automáticas", href: `${basePath}/rutas`, detail: "Cobros del día" },
-        { label: "Ver reportes", href: `${basePath}/reportes`, detail: "Prioriza pendientes" },
       ];
 
   return (

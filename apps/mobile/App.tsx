@@ -36,7 +36,6 @@ import { BorrowerOcrControl } from "./src/BorrowerOcrControl";
 import { CreditWorkspace } from "./src/CreditWorkspace";
 import { EmployeeCreateForm } from "./src/EmployeeCreateForm";
 import { MemberProfileForm } from "./src/MemberProfileForm";
-import { OperationalReport } from "./src/OperationalReport";
 import { VerificationNetworkCard } from "./src/VerificationNetworkCard";
 
 type Screen =
@@ -52,7 +51,6 @@ type TenantSection =
   | "clients"
   | "verification"
   | "credits"
-  | "reports"
   | "routes";
 
 const roleLabels: Record<
@@ -975,27 +973,6 @@ function TenantSectionNav({
           </Text>
         </Pressable>
       ) : null}
-      {canViewCredits ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => onChange("reports")}
-          style={[
-            styles.sectionNavItem,
-            active === "reports" && styles.sectionNavItemActive,
-            active === "reports" && { borderColor: primaryColor },
-          ]}
-        >
-          <Text
-            style={[
-              styles.sectionNavText,
-              active === "reports" && styles.sectionNavTextActive,
-              active === "reports" && { color: primaryColor },
-            ]}
-          >
-            Reportes
-          </Text>
-        </Pressable>
-      ) : null}
       {canViewRoutes ? (
         <Pressable
           accessibilityRole="button"
@@ -1408,15 +1385,6 @@ function AuthenticatedHome({
                   <CreditWorkspace
                     api={api}
                     borrowers={directory?.borrowers ?? []}
-                    onNeedsReauthentication={() => {
-                      setNeedsReauthentication(true);
-                      setMessage("Confirma tu contraseña para continuar con esta acción.");
-                    }}
-                    tenantId={tenant.tenant.id}
-                  />
-                ) : tenantSection === "reports" ? (
-                  <OperationalReport
-                    api={api}
                     onNeedsReauthentication={() => {
                       setNeedsReauthentication(true);
                       setMessage("Confirma tu contraseña para continuar con esta acción.");

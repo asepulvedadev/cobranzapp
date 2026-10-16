@@ -2,7 +2,6 @@
 
 import {
   Buildings,
-  ChartBar,
   DotsThreeCircle,
   Gauge,
   MapPin,
@@ -99,11 +98,6 @@ export function PanelNavigation({
         icon: ShieldCheck,
       },
       team: { href: `${effectiveDashboardHref}/equipo`, label: "Personal", icon: UsersThree },
-      reports: {
-        href: `${effectiveDashboardHref}/reportes`,
-        label: "Reportes",
-        icon: ChartBar,
-      },
       settings: {
         href: `${effectiveDashboardHref}/configuracion`,
         label: "Empresa",
@@ -118,17 +112,12 @@ export function PanelNavigation({
         tenantItems.routes,
         tenantItems.verify,
       ];
-      secondaryItems = [tenantItems.reports, ...accountItems];
+      secondaryItems = accountItems;
     } else if (role === "supervisor") {
       primaryItems = [tenantItems.home, tenantItems.clients, tenantItems.routes, tenantItems.team];
-      secondaryItems = [
-        tenantItems.reports,
-        tenantItems.verify,
-        tenantItems.settings,
-        ...accountItems,
-      ];
+      secondaryItems = [tenantItems.verify, tenantItems.settings, ...accountItems];
     } else {
-      primaryItems = [tenantItems.home, tenantItems.clients, tenantItems.team, tenantItems.reports];
+      primaryItems = [tenantItems.home, tenantItems.clients, tenantItems.team];
       secondaryItems = [
         tenantItems.routes,
         tenantItems.verify,
