@@ -679,10 +679,8 @@ export function BorrowerDirectory({
                       </>
                     }
                     homeWazeHref={wazeUrl(borrower.homeAddress, borrower.addressLocations.home)}
-                    locating={geocodeBusy}
                     onEditAddresses={() => openAddressEditor(borrower)}
-                    onLocate={(kind) => void geocodeAddress(borrower.id, kind)}
-                    onUseDeviceLocation={(kind) => captureDeviceLocation(borrower.id, kind)}
+                    tenantId={tenantId}
                     whatsappHref={whatsappUrl(borrower.whatsappPhone ?? borrower.phone)}
                     workWazeHref={wazeUrl(borrower.workAddress, borrower.addressLocations.work)}
                     key={borrower.id}
