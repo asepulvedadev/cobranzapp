@@ -36,6 +36,10 @@ type PlannedGroup = {
   planner: "agent" | "fallback";
 };
 
+export function shouldCreateAutomaticRoute(candidateCount: number) {
+  return candidateCount >= 2;
+}
+
 function dateParts(date: Date, timezone: string) {
   const values = new Map(
     new Intl.DateTimeFormat("en-US", {
@@ -246,7 +250,9 @@ async function generateTenant(
       byCollector.set(candidate.collector_id, group);
     }
     const groups = await Promise.all(
-      [...byCollector.values()].map((group) => orderGroup(group, planner)),
+      [...byCollector.values()]
+        .filter((group) => shouldCreateAutomaticRoute(group.length))
+        .map((group) => orderGroup(group, planner)),
     );
     const client = await pool.connect();
     try {

@@ -2235,68 +2235,6 @@ html:has(.panel-shell) {
   opacity: 0.35;
 }
 
-.route-board-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding-top: 2px;
-}
-
-.route-assignment-form {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.route-assignment-form label {
-  color: var(--panel-muted);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.route-assignment-form select {
-  min-height: 32px;
-  max-width: 220px;
-  padding: 0 8px;
-  border: 1px solid var(--panel-line);
-  border-radius: 6px;
-  background: #f7fafb;
-  color: var(--panel-ink);
-  font-size: 12px;
-}
-
-.route-board-actions .button-link {
-  width: fit-content;
-  min-height: 32px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: #7a5700;
-  font-size: 12px;
-  text-decoration: underline;
-}
-
-.route-board-actions .button-link:disabled {
-  color: #9ba3a8;
-  cursor: not-allowed;
-}
-
-.route-board-forms {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.route-board-forms h3 {
-  margin: 0;
-  color: var(--panel-ink);
-  font-size: 15px;
-}
-
 .loan-application-card {
   display: grid;
   gap: 16px;
@@ -6330,10 +6268,6 @@ html:has(.panel-shell) {
 
   .schedule-preview-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .route-board-forms {
-    grid-template-columns: 1fr;
   }
 }
 

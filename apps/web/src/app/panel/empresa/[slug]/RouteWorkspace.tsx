@@ -1,19 +1,17 @@
 "use client";
 
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
-import type { BorrowerDirectory, Route, TenantOverview } from "../../../../lib/platform";
+import type { Route, TenantOverview } from "../../../../lib/platform";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
 import { CollectionRouteBoard } from "./CollectionRouteBoard";
 
 export function RouteWorkspace({
   actorRole,
-  collectors,
   settings,
   tenantId,
   tenantName,
 }: {
   actorRole: TenantOverview["actorRole"];
-  collectors: TenantOverview["members"];
   settings: TenantOverview["settings"];
   tenantId: string;
   tenantName: string;
@@ -22,26 +20,25 @@ export function RouteWorkspace({
   const sensitiveFetchRef = useRef(sensitiveFetch);
   sensitiveFetchRef.current = sensitiveFetch;
   const [routes, setRoutes] = useState<Route[] | null>(null);
-  const [borrowers, setBorrowers] = useState<BorrowerDirectory | null>(null);
   const [message, setMessage] = useState("");
 
   const load = useCallback(async () => {
     setMessage("");
     const request = sensitiveFetchRef.current;
-    const [routesResponse, borrowersResponse] = await Promise.all([
-      request(`/api/v1/tenants/${tenantId}/routes`),
-      request(`/api/v1/tenants/${tenantId}/borrowers?page=1&pageSize=100`),
-    ]);
-    if (!routesResponse?.ok || !borrowersResponse?.ok) {
-      setMessage(
-        "No fue posible cargar las rutas. Confirma tu contraseña cuando aparezca la ventana de seguridad y vuelve a intentarlo.",
-      );
+    const routesResponse = await request(`/api/v1/tenants/${tenantId}/routes`);
+    if (!routesResponse?.ok) {
+      setMessage("No fue posible cargar las visitas. Intenta nuevamente.");
       return;
     }
     const routesBody = (await routesResponse.json()) as { routes: Route[] };
-    const borrowersBody = (await borrowersResponse.json()) as BorrowerDirectory;
-    setRoutes(routesBody.routes);
-    setBorrowers(borrowersBody);
+    setRoutes(
+      routesBody.routes.filter(
+        (route) =>
+          route.generationMode === "automatic" &&
+          route.status === "active" &&
+          route.stops.length > 1,
+      ),
+    );
   }, [tenantId]);
 
   useEffect(() => {
@@ -61,24 +58,21 @@ export function RouteWorkspace({
       <header className="dashboard-header">
         <div>
           <span className="panel-eyebrow">{tenantName}</span>
-          <h1>Rutas de cobranza</h1>
+          <h1>Visitas para cobrar</h1>
         </div>
       </header>
-      {routes && borrowers ? (
+      {routes ? (
         <CollectionRouteBoard
-          borrowers={borrowers.borrowers}
-          canManage={actorRole === "owner" || actorRole === "supervisor"}
           canReorder={
             actorRole === "owner" || actorRole === "supervisor" || actorRole === "collector"
           }
-          collectors={collectors.filter((member) => member.role === "collector")}
           onChanged={() => void load()}
           routes={routes}
           tenantId={tenantId}
         />
       ) : (
         <section className="dashboard-card">
-          <h2>{message ? "No se pudieron cargar las rutas" : "Cargando rutas…"}</h2>
+          <h2>{message ? "No se pudieron cargar las visitas" : "Cargando visitas…"}</h2>
           {message ? <p className="tenant-form-message form-message-error">{message}</p> : null}
           {message ? (
             <button onClick={() => void load()} type="button">

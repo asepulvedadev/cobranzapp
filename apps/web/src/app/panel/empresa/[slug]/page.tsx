@@ -134,7 +134,7 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
           href: `${basePath}/clientes`,
           detail: "Consulta su información",
         },
-        { label: "Abrir mis rutas", href: `${basePath}/rutas`, detail: "Continúa el recorrido" },
+        { label: "Ver visitas de hoy", href: `${basePath}/rutas`, detail: "Ruta automática" },
         {
           label: "Verificar identidad",
           href: `${basePath}/verificacion`,
@@ -153,7 +153,7 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
           href: `${basePath}/creditos`,
           detail: "Solicitudes y productos",
         },
-        { label: "Planear rutas", href: `${basePath}/rutas`, detail: "Organiza la cobranza" },
+        { label: "Ver rutas automáticas", href: `${basePath}/rutas`, detail: "Cobros del día" },
         { label: "Ver reportes", href: `${basePath}/reportes`, detail: "Prioriza pendientes" },
       ];
 
