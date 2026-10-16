@@ -1261,7 +1261,7 @@ describe("health endpoints", () => {
 describe("authentication", () => {
   it("accepts a username or email identifier and sets a secure session cookie", async () => {
     const deps = dependencies();
-    const app = buildApp(deps);
+    const app = buildApp({ ...deps, sessionTtlHours: 8_760 });
     apps.push(app);
     const response = await app.inject({
       method: "POST",
@@ -1278,6 +1278,20 @@ describe("authentication", () => {
     expect(response.headers["set-cookie"]).toContain("HttpOnly");
     expect(response.headers["set-cookie"]).toContain("SameSite=Strict");
     expect(response.headers["set-cookie"]).toContain("Secure");
+    expect(response.headers["set-cookie"]).toContain("Max-Age=31536000");
+  });
+
+  it("renews the trusted-device cookie while the authenticated session is in use", async () => {
+    const app = buildApp({ ...dependencies(), sessionTtlHours: 8_760 });
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/auth/me",
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["set-cookie"]).toContain("cobranzapp_session=session-token");
+    expect(response.headers["set-cookie"]).toContain("Max-Age=31536000");
   });
 
   it("rejects state-changing requests from an unknown origin", async () => {
@@ -1369,14 +1383,14 @@ describe("authentication", () => {
       payload: { password: "correct-password" },
     });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ reauthenticated: true, validForMinutes: 10 });
+    expect(response.json()).toEqual({ reauthenticated: true, validForMinutes: 480 });
     expect(deps.authService.reauthenticate).toHaveBeenCalledWith(
       developer.id,
       "session-token",
       "correct-password",
       expect.any(String),
     );
-    expect(response.headers["set-cookie"]).toBeUndefined();
+    expect(response.headers["set-cookie"]).toContain("cobranzapp_session=session-token");
   });
 
   it("rejects an incorrect password during reauthentication", async () => {
@@ -2036,6 +2050,11 @@ describe("developer platform", () => {
       "5c58269f-ce16-4250-82e2-c0c16621b0fb",
       "active",
       expect.any(String),
+    );
+    expect(deps.authService.isRecentlyReauthenticated).toHaveBeenCalledWith(
+      developer.id,
+      "session-token",
+      480,
     );
   });
 

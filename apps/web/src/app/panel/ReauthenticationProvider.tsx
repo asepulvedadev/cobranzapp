@@ -124,8 +124,8 @@ export function ReauthenticationProvider({
               <span className="panel-eyebrow">Acción protegida</span>
               <h2 id="reauthentication-title">Confirma que eres tú</h2>
               <p id="reauthentication-description">
-                Escribe tu contraseña para continuar. La confirmación será válida durante 10 minutos
-                en este dispositivo.
+                Escribe tu contraseña para continuar. La confirmación será válida durante toda la
+                sesión activa en este dispositivo.
               </p>
             </div>
             <form onSubmit={confirm}>

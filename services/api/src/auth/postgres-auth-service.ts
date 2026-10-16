@@ -339,12 +339,14 @@ export function createPostgresAuthService(
         await client.query("BEGIN");
         const sessionResult = await client.query<{ user_id: string }>(
           `UPDATE auth_sessions
-              SET last_seen_at = now()
+              SET last_seen_at = now(),
+                  expires_at = now() + make_interval(hours => $2),
+                  reauthenticated_at = now()
             WHERE token_hash = $1
               AND revoked_at IS NULL
               AND expires_at > now()
           RETURNING user_id`,
-          [hashToken(token)],
+          [hashToken(token), sessionTtlHours],
         );
         const session = sessionResult.rows[0];
         if (!session) {

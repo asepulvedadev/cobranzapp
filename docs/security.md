@@ -25,8 +25,8 @@ PostgreSQL documents that owners normally bypass RLS and superusers/`BYPASSRLS` 
 
 - Mobile: OIDC authorization-code flow with PKCE through the system browser; no embedded credential form or secret in the app binary.
 - Web: server-managed sessions with secure HttpOnly cookies, CSRF defenses, strict redirects, and server-side token handling. No long-lived tokens in browser local storage.
-- MFA for owners, finance, and sensitive approvals; reauthentication for role grants, exports, and financial policy changes.
-- Short-lived access tokens, rotation/revocation policy, per-device session management, and immediate membership checks for sensitive operations.
+- MFA remains available for stronger sign-in assurance; an active device session does not interrupt daily work with repeated password prompts.
+- Revocable per-device sessions use secure cookies, rolling inactivity renewal, and immediate membership checks for sensitive operations.
 - Tenant-specific document-number lookup uses keyed HMAC over normalized country/type/number plus encrypted original value; ordinary hashing is insufficient for low-entropy identifiers. Key versioning and rotation need migration support.
 - Encrypt sensitive files and local data; keep decryption keys outside the database and app bundle. Mask identity values by role and redact PII from telemetry.
 - Minimize offline data to assigned work with expiration; separate caches by tenant/user/device. Wipe on authorized logout/tenant switch only after protecting unresolved physical-cash evidence through a defined recovery workflow.
@@ -36,21 +36,23 @@ PostgreSQL documents that owners normally bypass RLS and superusers/`BYPASSRLS` 
 
 ### Implemented session-security baseline
 
-As of 2026-10-11, the web application uses server-managed opaque sessions in secure HttpOnly,
-SameSite cookies. A password confirmation is required again when the latest credential proof is
-older than ten minutes before platform lifecycle changes, invitations, membership changes, or team
-scope assignments. Successful confirmations are bound to the current session, rate-limited, and
-recorded as account-scoped audit events; no password or session token is included in audit data.
+As of 2026-10-16, the web application uses server-managed opaque device sessions in secure
+HttpOnly, SameSite cookies. A successful sign-in authorizes the device for the complete active
+session and daily operations never request the password again. The session has a rolling one-year
+inactivity window: each authenticated request renews both the server record and cookie. It ends on
+explicit logout, password change, remote revocation, user disablement, or one year without use.
+Authorization, active membership and allowed-origin checks still run for every protected request;
+no password or session token is included in audit data.
 Invitation links expire after 72 hours and are single-use. Tenant owners can revoke pending
 non-owner invitations, while owner invitations remain protected behind platform administration;
-revocation requires recent password confirmation and creates a tenant-scoped audit event.
+revocation requires an authenticated authorized session and creates a tenant-scoped audit event.
 Employee-seat activation is checked inside the same database transaction as invitation acceptance
 or membership reactivation. A tenant-scoped transaction advisory lock prevents concurrent
 acceptances from exceeding the versioned entitlement; a narrowly scoped database function returns
 only the active employee count needed for that check.
 
 The developer console also provides a paginated identity directory. Disabling a tenant identity
-requires recent password confirmation, immediately revokes every active session and records a
+requires the developer role, immediately revokes every active session and records a
 global audit event without credentials or session tokens. Developer identities are protected from
 this general-purpose control to prevent accidental platform lockout.
 
@@ -58,8 +60,8 @@ The developer can search and paginate the global audit directory by actor, compa
 an exact action type. This view is read-only, requires the platform developer role, and returns actor
 and tenant context without exposing event metadata that may contain internal operational details.
 
-Users can enroll TOTP verification from the security screen. Setup and removal require password
-confirmation when the latest credential proof is older than ten minutes. TOTP secrets are encrypted
+Users can enroll TOTP verification from the security screen. Setup and removal require an active
+authenticated session. TOTP secrets are encrypted
 with AES-256-GCM using the deployment key in `MFA_ENCRYPTION_KEY`; recovery codes are stored only as
 one-way hashes and work once. Password login for an enrolled account creates a five-minute challenge
 instead of a session. The challenge allows at most five failed attempts, accepts either a current

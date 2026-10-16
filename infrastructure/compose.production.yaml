@@ -33,7 +33,7 @@ services:
       APP_VERSION: ${IMAGE_TAG}
       DATABASE_URL: postgresql://${APP_DATABASE_USER}:${APP_DATABASE_PASSWORD}@postgres:5432/${POSTGRES_DB}
       ALLOWED_WEB_ORIGINS: ${ALLOWED_WEB_ORIGINS}
-      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-8}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-8760}
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL}
       BORROWER_DOCUMENTS_ROOT: /var/lib/cobranzapp/documents
       HERMES_OCR_URL: ${HERMES_OCR_URL:-http://host.docker.internal:8650/v1/chat/completions}

@@ -206,8 +206,9 @@ export function buildApp(dependencies: AppDependencies) {
   const reauthenticationRateLimiter = new LoginRateLimiter();
   const identityOcrRateLimiter = new LoginRateLimiter(12, 60_000);
   const secureCookies = dependencies.isProduction ?? false;
-  const sessionMaxAgeSeconds = (dependencies.sessionTtlHours ?? 8) * 60 * 60;
-  const reauthenticationWindowMinutes = 10;
+  const sessionTtlHours = dependencies.sessionTtlHours ?? 8;
+  const sessionMaxAgeSeconds = sessionTtlHours * 60 * 60;
+  const reauthenticationWindowMinutes = sessionTtlHours * 60;
 
   app.addHook("onSend", async (_request, reply, payload) => {
     reply.header("x-content-type-options", "nosniff");
@@ -247,6 +248,7 @@ export function buildApp(dependencies: AppDependencies) {
       sendError(reply, 401, "SESSION_INVALID", "La sesión venció o ya no es válida.", request.id);
       return null;
     }
+    reply.header("set-cookie", sessionCookie(token, secureCookies, sessionMaxAgeSeconds));
     return { token, user };
   }
 
@@ -1023,6 +1025,7 @@ export function buildApp(dependencies: AppDependencies) {
         "La contraseña actual no es válida.",
         request.id,
       );
+    reply.removeHeader("set-cookie");
     reply.header("set-cookie", expiredSessionCookie(secureCookies));
     return reply.send({ message: "Contraseña actualizada. Inicia sesión nuevamente." });
   });

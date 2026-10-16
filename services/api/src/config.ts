@@ -5,7 +5,7 @@ const configSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(3001),
   DATABASE_URL: z.string().min(1),
   ALLOWED_WEB_ORIGINS: z.string().default("http://localhost:3000"),
-  SESSION_TTL_HOURS: z.coerce.number().int().positive().max(168).default(8),
+  SESSION_TTL_HOURS: z.coerce.number().int().positive().max(8_760).default(8_760),
   MFA_ENCRYPTION_KEY: z.string().min(43).max(44),
   BORROWER_IDENTITY_KEY: z.string().min(32).optional(),
   BORROWER_DOCUMENTS_ROOT: z.string().min(1).default(".data/documents"),

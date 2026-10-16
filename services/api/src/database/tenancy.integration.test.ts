@@ -107,6 +107,12 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
     await expect(
       auth.isRecentlyReauthenticated(developerId, byEmail?.token ?? "", 10),
     ).resolves.toBe(false);
+    await expect(auth.authenticate(byEmail?.token ?? "")).resolves.toMatchObject({
+      id: developerId,
+    });
+    await expect(
+      auth.isRecentlyReauthenticated(developerId, byEmail?.token ?? "", 10),
+    ).resolves.toBe(true);
     await expect(
       auth.reauthenticate(developerId, byEmail?.token ?? "", "incorrect-password", `bad-${suffix}`),
     ).resolves.toBe(false);
