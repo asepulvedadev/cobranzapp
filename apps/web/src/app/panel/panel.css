@@ -4629,6 +4629,10 @@ html:has(.panel-shell) {
   gap: 22px;
 }
 
+.collector-client-mobile-list {
+  display: none;
+}
+
 .borrower-toast {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -6014,6 +6018,293 @@ html:has(.panel-shell) {
 
   .route-board-forms {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .collector-client-desktop-list {
+    display: none;
+  }
+
+  .collector-client-mobile-list {
+    display: grid;
+    gap: 12px;
+    padding: 4px 12px 14px;
+  }
+
+  .collector-client-card {
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--panel-line) 82%, #c7d5cc);
+    border-radius: 18px;
+    background: var(--panel-surface, #fff);
+    box-shadow: 0 7px 24px rgb(25 38 29 / 7%);
+  }
+
+  .collector-client-heading {
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 14px 10px;
+  }
+
+  .collector-client-avatar {
+    display: grid;
+    width: 46px;
+    height: 46px;
+    place-items: center;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--tenant-brand-primary, #184d32) 12%, #f2f8f4);
+    color: var(--tenant-brand-primary, #184d32);
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+  }
+
+  .collector-client-heading > div {
+    min-width: 0;
+  }
+
+  .collector-client-heading h3,
+  .collector-client-heading p {
+    margin: 0;
+  }
+
+  .collector-client-heading h3 {
+    overflow: hidden;
+    color: var(--panel-ink);
+    font-size: 16px;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .collector-client-heading p {
+    margin-top: 3px;
+    color: var(--panel-muted);
+    font-size: 11px;
+    font-weight: 750;
+  }
+
+  .collector-client-status {
+    align-self: start;
+    padding: 6px 8px;
+    font-size: 9px;
+    white-space: nowrap;
+  }
+
+  .collector-client-card .status-reviewed {
+    background: #e6f5ed;
+    color: #176b43;
+  }
+
+  .collector-client-card .status-manual_pending {
+    background: #fff5dd;
+    color: #8b5b00;
+  }
+
+  .collector-client-card .status-rejected {
+    background: #fdeaea;
+    color: #a63a3a;
+  }
+
+  .collector-client-contact {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 14px;
+    padding: 10px 0 12px;
+    border-top: 1px solid var(--panel-line);
+  }
+
+  .collector-client-contact span {
+    color: var(--panel-muted);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .collector-client-contact strong {
+    color: var(--panel-ink);
+    font-size: 14px;
+  }
+
+  .collector-client-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 0 14px 14px;
+  }
+
+  .collector-client-action {
+    display: flex;
+    min-height: 46px;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    border: 1px solid var(--panel-line);
+    border-radius: 12px;
+    background: #fff;
+    color: var(--panel-ink);
+    font-size: 12px;
+    font-weight: 850;
+    line-height: 1.15;
+    text-align: center;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+
+  .collector-client-action-primary {
+    grid-column: 1 / -1;
+    border-color: color-mix(in srgb, var(--tenant-brand-primary, #184d32) 42%, var(--panel-dark));
+    background: color-mix(in srgb, var(--tenant-brand-primary, #184d32) 42%, var(--panel-dark));
+    color: #fff;
+  }
+
+  .collector-client-action:focus-visible,
+  .collector-client-details summary:focus-visible,
+  .collector-client-address-actions > *:focus-visible,
+  .collector-client-edit:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--tenant-brand-accent, #f5bd1f) 80%, #fff);
+    outline-offset: 2px;
+  }
+
+  .collector-client-details {
+    border-top: 1px solid var(--panel-line);
+  }
+
+  .collector-client-details > summary {
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    color: var(--panel-ink);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 850;
+    list-style: none;
+  }
+
+  .collector-client-details > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .collector-client-details > summary::after {
+    color: var(--panel-muted);
+    content: "+";
+    font-size: 20px;
+    font-weight: 500;
+  }
+
+  .collector-client-details[open] > summary::after {
+    content: "−";
+  }
+
+  .collector-client-details-body {
+    display: grid;
+    gap: 10px;
+    padding: 0 14px 14px;
+  }
+
+  .collector-client-address,
+  .collector-client-emergency,
+  .collector-client-documents {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 13px;
+    background: var(--panel-soft);
+  }
+
+  .collector-client-address > div:first-child {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .collector-client-address span,
+  .collector-client-emergency > span,
+  .collector-client-documents > span {
+    color: var(--panel-muted);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .collector-client-address strong {
+    color: var(--panel-ink);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .collector-client-address small,
+  .collector-client-documents small {
+    color: var(--panel-muted);
+    font-size: 10px;
+  }
+
+  .collector-client-address-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .collector-client-address-actions > *,
+  .collector-client-edit {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 7px;
+    border: 1px solid var(--panel-line);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--panel-ink);
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .collector-client-address-actions button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+  }
+
+  .collector-client-edit {
+    width: 100%;
+    border-color: color-mix(in srgb, var(--tenant-brand-primary, #184d32) 32%, var(--panel-line));
+  }
+
+  .collector-client-emergency a {
+    display: grid;
+    min-height: 44px;
+    align-content: center;
+    gap: 2px;
+    color: var(--panel-ink);
+    text-decoration: none;
+  }
+
+  .collector-client-emergency strong {
+    font-size: 12px;
+  }
+
+  .collector-client-emergency small {
+    color: var(--panel-muted);
+    font-size: 11px;
+  }
+
+  .collector-client-documents .borrower-document-upload summary,
+  .collector-client-documents .borrower-ocr-control > button {
+    min-height: 44px;
+    align-content: center;
   }
 }
 
