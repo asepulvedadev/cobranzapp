@@ -1,4 +1,7 @@
-import { borrowerCreateRequestSchema } from "@cobranzapp/contracts";
+import {
+  borrowerCreateRequestSchema,
+  type IdentityDocumentExtraction,
+} from "@cobranzapp/contracts";
 import { Contact, ContactField, requestPermissionsAsync } from "expo-contacts";
 import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
@@ -65,6 +68,8 @@ export function BorrowerCreateForm({
   const [step, setStep] = useState(1);
   const [createdBorrowerId, setCreatedBorrowerId] = useState<string | null>(null);
   const [uploadedUploads, setUploadedUploads] = useState<UploadKey[]>([]);
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrExtraction, setOcrExtraction] = useState<IdentityDocumentExtraction | null>(null);
 
   function close() {
     if (busy) return;
@@ -115,6 +120,37 @@ export function BorrowerCreateForm({
       type: asset.mimeType ?? "image/jpeg",
       file: asset.file,
     });
+  }
+
+  async function scanIdentity(front: SelectedImage, back?: SelectedImage | null) {
+    setOcrBusy(true);
+    setOcrExtraction(null);
+    setMessage("Hermes está leyendo y organizando todos los datos de la cédula…");
+    try {
+      const extraction = await api.extractIdentityDocument(tenantId, front, back ?? undefined);
+      setOcrExtraction(extraction);
+      setFullName(extraction.fields.fullName ?? "");
+      setDocumentNumber(extraction.fields.documentNumber ?? "");
+      if (extraction.fields.documentType) setDocumentType(extraction.fields.documentType);
+      setMessage(
+        extraction.fields.fullName && extraction.fields.documentNumber
+          ? `Hermes completó la lectura con ${Math.round(extraction.confidence * 100)}% de confianza. Verifica los datos.`
+          : "Hermes encontró datos parciales. Completa lo que falte y verifica la cédula.",
+      );
+    } catch (error) {
+      if (error instanceof MobileApiError && error.status === 428) {
+        onNeedsReauthentication();
+        setMessage("Confirma tu contraseña para que Hermes pueda leer el documento.");
+      } else {
+        setMessage(
+          error instanceof MobileApiError
+            ? error.message
+            : "Hermes no pudo leer la imagen. Puedes completar los datos manualmente.",
+        );
+      }
+    } finally {
+      setOcrBusy(false);
+    }
   }
 
   async function pickDeviceContact() {
@@ -311,6 +347,7 @@ export function BorrowerCreateForm({
       setIdentityFront(null);
       setIdentityBack(null);
       setProfilePhoto(null);
+      setOcrExtraction(null);
       setStep(1);
       setCreatedBorrowerId(null);
       setUploadedUploads([]);
@@ -350,6 +387,7 @@ export function BorrowerCreateForm({
             onPress={() => {
               setMessage("");
               setStep(1);
+              setOcrExtraction(null);
               setOpen(true);
             }}
             style={styles.openButton}
@@ -419,8 +457,18 @@ export function BorrowerCreateForm({
                     label={
                       identityFront ? `✓ Frente · ${identityFront.name}` : "Cargar cédula · frente"
                     }
-                    onPress={() => void pickImage(setIdentityFront, "cedula-frente.jpg")}
-                    onCamera={() => void captureImage(setIdentityFront, "cedula-frente.jpg")}
+                    onPress={() =>
+                      void pickImage((image) => {
+                        setIdentityFront(image);
+                        void scanIdentity(image, identityBack);
+                      }, "cedula-frente.jpg")
+                    }
+                    onCamera={() =>
+                      void captureImage((image) => {
+                        setIdentityFront(image);
+                        void scanIdentity(image, identityBack);
+                      }, "cedula-frente.jpg")
+                    }
                   />
                   <ImageButton
                     label={
@@ -428,8 +476,18 @@ export function BorrowerCreateForm({
                         ? `✓ Reverso · ${identityBack.name}`
                         : "Cargar cédula · reverso opcional"
                     }
-                    onPress={() => void pickImage(setIdentityBack, "cedula-reverso.jpg")}
-                    onCamera={() => void captureImage(setIdentityBack, "cedula-reverso.jpg")}
+                    onPress={() =>
+                      void pickImage((image) => {
+                        setIdentityBack(image);
+                        if (identityFront) void scanIdentity(identityFront, image);
+                      }, "cedula-reverso.jpg")
+                    }
+                    onCamera={() =>
+                      void captureImage((image) => {
+                        setIdentityBack(image);
+                        if (identityFront) void scanIdentity(identityFront, image);
+                      }, "cedula-reverso.jpg")
+                    }
                   />
                   <ImageButton
                     label={
@@ -438,6 +496,44 @@ export function BorrowerCreateForm({
                     onPress={() => void pickImage(setProfilePhoto, "foto-perfil.jpg")}
                     onCamera={() => void captureImage(setProfilePhoto, "foto-perfil.jpg")}
                   />
+                  {ocrBusy ? (
+                    <Text style={styles.ocrStatus}>Hermes está leyendo la cédula…</Text>
+                  ) : null}
+                  {ocrExtraction ? (
+                    <View style={styles.ocrDetails}>
+                      <Text style={styles.ocrTitle}>Todos los datos detectados</Text>
+                      {[
+                        ["Nombres", ocrExtraction.fields.firstNames],
+                        ["Apellidos", ocrExtraction.fields.lastNames],
+                        ["Nacionalidad", ocrExtraction.fields.nationality],
+                        ["Nacimiento", ocrExtraction.fields.birthDate],
+                        ["Lugar de nacimiento", ocrExtraction.fields.birthPlace],
+                        ["Sexo", ocrExtraction.fields.sex],
+                        ["Estatura", ocrExtraction.fields.height],
+                        ["RH", ocrExtraction.fields.bloodType],
+                        ["Expedición", ocrExtraction.fields.issueDate],
+                        ["Lugar de expedición", ocrExtraction.fields.issuePlace],
+                        ["Vencimiento", ocrExtraction.fields.expirationDate],
+                        ["Serial", ocrExtraction.fields.serialNumber],
+                      ].map(([label, value]) =>
+                        value ? (
+                          <Text key={label} style={styles.ocrDetailText}>
+                            {label}: {value}
+                          </Text>
+                        ) : null,
+                      )}
+                      {ocrExtraction.fields.mrzLines.length ? (
+                        <Text style={styles.ocrMachineText}>
+                          MRZ: {ocrExtraction.fields.mrzLines.join(" / ")}
+                        </Text>
+                      ) : null}
+                      {ocrExtraction.fields.barcodeData ? (
+                        <Text style={styles.ocrMachineText}>
+                          Código: {ocrExtraction.fields.barcodeData}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
                 </>
               ) : null}
 
@@ -785,6 +881,23 @@ const styles = {
     paddingHorizontal: 10,
   },
   cameraButtonText: { color: "#fbbf24", fontSize: 12, fontWeight: "800" as const },
+  ocrStatus: {
+    color: "#fbbf24",
+    fontSize: 13,
+    fontWeight: "700" as const,
+    lineHeight: 19,
+  },
+  ocrDetails: {
+    gap: 5,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#355844",
+    backgroundColor: "#17241d",
+  },
+  ocrTitle: { color: "#eef2ee", fontSize: 14, fontWeight: "800" as const },
+  ocrDetailText: { color: "#c8d6cc", fontSize: 12, lineHeight: 18 },
+  ocrMachineText: { color: "#9eb4a5", fontSize: 10, lineHeight: 15 },
   consentRow: {
     flexDirection: "row" as const,
     gap: 8,

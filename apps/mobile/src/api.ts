@@ -13,6 +13,7 @@ import {
   currentUserSchema,
   type FinancialSchedulePreview,
   financialSchedulePreviewResponseSchema,
+  identityDocumentExtractionResponseSchema,
   type LoanApplication,
   type LoanProduct,
   loanApplicationDirectorySchema,
@@ -336,6 +337,35 @@ export class MobileApi {
       );
     }
     return tenantMemberResponseSchema.parse(await response.json()).member;
+  }
+
+  async extractIdentityDocument(
+    tenantId: string,
+    front: { uri: string; name: string; type: string; file?: Blob },
+    back?: { uri: string; name: string; type: string; file?: Blob },
+  ) {
+    const form = new FormData();
+    form.append(
+      "front",
+      front.file ?? ({ uri: front.uri, name: front.name, type: front.type } as unknown as Blob),
+    );
+    if (back) {
+      form.append(
+        "back",
+        back.file ?? ({ uri: back.uri, name: back.name, type: back.type } as unknown as Blob),
+      );
+    }
+    const response = await this.request(`/v1/tenants/${tenantId}/borrowers/identity-extract`, {
+      method: "POST",
+      body: form,
+    });
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "Hermes no pudo leer la cédula."),
+        response.status,
+      );
+    }
+    return identityDocumentExtractionResponseSchema.parse(await response.json()).extraction;
   }
 
   async memberProfile(tenantId: string, userId: string): Promise<TenantMemberProfile> {
