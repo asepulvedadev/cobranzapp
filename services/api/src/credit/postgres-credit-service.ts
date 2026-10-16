@@ -3,7 +3,7 @@ import { buildSchedulePreview } from "@cobranzapp/financial";
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
 import { operationalPaymentState } from "./operational-schedule.js";
-import { renewalPaymentProgress } from "./renewal-policy.js";
+import { renewalPaymentProgress, renewedPrincipalFromSchedule } from "./renewal-policy.js";
 import type {
   CreditService,
   LoanAnalyticsResult,
@@ -501,8 +501,9 @@ export function createPostgresCreditService(pool: Pool): CreditService {
             WHERE application.tenant_id = $1 AND application.status = 'active'`,
           [tenantId],
         );
-        const activePrincipalOutstanding = activeApplications.rows.reduce((total, row) => {
-          const schedule = buildSchedulePreview({
+        const activeSchedules = activeApplications.rows.map((row) => ({
+          row,
+          schedule: buildSchedulePreview({
             principal: row.requested_principal,
             termCount: row.requested_term_count,
             paymentFrequency: row.payment_frequency,
@@ -510,14 +511,34 @@ export function createPostgresCreditService(pool: Pool): CreditService {
             nominalRate: row.nominal_rate,
             documentationFeeRate: row.documentation_fee_rate,
             startDate: row.created_at.toISOString().slice(0, 10),
-          });
-          return (
+          }),
+        }));
+        const activePrincipalOutstanding = activeSchedules.reduce(
+          (total, { row, schedule }) =>
             total +
             schedule.periods
               .slice(row.paid_installments)
-              .reduce((subtotal, period) => subtotal + parseCents(period.principal), 0n)
-          );
-        }, 0n);
+              .reduce((subtotal, period) => subtotal + parseCents(period.principal), 0n),
+          0n,
+        );
+        const activeInterestOutstanding = activeSchedules.reduce(
+          (total, { row, schedule }) =>
+            total +
+            schedule.periods
+              .slice(row.paid_installments)
+              .reduce((subtotal, period) => subtotal + parseCents(period.interest), 0n),
+          0n,
+        );
+        const activePrincipal = activeApplications.rows.reduce(
+          (total, row) => total + Number(row.requested_principal),
+          0,
+        );
+        const weightedAverageNominalRate = activePrincipal
+          ? activeApplications.rows.reduce(
+              (total, row) => total + Number(row.requested_principal) * Number(row.nominal_rate),
+              0,
+            ) / activePrincipal
+          : 0;
         const totals = await client.query<{
           approved_principal: string;
           collected_amount: string;
@@ -553,6 +574,57 @@ export function createPostgresCreditService(pool: Pool): CreditService {
              )::text AS renewal_count`,
           [tenantId, query.from, query.to],
         );
+        const payments = await client.query<
+          Pick<
+            LoanApplicationRow,
+            | "id"
+            | "requested_principal"
+            | "payment_frequency"
+            | "requested_term_count"
+            | "rate_basis"
+            | "nominal_rate"
+            | "documentation_fee_rate"
+            | "created_at"
+          > & { installment_number: number }
+        >(
+          `SELECT application.id,
+                  application.requested_principal,
+                  application.payment_frequency,
+                  application.requested_term_count,
+                  application.rate_basis,
+                  application.nominal_rate,
+                  application.documentation_fee_rate,
+                  application.created_at,
+                  payment.installment_number
+             FROM loan_payments payment
+             JOIN loan_applications application
+               ON application.tenant_id = payment.tenant_id
+              AND application.id = payment.application_id
+             JOIN tenants tenant ON tenant.id = payment.tenant_id
+            WHERE payment.tenant_id = $1
+              AND (payment.paid_at AT TIME ZONE tenant.timezone)::date
+                  BETWEEN $2::date AND $3::date`,
+          [tenantId, query.from, query.to],
+        );
+        const paymentScheduleCache = new Map<string, ReturnType<typeof buildSchedulePreview>>();
+        const collectedInterest = payments.rows.reduce((total, payment) => {
+          let schedule = paymentScheduleCache.get(payment.id);
+          if (!schedule) {
+            schedule = buildSchedulePreview({
+              principal: payment.requested_principal,
+              termCount: payment.requested_term_count,
+              paymentFrequency: payment.payment_frequency,
+              rateBasis: payment.rate_basis,
+              nominalRate: payment.nominal_rate,
+              documentationFeeRate: payment.documentation_fee_rate,
+              startDate: payment.created_at.toISOString().slice(0, 10),
+            });
+            paymentScheduleCache.set(payment.id, schedule);
+          }
+          return (
+            total + parseCents(schedule.periods[payment.installment_number - 1]?.interest ?? "0")
+          );
+        }, 0n);
         const renewalsByMember = await client.query<{
           user_id: string;
           display_name: string;
@@ -592,8 +664,11 @@ export function createPostgresCreditService(pool: Pool): CreditService {
           period: query,
           metrics: {
             activePrincipalOutstanding: formatCents(activePrincipalOutstanding),
+            activeInterestOutstanding: formatCents(activeInterestOutstanding),
             approvedPrincipal: periodTotals?.approved_principal ?? "0.00",
             collectedAmount: periodTotals?.collected_amount ?? "0.00",
+            collectedInterest: formatCents(collectedInterest),
+            weightedAverageNominalRate: Math.round(weightedAverageNominalRate).toString(),
             renewalCount: Number(periodTotals?.renewal_count ?? 0),
             activeCreditCount: activeApplications.rowCount ?? activeApplications.rows.length,
           },
@@ -614,12 +689,24 @@ export function createPostgresCreditService(pool: Pool): CreditService {
       if (!canManageApplications(actor)) return { status: "forbidden" };
       return withTransaction(actor, tenantId, async (client) => {
         const creationPolicy = loanCreationPolicy(actor.tenantRole);
-        const borrowerResult = await client.query<{ id: string }>(
-          `SELECT id FROM borrowers
-            WHERE tenant_id = $1 AND id = $2 AND status = 'active'`,
+        const borrowerResult = await client.query<{
+          id: string;
+          status: "active" | "archived";
+          verification_state: "manual_pending" | "reviewed" | "rejected";
+        }>(
+          `SELECT borrower.id, borrower.status, identity.verification_state
+             FROM borrowers borrower
+             JOIN borrower_identities identity
+               ON identity.tenant_id = borrower.tenant_id
+              AND identity.borrower_id = borrower.id
+            WHERE borrower.tenant_id = $1 AND borrower.id = $2`,
           [tenantId, input.borrowerId],
         );
-        if (!borrowerResult.rows[0]) return { status: "not_found" };
+        const borrower = borrowerResult.rows[0];
+        if (borrower?.status !== "active") return { status: "not_found" };
+        if (borrower.verification_state !== "reviewed") {
+          return { status: "borrower_not_verified" };
+        }
 
         const productResult = await client.query<{
           id: string;
@@ -948,8 +1035,11 @@ export function createPostgresCreditService(pool: Pool): CreditService {
         const outstanding = preview.periods
           .slice(state.paid_installments)
           .reduce((sum, period) => sum + parseCents(period.principal), 0n);
-        const excess = parseCents(input.excessAmount);
-        const renewedPrincipal = formatCents(outstanding + excess);
+        const renewedPrincipal = renewedPrincipalFromSchedule(
+          preview,
+          state.paid_installments,
+          input.excessAmount,
+        );
         const amountCheck = await client.query<{ out_of_range: boolean }>(
           `SELECT ($3::numeric < $1::numeric OR $3::numeric > $2::numeric) AS out_of_range`,
           [state.principal_min, state.principal_max, renewedPrincipal],

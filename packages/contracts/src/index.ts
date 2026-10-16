@@ -995,8 +995,11 @@ export const loanAnalyticsSchema = z.object({
   }),
   metrics: z.object({
     activePrincipalOutstanding: decimalAmountSchema,
+    activeInterestOutstanding: decimalAmountSchema,
     approvedPrincipal: decimalAmountSchema,
     collectedAmount: decimalAmountSchema,
+    collectedInterest: decimalAmountSchema,
+    weightedAverageNominalRate: decimalRateSchema,
     renewalCount: z.number().int().nonnegative(),
     activeCreditCount: z.number().int().nonnegative(),
   }),

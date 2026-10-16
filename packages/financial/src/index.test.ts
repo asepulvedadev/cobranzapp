@@ -20,7 +20,40 @@ describe("buildSchedulePreview", () => {
       "2026-10-14",
       "2026-10-15",
     ]);
+    expect(result.periods.map(({ interest, principal }) => ({ interest, principal }))).toEqual([
+      { interest: "10000.00", principal: "26666.68" },
+      { interest: "0.00", principal: "36666.66" },
+      { interest: "0.00", principal: "36666.66" },
+    ]);
     expect(result.periods.at(-1)?.balance).toBe("0.00");
+  });
+
+  it("charges all interest before amortizing principal", () => {
+    const result = buildSchedulePreview({
+      principal: "300",
+      termCount: 6,
+      paymentFrequency: "weekly",
+      rateBasis: "flat_total",
+      nominalRate: "20",
+      documentationFeeRate: "0",
+      startDate: "2026-10-16",
+    });
+
+    expect(
+      result.periods.map(({ installment, interest, principal, balance }) => ({
+        installment,
+        interest,
+        principal,
+        balance,
+      })),
+    ).toEqual([
+      { installment: "60.00", interest: "60.00", principal: "0.00", balance: "300.00" },
+      { installment: "60.00", interest: "0.00", principal: "60.00", balance: "240.00" },
+      { installment: "60.00", interest: "0.00", principal: "60.00", balance: "180.00" },
+      { installment: "60.00", interest: "0.00", principal: "60.00", balance: "120.00" },
+      { installment: "60.00", interest: "0.00", principal: "60.00", balance: "60.00" },
+      { installment: "60.00", interest: "0.00", principal: "60.00", balance: "0.00" },
+    ]);
   });
 
   it("supports fortnightly simple interest and allocates the remaining balance", () => {

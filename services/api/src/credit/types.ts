@@ -40,6 +40,7 @@ export type LoanProductSchedulePreviewResult =
 export type LoanApplicationResult =
   | { status: "created"; application: LoanApplication }
   | { status: "not_found" }
+  | { status: "borrower_not_verified" }
   | { status: "forbidden" }
   | { status: "invalid_product" }
   | { status: "amount_out_of_range" }

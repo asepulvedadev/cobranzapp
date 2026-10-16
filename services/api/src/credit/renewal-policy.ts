@@ -2,7 +2,7 @@ export const renewalRequiredPercentage = 40 as const;
 
 type RenewalSchedule = {
   scheduledTotal: string;
-  periods: { installment: string }[];
+  periods: { installment: string; principal?: string }[];
 };
 
 function parseCents(value: string) {
@@ -28,4 +28,15 @@ export function renewalPaymentProgress(schedule: RenewalSchedule, paidInstallmen
     eligible,
     requiredPercentage: renewalRequiredPercentage,
   };
+}
+
+export function renewedPrincipalFromSchedule(
+  schedule: RenewalSchedule,
+  paidInstallments: number,
+  additionalAmount: string,
+) {
+  const outstandingPrincipal = schedule.periods
+    .slice(paidInstallments)
+    .reduce((total, period) => total + parseCents(period.principal ?? "0"), 0n);
+  return formatCents(outstandingPrincipal + parseCents(additionalAmount));
 }

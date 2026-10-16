@@ -4819,6 +4819,15 @@ export function buildApp(dependencies: AppDependencies) {
         request.id,
       );
     }
+    if (result.status === "borrower_not_verified") {
+      return sendError(
+        reply,
+        409,
+        "BORROWER_NOT_VERIFIED",
+        "Aprueba la identidad del cliente antes de crearle un crédito.",
+        request.id,
+      );
+    }
     if (result.status === "invalid_product") {
       return sendError(
         reply,

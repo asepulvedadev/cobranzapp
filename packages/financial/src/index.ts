@@ -122,6 +122,33 @@ function centsFromNumber(value: number) {
   return BigInt(Math.round(value));
 }
 
+function allocateInterestFirst(periods: SchedulePeriod[], principal: bigint) {
+  let remainingInterest = periods.reduce(
+    (total, period) => total + parseCents(period.interest),
+    0n,
+  );
+  let remainingPrincipal = principal;
+
+  return periods.map((period, index) => {
+    const installment = parseCents(period.installment);
+    const interest = remainingInterest < installment ? remainingInterest : installment;
+    const availableForPrincipal = installment - interest;
+    const principalPart =
+      index === periods.length - 1 || remainingPrincipal < availableForPrincipal
+        ? remainingPrincipal
+        : availableForPrincipal;
+    remainingInterest -= interest;
+    remainingPrincipal -= principalPart;
+    return {
+      ...period,
+      principal: formatCents(principalPart),
+      interest: formatCents(interest),
+      installment: formatCents(principalPart + interest),
+      balance: formatCents(remainingPrincipal),
+    };
+  });
+}
+
 /**
  * Builds a preview only. It never posts a loan, payment, journal or receipt.
  * The owner controls the product rate and frequency; every installment is rounded
@@ -199,8 +226,15 @@ export function buildSchedulePreview(input: SchedulePreviewInput): SchedulePrevi
     }
   }
 
-  const interestTotal = periods.reduce((sum, period) => sum + parseCents(period.interest), 0n);
-  const scheduledTotal = periods.reduce((sum, period) => sum + parseCents(period.installment), 0n);
+  const interestFirstPeriods = allocateInterestFirst(periods, principal);
+  const interestTotal = interestFirstPeriods.reduce(
+    (sum, period) => sum + parseCents(period.interest),
+    0n,
+  );
+  const scheduledTotal = interestFirstPeriods.reduce(
+    (sum, period) => sum + parseCents(period.installment),
+    0n,
+  );
   return {
     currency: "COP",
     principal: formatCents(principal),
@@ -213,6 +247,6 @@ export function buildSchedulePreview(input: SchedulePreviewInput): SchedulePrevi
       input.rateBasis === "effective_annual"
         ? formatRate(periodicRatePercent(rate, input.paymentFrequency))
         : formatRate(ratePercent),
-    periods,
+    periods: interestFirstPeriods,
   };
 }

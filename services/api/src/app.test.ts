@@ -881,6 +881,44 @@ describe("borrower creation security", () => {
   });
 });
 
+describe("loan application creation", () => {
+  it("requires an approved customer before creating credit", async () => {
+    const createApplication = vi.fn(async () => ({ status: "borrower_not_verified" as const }));
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => tenantOwner) },
+        creditService: { createApplication } as unknown as CreditService,
+      }),
+    );
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/loan-applications",
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+      },
+      payload: {
+        borrowerId: "2a1eeaa6-50b3-470d-b708-067207aacddd",
+        loanProductId: "56d33f0e-b1a8-4a55-9061-2ccf283ce0f5",
+        requestedPrincipal: "300000",
+        paymentFrequency: "daily",
+        requestedTermCount: 30,
+        purpose: null,
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      error: {
+        code: "BORROWER_NOT_VERIFIED",
+        message: "Aprueba la identidad del cliente antes de crearle un crédito.",
+      },
+    });
+  });
+});
+
 describe("loan application review queue", () => {
   it("allows an owner to start review after recent reauthentication", async () => {
     const application = {
@@ -1039,8 +1077,11 @@ describe("owner credit analytics", () => {
     period: { from: "2026-10-01", to: "2026-10-16", preset: "month" },
     metrics: {
       activePrincipalOutstanding: "850000.00",
+      activeInterestOutstanding: "170000.00",
       approvedPrincipal: "1200000.00",
       collectedAmount: "350000.00",
+      collectedInterest: "70000.00",
+      weightedAverageNominalRate: "20.00",
       renewalCount: 3,
       activeCreditCount: 8,
     },

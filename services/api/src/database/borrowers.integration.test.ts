@@ -142,30 +142,17 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
     });
     expect(product.status).toBe("created");
     if (product.status !== "created") throw new Error("Loan product was not created");
-    const application = await creditService.createApplication(actor, tenantId, {
-      borrowerId: created.borrower.id,
-      loanProductId: product.product.id,
-      requestedPrincipal: "400000",
-      paymentFrequency: "daily",
-      requestedTermCount: 30,
-      purpose: null,
-      requestId: "loan-application-create-test",
-    });
-    expect(application).toMatchObject({
-      status: "created",
-      application: { requestedPrincipal: "400000.00", status: "active" },
-    });
-    const applicationAudit = await ownerPool.query<{ metadata: Record<string, unknown> }>(
-      `SELECT metadata FROM audit_events
-        WHERE tenant_id = $1 AND request_id = 'loan-application-create-test'`,
-      [tenantId],
-    );
-    expect(applicationAudit.rows[0]?.metadata).toMatchObject({
-      status: "active",
-      actorRole: "owner",
-      requestedPrincipal: 400000,
-      nominalRate: 20,
-    });
+    await expect(
+      creditService.createApplication(actor, tenantId, {
+        borrowerId: created.borrower.id,
+        loanProductId: product.product.id,
+        requestedPrincipal: "400000",
+        paymentFrequency: "daily",
+        requestedTermCount: 30,
+        purpose: null,
+        requestId: "unverified-loan-application-test",
+      }),
+    ).resolves.toEqual({ status: "borrower_not_verified" });
 
     const documentKeyPrefix = `tenant/${tenantId}/borrowers/${created.borrower.id}/documents`;
     for (const document of [
@@ -191,6 +178,30 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
     expect(reviewed).toMatchObject({
       status: "updated",
       borrower: { identity: { verificationState: "reviewed" } },
+    });
+    const application = await creditService.createApplication(actor, tenantId, {
+      borrowerId: created.borrower.id,
+      loanProductId: product.product.id,
+      requestedPrincipal: "400000",
+      paymentFrequency: "daily",
+      requestedTermCount: 30,
+      purpose: null,
+      requestId: "loan-application-create-test",
+    });
+    expect(application).toMatchObject({
+      status: "created",
+      application: { requestedPrincipal: "400000.00", status: "active" },
+    });
+    const applicationAudit = await ownerPool.query<{ metadata: Record<string, unknown> }>(
+      `SELECT metadata FROM audit_events
+        WHERE tenant_id = $1 AND request_id = 'loan-application-create-test'`,
+      [tenantId],
+    );
+    expect(applicationAudit.rows[0]?.metadata).toMatchObject({
+      status: "active",
+      actorRole: "owner",
+      requestedPrincipal: 400000,
+      nominalRate: 20,
     });
   });
 });
