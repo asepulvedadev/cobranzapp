@@ -46,7 +46,7 @@ Discuss one decision at a time. Jurisdiction and a reported loan example are rec
 - [x] Mobile-first experience, multi-tenant branding/settings/onboarding, and proposed architecture are documented.
 - [x] A logical PostgreSQL blueprint and financial/isolation invariants are provided.
 - [x] Manual document capture, deep analytics, deterministic automation boundaries, and VPS/recovery plan are included.
-- [x] The no-generative-AI requirement replaces the earlier Hermes direction; deterministic Tesseract OCR is allowed only as an assistive suggestion with mandatory human confirmation.
+- [x] Dedicated Hermes OCR profile and Colombian-ID skill extract all legible front/back fields; mandatory human confirmation remains the gate and no credit decision is delegated to the model.
 - [x] Assumptions are explicit and distinct from requirements and approved decisions.
 - [x] Technical constraints are checked against primary documentation; the current operational pilot is implemented within the protected scope below, while accounting, custody, offline money capture, and full reporting remain gated.
 - [x] Documentation is separated by responsibility; visual design is isolated in `design.md`.

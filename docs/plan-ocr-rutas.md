@@ -21,7 +21,8 @@ guardan direcciones y coordenadas, pero Waze sigue siendo la navegación final.
 
 ### 2. OCR con confirmación — implementada en el VPS
 
-- El worker procesa imágenes y la primera página de PDF con Tesseract 5.5 y español.
+- El agente Hermes dedicado procesa imágenes; el worker convierte la primera página de PDF antes de enviarla al mismo agente.
+- La skill de cédula colombiana extrae nombres, apellidos, NUIP, nacionalidad, nacimiento, sexo, estatura, RH, expedición, vencimiento, serial, MRZ y código legible, sin inventar valores.
 - El procesamiento es asíncrono mediante `outbox_events`, sin bloquear el alta.
 - Se extraen sugerencias de nombre y número de documento, con confianza estimada.
 - La vista de ficha permite editar y confirmar cada extracción.
@@ -33,7 +34,7 @@ guardan direcciones y coordenadas, pero Waze sigue siendo la navegación final.
 - Tabla de extracciones con estados `pending`, `processing`, `ready`, `confirmed`, `rejected` y `failed`.
 - Cifrado de número completo y campos sensibles.
 - Versión del modelo, confianza, usuario y fecha de confirmación.
-- Hash del texto OCR, auditoría y worker con reintentos.
+- Hash del resultado estructurado, auditoría y worker con reintentos.
 - El almacenamiento de documentos continúa siendo privado en el volumen del VPS.
 
 ### 4. Rutas operativas — base implementada

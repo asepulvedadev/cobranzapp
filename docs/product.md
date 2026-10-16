@@ -13,7 +13,7 @@ Build a mobile-first, multi-tenant loan portfolio and collection management SaaS
 
 **Product promise:** Know who owes what, who collected it, where the money is, and which action needs attention—with auditable numbers rather than spreadsheets or chat messages.
 
-**Latest scope change:** The user explicitly removed generative and autonomous AI. All operations and deep analytics are deterministic; deterministic Tesseract OCR may suggest document fields, but an authorized person must correct and confirm them. Hermes, LLMs, biometrics and authenticity models remain excluded.
+**Latest scope change:** The user approved a narrow Hermes agent for Colombian identity OCR. It may extract and organize all legible fields from the required front and optional back image, but an authorized person must correct and confirm them. Autonomous business decisions, biometrics and authenticity judgments remain excluded.
 
 This is a lending operations product, not an investment marketplace. The initial scope does not include raising public funds, pooled investments, promised investor returns, a banking wallet, or custody of customer money. Any expansion into those activities requires separate product and legal review.
 
@@ -31,7 +31,7 @@ This is a lending operations product, not an investment marketplace. The initial
 | Multi-tenancy | Required | Independent lending business = tenant |
 | Branding, settings, onboarding | Required | Configurable workspace, shared application |
 | PostgreSQL and VPS | Required | Self-hosted application and PostgreSQL |
-| No generative/autonomous AI | Required — latest instruction | No Hermes, LLMs, agents, biometrics, authenticity models or automated decisions; deterministic Tesseract suggestions require human confirmation |
+| Bounded Hermes OCR only | Required — latest instruction | Dedicated document-reading profile and skill; no biometrics, authenticity model or automated business decision; every suggestion requires human confirmation |
 | First market | Confirmed by user | Colombia; other jurisdictions are outside the initial scope |
 | Currency | Confirmed example | Colombian pesos (COP) |
 | Locale and timezone | Confirmed by user | Colombian Spanish (`es-CO`), `America/Bogota` |
@@ -84,7 +84,7 @@ A business subscription for operational control, not a percentage of borrower pa
 
 | Release | Included | Explicitly deferred |
 |---|---|---|
-| First operational pilot | Tenant onboarding, the four approved roles, branding/settings, customer dossier, private document capture with assistive Tesseract OCR, one approved loan model, schedules, collections/receipts, route lists, cash reconciliation, consent-gated verification network, core dashboards, customer receipt view, audit trail | Automated credit approval, external credit bureau reporting, unconsented reputation sharing, native desktop apps |
+| First operational pilot | Tenant onboarding, the four approved roles, branding/settings, customer dossier, private document capture with assistive Hermes OCR, one approved loan model, schedules, collections/receipts, route lists, cash reconciliation, consent-gated verification network, core dashboards, customer receipt view, audit trail | Automated credit approval, external credit bureau reporting, unconsented reputation sharing, native desktop apps |
 | Field reliability and automation | Offline capture/reconciliation if validated as essential, manual document review, optional validated non-model barcode parsing, map provider integration, controlled notifications, imports, richer supervisor workflows | Guaranteed background sync, continuous employee tracking, fully autonomous collection |
 | Deep analytics and systematization | Cohorts, trend reports, explicit exception thresholds, deterministic scenarios, scheduled reports and task workflows | AI, machine learning, automatic loan denial, unrestricted rule execution |
 | Expansion after evidence | Payment integrations, borrower portal, advanced routing, multiple approved loan products, dedicated tenant infrastructure | Banking/custody or capital marketplace without separate approval |

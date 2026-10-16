@@ -138,19 +138,20 @@ financieras exactas. Las renovaciones siguen la misma regla: una renovación cre
 cierra el crédito anterior hasta que sea aprobada. Esta aprobación es operativa; no prueba un
 desembolso, un recibo de dinero ni un asiento contable.
 
-## Document capture and deterministic OCR
+## Document capture and Hermes OCR
 
-The web and VPS worker now support **deterministic Tesseract OCR** for the first page of an
-identity image or PDF. This is an assistive extraction only: it is not a generative model,
-does not assert authenticity and never changes identity fields without a human confirmation.
+The web, mobile app and VPS worker use a dedicated **Hermes OCR agent** for identity images. The
+worker converts the first page of a PDF before calling the same agent. Its isolated profile has no
+operational tools and follows the Colombian-ID extraction skill. It does not assert authenticity,
+perform biometrics or change identity fields without human confirmation.
 
-Flow: `Authorized camera/file capture → Private quarantine → File checks → Tesseract suggestion → Manual correction → Human review → Verified fields`.
+Flow: `Authorized camera/file capture → File checks → Hermes structured extraction → Form autofill → Manual correction → Human review → Verified fields`.
 
-- Support guided front/back camera capture and file upload, crop/rotation, explicit reshoot, and manual entry. No model-based blur/glare detection is assumed.
-- Capture document country/type/number and required legal-name fields; OCR suggestions remain encrypted and editable until confirmation.
+- Support guided front/back camera capture, file upload, explicit reshoot and manual entry. Quality warnings are advisory.
+- Extract every legible front/back field, including machine-readable lines when available. Suggestions remain encrypted and editable until confirmation.
 - Require a second reviewer where the approved risk/identity policy calls for one; apply normalization and tenant-local exact duplicate checks deterministically.
-- Barcode/QR parsing is a possible non-AI convenience only if the target document exposes a supported format and its use is approved. Use a selected non-model decoder and explicit field mapping; never assume jurisdiction-wide coverage or identity authenticity.
-- Minimize collected fields; avoid face matching, biometrics, document fraud models, and third-party AI extraction services.
+- Preserve MRZ/barcode content only when Hermes can read it reliably; never treat it as proof of authenticity.
+- Limit access and retention even when all document fields are extracted; avoid face matching, biometrics and document-fraud decisions.
 - File integrity, actual content-type validation, size limits, quarantine/scanning, private access and retention remain mandatory without AI.
 - Pilot validation measures entry errors, correction frequency, capture failure rate, OCR confidence and reviewer time. Confidence is only a heuristic for prioritization, never proof of identity.
 

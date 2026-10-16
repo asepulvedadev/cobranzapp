@@ -18,6 +18,7 @@ Provisional capacity hypothesis: 4 vCPU, 8–16 GB RAM, SSD storage sized from d
 - Build images in CI, pin digests, run non-root where supported, drop capabilities, restrict mounts/network egress, and do not expose the Docker socket to application services.
 - Keep secrets out of Git, images, logs, and mobile binaries; use restricted runtime secret delivery and a rotation/recovery procedure.
 - Mount the private borrower-document volume at `/var/lib/cobranzapp/documents`; it is quarantine storage only until the approved antivirus and off-site/versioned object-backup provider is connected.
+- Run the dedicated `hermes-cobranzapp-ocr.service` outside the application containers on port 8650. UFW permits only the CobranzApp Docker subnets, and the API server requires its own bearer key. Configure `HERMES_OCR_URL`, `HERMES_OCR_API_KEY` and `HERMES_OCR_TIMEOUT_MS` only in the production secret environment.
 - Health/readiness checks, restart policy, resource limits, structured redacted logs, metrics, alerts, and dependency patching.
 - Caddy provides automatic HTTPS under documented prerequisites; certificate/DNS/renewal operations still need monitoring. [Caddy HTTPS](https://caddyserver.com/docs/automatic-https)
 - Compose can support an initial production setup, but it does not make one host highly available. [Docker Compose production guidance](https://docs.docker.com/compose/how-tos/production/)

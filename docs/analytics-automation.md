@@ -30,7 +30,7 @@ Every report states filters, timezone, currency, as-of time, accounting basis, a
 
 ## Deterministic systematization and automation — no AI
 
-**Confirmed constraint:** No Hermes, conversational assistant, LLM, autonomous agent, learned credit scoring, vector/RAG service, trained anomaly model, or model-based OCR. Do not leave placeholder AI infrastructure or unused AI tables/providers in the future implementation.
+**Confirmed constraint:** Hermes is allowed only in the isolated identity OCR path. It may extract document text but cannot approve customers, score credit, perform biometrics, judge authenticity, or automate collections. Conversational assistants, learned credit scoring, vector/RAG services and autonomous business decisions remain excluded.
 
 Systematization means explicit, testable business workflows: `Event or schedule → Approved rule version → Validated scope/state → Permitted action → Audit/result`.
 

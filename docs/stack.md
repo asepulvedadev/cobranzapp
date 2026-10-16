@@ -3,7 +3,7 @@
 > **Status:** Engineering foundation v0.6; the current web/API/worker/VPS stack is installed and deployed.
 > **Updated:** 2026-10-13.
 
-Owns technology choices, alternatives, compatibility constraints and distribution boundaries. The Node/TypeScript, Next.js, Fastify, Expo, PostgreSQL, Docker Compose, and Caddy-compatible foundation is installed. The production pilot uses private VPS file storage, deterministic Tesseract OCR, on-demand Nominatim geocoding and Waze links; native offline encrypted persistence, external route optimization and notifications remain optional work.
+Owns technology choices, alternatives, compatibility constraints and distribution boundaries. The Node/TypeScript, Next.js, Fastify, Expo, PostgreSQL, Docker Compose, and Caddy-compatible foundation is installed. The production pilot uses private VPS file storage, an isolated Hermes OCR agent, on-demand Nominatim geocoding and Waze links; native offline encrypted persistence, external route optimization and notifications remain optional work.
 
 ## Proposed technology stack and tradeoffs
 
@@ -19,7 +19,7 @@ These are recommendations, not installations or final commitments. Pin supported
 | Data layer | PostgreSQL + Drizzle with reviewed SQL migrations | Relational integrity, explicit queries, and typed access; RLS and accounting constraints still need SQL/testing |
 | Identity | Self-hosted Keycloak via OIDC | Avoid custom password/MFA implementation; adds memory, patching, email, and operational work |
 | Background work | PostgreSQL outbox/job tables + dedicated worker | Durable tasks without an initial Redis dependency; retries, leases, and dead-letter handling require design |
-| Document capture | Camera/file acquisition + deterministic Tesseract assistive OCR + manual review | OCR only suggests fields; human confirmation remains mandatory and it is not an authenticity decision |
+| Document capture | Camera/file acquisition + isolated Hermes OCR profile/skill + manual review | Extracts all legible Colombian-ID fields; human confirmation remains mandatory and it is not an authenticity decision |
 | Document storage | Private VPS object/file storage with scoped keys and quarantine | Keeps binaries out of relational tables while the pilot runs on one VPS; off-host replication remains a launch hardening item |
 | Business automation | Typed application rules + schedules + PostgreSQL outbox/jobs | Reproducible conditions/actions with audit, approvals and limits; no agent runtime |
 | VPS | Docker Compose + Caddy + dedicated PostgreSQL volume | Simple initial operations; a single VPS is a failure domain, not high availability |

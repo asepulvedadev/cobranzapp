@@ -2,7 +2,7 @@
 
 > **Estado:** Piloto operativo v0.6. Actualizada el 2026-10-13. El monorepositorio, las aplicaciones web y móvil, la API, el procesador de tareas, PostgreSQL, la entrega con contenedores y el despliegue directo al VPS están implementados. El OCR asistivo, las direcciones geocodificadas y las rutas con Waze están activos; la contabilidad y el desembolso siguen condicionados por las aprobaciones de la hoja de ruta.
 
-Plataforma móvil y multiempresa para gestionar créditos y cobranzas de prestamistas independientes en **Colombia**, sin IA generativa ni decisiones autónomas. Este índice reemplaza el anterior documento único de diseño. La estructura documental está confirmada; las propuestas tecnológicas y de producto no se consideran aprobadas salvo indicación explícita.
+Plataforma móvil y multiempresa para gestionar créditos y cobranzas de prestamistas independientes en **Colombia**. Hermes se usa únicamente como OCR asistivo para organizar datos de cédulas; no toma decisiones crediticias ni reemplaza la revisión humana. Este índice reemplaza el anterior documento único de diseño.
 
 ## Documento responsable de cada decisión
 
@@ -37,7 +37,7 @@ Plataforma móvil y multiempresa para gestionar créditos y cobranzas de prestam
 
 - El nombre de la aplicación es **cobranzapp**. El isotipo y el logotipo geométrico están aprobados. Los archivos transparentes están en `assets/brand-app/`.
 - El mercado inicial es Colombia, la moneda de referencia es COP, el idioma público es español colombiano (`es-CO`) y la zona horaria es `America/Bogota`.
-- No se usarán Hermes, asistentes, modelos de lenguaje, biometría ni decisiones automatizadas. El alta y la revisión siguen siendo manuales; el worker puede proponer campos mediante Tesseract OCR determinista, siempre con confirmación humana.
+- Hermes OCR puede leer el frente obligatorio y el reverso opcional, organizar todos los campos legibles y rellenar el formulario. No realiza biometría, autenticidad ni decisiones automatizadas; el operador debe corregir y confirmar antes de guardar.
 - Ejemplo reportado: COP 100.000 nominales, COP 10.000 retenidos por documentación, COP 90.000 entregados y COP 130.000 de pago futuro total.
 - Frecuencias reportadas: 30 cuotas diarias, dos cuotas quincenales o un pago al final del mes.
 - Cobradores y supervisores trabajan en campo y necesitan acceso limitado a la información del cliente y sus direcciones.
