@@ -30,7 +30,7 @@ Every report states filters, timezone, currency, as-of time, accounting basis, a
 
 ## Deterministic systematization and automation — no AI
 
-**Confirmed constraint:** Hermes is allowed only in the isolated identity OCR path. It may extract document text but cannot approve customers, score credit, perform biometrics, judge authenticity, or automate collections. Conversational assistants, learned credit scoring, vector/RAG services and autonomous business decisions remain excluded.
+**Confirmed constraint:** Hermes is limited to two isolated, narrow paths: identity-field extraction and ordering preselected route stops from opaque IDs and coordinates. It cannot approve customers, select who is due, score credit, perform biometrics, judge authenticity, record payments, change balances, or make autonomous collection decisions. The worker owns deterministic due-date selection and validates every returned route permutation; conversational assistants, learned credit scoring, vector/RAG services and autonomous business decisions remain excluded.
 
 Systematization means explicit, testable business workflows: `Event or schedule → Approved rule version → Validated scope/state → Permitted action → Audit/result`.
 
