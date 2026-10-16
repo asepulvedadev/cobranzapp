@@ -57,7 +57,7 @@ function splitAddress(value: string) {
 }
 
 const CREATE_STEPS = [
-  { label: "Identidad", detail: "Datos y documentos" },
+  { label: "Documento", detail: "Fotos y lectura" },
   { label: "Contacto", detail: "Teléfonos y direcciones" },
   { label: "Referencias", detail: "Personas de confianza" },
   { label: "Revisión", detail: "Confirma y guarda" },
@@ -171,6 +171,7 @@ export function BorrowerDirectory({
   const [includeSecondContact, setIncludeSecondContact] = useState(false);
   const [homeAddressConfirmed, setHomeAddressConfirmed] = useState(false);
   const [workAddressConfirmed, setWorkAddressConfirmed] = useState(false);
+  const [identityConfirmed, setIdentityConfirmed] = useState(false);
   const [createStep, setCreateStep] = useState(1);
   const [createdBorrowerId, setCreatedBorrowerId] = useState<string | null>(null);
   const [uploadedDocumentFields, setUploadedDocumentFields] = useState<string[]>([]);
@@ -182,6 +183,9 @@ export function BorrowerDirectory({
   const [ocrMessage, setOcrMessage] = useState("");
   const ocrRunRef = useRef(0);
   const createFormRef = useRef<HTMLFormElement>(null);
+  const hasIdentityDocumentPhotos = Boolean(
+    selectedUploadNames.identityFront && selectedUploadNames.identityBack,
+  );
 
   function closeCreateModal(force = false) {
     if (isSubmitting && !force) return;
@@ -196,6 +200,7 @@ export function BorrowerDirectory({
     setIncludeSecondContact(false);
     setHomeAddressConfirmed(false);
     setWorkAddressConfirmed(false);
+    setIdentityConfirmed(false);
     setCreateStep(1);
   }
 
@@ -213,6 +218,11 @@ export function BorrowerDirectory({
     setMessage("");
     setIsError(false);
     if (file && (field === "identityFront" || field === "identityBack")) {
+      setIdentityConfirmed(false);
+      const nameInput = createFormRef.current?.elements.namedItem("fullName");
+      const numberInput = createFormRef.current?.elements.namedItem("documentNumber");
+      if (nameInput instanceof HTMLInputElement) nameInput.value = "";
+      if (numberInput instanceof HTMLInputElement) numberInput.value = "";
       const otherField = field === "identityFront" ? "identityBack" : "identityFront";
       const otherElement = createFormRef.current?.elements.namedItem(otherField);
       const otherFile = otherElement instanceof HTMLInputElement ? otherElement.files?.[0] : null;
@@ -247,18 +257,10 @@ export function BorrowerDirectory({
       const backResult = await worker.recognize(back);
       if (run !== ocrRunRef.current) return;
       const fields = extractOcrIdentityFields(`${frontResult.data.text}\n${backResult.data.text}`);
-      if (fields.fullName) {
-        const nameInput = createFormRef.current?.elements.namedItem("fullName");
-        if (nameInput instanceof HTMLInputElement && !nameInput.value.trim()) {
-          nameInput.value = fields.fullName;
-        }
-      }
-      if (fields.documentNumber) {
-        const numberInput = createFormRef.current?.elements.namedItem("documentNumber");
-        if (numberInput instanceof HTMLInputElement && !numberInput.value.trim()) {
-          numberInput.value = fields.documentNumber;
-        }
-      }
+      const nameInput = createFormRef.current?.elements.namedItem("fullName");
+      const numberInput = createFormRef.current?.elements.namedItem("documentNumber");
+      if (nameInput instanceof HTMLInputElement) nameInput.value = fields.fullName;
+      if (numberInput instanceof HTMLInputElement) numberInput.value = fields.documentNumber;
       const foundCount = Number(Boolean(fields.fullName)) + Number(Boolean(fields.documentNumber));
       setOcrStatus(foundCount === 2 ? "ready" : foundCount === 1 ? "partial" : "error");
       setOcrMessage(
@@ -282,7 +284,7 @@ export function BorrowerDirectory({
 
   function validateCreateStep(step: number) {
     const errors: Record<number, string> = {
-      1: "Completa el nombre, número y las imágenes del documento antes de continuar.",
+      1: "Adjunta las fotos, revisa el nombre y el número detectados y confirma que coinciden con el documento.",
       2: "Completa el celular, WhatsApp, cada dirección y su barrio/municipio; luego confirma que fueron verificadas con el cliente.",
       3: "Registra al menos una referencia y el consentimiento del cliente.",
     };
@@ -293,7 +295,12 @@ export function BorrowerDirectory({
       const hasFiles = files.every(
         (element) => element instanceof HTMLInputElement && element.files?.[0],
       );
-      if (!fieldValue("fullName") || !fieldValue("documentNumber") || !hasFiles) {
+      if (
+        !fieldValue("fullName") ||
+        !fieldValue("documentNumber") ||
+        !hasFiles ||
+        !identityConfirmed
+      ) {
         setMessage(errors[step]);
         setIsError(true);
         return false;
@@ -457,6 +464,13 @@ export function BorrowerDirectory({
     setIsError(false);
     setIsSubmitting(true);
     const form = new FormData(event.currentTarget);
+    if (!identityConfirmed) {
+      setCreateStep(1);
+      setMessage("Vuelve a revisar y confirmar los datos detectados en el documento.");
+      setIsError(true);
+      setIsSubmitting(false);
+      return;
+    }
     const requiredFiles = ["identityFront", "identityBack", "profilePhoto"];
     if (
       requiredFiles.some((field) => {
@@ -885,8 +899,8 @@ export function BorrowerDirectory({
             <div>
               <span className="panel-eyebrow">Registro guiado · 4 pasos</span>
               <p>
-                Completa lo esencial primero. Puedes volver atrás sin perder los datos y las
-                imágenes quedan privadas para revisión.
+                Empieza con las fotos del documento. La app leerá los datos y te pedirá confirmarlos
+                antes de continuar. Las imágenes quedan privadas para revisión.
               </p>
             </div>
             <span className="borrower-step-counter">Paso {createStep} de 4</span>
@@ -932,33 +946,15 @@ export function BorrowerDirectory({
             <section aria-labelledby="borrower-step-document" hidden={createStep !== 1}>
               <div className="borrower-section-heading">
                 <div>
-                  <span className="borrower-section-kicker">Paso 1 · Identidad</span>
-                  <h3 id="borrower-step-document">¿Quién es tu cliente?</h3>
+                  <span className="borrower-section-kicker">Paso 1 · Documento</span>
+                  <h3 id="borrower-step-document">Primero, toma las fotos</h3>
                 </div>
                 <span className="borrower-required-note">Todo es obligatorio</span>
               </div>
               <p className="borrower-section-help">
-                Captura frente y reverso desde el celular. El OCR se ejecutará en segundo plano; sus
-                sugerencias siempre deben confirmarse manualmente.
+                Captura el frente y el reverso de la cédula. Cuando estén listas, completaremos el
+                nombre y el número debajo para que los verifiques.
               </p>
-              <div className="borrower-form-grid borrower-form-grid-identity">
-                <label className="borrower-field borrower-field-wide" htmlFor="borrower-full-name">
-                  Nombre completo
-                  <input id="borrower-full-name" name="fullName" maxLength={160} />
-                </label>
-                <label className="borrower-field">
-                  Tipo
-                  <select defaultValue="CC" name="documentType">
-                    <option value="CC">Cédula de ciudadanía</option>
-                    <option value="CE">Cédula de extranjería</option>
-                    <option value="PPT">Permiso por protección temporal</option>
-                  </select>
-                </label>
-                <label className="borrower-field">
-                  Número de documento
-                  <input name="documentNumber" inputMode="numeric" maxLength={32} />
-                </label>
-              </div>
               <div className="borrower-upload-grid">
                 <label
                   className={`borrower-upload-card${selectedUploadNames.identityFront ? " is-selected" : ""}`}
@@ -971,7 +967,7 @@ export function BorrowerDirectory({
                   </strong>
                   <small>{selectedUploadNames.identityFront ?? "Foto nítida, sin reflejos"}</small>
                   <input
-                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                    accept="image/jpeg,image/png,image/webp"
                     capture="environment"
                     name="identityFront"
                     onChange={(event) => selectUpload(event, "identityFront")}
@@ -994,7 +990,7 @@ export function BorrowerDirectory({
                     {selectedUploadNames.identityBack ?? "Incluye todos los datos visibles"}
                   </small>
                   <input
-                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                    accept="image/jpeg,image/png,image/webp"
                     capture="environment"
                     name="identityBack"
                     onChange={(event) => selectUpload(event, "identityBack")}
@@ -1044,6 +1040,69 @@ export function BorrowerDirectory({
                   </div>
                 </div>
               ) : null}
+              {hasIdentityDocumentPhotos ? (
+                <div className="borrower-identity-review">
+                  <div>
+                    <span className="borrower-section-kicker">Datos detectados</span>
+                    <h4>Verifica antes de continuar</h4>
+                    <p>
+                      Corrige cualquier error de lectura. Estos datos se usarán para identificar al
+                      cliente.
+                    </p>
+                  </div>
+                  <div className="borrower-form-grid borrower-form-grid-identity">
+                    <label
+                      className="borrower-field borrower-field-wide"
+                      htmlFor="borrower-full-name"
+                    >
+                      Nombre completo
+                      <input
+                        disabled={ocrStatus === "processing"}
+                        id="borrower-full-name"
+                        maxLength={160}
+                        name="fullName"
+                        onChange={() => setIdentityConfirmed(false)}
+                      />
+                    </label>
+                    <label className="borrower-field">
+                      Tipo
+                      <select
+                        defaultValue="CC"
+                        disabled={ocrStatus === "processing"}
+                        name="documentType"
+                        onChange={() => setIdentityConfirmed(false)}
+                      >
+                        <option value="CC">Cédula de ciudadanía</option>
+                        <option value="CE">Cédula de extranjería</option>
+                        <option value="PPT">Permiso por protección temporal</option>
+                      </select>
+                    </label>
+                    <label className="borrower-field">
+                      Número de documento
+                      <input
+                        disabled={ocrStatus === "processing"}
+                        inputMode="numeric"
+                        maxLength={32}
+                        name="documentNumber"
+                        onChange={() => setIdentityConfirmed(false)}
+                      />
+                    </label>
+                  </div>
+                  <label className="checkbox-row borrower-identity-confirmation">
+                    <input
+                      checked={identityConfirmed}
+                      disabled={ocrStatus === "processing"}
+                      onChange={(event) => setIdentityConfirmed(event.target.checked)}
+                      type="checkbox"
+                    />
+                    <span>Confirmo que el nombre y el documento coinciden con las fotos.</span>
+                  </label>
+                </div>
+              ) : (
+                <div className="borrower-photo-gate" role="status">
+                  Adjunta frente y reverso para leer automáticamente los datos del cliente.
+                </div>
+              )}
               <div className="borrower-inline-tip">
                 <span aria-hidden="true">i</span>
                 <span>
@@ -1236,8 +1295,12 @@ export function BorrowerDirectory({
                 </button>
               ) : null}
               {createStep < 4 ? (
-                <button onClick={nextCreateStep} type="button">
-                  Continuar
+                <button
+                  disabled={createStep === 1 && ocrStatus === "processing"}
+                  onClick={nextCreateStep}
+                  type="button"
+                >
+                  {createStep === 1 ? "Confirmar identidad y continuar" : "Continuar"}
                 </button>
               ) : (
                 <button className="borrower-submit-button" disabled={isSubmitting} type="submit">

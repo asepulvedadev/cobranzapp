@@ -5061,6 +5061,60 @@ html:has(.panel-shell) {
   background: #c17e00;
 }
 
+.borrower-photo-gate {
+  padding: 12px 14px;
+  border: 1px solid var(--panel-line);
+  border-radius: 11px;
+  background: #f7f8f7;
+  color: var(--panel-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.borrower-identity-review {
+  display: grid;
+  gap: 14px;
+  margin-top: 4px;
+  padding: 16px;
+  border: 1px solid #b8d9c6;
+  border-radius: 14px;
+  background: #f7fcf9;
+}
+
+.borrower-identity-review h4 {
+  margin: 0;
+  color: var(--panel-ink);
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.borrower-identity-review > div:first-child > p {
+  margin: 4px 0 0;
+  color: var(--panel-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.borrower-identity-review input:disabled,
+.borrower-identity-review select:disabled {
+  background-color: #eef1ee;
+  cursor: wait;
+  opacity: 0.76;
+}
+
+.borrower-identity-confirmation {
+  min-height: 48px;
+  padding: 11px 12px;
+  border: 1px solid #a9ccb8;
+  border-radius: 10px;
+  background: #fff;
+  color: #155f3d;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .borrower-inline-tip {
   display: flex;
   align-items: flex-start;
