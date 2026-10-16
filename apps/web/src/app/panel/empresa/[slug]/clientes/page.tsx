@@ -4,12 +4,23 @@ import type { CSSProperties } from "react";
 import type { BorrowerDirectory } from "../../../../../lib/platform";
 import { serverApi } from "../../../../../lib/server-api";
 import { BorrowerDirectory as BorrowerDirectoryView } from "../BorrowerDirectory";
+import { borrowerDirectoryApiPath, parseBorrowerDirectoryQuery } from "../borrower-directory-query";
 import { loadTenantContext } from "../tenant-context";
 
 export const metadata: Metadata = { title: "Clientes" };
 
-export default async function CustomersPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function CustomersPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{
+    cliente?: string | string[];
+    paginaCliente?: string | string[];
+  }>;
+}) {
   const { slug } = await params;
+  const { page, search } = parseBorrowerDirectoryQuery(await searchParams);
   const { overview } = await loadTenantContext(slug);
   if (
     overview.actorRole !== "owner" &&
@@ -18,9 +29,7 @@ export default async function CustomersPage({ params }: { params: Promise<{ slug
   ) {
     notFound();
   }
-  const response = await serverApi(
-    `/v1/tenants/${overview.tenant.id}/borrowers?page=1&pageSize=20`,
-  );
+  const response = await serverApi(borrowerDirectoryApiPath(overview.tenant.id, search, page));
   const directory = response.ok ? ((await response.json()) as BorrowerDirectory) : null;
   const brandStyle = {
     "--tenant-brand-primary": overview.settings.primaryColor,
@@ -46,7 +55,7 @@ export default async function CustomersPage({ params }: { params: Promise<{ slug
             }
             canReview={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
             directory={directory}
-            search=""
+            search={search}
             tenantSlug={slug}
             tenantId={overview.tenant.id}
           />

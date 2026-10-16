@@ -15,6 +15,7 @@ import { useSensitiveFetch } from "../../ReauthenticationProvider";
 import { BorrowerDocumentUpload } from "./BorrowerDocumentUpload";
 import { BorrowerOcrControl } from "./BorrowerOcrControl";
 import { BorrowerReviewControl } from "./BorrowerReviewControl";
+import { borrowerDirectoryHref } from "./borrower-directory-query";
 import { CollectorBorrowerCard } from "./CollectorBorrowerCard";
 
 function statusLabel(status: Borrower["identity"]["verificationState"]) {
@@ -648,7 +649,11 @@ export function BorrowerDirectory({
           La búsqueda muestra el nombre y los últimos cuatro dígitos. Nunca se expone el número
           completo.
         </p>
-        <form className="tenant-directory-filters" action={`/panel/empresa/${tenantSlug}#clientes`}>
+        <form
+          className="tenant-directory-filters"
+          action={borrowerDirectoryHref(tenantSlug)}
+          method="get"
+        >
           <label>
             <span>Buscar cliente</span>
             <input
@@ -661,7 +666,7 @@ export function BorrowerDirectory({
           </label>
           <div className="tenant-directory-filter-actions">
             <button type="submit">Buscar</button>
-            {search ? <a href={`/panel/empresa/${tenantSlug}#clientes`}>Limpiar</a> : null}
+            {search ? <a href={borrowerDirectoryHref(tenantSlug)}>Limpiar</a> : null}
           </div>
         </form>
         {directory.borrowers.length ? (
@@ -880,12 +885,7 @@ export function BorrowerDirectory({
         {directory.pagination.totalPages > 1 ? (
           <nav className="tenant-directory-pagination" aria-label="Páginas de clientes">
             {directory.pagination.page > 1 ? (
-              <a
-                href={`/panel/empresa/${tenantSlug}?${new URLSearchParams({
-                  ...(search ? { cliente: search } : {}),
-                  paginaCliente: String(directory.pagination.page - 1),
-                })}#clientes`}
-              >
+              <a href={borrowerDirectoryHref(tenantSlug, search, directory.pagination.page - 1)}>
                 Anterior
               </a>
             ) : (
@@ -895,12 +895,7 @@ export function BorrowerDirectory({
               Página {directory.pagination.page} de {directory.pagination.totalPages}
             </strong>
             {directory.pagination.page < directory.pagination.totalPages ? (
-              <a
-                href={`/panel/empresa/${tenantSlug}?${new URLSearchParams({
-                  ...(search ? { cliente: search } : {}),
-                  paginaCliente: String(directory.pagination.page + 1),
-                })}#clientes`}
-              >
+              <a href={borrowerDirectoryHref(tenantSlug, search, directory.pagination.page + 1)}>
                 Siguiente
               </a>
             ) : (
