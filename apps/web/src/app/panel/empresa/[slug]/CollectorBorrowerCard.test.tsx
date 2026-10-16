@@ -131,7 +131,7 @@ describe("CollectorBorrowerCard", () => {
     expect(html).toContain("Crear crédito");
     expect(html).toContain("Llamar");
     expect(html).toContain("WhatsApp");
-    expect(html).toContain("Ver ficha y direcciones");
+    expect(html).toContain("Ver perfil completo");
     expect(html).toContain('aria-label="Ver fotos de Laura Walteros"');
     expect(html).toContain(
       "/api/v1/tenants/4cde1a7b-46d3-4405-914f-6e4b9aeed985/borrowers/2a1eeaa6-50b3-470d-b708-067207aacddd/documents/73d33f0e-b1a8-4a55-9061-2ccf283ce0f5",
@@ -141,5 +141,30 @@ describe("CollectorBorrowerCard", () => {
     expect(html).not.toContain("Usar GPS");
     expect(html).not.toContain(">Ubicar<");
     expect(html).not.toContain("1.234.567.890");
+  });
+
+  it("blocks credit creation until the customer is approved", () => {
+    const html = renderToStaticMarkup(
+      <ReauthenticationProvider username="cobrador">
+        <CollectorBorrowerCard
+          borrower={{
+            ...borrower,
+            identity: { ...borrower.identity, verificationState: "manual_pending" },
+          }}
+          creditHref={null}
+          documentTools={<span>Agregar documento</span>}
+          homeWazeHref="https://waze.example/home"
+          onEditAddresses={vi.fn()}
+          reviewTools={<span>Aprobar cliente</span>}
+          tenantId="4cde1a7b-46d3-4405-914f-6e4b9aeed985"
+          whatsappHref="https://wa.me/573005551212"
+          workWazeHref="https://waze.example/work"
+        />
+      </ReauthenticationProvider>,
+    );
+
+    expect(html).toContain("Aprueba al cliente para crear crédito");
+    expect(html).toContain("Ver perfil y aprobar");
+    expect(html).not.toContain('href="/creditos');
   });
 });

@@ -48,15 +48,17 @@ export function CollectorBorrowerCard({
   workWazeHref,
   onEditAddresses,
   documentTools,
+  reviewTools,
 }: {
   borrower: Borrower;
   tenantId: string;
-  creditHref: string;
+  creditHref: string | null;
   whatsappHref: string | null;
   homeWazeHref: string;
   workWazeHref: string;
   onEditAddresses: () => void;
   documentTools: ReactNode;
+  reviewTools?: ReactNode;
 }) {
   const sensitiveFetch = useSensitiveFetch();
   const [isEvidenceOpen, setIsEvidenceOpen] = useState(false);
@@ -135,9 +137,23 @@ export function CollectorBorrowerCard({
         </div>
 
         <div className="collector-client-actions">
-          <a className="collector-client-action collector-client-action-primary" href={creditHref}>
-            Crear crédito
-          </a>
+          {creditHref ? (
+            <a
+              className="collector-client-action collector-client-action-primary"
+              href={creditHref}
+            >
+              Crear crédito
+            </a>
+          ) : (
+            <span
+              aria-disabled="true"
+              className="collector-client-action collector-client-action-primary collector-client-action-disabled"
+            >
+              {borrower.identity.verificationState === "rejected"
+                ? "Corrige y aprueba para crear crédito"
+                : "Aprueba al cliente para crear crédito"}
+            </span>
+          )}
           <a className="collector-client-action" href={phoneHref}>
             Llamar
           </a>
@@ -162,7 +178,11 @@ export function CollectorBorrowerCard({
         </div>
 
         <details className="collector-client-details">
-          <summary>Ver ficha y direcciones</summary>
+          <summary>
+            {reviewTools && borrower.identity.verificationState !== "reviewed"
+              ? "Ver perfil y aprobar"
+              : "Ver perfil completo"}
+          </summary>
           <div className="collector-client-details-body">
             <section className="collector-client-address">
               <div>
@@ -213,6 +233,9 @@ export function CollectorBorrowerCard({
               <small>{borrower.documents.length} archivo(s) privado(s)</small>
               {documentTools}
             </section>
+            {reviewTools ? (
+              <section className="collector-client-review">{reviewTools}</section>
+            ) : null}
           </div>
         </details>
       </article>

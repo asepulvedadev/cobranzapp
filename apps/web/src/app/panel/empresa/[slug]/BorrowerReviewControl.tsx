@@ -46,8 +46,22 @@ export function BorrowerReviewControl({
 
   if (!canReview) return <span className="table-muted">Revisión restringida</span>;
 
+  if (borrower.identity.verificationState === "reviewed") {
+    return (
+      <div className="borrower-review-approved" role="status">
+        <strong>Cliente aprobado</strong>
+        <small>Ya puede recibir créditos.</small>
+      </div>
+    );
+  }
+
   async function submit(event: { preventDefault: () => void }, decision: "reviewed" | "rejected") {
     event.preventDefault();
+    if (decision === "rejected" && notes.trim().length < 10) {
+      setMessage("Escribe el motivo del rechazo con al menos 10 caracteres.");
+      setIsError(true);
+      return;
+    }
     setIsBusy(true);
     setMessage("");
     setIsError(false);
@@ -58,7 +72,7 @@ export function BorrowerReviewControl({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           decision,
-          notes: notes.trim(),
+          notes: notes.trim() || "Identidad aprobada tras revisar la cédula frontal y la selfie.",
           legalNameConfirmed,
           identityFrontConfirmed,
           identityBackConfirmed,
@@ -78,8 +92,15 @@ export function BorrowerReviewControl({
   }
 
   return (
-    <details className="borrower-review-control">
-      <summary>Revisar identidad</summary>
+    <section className="borrower-review-control" aria-label="Aprobación del cliente">
+      <div className="borrower-review-heading">
+        <span>Aprobación</span>
+        <strong>
+          {borrower.identity.verificationState === "rejected"
+            ? "Revisar nuevamente"
+            : "Aprobar cliente"}
+        </strong>
+      </div>
       <div className="borrower-review-body">
         <ul className="borrower-document-checklist">
           {borrower.documents.length ? (
@@ -132,19 +153,18 @@ export function BorrowerReviewControl({
             Confirmo que existe la selfie actual del cliente.
           </label>
           <label>
-            Nota de revisión
+            Nota de revisión <small>(opcional al aprobar)</small>
             <textarea
               minLength={10}
               maxLength={500}
               onChange={(event) => setNotes(event.target.value)}
               placeholder="Describe la evidencia y cualquier corrección solicitada."
-              required
               value={notes}
             />
           </label>
           <div className="borrower-review-actions">
             <button disabled={isBusy} type="submit">
-              {isBusy ? "Guardando…" : "Marcar revisado"}
+              {isBusy ? "Guardando…" : "Aprobar cliente"}
             </button>
             <button
               className="review-reject-button"
@@ -165,6 +185,6 @@ export function BorrowerReviewControl({
           ) : null}
         </form>
       </div>
-    </details>
+    </section>
   );
 }
