@@ -4,8 +4,9 @@ import type {
   LoanApplication,
   LoanProduct,
 } from "@cobranzapp/contracts";
+import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, Text, TextInput, View } from "react-native";
+import { Alert, Linking, Pressable, Text, TextInput, View } from "react-native";
 import { type MobileApi, MobileApiError } from "./api";
 
 const frequencyLabels: Record<LoanProduct["paymentFrequency"], string> = {
@@ -38,6 +39,19 @@ function renewalProgress(application: LoanApplication) {
     application.paidPercentage ??
     Math.min(100, (application.paidInstallments / application.requestedTermCount) * 100)
   );
+}
+
+function formatCop(value: string) {
+  return new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(Number(value));
+}
+
+function whatsappNumber(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length === 10 ? `57${digits}` : digits;
 }
 
 export function CreditWorkspace({
@@ -149,21 +163,64 @@ export function CreditWorkspace({
     }
   }
 
-  async function recordPayment(application: LoanApplication) {
+  async function recordPayment(
+    application: LoanApplication,
+    paymentMethod: "cash" | "transfer",
+    proof?: { uri: string; name: string; type: string },
+  ) {
     setBusyAction(`payment:${application.id}`);
     setMessage("");
     setError(false);
     try {
-      const updated = await api.recordLoanPayment(tenantId, application);
+      const result = await api.recordLoanPayment(tenantId, application, paymentMethod, proof);
+      const updated = result.application;
       setApplications((current) =>
         current.map((item) => (item.id === updated.id ? updated : item)),
       );
-      setMessage(`Cuota ${updated.paidInstallments} registrada.`);
+      setMessage(`Pago de la cuota ${updated.paidInstallments} registrado.`);
+      const borrower = borrowers.find((item) => item.id === application.borrowerId);
+      const phone = borrower?.whatsappPhone ?? borrower?.phone ?? "";
+      Alert.alert(
+        "Pago confirmado",
+        `${formatCop(result.payment.amount)} · saldo restante ${formatCop(result.payment.remainingAmount)}`,
+        [
+          { text: "Cerrar", style: "cancel" },
+          {
+            text: "Enviar por WhatsApp",
+            onPress: () => {
+              const text = `Hola ${application.borrowerName}, aquí está tu comprobante ${result.payment.receiptNumber} por ${formatCop(result.payment.amount)}. Saldo restante: ${formatCop(result.payment.remainingAmount)}. ${result.payment.receiptUrl}`;
+              void Linking.openURL(
+                `https://wa.me/${whatsappNumber(phone)}?text=${encodeURIComponent(text)}`,
+              );
+            },
+          },
+        ],
+      );
     } catch (cause) {
       showError(cause, "No fue posible registrar la cuota.");
     } finally {
       setBusyAction(null);
     }
+  }
+
+  async function chooseTransferProof(application: LoanApplication) {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setMessage("Permite el acceso a fotos para adjuntar la transferencia.");
+      setError(true);
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.85,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    await recordPayment(application, "transfer", {
+      uri: asset.uri,
+      name: asset.fileName ?? `transferencia-${Date.now()}.jpg`,
+      type: asset.mimeType ?? "image/jpeg",
+    });
   }
 
   async function renewLoan(application: LoanApplication) {
@@ -331,11 +388,18 @@ export function CreditWorkspace({
                 disabled={busyAction !== null}
                 onPress={() =>
                   Alert.alert(
-                    "Confirmar avance de cuota",
-                    `Se registrará la cuota ${application.paidInstallments + 1} de ${application.requestedTermCount} para ${application.borrowerName}. Esta acción solo actualiza el avance operativo; no es un recibo financiero ni confirma la recepción de dinero.`,
+                    "Registrar pago",
+                    `${formatCop(application.nextPaymentAmount ?? application.installmentAmount)} · cuota ${application.paidInstallments + 1} de ${application.requestedTermCount}. ¿Cómo pagó ${application.borrowerName}?`,
                     [
                       { text: "Cancelar", style: "cancel" },
-                      { text: "Confirmar", onPress: () => void recordPayment(application) },
+                      {
+                        text: "Efectivo",
+                        onPress: () => void recordPayment(application, "cash"),
+                      },
+                      {
+                        text: "Transferencia + imagen",
+                        onPress: () => void chooseTransferProof(application),
+                      },
                     ],
                   )
                 }
@@ -344,7 +408,7 @@ export function CreditWorkspace({
                 <Text style={styles.secondaryText}>
                   {busyAction === `payment:${application.id}`
                     ? "Registrando…"
-                    : `Registrar cuota ${application.paidInstallments + 1}`}
+                    : `Registrar pago · ${formatCop(application.nextPaymentAmount ?? application.installmentAmount)}`}
                 </Text>
               </Pressable>
               {application.renewalEligible === true ? (

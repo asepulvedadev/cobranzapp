@@ -15,9 +15,11 @@ import {
   financialSchedulePreviewResponseSchema,
   identityDocumentExtractionResponseSchema,
   type LoanApplication,
+  type LoanPayment,
   type LoanProduct,
   loanApplicationDirectorySchema,
   loanApplicationResponseSchema,
+  loanPaymentSchema,
   loanProductDirectorySchema,
   messageResponseSchema,
   mfaLoginRequiredResponseSchema,
@@ -773,13 +775,22 @@ export class MobileApi {
     return financialSchedulePreviewResponseSchema.parse(await response.json()).preview;
   }
 
-  async recordLoanPayment(tenantId: string, application: LoanApplication) {
+  async recordLoanPayment(
+    tenantId: string,
+    application: LoanApplication,
+    paymentMethod: "cash" | "transfer",
+    proof?: { uri: string; name: string; type: string },
+  ): Promise<{ application: LoanApplication; payment: LoanPayment }> {
+    const form = new FormData();
+    form.append("installmentNumber", String(application.paidInstallments + 1));
+    form.append("amount", application.nextPaymentAmount ?? application.installmentAmount);
+    form.append("paymentMethod", paymentMethod);
+    if (proof) form.append("proof", proof as unknown as Blob);
     const response = await this.request(
       `/v1/tenants/${tenantId}/loan-applications/${application.id}/payments`,
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ installmentNumber: application.paidInstallments + 1 }),
+        body: form,
       },
     );
     if (!response.ok) {
@@ -788,7 +799,11 @@ export class MobileApi {
         response.status,
       );
     }
-    return loanApplicationResponseSchema.parse(await response.json()).application;
+    const body = (await response.json()) as unknown;
+    return {
+      application: loanApplicationResponseSchema.parse(body).application,
+      payment: loanPaymentSchema.parse((body as { payment?: unknown }).payment),
+    };
   }
 
   async renewLoan(tenantId: string, applicationId: string, excessAmount: string) {
