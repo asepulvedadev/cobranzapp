@@ -1270,7 +1270,7 @@ export function createOpenApiDocument(version: string) {
         },
         post: {
           tags: ["Crédito"],
-          operationId: "createLoanApplicationDraft",
+          operationId: "createLoanApplication",
           security: sessionSecurity,
           parameters: [
             {
@@ -1286,7 +1286,7 @@ export function createOpenApiDocument(version: string) {
           },
           responses: {
             "201": response(
-              "Solicitud creada como borrador.",
+              "Crédito activo para propietario/supervisor o solicitud pendiente para cobrador.",
               schemaReference("LoanApplicationResponse"),
             ),
             "400": errorResponses["400"],
@@ -1366,6 +1366,39 @@ export function createOpenApiDocument(version: string) {
               "La solicitud no puede entrar en revisión.",
               schemaReference("ApiError"),
             ),
+            "428": response("Confirmación reciente requerida.", schemaReference("ApiError")),
+            "503": response("El módulo no está habilitado.", schemaReference("ApiError")),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/loan-applications/{applicationId}/approve": {
+        post: {
+          tags: ["Crédito"],
+          operationId: "approveLoanApplication",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "applicationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": response(
+              "Solicitud aprobada y crédito activado.",
+              schemaReference("LoanApplicationResponse"),
+            ),
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("La solicitud no existe.", schemaReference("ApiError")),
+            "409": response("La solicitud no está pendiente.", schemaReference("ApiError")),
             "428": response("Confirmación reciente requerida.", schemaReference("ApiError")),
             "503": response("El módulo no está habilitado.", schemaReference("ApiError")),
           },

@@ -9,8 +9,15 @@ import { loadTenantContext } from "../tenant-context";
 
 export const metadata: Metadata = { title: "Créditos" };
 
-export default async function CreditsPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function CreditsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ cliente?: string; nuevo?: string }>;
+}) {
   const { slug } = await params;
+  const query = await searchParams;
   const { overview } = await loadTenantContext(slug);
   if (!["owner", "supervisor", "collector"].includes(overview.actorRole)) notFound();
 
@@ -57,9 +64,18 @@ export default async function CreditsPage({ params }: { params: Promise<{ slug: 
             />
           ) : null}
           <LoanApplicationBoard
+            actorRole={overview.actorRole as "owner" | "supervisor" | "collector"}
             applications={applications}
             borrowers={borrowers}
             canReview={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
+            initialBorrowerId={
+              borrowers.some((borrower) => borrower.id === query.cliente)
+                ? query.cliente
+                : undefined
+            }
+            openCreate={
+              query.nuevo === "1" && borrowers.some((borrower) => borrower.id === query.cliente)
+            }
             products={products}
             tenantId={overview.tenant.id}
           />

@@ -52,7 +52,7 @@ An employee with several allowed roles is one user/seat, not a charge for each r
 | Updated internal customer profile and rating | Staff-authenticated view; the owner and authorized collectors/advisors access only their permitted scope |
 | Unique passwordless customer link | Read-only view of that customer's loans, balances, payments and receipts; no internal rating or other customer data |
 | Editable business rules, percentages and loan values | Owner-controlled policy; staff input amounts only within approved configuration |
-| Loan approval | Collector submits a request; supervisor or owner authorizes it before activation/disbursement |
+| Loan approval | Collector submits a request; supervisor or owner authorizes it before activation. Credits created by an owner or supervisor are approved immediately with audit evidence. |
 
 Ultra adds priority support. Its response times, support channels and operating hours remain undecided; the landing must not invent a 24/7 or guaranteed-response promise.
 
@@ -63,11 +63,11 @@ Ultra adds priority support. Its response times, support channels and operating 
 | Change lending percentages or percentage-based charges | Owner only, with audit and the existing financial/compliance gates |
 | Configure lending products and business rules | Owner; non-owner editing of individual non-financial settings remains permission-specific |
 | Enter a loan amount and prepare a request | Assigned collector, constrained by the current approved policy |
-| Authorize a submitted loan | Supervisor or owner within assigned scope; no automatic collector approval |
+| Authorize a submitted loan | Supervisor or owner within assigned scope; no automatic collector approval. Their own new credits are auto-approved with role attribution. |
 | Read internal ratings/risk records | Owner and explicitly authorized internal personnel; never the public customer link |
 | View a customer loan through its shared link | Possessor of the scoped bearer link, read-only and limited to that customer |
 
-Approval must capture the exact amount, policy version, percentages and schedule being authorized. Changing a pending request invalidates its prior approval. A policy edit applies to future requests; approved/disbursed loan terms cannot silently change. Supervisor loan approval does not grant permission to edit percentages. The existing [financial rules](financial-rules.md) and [compliance gates](compliance.md) still apply: configurable does not mean unrestricted or automatically lawful.
+Approval captures the exact amount, product, percentages, frequency and term being authorized, plus creator role, approver and timestamp. Changing a pending request invalidates its prior approval. A policy edit applies to future requests; approved loan terms cannot silently change. Supervisor loan approval does not grant permission to edit percentages. The existing [financial rules](financial-rules.md) and [compliance gates](compliance.md) still apply: operational approval is not evidence of disbursement, accounting recognition or legal compliance.
 
 The user mentioned an **advisor** as an internal rating reader. Current product roles are owner, supervisor, collector and customer; the advisor role/permission mapping is an explicit discovery item, not a newly implemented broad-access role. Supervisor access to ratings must also be explicitly scoped rather than inferred from the ability to approve loans.
 

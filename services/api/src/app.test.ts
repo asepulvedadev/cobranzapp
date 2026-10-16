@@ -798,6 +798,82 @@ describe("loan application review queue", () => {
     expect(response.json()).toMatchObject({ error: { code: "SCOPE_DENIED" } });
     expect(startApplicationReview).not.toHaveBeenCalled();
   });
+
+  it("allows an owner to approve and activate a pending collector request", async () => {
+    const application = {
+      id: "f9a9ef72-e2d6-44c6-8d89-30d7e1f9b9c8",
+      borrowerId: "193a2db4-2349-4a48-8833-746a2a334260",
+      borrowerName: "Cliente de prueba",
+      loanProductId: "56d33f0e-b1a8-4a55-9061-2ccf283ce0f5",
+      loanProductName: "Capital de trabajo",
+      requestedPrincipal: "500000.00",
+      paymentFrequency: "weekly" as const,
+      requestedTermCount: 4,
+      paidInstallments: 0,
+      purpose: null,
+      status: "active" as const,
+      createdAt: "2026-10-11T00:00:00.000Z",
+      updatedAt: "2026-10-11T00:01:00.000Z",
+    };
+    const approveApplication = vi.fn(async () => ({
+      status: "approved" as const,
+      application,
+    }));
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => tenantOwner) },
+        creditService: { approveApplication } as unknown as CreditService,
+      }),
+    );
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/loan-applications/f9a9ef72-e2d6-44c6-8d89-30d7e1f9b9c8/approve",
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ application });
+    expect(approveApplication).toHaveBeenCalledWith(
+      {
+        userId: tenantOwner.id,
+        platformRole: null,
+        tenantRole: "owner",
+      },
+      "5c58269f-ce16-4250-82e2-c0c16621b0fb",
+      "f9a9ef72-e2d6-44c6-8d89-30d7e1f9b9c8",
+      expect.any(String),
+    );
+  });
+
+  it("does not let a collector approve a credit", async () => {
+    const approveApplication = vi.fn();
+    const collector: AuthenticatedUser = {
+      ...tenantOwner,
+      id: "8b8f4a23-3207-497f-a4b6-778cb8f4d1d0",
+      memberships: [{ ...tenantOwner.memberships[0], role: "collector" }],
+    };
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => collector) },
+        creditService: { approveApplication } as unknown as CreditService,
+      }),
+    );
+    apps.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/loan-applications/f9a9ef72-e2d6-44c6-8d89-30d7e1f9b9c8/approve",
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+      },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ error: { code: "SCOPE_DENIED" } });
+    expect(approveApplication).not.toHaveBeenCalled();
+  });
 });
 
 describe("loan product configuration permissions", () => {

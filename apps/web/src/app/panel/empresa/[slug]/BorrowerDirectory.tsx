@@ -594,6 +594,7 @@ export function BorrowerDirectory({
       router.refresh();
       return;
     }
+    if (!borrowerId) return;
     const createdName = String(form.get("fullName") ?? "").trim();
     event.currentTarget.reset();
     setMessage(
@@ -603,7 +604,9 @@ export function BorrowerDirectory({
     setIsError(false);
     setIsSubmitting(false);
     closeCreateModal(true);
-    router.refresh();
+    router.push(
+      `/panel/empresa/${tenantSlug}/creditos?cliente=${encodeURIComponent(borrowerId)}&nuevo=1`,
+    );
   }
 
   return (

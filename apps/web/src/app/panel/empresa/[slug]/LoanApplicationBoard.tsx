@@ -16,7 +16,7 @@ import { useSensitiveFetch } from "../../ReauthenticationProvider";
 
 const statusLabels: Record<LoanApplication["status"], string> = {
   draft: "Borrador",
-  submitted: "Enviada",
+  submitted: "Pendiente de aprobación",
   under_review: "En revisión",
   approved: "Aprobada",
   active: "Activo",
@@ -43,12 +43,18 @@ export function LoanApplicationBoard({
   products,
   applications,
   canReview,
+  actorRole,
+  initialBorrowerId,
+  openCreate = false,
 }: {
   tenantId: string;
   borrowers: Borrower[];
   products: LoanProduct[];
   applications: LoanApplication[];
   canReview: boolean;
+  actorRole: "owner" | "supervisor" | "collector";
+  initialBorrowerId?: string;
+  openCreate?: boolean;
 }) {
   const router = useRouter();
   const sensitiveFetch = useSensitiveFetch();
@@ -56,13 +62,14 @@ export function LoanApplicationBoard({
   const [isError, setIsError] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [reviewingApplicationId, setReviewingApplicationId] = useState<string | null>(null);
-  const [startingReviewId, setStartingReviewId] = useState<string | null>(null);
+  const [approvingApplicationId, setApprovingApplicationId] = useState<string | null>(null);
+  const [approvalConfirmation, setApprovalConfirmation] = useState<LoanApplication | null>(null);
   const [paymentApplicationId, setPaymentApplicationId] = useState<string | null>(null);
   const [paymentConfirmation, setPaymentConfirmation] = useState<LoanApplication | null>(null);
   const [renewingApplicationId, setRenewingApplicationId] = useState<string | null>(null);
   const [schedulePreview, setSchedulePreview] = useState<FinancialSchedulePreview | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [borrowerId, setBorrowerId] = useState("");
+  const [createOpen, setCreateOpen] = useState(openCreate);
+  const [borrowerId, setBorrowerId] = useState(initialBorrowerId ?? "");
   const [productId, setProductId] = useState("");
   const [requestedPrincipal, setRequestedPrincipal] = useState("");
   const [frequency, setFrequency] = useState<LoanProduct["paymentFrequency"]>("daily");
@@ -158,6 +165,9 @@ export function LoanApplicationBoard({
       setIsBusy(false);
       return;
     }
+    const body = (await response.json().catch(() => null)) as {
+      application?: LoanApplication;
+    } | null;
     setBorrowerId("");
     setProductId("");
     setRequestedPrincipal("");
@@ -165,7 +175,11 @@ export function LoanApplicationBoard({
     setTermCount(30);
     setSchedulePreview(null);
     setCreateOpen(false);
-    setMessage("Crédito creado con el calendario que confirmaste.");
+    setMessage(
+      body?.application?.status === "submitted"
+        ? "Solicitud creada. Quedó pendiente de aprobación por el propietario o un supervisor."
+        : "Crédito creado y aprobado automáticamente con el calendario confirmado.",
+    );
     setIsBusy(false);
     router.refresh();
   }
@@ -213,7 +227,14 @@ export function LoanApplicationBoard({
       setRenewingApplicationId(null);
       return;
     }
-    setMessage("Crédito renovado. Se creó un nuevo calendario con el excedente solicitado.");
+    const body = (await response.json().catch(() => null)) as {
+      application?: LoanApplication;
+    } | null;
+    setMessage(
+      body?.application?.status === "submitted"
+        ? "Renovación enviada. El crédito anterior seguirá activo hasta que un propietario o supervisor la apruebe."
+        : "Crédito renovado. Se creó y aprobó el nuevo calendario.",
+    );
     setRenewingApplicationId(null);
     router.refresh();
   }
@@ -237,22 +258,22 @@ export function LoanApplicationBoard({
     router.refresh();
   }
 
-  async function startReview(application: LoanApplication) {
-    setStartingReviewId(application.id);
+  async function approveApplication(application: LoanApplication) {
+    setApprovingApplicationId(application.id);
     setMessage("");
     setIsError(false);
     const response = await sensitiveFetch(
-      `/api/v1/tenants/${tenantId}/loan-applications/${application.id}/review`,
+      `/api/v1/tenants/${tenantId}/loan-applications/${application.id}/approve`,
       { method: "POST" },
     ).catch(() => null);
     if (!response?.ok) {
       setMessage(await errorMessage(response));
       setIsError(true);
-      setStartingReviewId(null);
+      setApprovingApplicationId(null);
       return;
     }
-    setMessage(`La solicitud de ${application.borrowerName} entró en revisión.`);
-    setStartingReviewId(null);
+    setMessage(`Crédito de ${application.borrowerName} aprobado y activado.`);
+    setApprovingApplicationId(null);
     router.refresh();
   }
 
@@ -280,7 +301,9 @@ export function LoanApplicationBoard({
         </div>
       </div>
       <p className="operational-note">
-        Cada crédito se simula primero y solo se crea después de confirmar el total y las cuotas.
+        {actorRole === "collector"
+          ? "Tus solicitudes quedan pendientes hasta que el propietario o un supervisor las apruebe."
+          : "Los créditos que creas se aprueban de inmediato; las solicitudes de cobradores requieren tu aprobación."}
       </p>
       {applications.length ? (
         <div className="loan-application-list">
@@ -291,8 +314,10 @@ export function LoanApplicationBoard({
                   <strong>{application.borrowerName}</strong>
                   <small>
                     {application.loanProductName} · {formatCop(application.requestedPrincipal)} ·{" "}
-                    {frequencyLabels[application.paymentFrequency]} · {application.paidInstallments}
-                    /{application.requestedTermCount} cuotas
+                    {application.nominalRate}% total ·{" "}
+                    {frequencyLabels[application.paymentFrequency]}
+                    {" · "}
+                    {application.paidInstallments}/{application.requestedTermCount} cuotas
                   </small>
                   <small>
                     Próxima cuota: {application.nextDueDate ?? "Sin fecha"}
@@ -315,14 +340,18 @@ export function LoanApplicationBoard({
                   {reviewingApplicationId === application.id ? "Enviando…" : "Enviar a revisión"}
                 </button>
               ) : null}
-              {application.status === "submitted" && canReview ? (
+              {["submitted", "under_review"].includes(application.status) && canReview ? (
                 <button
-                  disabled={startingReviewId !== null}
-                  onClick={() => void startReview(application)}
+                  className="primary-action"
+                  disabled={approvingApplicationId !== null}
+                  onClick={() => setApprovalConfirmation(application)}
                   type="button"
                 >
-                  {startingReviewId === application.id ? "Iniciando…" : "Iniciar revisión"}
+                  {approvingApplicationId === application.id ? "Aprobando…" : "Revisar y aprobar"}
                 </button>
+              ) : null}
+              {application.status === "submitted" && !canReview ? (
+                <p className="form-help">Pendiente de aprobación por propietario o supervisor.</p>
               ) : null}
               {application.status === "active" ? (
                 <div className="loan-application-actions">
@@ -373,7 +402,11 @@ export function LoanApplicationBoard({
           <form className="tenant-form loan-application-form" onSubmit={previewCredit}>
             <div className="financial-form-intro">
               <strong>Primero simula, después confirma</strong>
-              <p>El crédito no se crea hasta que revises el total y pulses “Confirmar crédito”.</p>
+              <p>
+                {actorRole === "collector"
+                  ? "Al confirmar se enviará al propietario o supervisor para aprobación."
+                  : "Al confirmar quedará aprobado y activo de inmediato."}
+              </p>
             </div>
             <label>
               Cliente
@@ -511,7 +544,11 @@ export function LoanApplicationBoard({
                 </dl>
                 <small>La última cuota puede variar unos pesos por el redondeo.</small>
                 <button disabled={isBusy} onClick={() => void createCredit()} type="button">
-                  {isBusy ? "Creando…" : "Confirmar crédito"}
+                  {isBusy
+                    ? "Creando…"
+                    : actorRole === "collector"
+                      ? "Enviar para aprobación"
+                      : "Confirmar y aprobar crédito"}
                 </button>
               </div>
             ) : (
@@ -551,6 +588,62 @@ export function LoanApplicationBoard({
               type="button"
             >
               Confirmar avance
+            </button>
+          </div>
+        </Modal>
+      ) : null}
+      {approvalConfirmation ? (
+        <Modal onClose={() => setApprovalConfirmation(null)} title="Aprobar crédito">
+          <div className="credit-confirmation-summary">
+            <span>Verifica antes de aprobar</span>
+            <dl>
+              <div>
+                <dt>Cliente</dt>
+                <dd>{approvalConfirmation.borrowerName}</dd>
+              </div>
+              <div>
+                <dt>Monto</dt>
+                <dd>{formatCop(approvalConfirmation.requestedPrincipal)}</dd>
+              </div>
+              <div>
+                <dt>Interés total</dt>
+                <dd>{approvalConfirmation.nominalRate}%</dd>
+              </div>
+              <div>
+                <dt>Cuota</dt>
+                <dd>{formatCop(approvalConfirmation.installmentAmount)}</dd>
+              </div>
+              <div>
+                <dt>Plan</dt>
+                <dd>
+                  {approvalConfirmation.requestedTermCount} cuotas{" "}
+                  {frequencyLabels[approvalConfirmation.paymentFrequency]}
+                </dd>
+              </div>
+              <div>
+                <dt>Total a pagar</dt>
+                <dd>{formatCop(approvalConfirmation.scheduledTotal)}</dd>
+              </div>
+            </dl>
+            <small>
+              La aprobación quedará registrada con tu usuario, rol, fecha y condiciones del crédito.
+            </small>
+          </div>
+          <div className="borrower-step-actions">
+            <button onClick={() => setApprovalConfirmation(null)} type="button">
+              Cancelar
+            </button>
+            <button
+              className="primary-action"
+              disabled={approvingApplicationId !== null}
+              onClick={() => {
+                const application = approvalConfirmation;
+                setApprovalConfirmation(null);
+                void approveApplication(application);
+              }}
+              type="button"
+            >
+              {approvingApplicationId ? "Aprobando…" : "Aprobar y activar"}
             </button>
           </div>
         </Modal>

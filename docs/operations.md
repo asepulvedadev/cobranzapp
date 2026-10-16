@@ -123,17 +123,19 @@ y cobradores pueden consultar el catálogo; propietario y supervisor pueden envi
 calcular cuotas, originar, desembolsar ni registrar pagos. Esto evita convertir una tasa o ejemplo
 comercial en una regla financiera vigente sin revisión legal, contable y de calendario.
 
-### Solicitudes de crédito en borrador
+### Creación y aprobación operativa de créditos
 
-Propietarios, supervisores y cobradores pueden registrar una solicitud asociando un cliente activo
-con un producto disponible. La API valida el rango de monto y el máximo de periodos del producto,
-guarda el estado `draft` y registra el actor en auditoría. Una solicitud solo puede enviarse a
-revisión cuando la identidad del cliente está revisada y el producto está en `under_review` o
-`approved`; el envío también queda auditado. Propietarios y supervisores pueden tomar una
-solicitud `submitted` y moverla a `under_review` con reautenticación reciente; ese cambio también
-queda auditado. La interfaz deja claro que esto no aprueba,
-desembolsa, calcula cuotas ni registra pagos; esas decisiones requieren los controles legales,
-contables y de calendario de las siguientes fases.
+Después de registrar un cliente, la interfaz abre el flujo de su primer crédito con el cliente ya
+seleccionado. La API valida el rango, la frecuencia y el plazo, y congela en el crédito el monto,
+la base de tasa, el porcentaje, el cargo y el calendario confirmados. Si el creador es cobrador, la
+solicitud nace como `submitted` y solo un propietario o supervisor puede aprobarla y activarla. Si
+el creador es propietario o supervisor, queda aprobada y activa de inmediato.
+
+La base de datos conserva creador, rol de creación, aprobador, fecha y modo de aprobación. Cada
+creación y aprobación también genera un evento de auditoría con la transición y las condiciones
+financieras exactas. Las renovaciones siguen la misma regla: una renovación creada por cobrador no
+cierra el crédito anterior hasta que sea aprobada. Esta aprobación es operativa; no prueba un
+desembolso, un recibo de dinero ni un asiento contable.
 
 ## Document capture and deterministic OCR
 
