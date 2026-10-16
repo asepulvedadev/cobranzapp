@@ -22,6 +22,7 @@ import type {
   BorrowerAddressKind,
   BorrowerAddressUpdateInput,
   BorrowerAddressUpdateResult,
+  BorrowerAssignmentResult,
   BorrowerCreateInput,
   BorrowerCreateResult,
   BorrowerDocumentInput,
@@ -43,6 +44,8 @@ type BorrowerRow = {
   home_address_status: Borrower["homeAddressStatus"];
   work_address_status: Borrower["workAddressStatus"];
   profile_photo_object_key: string | null;
+  assigned_collector_id: string | null;
+  assigned_collector_name: string | null;
   consent_version: string;
   country: string;
   document_type: string;
@@ -160,12 +163,14 @@ async function loadBorrower(
     `SELECT borrower.id, borrower.full_name, borrower.status,
             borrower.phone, borrower.whatsapp_phone, borrower.home_address, borrower.work_address,
             borrower.home_address_status, borrower.work_address_status,
-            borrower.profile_photo_object_key, borrower.consent_version,
+            borrower.profile_photo_object_key, borrower.assigned_collector_id,
+            assigned_user.display_name AS assigned_collector_name, borrower.consent_version,
             identity.country, identity.document_type, identity.document_last4,
             identity.verification_state, borrower.created_at
        FROM borrowers borrower
        JOIN borrower_identities identity
          ON identity.tenant_id = borrower.tenant_id AND identity.borrower_id = borrower.id
+       LEFT JOIN users assigned_user ON assigned_user.id = borrower.assigned_collector_id
       WHERE borrower.tenant_id = $1 AND borrower.id = $2`,
     [tenantId, borrowerId],
   );
@@ -235,6 +240,8 @@ async function loadBorrower(
       work: locationByKind.get("work") ?? pendingLocation,
     },
     profilePhotoObjectKey: row.profile_photo_object_key,
+    assignedCollectorId: row.assigned_collector_id,
+    assignedCollectorName: row.assigned_collector_name,
     consentVersion: row.consent_version,
     identity: {
       country: row.country,
@@ -510,12 +517,14 @@ export function createPostgresBorrowerService(
           `SELECT borrower.id, borrower.full_name, borrower.status,
                   borrower.phone, borrower.whatsapp_phone, borrower.home_address, borrower.work_address,
                   borrower.home_address_status, borrower.work_address_status,
-                  borrower.profile_photo_object_key, borrower.consent_version,
+                  borrower.profile_photo_object_key, borrower.assigned_collector_id,
+                  assigned_user.display_name AS assigned_collector_name, borrower.consent_version,
                   identity.country, identity.document_type, identity.document_last4,
                   identity.verification_state, borrower.created_at
              FROM borrowers borrower
              JOIN borrower_identities identity
                ON identity.tenant_id = borrower.tenant_id AND identity.borrower_id = borrower.id
+             LEFT JOIN users assigned_user ON assigned_user.id = borrower.assigned_collector_id
             WHERE borrower.tenant_id = $2 AND (${filter})
             ORDER BY borrower.created_at DESC, borrower.id DESC
             LIMIT $3 OFFSET $4`,
@@ -589,6 +598,7 @@ export function createPostgresBorrowerService(
                 home_address_status, work_address_status, home_address_confirmed_at,
                 work_address_confirmed_at, home_address_confirmed_by, work_address_confirmed_by,
                 profile_photo_object_key, consent_version, consent_evidence_ref, created_by,
+                assigned_collector_id,
                 created_by_role)
              VALUES ($1, $2, $3, $4, $5, $6, $7,
                      CASE WHEN $8 THEN 'confirmed' ELSE 'pending' END,
@@ -597,7 +607,9 @@ export function createPostgresBorrowerService(
                      CASE WHEN $9 THEN now() ELSE NULL END,
                      CASE WHEN $8 THEN $10::uuid ELSE NULL END,
                      CASE WHEN $9 THEN $10::uuid ELSE NULL END,
-                     $11, $12, $13, $10, $14)`,
+                     $11, $12, $13, $10,
+                     CASE WHEN $14 = 'collector' THEN $10::uuid ELSE NULL END,
+                     $14)`,
               [
                 tenantId,
                 borrowerId,
@@ -1387,6 +1399,47 @@ export function createPostgresBorrowerService(
               workAddressConfirmed: input.workAddressConfirmed,
             }),
           ],
+        );
+        const updated = await loadBorrower(client, tenantId, borrowerId);
+        return updated ? { status: "updated", borrower: updated } : { status: "not_found" };
+      });
+    },
+
+    async assignCollector(actor, tenantId, borrowerId, input): Promise<BorrowerAssignmentResult> {
+      if (actor.tenantRole !== "owner" && actor.tenantRole !== "supervisor") {
+        return { status: "forbidden" };
+      }
+      return withTransaction(actor, tenantId, async (client) => {
+        const current = await client.query<{ id: string }>(
+          `SELECT id FROM borrowers WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
+          [tenantId, borrowerId],
+        );
+        if (!current.rows[0]) return { status: "not_found" };
+
+        if (input.collectorId) {
+          const membershipResult = await client.query<{ role: string; status: string }>(
+            `SELECT role, status
+               FROM tenant_memberships
+              WHERE tenant_id = $1 AND user_id = $2`,
+            [tenantId, input.collectorId],
+          );
+          const membership = membershipResult.rows[0];
+          if (membership?.role !== "collector") return { status: "collector_not_found" };
+          if (membership.status !== "active") return { status: "collector_inactive" };
+        }
+
+        await client.query(
+          `UPDATE borrowers
+              SET assigned_collector_id = $3, updated_at = now()
+            WHERE tenant_id = $1 AND id = $2`,
+          [tenantId, borrowerId, input.collectorId],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'borrower.collector_assigned', 'borrower', $3, $4,
+                   jsonb_build_object('collectorId', $5::text))`,
+          [tenantId, actor.userId, borrowerId, input.requestId, input.collectorId],
         );
         const updated = await loadBorrower(client, tenantId, borrowerId);
         return updated ? { status: "updated", borrower: updated } : { status: "not_found" };

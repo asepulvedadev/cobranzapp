@@ -6,12 +6,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsx watch src/worker.ts",
+    "pretest": "pnpm --filter @cobranzapp/hermes-routes build",
     "start": "node dist/worker.js",
     "test": "vitest run src --passWithNoTests",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@cobranzapp/hermes-ocr": "workspace:*",
+    "@cobranzapp/hermes-routes": "workspace:*",
     "pg": "8.23.1",
     "zod": "4.6.6"
   },

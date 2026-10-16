@@ -761,7 +761,7 @@ export const routeStopCreateRequestSchema = z.object({
 export const routeStopReorderRequestSchema = z.object({
   stopIds: z.array(z.uuid()).min(1).max(500),
 });
-export const routeStopVisitStatusSchema = z.enum(["pending", "visited", "skipped"]);
+export const routeStopVisitStatusSchema = z.enum(["pending", "visited", "not_home"]);
 export const routeStopVisitRequestSchema = z.object({
   status: routeStopVisitStatusSchema,
   notes: z.string().trim().max(500).nullable().optional(),
@@ -787,6 +787,8 @@ export const routeSchema = z.object({
   name: z.string().min(2),
   description: z.string().nullable(),
   status: routeStatusSchema,
+  serviceDate: z.iso.date().nullable(),
+  generationMode: z.enum(["manual", "automatic"]),
   branchId: z.uuid().nullable(),
   branchName: z.string().nullable(),
   assignedCollectorId: z.uuid().nullable(),
@@ -1152,11 +1154,17 @@ export const borrowerSchema = z.object({
     work: borrowerAddressLocationSchema,
   }),
   profilePhotoObjectKey: z.string().nullable(),
+  assignedCollectorId: z.uuid().nullable(),
+  assignedCollectorName: z.string().nullable(),
   consentVersion: z.string().min(1),
   identity: borrowerIdentitySchema,
   emergencyContacts: z.array(borrowerEmergencyContactInputSchema.extend({ id: z.uuid() })).max(2),
   documents: z.array(borrowerDocumentSchema).max(3),
   createdAt: z.iso.datetime(),
+});
+
+export const borrowerAssignmentUpdateRequestSchema = z.object({
+  collectorId: z.uuid().nullable(),
 });
 
 export const borrowerResponseSchema = z.object({ borrower: borrowerSchema });
@@ -1421,6 +1429,7 @@ export type FinancialSchedulePeriod = z.infer<typeof financialSchedulePeriodSche
 export type FinancialSchedulePreview = z.infer<typeof financialSchedulePreviewSchema>;
 export type BorrowerDocument = z.infer<typeof borrowerDocumentSchema>;
 export type BorrowerCreateRequest = z.infer<typeof borrowerCreateRequestSchema>;
+export type BorrowerAssignmentUpdateRequest = z.infer<typeof borrowerAssignmentUpdateRequestSchema>;
 export type BorrowerReviewRequest = z.infer<typeof borrowerReviewRequestSchema>;
 export type BorrowerDocumentResponse = z.infer<typeof borrowerDocumentResponseSchema>;
 export type IdentityDocumentFields = z.infer<typeof identityDocumentFieldsSchema>;

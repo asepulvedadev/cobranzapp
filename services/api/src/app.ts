@@ -1,6 +1,7 @@
 import {
   borrowerAddressGeocodeRequestSchema,
   borrowerAddressUpdateRequestSchema,
+  borrowerAssignmentUpdateRequestSchema,
   borrowerCreateRequestSchema,
   borrowerDirectoryQuerySchema,
   borrowerOcrConfirmRequestSchema,
@@ -2187,7 +2188,6 @@ export function buildApp(dependencies: AppDependencies) {
         request.id,
       );
     }
-    if (!(await requireRecentReauthentication(session, request, reply))) return;
     if (!dependencies.routeService) {
       return sendError(
         reply,
@@ -2373,16 +2373,9 @@ export function buildApp(dependencies: AppDependencies) {
     const membership = session.user.memberships.find(
       (item) => item.tenantId === params.data.tenantId,
     );
-    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
-      return sendError(
-        reply,
-        403,
-        "SCOPE_DENIED",
-        "Solo propietarios y supervisores pueden ordenar rutas.",
-        request.id,
-      );
+    if (!membership || !["owner", "supervisor", "collector"].includes(membership.role)) {
+      return sendError(reply, 403, "SCOPE_DENIED", "No puedes ordenar esta ruta.", request.id);
     }
-    if (!(await requireRecentReauthentication(session, request, reply))) return;
     if (!dependencies.routeService) {
       return sendError(
         reply,
@@ -2441,7 +2434,6 @@ export function buildApp(dependencies: AppDependencies) {
     if (!membership || !["owner", "supervisor", "collector"].includes(membership.role)) {
       return sendError(reply, 403, "SCOPE_DENIED", "No tienes acceso a esta ruta.", request.id);
     }
-    if (!(await requireRecentReauthentication(session, request, reply))) return;
     if (!dependencies.routeService) {
       return sendError(
         reply,
@@ -2717,7 +2709,7 @@ export function buildApp(dependencies: AppDependencies) {
         reply,
         503,
         "HERMES_OCR_UNAVAILABLE",
-        "Hermes no está disponible. Puedes escribir los datos manualmente.",
+        "La lectura automática no está disponible. Escribe los datos manualmente.",
         request.id,
       );
     }
@@ -2819,8 +2811,8 @@ export function buildApp(dependencies: AppDependencies) {
           ? code
           : "HERMES_OCR_UNAVAILABLE",
         busy
-          ? "Hermes está atendiendo otras lecturas. Intenta nuevamente en unos segundos."
-          : "Hermes no pudo leer el documento. Toma fotos más nítidas o escribe los datos manualmente.",
+          ? "La lectura está ocupada. Intenta nuevamente en unos segundos."
+          : "No fue posible leer el documento. Toma fotos más nítidas o escribe los datos manualmente.",
         request.id,
       );
     }
@@ -3057,6 +3049,77 @@ export function buildApp(dependencies: AppDependencies) {
       }
       throw error;
     }
+  });
+
+  app.patch("/v1/tenants/:tenantId/borrowers/:borrowerId/assignment", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantBorrowerParamsSchema.safeParse(request.params);
+    const body = borrowerAssignmentUpdateRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_BORROWER_ASSIGNMENT",
+        "Selecciona un cobrador válido.",
+        request.id,
+      );
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo el propietario o supervisor puede asignar clientes.",
+        request.id,
+      );
+    }
+    if (!dependencies.borrowerService) {
+      return sendError(
+        reply,
+        503,
+        "BORROWER_DOSSIER_UNAVAILABLE",
+        "El módulo de clientes no está disponible.",
+        request.id,
+      );
+    }
+    const result = await dependencies.borrowerService.assignCollector(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      params.data.borrowerId,
+      { ...body.data, requestId: request.id },
+    );
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
+    }
+    if (result.status === "collector_not_found") {
+      return sendError(
+        reply,
+        404,
+        "COLLECTOR_NOT_FOUND",
+        "El usuario seleccionado no es cobrador de esta empresa.",
+        request.id,
+      );
+    }
+    if (result.status === "collector_inactive") {
+      return sendError(
+        reply,
+        409,
+        "COLLECTOR_INACTIVE",
+        "El cobrador seleccionado no está activo.",
+        request.id,
+      );
+    }
+    if (result.status === "forbidden") {
+      return sendError(reply, 403, "SCOPE_DENIED", "No puedes asignar este cliente.", request.id);
+    }
+    return reply.send({ borrower: result.borrower });
   });
 
   app.post("/v1/tenants/:tenantId/borrowers/:borrowerId/geocode", async (request, reply) => {

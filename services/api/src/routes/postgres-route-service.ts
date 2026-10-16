@@ -25,6 +25,8 @@ type RouteRow = {
   name: string;
   description: string | null;
   status: Route["status"];
+  service_date: Date | string | null;
+  generation_mode: Route["generationMode"];
   branch_id: string | null;
   branch_name: string | null;
   assigned_collector_id: string | null;
@@ -71,6 +73,7 @@ function isUniqueViolation(error: unknown) {
 async function loadRoute(client: Pick<PoolClient, "query">, tenantId: string, routeId: string) {
   const routeResult = await client.query<RouteRow>(
     `SELECT route.id, route.name, route.description, route.status,
+            route.service_date, route.generation_mode,
             route.branch_id, branch.display_name AS branch_name,
             route.assigned_collector_id,
             assigned_user.display_name AS assigned_collector_name,
@@ -107,6 +110,11 @@ async function loadRoute(client: Pick<PoolClient, "query">, tenantId: string, ro
     name: row.name,
     description: row.description,
     status: row.status,
+    serviceDate:
+      row.service_date instanceof Date
+        ? row.service_date.toISOString().slice(0, 10)
+        : row.service_date,
+    generationMode: row.generation_mode,
     branchId: row.branch_id,
     branchName: row.branch_name,
     assignedCollectorId: row.assigned_collector_id,
@@ -155,8 +163,12 @@ export function createPostgresRouteService(pool: Pool): RouteService {
       if (!canRead(actor)) return [];
       return withTransaction(actor, tenantId, async (client) => {
         const result = await client.query<{ id: string }>(
-          `SELECT id FROM collection_routes WHERE tenant_id = $1 ORDER BY updated_at DESC, id DESC`,
-          [tenantId],
+          `SELECT id
+             FROM collection_routes
+            WHERE tenant_id = $1
+              AND ($2::text <> 'collector' OR assigned_collector_id = $3)
+            ORDER BY service_date DESC NULLS LAST, updated_at DESC, id DESC`,
+          [tenantId, actor.tenantRole, actor.userId],
         );
         const routes: Route[] = [];
         for (const row of result.rows) {
@@ -256,13 +268,23 @@ export function createPostgresRouteService(pool: Pool): RouteService {
       routeId,
       input: RouteStopReorderRequest & { requestId: string },
     ): Promise<RouteStopReorderResult> {
-      if (!canManage(actor)) return { status: "forbidden" };
+      if (!canRead(actor)) return { status: "forbidden" };
       return withTransaction(actor, tenantId, async (client) => {
-        const route = await client.query<{ id: string }>(
-          `SELECT id FROM collection_routes WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
+        const route = await client.query<{ id: string; assigned_collector_id: string | null }>(
+          `SELECT id, assigned_collector_id
+             FROM collection_routes
+            WHERE tenant_id = $1 AND id = $2
+            FOR UPDATE`,
           [tenantId, routeId],
         );
-        if (!route.rows[0]) return { status: "not_found" };
+        const currentRoute = route.rows[0];
+        if (!currentRoute) return { status: "not_found" };
+        if (
+          actor.tenantRole === "collector" &&
+          currentRoute.assigned_collector_id !== actor.userId
+        ) {
+          return { status: "forbidden" };
+        }
         const current = await client.query<{ id: string }>(
           `SELECT id FROM collection_route_stops
             WHERE tenant_id = $1 AND route_id = $2

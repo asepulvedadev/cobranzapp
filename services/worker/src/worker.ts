@@ -1,5 +1,6 @@
 import { hostname } from "node:os";
 import { createHermesIdentityExtractor } from "@cobranzapp/hermes-ocr";
+import { createHermesCollectionRoutePlanner } from "@cobranzapp/hermes-routes";
 import pg from "pg";
 import { z } from "zod";
 import {
@@ -8,6 +9,7 @@ import {
   recordOutboxFailure,
   safeErrorMessage,
 } from "./outbox.js";
+import { planNextDayRoutes } from "./routes.js";
 
 const config = z
   .object({
@@ -21,6 +23,9 @@ const config = z
     HERMES_OCR_URL: z.url().optional(),
     HERMES_OCR_API_KEY: z.string().min(32).optional(),
     HERMES_OCR_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(45_000),
+    HERMES_ROUTES_URL: z.url().optional(),
+    HERMES_ROUTES_API_KEY: z.string().min(32).optional(),
+    HERMES_ROUTES_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(30_000),
   })
   .parse(process.env);
 
@@ -33,12 +38,21 @@ const workerId = config.WORKER_ID ?? `${hostname()}:${process.pid}`;
 let stopping = false;
 let wakeSleep: (() => void) | null = null;
 let lastHeartbeat = 0;
+let lastRoutePlanningCheck = 0;
 const identityExtractor =
   config.HERMES_OCR_URL && config.HERMES_OCR_API_KEY
     ? createHermesIdentityExtractor({
         endpoint: config.HERMES_OCR_URL,
         apiKey: config.HERMES_OCR_API_KEY,
         timeoutMs: config.HERMES_OCR_TIMEOUT_MS,
+      })
+    : undefined;
+const routePlanner =
+  config.HERMES_ROUTES_URL && config.HERMES_ROUTES_API_KEY
+    ? createHermesCollectionRoutePlanner({
+        endpoint: config.HERMES_ROUTES_URL,
+        apiKey: config.HERMES_ROUTES_API_KEY,
+        timeoutMs: config.HERMES_ROUTES_TIMEOUT_MS,
       })
     : undefined;
 
@@ -71,6 +85,17 @@ async function sleep(milliseconds: number) {
 }
 
 async function tick() {
+  if (Date.now() - lastRoutePlanningCheck >= 60_000) {
+    lastRoutePlanningCheck = Date.now();
+    try {
+      const routeSummary = await planNextDayRoutes(pool, routePlanner);
+      if (routeSummary.tenantsGenerated > 0) {
+        log("info", "routes_generated", routeSummary);
+      }
+    } catch (error) {
+      log("error", "route_generation_failed", { error: safeErrorMessage(error) });
+    }
+  }
   const claimed = await claimNextOutboxEvent(pool, workerId, config.WORKER_LEASE_SECONDS);
   if (!claimed) {
     if (Date.now() - lastHeartbeat >= 60_000) {
