@@ -5282,7 +5282,7 @@ export function buildApp(dependencies: AppDependencies) {
           );
         }
       }
-      let result;
+      let result: Awaited<ReturnType<CreditService["recordPayment"]>>;
       try {
         result = await dependencies.creditService.recordPayment(
           {
