@@ -17,6 +17,9 @@ const configSchema = z.object({
   RESEND_FROM: z.string().min(1).default("cobranzapp <contacto@cobranzaap.tech>"),
   CONTACT_TO_EMAIL: z.email().default("info@cobranzaap.tech"),
   GEOCODING_ENDPOINT: z.url().default("https://nominatim.openstreetmap.org/search"),
+  HERMES_OCR_URL: z.url().optional(),
+  HERMES_OCR_API_KEY: z.string().min(32).optional(),
+  HERMES_OCR_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(45_000),
 });
 
 export type ApiConfig = z.infer<typeof configSchema>;

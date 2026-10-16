@@ -4,6 +4,7 @@ import path from "node:path";
 
 const maxDocumentSize = 10_485_760;
 const allowedMediaTypes = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
+const allowedIdentityImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export type BorrowerDocumentCategory = "identity" | "profile_photo";
 export type BorrowerDocumentSide = "front" | "back" | null;
@@ -81,6 +82,13 @@ function hasMagic(bytes: Buffer, mediaType: string) {
     );
   }
   return false;
+}
+
+export function validateIdentityExtractionImage(bytes: Buffer, mediaType: string) {
+  if (!allowedIdentityImageTypes.has(mediaType)) throw new Error("UNSUPPORTED_OCR_IMAGE_TYPE");
+  if (bytes.length < 1 || bytes.length > maxDocumentSize) throw new Error("OCR_IMAGE_SIZE_INVALID");
+  if (!hasMagic(bytes, mediaType)) throw new Error("OCR_IMAGE_CONTENT_INVALID");
+  return mediaType as "image/jpeg" | "image/png" | "image/webp";
 }
 
 function detectMediaType(bytes: Buffer) {
@@ -182,6 +190,6 @@ export function createLocalBorrowerDocumentStorage(root: string): BorrowerDocume
 
 export const borrowerDocumentUploadLimits = {
   fileSize: maxDocumentSize,
-  files: 1,
+  files: 2,
   fields: 3,
 };

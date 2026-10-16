@@ -1,4 +1,5 @@
 import type { LoanProduct, Route } from "@cobranzapp/contracts";
+import type { IdentityExtractor } from "@cobranzapp/hermes-ocr";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "./app.js";
 import type { AuthenticatedUser, AuthService } from "./auth/types.js";
@@ -69,6 +70,7 @@ function dependencies(overrides?: {
   creditService?: CreditService;
   routeService?: RouteService;
   supportAccessService?: Partial<SupportAccessService>;
+  identityExtractor?: IdentityExtractor;
 }) {
   const authService: AuthService = {
     login: vi.fn(async () => ({
@@ -373,6 +375,7 @@ function dependencies(overrides?: {
     allowedWebOrigins: ["https://cobranzaap.tech"],
     authService,
     borrowerService: overrides?.borrowerService,
+    identityExtractor: overrides?.identityExtractor,
     creditService: overrides?.creditService,
     routeService: overrides?.routeService,
     checkDatabase: async () => undefined,
@@ -381,6 +384,19 @@ function dependencies(overrides?: {
     supportAccessService,
     tenancyService,
     version: "test",
+  };
+}
+
+function multipartImage(field: string, bytes: Buffer, boundary = "cobranzapp-test-boundary") {
+  return {
+    boundary,
+    payload: Buffer.concat([
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="${field}"; filename="cedula.jpg"\r\nContent-Type: image/jpeg\r\n\r\n`,
+      ),
+      bytes,
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]),
   };
 }
 
@@ -503,6 +519,58 @@ describe("collection route status", () => {
 });
 
 describe("borrower creation security", () => {
+  it("uses Hermes to extract all identity fields before creating the borrower", async () => {
+    const extraction = {
+      fields: {
+        firstNames: "ANA MARIA",
+        lastNames: "PEREZ LOPEZ",
+        fullName: "ANA MARIA PEREZ LOPEZ",
+        documentNumber: "1234567890",
+        documentType: "CC" as const,
+        country: "CO" as const,
+        nationality: "COL",
+        birthDate: "1990-01-02",
+        birthPlace: "BOGOTA",
+        sex: "F",
+        height: "1.65",
+        bloodType: "O+",
+        issueDate: "2010-03-04",
+        issuePlace: "BOGOTA",
+        expirationDate: "2030-03-04",
+        serialNumber: "A123",
+        mrzLines: ["ICCOL1234567890<<<<<<<<<<<<"],
+        barcodeData: null,
+      },
+      confidence: 0.97,
+      warnings: [],
+      sources: { front: true, back: false },
+    };
+    const extract = vi.fn(async () => extraction);
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => tenantOwner) },
+        identityExtractor: { extract },
+      }),
+    );
+    apps.push(app);
+    const multipart = multipartImage("front", Buffer.from([0xff, 0xd8, 0xff, 0x00, 0x01]));
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/borrowers/identity-extract",
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+        "content-type": `multipart/form-data; boundary=${multipart.boundary}`,
+      },
+      payload: multipart.payload,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ extraction });
+    expect(extract).toHaveBeenCalledWith({
+      front: expect.objectContaining({ mediaType: "image/jpeg", side: "front" }),
+    });
+  });
+
   it("requires recent reauthentication before creating a dossier", async () => {
     const create = vi.fn();
     const app = buildApp(

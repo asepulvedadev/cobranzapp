@@ -51,6 +51,7 @@ import {
   verificationNetworkQueryRequestSchema,
 } from "@cobranzapp/contracts";
 import { createOpenApiDocument } from "@cobranzapp/contracts/openapi";
+import type { IdentityExtractor, IdentityImage } from "@cobranzapp/hermes-ocr";
 import multipart from "@fastify/multipart";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import QRCode from "qrcode";
@@ -58,7 +59,10 @@ import { z } from "zod";
 import { LoginRateLimiter } from "./auth/login-rate-limiter.js";
 import type { AuthenticatedUser, AuthService } from "./auth/types.js";
 import type { BorrowerDocumentStorage } from "./borrowers/document-storage.js";
-import { borrowerDocumentUploadLimits } from "./borrowers/document-storage.js";
+import {
+  borrowerDocumentUploadLimits,
+  validateIdentityExtractionImage,
+} from "./borrowers/document-storage.js";
 import type { BorrowerService } from "./borrowers/types.js";
 import type { ContactMailer } from "./contact/resend.js";
 import { registerContactRoutes } from "./contact/routes.js";
@@ -125,6 +129,7 @@ const supportAccessRequestSchema = z.object({
 const supportAccessReviewSchema = z.object({ action: z.enum(["approve", "deny", "revoke"]) });
 
 export interface AppDependencies {
+  identityExtractor?: IdentityExtractor;
   borrowerService?: BorrowerService;
   creditService?: CreditService;
   routeService?: RouteService;
@@ -195,6 +200,7 @@ export function buildApp(dependencies: AppDependencies) {
   });
   const loginRateLimiter = new LoginRateLimiter();
   const reauthenticationRateLimiter = new LoginRateLimiter();
+  const identityOcrRateLimiter = new LoginRateLimiter(12, 60_000);
   const secureCookies = dependencies.isProduction ?? false;
   const sessionMaxAgeSeconds = (dependencies.sessionTtlHours ?? 8) * 60 * 60;
   const reauthenticationWindowMinutes = 10;
@@ -2679,6 +2685,139 @@ export function buildApp(dependencies: AppDependencies) {
   function canManageBorrowers(role: AuthenticatedUser["memberships"][number]["role"] | undefined) {
     return role === "owner" || role === "supervisor" || role === "collector";
   }
+
+  app.post("/v1/tenants/:tenantId/borrowers/identity-extract", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 400, "INVALID_TENANT", "La empresa no es válida.", request.id);
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !canManageBorrowers(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "No puedes leer documentos de clientes.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    if (!dependencies.identityExtractor) {
+      return sendError(
+        reply,
+        503,
+        "HERMES_OCR_UNAVAILABLE",
+        "Hermes no está disponible. Puedes escribir los datos manualmente.",
+        request.id,
+      );
+    }
+
+    const images: Partial<Record<"front" | "back", IdentityImage>> = {};
+    let totalBytes = 0;
+    try {
+      for await (const part of request.parts()) {
+        if (part.type !== "file" || (part.fieldname !== "front" && part.fieldname !== "back")) {
+          continue;
+        }
+        if (images[part.fieldname]) {
+          return sendError(
+            reply,
+            400,
+            "DUPLICATE_OCR_IMAGE",
+            "Adjunta una sola imagen por cada cara de la cédula.",
+            request.id,
+          );
+        }
+        const bytes = await part.toBuffer();
+        totalBytes += bytes.length;
+        const mediaType = validateIdentityExtractionImage(bytes, part.mimetype);
+        images[part.fieldname] = { bytes, mediaType, side: part.fieldname };
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        const errors: Record<string, [number, string, string]> = {
+          FST_REQ_FILE_TOO_LARGE: [
+            413,
+            "OCR_IMAGE_TOO_LARGE",
+            "Cada imagen debe pesar menos de 10 MB.",
+          ],
+          UNSUPPORTED_OCR_IMAGE_TYPE: [
+            400,
+            "UNSUPPORTED_OCR_IMAGE_TYPE",
+            "Usa una imagen JPG, PNG o WebP.",
+          ],
+          OCR_IMAGE_SIZE_INVALID: [
+            400,
+            "OCR_IMAGE_SIZE_INVALID",
+            "La imagen está vacía o es demasiado grande.",
+          ],
+          OCR_IMAGE_CONTENT_INVALID: [
+            400,
+            "OCR_IMAGE_CONTENT_INVALID",
+            "El archivo no coincide con el formato de imagen indicado.",
+          ],
+        };
+        const mapped =
+          errors[error.message] ??
+          ("code" in error && typeof error.code === "string" ? errors[error.code] : undefined);
+        if (mapped) return sendError(reply, mapped[0], mapped[1], mapped[2], request.id);
+      }
+      throw error;
+    }
+    if (!images.front) {
+      return sendError(
+        reply,
+        400,
+        "IDENTITY_FRONT_REQUIRED",
+        "Adjunta el frente de la cédula para leer sus datos.",
+        request.id,
+      );
+    }
+    if (totalBytes > 7_000_000) {
+      return sendError(
+        reply,
+        413,
+        "OCR_IMAGES_TOO_LARGE",
+        "Las imágenes para lectura pesan demasiado. Toma fotos con menor resolución.",
+        request.id,
+      );
+    }
+    const limiterKey = `${params.data.tenantId}:${session.user.id}`;
+    if (identityOcrRateLimiter.isBlocked(limiterKey)) {
+      return sendError(
+        reply,
+        429,
+        "HERMES_OCR_RATE_LIMITED",
+        "Has realizado varias lecturas seguidas. Espera un minuto antes de intentar nuevamente.",
+        request.id,
+      );
+    }
+    identityOcrRateLimiter.registerFailure(limiterKey);
+    try {
+      const extraction = await dependencies.identityExtractor.extract({
+        front: images.front,
+        ...(images.back ? { back: images.back } : {}),
+      });
+      return reply.send({ extraction });
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "HERMES_OCR_UNAVAILABLE";
+      const busy = code === "HERMES_OCR_BUSY";
+      return sendError(
+        reply,
+        busy ? 429 : 502,
+        ["HERMES_OCR_TIMEOUT", "HERMES_OCR_INVALID_RESPONSE"].includes(code)
+          ? code
+          : "HERMES_OCR_UNAVAILABLE",
+        busy
+          ? "Hermes está atendiendo otras lecturas. Intenta nuevamente en unos segundos."
+          : "Hermes no pudo leer el documento. Toma fotos más nítidas o escribe los datos manualmente.",
+        request.id,
+      );
+    }
+  });
 
   app.get("/v1/tenants/:tenantId/borrowers", async (request, reply) => {
     const session = await requireUser(request, reply);

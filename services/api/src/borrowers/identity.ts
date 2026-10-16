@@ -78,10 +78,24 @@ export function decryptBorrowerDocumentNumber(secret: string, payload: string) {
 }
 
 export type BorrowerOcrFields = {
+  firstNames: string | null;
+  lastNames: string | null;
   fullName: string | null;
   documentNumber: string | null;
   country: string | null;
   documentType: string | null;
+  nationality: string | null;
+  birthDate: string | null;
+  birthPlace: string | null;
+  sex: string | null;
+  height: string | null;
+  bloodType: string | null;
+  issueDate: string | null;
+  issuePlace: string | null;
+  expirationDate: string | null;
+  serialNumber: string | null;
+  mrzLines: string[];
+  barcodeData: string | null;
 };
 
 export function encryptBorrowerOcrFields(secret: string, fields: BorrowerOcrFields) {
@@ -108,10 +122,27 @@ export function decryptBorrowerOcrFields(secret: string, payload: string): Borro
     decipher.final(),
   ]).toString("utf8");
   const parsed = JSON.parse(raw) as Partial<BorrowerOcrFields>;
+  const text = (value: unknown) => (typeof value === "string" ? value : null);
   return {
-    fullName: typeof parsed.fullName === "string" ? parsed.fullName : null,
-    documentNumber: typeof parsed.documentNumber === "string" ? parsed.documentNumber : null,
-    country: typeof parsed.country === "string" ? parsed.country : null,
-    documentType: typeof parsed.documentType === "string" ? parsed.documentType : null,
+    firstNames: text(parsed.firstNames),
+    lastNames: text(parsed.lastNames),
+    fullName: text(parsed.fullName),
+    documentNumber: text(parsed.documentNumber),
+    country: text(parsed.country),
+    documentType: text(parsed.documentType),
+    nationality: text(parsed.nationality),
+    birthDate: text(parsed.birthDate),
+    birthPlace: text(parsed.birthPlace),
+    sex: text(parsed.sex),
+    height: text(parsed.height),
+    bloodType: text(parsed.bloodType),
+    issueDate: text(parsed.issueDate),
+    issuePlace: text(parsed.issuePlace),
+    expirationDate: text(parsed.expirationDate),
+    serialNumber: text(parsed.serialNumber),
+    mrzLines: Array.isArray(parsed.mrzLines)
+      ? parsed.mrzLines.filter((value): value is string => typeof value === "string").slice(0, 3)
+      : [],
+    barcodeData: text(parsed.barcodeData),
   };
 }

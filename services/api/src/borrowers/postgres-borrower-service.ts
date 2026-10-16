@@ -7,6 +7,7 @@ import type {
 } from "@cobranzapp/contracts";
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
+import type { BorrowerOcrFields } from "./identity.js";
 import {
   borrowerDocumentLookupHmac,
   borrowerSharedDocumentLookupHmac,
@@ -337,7 +338,7 @@ export function createPostgresBorrowerService(
     const extraction = await client.query<{ id: string }>(
       `INSERT INTO borrower_document_ocr_extractions
          (tenant_id, borrower_id, document_id, status, model_name)
-       VALUES ($1, $2, $3, 'pending', 'tesseract-spa-v1')
+       VALUES ($1, $2, $3, 'pending', 'hermes-cobranzapp-ocr-v1')
        ON CONFLICT (tenant_id, borrower_id, document_id) DO UPDATE
          SET status = CASE
            WHEN borrower_document_ocr_extractions.status IN ('failed', 'rejected') THEN 'pending'
@@ -857,9 +858,28 @@ export function createPostgresBorrowerService(
           [tenantId, borrowerId],
         );
         if (!borrower.rows[0]) return { status: "not_found" };
-        let candidate = extraction.fields_ciphertext
+        let candidate: BorrowerOcrFields = extraction.fields_ciphertext
           ? decryptBorrowerOcrFields(identitySecret, extraction.fields_ciphertext)
-          : { fullName: null, documentNumber: null, country: null, documentType: null };
+          : {
+              firstNames: null,
+              lastNames: null,
+              fullName: null,
+              documentNumber: null,
+              country: null,
+              documentType: null,
+              nationality: null,
+              birthDate: null,
+              birthPlace: null,
+              sex: null,
+              height: null,
+              bloodType: null,
+              issueDate: null,
+              issuePlace: null,
+              expirationDate: null,
+              serialNumber: null,
+              mrzLines: [],
+              barcodeData: null,
+            };
         candidate = {
           ...candidate,
           fullName: input.fullName ?? candidate.fullName,

@@ -1,3 +1,4 @@
+import { createHermesIdentityExtractor } from "@cobranzapp/hermes-ocr";
 import pg from "pg";
 import { buildApp } from "./app.js";
 import { parseMfaEncryptionKey } from "./auth/mfa.js";
@@ -21,6 +22,14 @@ const pool = new pg.Pool({
 });
 
 const app = buildApp({
+  identityExtractor:
+    config.HERMES_OCR_URL && config.HERMES_OCR_API_KEY
+      ? createHermesIdentityExtractor({
+          endpoint: config.HERMES_OCR_URL,
+          apiKey: config.HERMES_OCR_API_KEY,
+          timeoutMs: config.HERMES_OCR_TIMEOUT_MS,
+        })
+      : undefined,
   contactMailer: config.RESEND_API_KEY
     ? createResendContactMailer({
         apiKey: config.RESEND_API_KEY,
