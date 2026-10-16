@@ -9,6 +9,7 @@ backup_timer=${5:-}
 backup_verify_script=${6:-}
 backup_verify_service=${7:-}
 backup_verify_timer=${8:-}
+compose_file=${9:-}
 
 if [[ ! "$release" =~ ^[0-9a-f]{40}$ ]]; then
   echo "Invalid release" >&2
@@ -25,6 +26,10 @@ for file in "$backup_script" "$backup_service" "$backup_timer" \
     exit 66
   fi
 done
+if [[ ! -f "$compose_file" ]]; then
+  echo "Compose file not found: $compose_file" >&2
+  exit 66
+fi
 
 cd /srv/cobranzapp
 umask 077
@@ -34,6 +39,7 @@ install -m 0644 "$backup_timer" /etc/systemd/system/cobranzapp-backup.timer
 install -m 0700 "$backup_verify_script" /srv/cobranzapp/verify-cobranzapp-backup.sh
 install -m 0644 "$backup_verify_service" /etc/systemd/system/cobranzapp-backup-verify.service
 install -m 0644 "$backup_verify_timer" /etc/systemd/system/cobranzapp-backup-verify.timer
+install -m 0600 "$compose_file" /srv/cobranzapp/compose.yaml
 systemctl daemon-reload
 systemctl enable cobranzapp-backup.timer >/dev/null
 systemctl enable cobranzapp-backup-verify.timer >/dev/null

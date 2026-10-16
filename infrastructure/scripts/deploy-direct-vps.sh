@@ -78,8 +78,11 @@ sshpass -e scp "${ssh_opts[@]}" \
 sshpass -e scp "${ssh_opts[@]}" \
   infrastructure/systemd/cobranzapp-backup-verify.timer \
   "${user}@${host}:${remote_tmp}.backup-verify.timer"
+sshpass -e scp "${ssh_opts[@]}" \
+  infrastructure/compose.production.yaml \
+  "${user}@${host}:${remote_tmp}.compose.yaml"
 
 sshpass -e ssh "${ssh_opts[@]}" "${user}@${host}" \
-  "chmod 700 '${remote_tmp}.sh' '${remote_tmp}.backup.sh' '${remote_tmp}.backup-verify.sh' && '${remote_tmp}.sh' '${release}' '${archive}' '${remote_tmp}.backup.sh' '${remote_tmp}.backup.service' '${remote_tmp}.backup.timer' '${remote_tmp}.backup-verify.sh' '${remote_tmp}.backup-verify.service' '${remote_tmp}.backup-verify.timer' && rm -f '${remote_tmp}.sh' '${remote_tmp}.backup.sh' '${remote_tmp}.backup.service' '${remote_tmp}.backup.timer' '${remote_tmp}.backup-verify.sh' '${remote_tmp}.backup-verify.service' '${remote_tmp}.backup-verify.timer'"
+  "chmod 700 '${remote_tmp}.sh' '${remote_tmp}.backup.sh' '${remote_tmp}.backup-verify.sh' && '${remote_tmp}.sh' '${release}' '${archive}' '${remote_tmp}.backup.sh' '${remote_tmp}.backup.service' '${remote_tmp}.backup.timer' '${remote_tmp}.backup-verify.sh' '${remote_tmp}.backup-verify.service' '${remote_tmp}.backup-verify.timer' '${remote_tmp}.compose.yaml' && rm -f '${remote_tmp}.sh' '${remote_tmp}.backup.sh' '${remote_tmp}.backup.service' '${remote_tmp}.backup.timer' '${remote_tmp}.backup-verify.sh' '${remote_tmp}.backup-verify.service' '${remote_tmp}.backup-verify.timer' '${remote_tmp}.compose.yaml'"
 
 echo "Direct deployment completed: ${release}"

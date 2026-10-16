@@ -36,6 +36,11 @@ services:
       SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-8}
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL}
       BORROWER_DOCUMENTS_ROOT: /var/lib/cobranzapp/documents
+      HERMES_OCR_URL: ${HERMES_OCR_URL:-http://host.docker.internal:8650/v1/chat/completions}
+      HERMES_OCR_API_KEY: ${HERMES_OCR_API_KEY}
+      HERMES_OCR_TIMEOUT_MS: ${HERMES_OCR_TIMEOUT_MS:-45000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,6 +68,11 @@ services:
       DATABASE_URL: postgresql://${WORKER_DATABASE_USER}:${WORKER_DATABASE_PASSWORD}@postgres:5432/${POSTGRES_DB}
       WORKER_LEASE_SECONDS: ${WORKER_LEASE_SECONDS:-120}
       BORROWER_DOCUMENTS_ROOT: /var/lib/cobranzapp/documents
+      HERMES_OCR_URL: ${HERMES_OCR_URL:-http://host.docker.internal:8650/v1/chat/completions}
+      HERMES_OCR_API_KEY: ${HERMES_OCR_API_KEY}
+      HERMES_OCR_TIMEOUT_MS: ${HERMES_OCR_TIMEOUT_MS:-45000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
