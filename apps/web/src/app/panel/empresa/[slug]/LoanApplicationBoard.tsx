@@ -3,7 +3,12 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { fetchWithTimeout } from "../../../../lib/fetch-with-timeout";
-import { formatCop, normalizeCopInput } from "../../../../lib/financial-display";
+import {
+  formatCop,
+  formatCopInput,
+  formatPercentage,
+  normalizeCopInput,
+} from "../../../../lib/financial-display";
 import type {
   Borrower,
   FinancialSchedulePreview,
@@ -225,7 +230,9 @@ export function LoanApplicationBoard({
       {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ excessAmount: String(form.get("excessAmount") ?? "0").trim() }),
+        body: JSON.stringify({
+          excessAmount: normalizeCopInput(String(form.get("excessAmount") ?? "0")),
+        }),
       },
     ).catch(() => null);
     if (!response?.ok) {
@@ -321,7 +328,7 @@ export function LoanApplicationBoard({
                   <strong>{application.borrowerName}</strong>
                   <small>
                     {application.loanProductName} · {formatCop(application.requestedPrincipal)} ·{" "}
-                    {application.nominalRate}% total ·{" "}
+                    {formatPercentage(application.nominalRate)}% total ·{" "}
                     {frequencyLabels[application.paymentFrequency]}
                     {" · "}
                     {application.paidInstallments}/{application.requestedTermCount} cuotas
@@ -376,9 +383,12 @@ export function LoanApplicationBoard({
                       <label>
                         Excedente de renovación (COP)
                         <input
-                          inputMode="decimal"
+                          inputMode="numeric"
                           name="excessAmount"
-                          pattern="[0-9]+(\\.[0-9]{1,2})?"
+                          onInput={(event) => {
+                            event.currentTarget.value = formatCopInput(event.currentTarget.value);
+                          }}
+                          pattern="[0-9.]+"
                           required
                         />
                       </label>
@@ -458,7 +468,7 @@ export function LoanApplicationBoard({
                 </option>
                 {availableProducts.map((product) => (
                   <option key={product.id} value={product.id}>
-                    {product.name} · {product.nominalRate}% · máximo{" "}
+                    {product.name} · {formatPercentage(product.nominalRate)}% · máximo{" "}
                     {formatCop(product.principalMax)}
                   </option>
                 ))}
@@ -472,11 +482,11 @@ export function LoanApplicationBoard({
                   inputMode="numeric"
                   name="requestedPrincipal"
                   onChange={(event) => {
-                    setRequestedPrincipal(event.target.value);
+                    setRequestedPrincipal(formatCopInput(event.target.value));
                     clearPreview();
                   }}
-                  pattern="[0-9]+"
-                  placeholder="500000"
+                  pattern="[0-9.]+"
+                  placeholder="500.000"
                   required
                   value={requestedPrincipal}
                 />
@@ -619,7 +629,7 @@ export function LoanApplicationBoard({
               </div>
               <div>
                 <dt>Interés total</dt>
-                <dd>{approvalConfirmation.nominalRate}%</dd>
+                <dd>{formatPercentage(approvalConfirmation.nominalRate)}%</dd>
               </div>
               <div>
                 <dt>Cuota</dt>

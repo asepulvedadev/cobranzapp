@@ -1,7 +1,12 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { formatCop, normalizeCopInput } from "../../../../lib/financial-display";
+import {
+  formatCop,
+  formatCopInput,
+  formatPercentage,
+  normalizeCopInput,
+} from "../../../../lib/financial-display";
 import type { LoanProduct } from "../../../../lib/platform";
 import { Modal } from "../../Modal";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
@@ -42,7 +47,9 @@ export function LoanSchedulePreview({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [principal, setPrincipal] = useState(product.principalMin.split(".")[0] ?? "");
+  const [principal, setPrincipal] = useState(
+    formatCopInput(product.principalMin.split(".")[0] ?? ""),
+  );
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -87,7 +94,7 @@ export function LoanSchedulePreview({
           <div className="schedule-modal-context">
             <strong>{product.name}</strong>
             <span>
-              {product.nominalRate}% de interés total · cuotas{" "}
+              {formatPercentage(product.nominalRate)}% de interés total · cuotas{" "}
               {frequencyLabels[product.paymentFrequency]}
             </span>
           </div>
@@ -103,8 +110,8 @@ export function LoanSchedulePreview({
                   <input
                     inputMode="numeric"
                     name="principal"
-                    onChange={(event) => setPrincipal(event.target.value)}
-                    pattern="[0-9]+"
+                    onChange={(event) => setPrincipal(formatCopInput(event.target.value))}
+                    pattern="[0-9.]+"
                     required
                     value={principal}
                   />

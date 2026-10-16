@@ -2,7 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
-import { normalizeCopInput, normalizeRateInput } from "../../../../lib/financial-display";
+import {
+  formatCopInput,
+  formatPercentage,
+  normalizeCopInput,
+  normalizeRateInput,
+} from "../../../../lib/financial-display";
 import type { LoanProduct } from "../../../../lib/platform";
 import { Modal } from "../../Modal";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
@@ -21,8 +26,10 @@ export function LoanProductDraftEditor({
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [principalMax, setPrincipalMax] = useState(product.principalMax.split(".")[0] ?? "");
-  const [nominalRate, setNominalRate] = useState(product.nominalRate);
+  const [principalMax, setPrincipalMax] = useState(
+    formatCopInput(product.principalMax.split(".")[0] ?? ""),
+  );
+  const [nominalRate, setNominalRate] = useState(formatPercentage(product.nominalRate));
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -82,28 +89,28 @@ export function LoanProductDraftEditor({
                 <input
                   inputMode="numeric"
                   name="principalMax"
-                  onChange={(event) => setPrincipalMax(event.target.value)}
-                  pattern="[0-9]+"
+                  onChange={(event) => setPrincipalMax(formatCopInput(event.target.value))}
+                  pattern="[0-9.]+"
                   required
                   value={principalMax}
                 />
               </span>
-              <small>Escribe solo números, sin puntos ni comas.</small>
+              <small>Los puntos de miles se agregan automáticamente.</small>
             </label>
             <label>
               Interés total sobre el préstamo
               <span className="financial-input-shell financial-rate-input">
                 <input
-                  inputMode="decimal"
+                  inputMode="numeric"
                   name="nominalRate"
-                  onChange={(event) => setNominalRate(event.target.value)}
-                  pattern="[0-9]+([.,][0-9]{1,2})?"
+                  onChange={(event) => setNominalRate(normalizeRateInput(event.target.value))}
+                  pattern="[0-9]+"
                   required
                   value={nominalRate}
                 />
                 <b>%</b>
               </span>
-              <small>Ejemplo: 10 significa diez por ciento total.</small>
+              <small>Escribe un porcentaje entero. Ejemplo: 10 significa diez por ciento.</small>
             </label>
             <FinancialRuleSummary principal={principalMax} rate={nominalRate} />
             {message ? (

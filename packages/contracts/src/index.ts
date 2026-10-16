@@ -808,6 +808,7 @@ export const loanProductRateBasisSchema = z.enum([
 export const loanProductComplianceStatusSchema = z.enum(["pending", "approved", "expired"]);
 const decimalAmountSchema = z.string().regex(/^\d{1,12}(?:\.\d{1,2})?$/, "Monto decimal inválido.");
 const decimalRateSchema = z.string().regex(/^\d{1,4}(?:\.\d{1,8})?$/, "Tasa decimal inválida.");
+const wholeRateSchema = z.string().regex(/^\d{1,4}$/, "El porcentaje debe ser un número entero.");
 
 export const loanProductCreateRequestSchema = z
   .object({
@@ -817,8 +818,8 @@ export const loanProductCreateRequestSchema = z
     termCount: z.number().int().min(1).max(365),
     paymentFrequency: loanProductFrequencySchema,
     rateBasis: loanProductRateBasisSchema,
-    nominalRate: decimalRateSchema,
-    documentationFeeRate: decimalRateSchema,
+    nominalRate: wholeRateSchema,
+    documentationFeeRate: wholeRateSchema,
     complianceSourceRef: z.string().trim().min(3).max(240).nullable(),
   })
   .superRefine((value, context) => {

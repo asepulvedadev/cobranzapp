@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import {
   formatCop,
+  formatCopInput,
+  formatPercentage,
   normalizeCopInput,
   normalizeRateInput,
 } from "../../../../lib/financial-display";
@@ -138,11 +140,11 @@ export function CreditProductCatalog({
               <dl className="credit-product-facts">
                 <div>
                   <dt>Interés total</dt>
-                  <dd>{product.nominalRate}%</dd>
+                  <dd>{formatPercentage(product.nominalRate)}%</dd>
                 </div>
                 <div>
                   <dt>Cargo adicional</dt>
-                  <dd>{product.documentationFeeRate}%</dd>
+                  <dd>{formatPercentage(product.documentationFeeRate)}%</dd>
                 </div>
                 <div>
                   <dt>Validación</dt>
@@ -196,30 +198,30 @@ export function CreditProductCatalog({
                 <input
                   inputMode="numeric"
                   name="principalMax"
-                  onChange={(event) => setPrincipalMax(event.target.value)}
-                  pattern="[0-9]+"
-                  placeholder="5000000"
+                  onChange={(event) => setPrincipalMax(formatCopInput(event.target.value))}
+                  pattern="[0-9.]+"
+                  placeholder="5.000.000"
                   required
                   value={principalMax}
                 />
               </span>
-              <small>Escribe solo números, sin puntos ni comas.</small>
+              <small>Los puntos de miles se agregan automáticamente.</small>
             </label>
             <label>
               Interés total sobre el préstamo
               <span className="financial-input-shell financial-rate-input">
                 <input
-                  inputMode="decimal"
+                  inputMode="numeric"
                   name="nominalRate"
-                  onChange={(event) => setNominalRate(event.target.value)}
-                  pattern="[0-9]+([.,][0-9]{1,2})?"
+                  onChange={(event) => setNominalRate(normalizeRateInput(event.target.value))}
+                  pattern="[0-9]+"
                   placeholder="10"
                   required
                   value={nominalRate}
                 />
                 <b>%</b>
               </span>
-              <small>Ejemplo: 10 significa diez por ciento total, no 0,10.</small>
+              <small>Escribe un porcentaje entero. Ejemplo: 10 significa diez por ciento.</small>
             </label>
             <FinancialRuleSummary principal={principalMax} rate={nominalRate} />
             <button disabled={isBusy} type="submit">

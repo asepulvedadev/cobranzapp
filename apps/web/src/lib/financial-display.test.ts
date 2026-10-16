@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { flatRateTotal, normalizeCopInput, normalizeRateInput } from "./financial-display";
+import {
+  flatRateTotal,
+  formatCopInput,
+  formatPercentage,
+  normalizeCopInput,
+  normalizeRateInput,
+} from "./financial-display";
 
 describe("financial display input helpers", () => {
   it("normalizes Colombian-friendly values before sending them to the API", () => {
     expect(normalizeCopInput("$ 5.000.000")).toBe("5000000");
-    expect(normalizeRateInput("10,5")).toBe("10.5");
+    expect(formatCopInput("5000000")).toBe("5.000.000");
+    expect(formatCopInput("$ 05.000.000")).toBe("5.000.000");
+    expect(normalizeRateInput("10,5")).toBe("10");
+    expect(formatPercentage("20.00000000")).toBe("20");
   });
 
   it("previews a flat total rate without applying the percentage twice", () => {

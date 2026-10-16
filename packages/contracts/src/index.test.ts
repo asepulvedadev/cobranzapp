@@ -307,6 +307,14 @@ describe("shared API contracts", () => {
         termCount: 3,
       }).success,
     ).toBe(false);
+    expect(
+      loanProductCreateRequestSchema.safeParse({
+        ...base,
+        nominalRate: "10.5",
+        paymentFrequency: "daily",
+        termCount: 30,
+      }).success,
+    ).toBe(false);
   });
 
   it("keeps borrower verification totals independent from the visible page", () => {

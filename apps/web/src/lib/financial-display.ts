@@ -13,8 +13,20 @@ export function normalizeCopInput(value: string) {
   return value.replace(/\D/g, "");
 }
 
+export function formatCopInput(value: string) {
+  const digits = normalizeCopInput(value).replace(/^0+(?=\d)/, "");
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
 export function normalizeRateInput(value: string) {
-  return value.trim().replace(",", ".");
+  const trimmed = value.trim();
+  const digits = (trimmed.split(/[.,]/, 1)[0] ?? "").replace(/\D/g, "");
+  return trimmed.startsWith("-") ? `-${digits}` : digits;
+}
+
+export function formatPercentage(value: string | number) {
+  const rate = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(rate) ? String(Math.round(rate)) : "—";
 }
 
 export function flatRateTotal(principal: string, rate: string) {
