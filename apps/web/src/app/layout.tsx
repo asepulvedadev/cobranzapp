@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   description: "Clientes, rutas, verificación y seguimiento operativo para empresas colombianas.",
   applicationName: "cobranzapp",
   icons: {
-    apple: [{ url: "/pwa/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    apple: [{ url: "/pwa/apple-touch-icon-v2.png", sizes: "180x180", type: "image/png" }],
   },
   appleWebApp: {
     capable: true,
