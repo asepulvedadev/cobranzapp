@@ -2,6 +2,7 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { hashPassword } from "../auth/password.js";
 import { createPostgresBorrowerService } from "../borrowers/postgres-borrower-service.js";
+import { createPostgresCreditService } from "../credit/postgres-credit-service.js";
 
 const runtimeUrl = process.env.TEST_DATABASE_URL;
 const ownerUrl = process.env.TEST_MIGRATION_DATABASE_URL;
@@ -10,6 +11,8 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
   const developerId = crypto.randomUUID();
   const tenantId = crypto.randomUUID();
   const suffix = Date.now().toString(36);
+  const documentNumber = Date.now().toString().slice(-10);
+  const formattedDocumentNumber = `${documentNumber.slice(0, 1)}.${documentNumber.slice(1, 4)}.${documentNumber.slice(4, 7)}.${documentNumber.slice(7)}`;
   let runtimePool: pg.Pool;
   let ownerPool: pg.Pool;
 
@@ -42,6 +45,8 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
   afterAll(async () => {
     if (ownerPool) {
       await ownerPool.query("DELETE FROM audit_events WHERE tenant_id = $1", [tenantId]);
+      await ownerPool.query("DELETE FROM loan_applications WHERE tenant_id = $1", [tenantId]);
+      await ownerPool.query("DELETE FROM loan_products WHERE tenant_id = $1", [tenantId]);
       await ownerPool.query("DELETE FROM tenant_memberships WHERE tenant_id = $1", [tenantId]);
       await ownerPool.query("DELETE FROM tenants WHERE id = $1", [tenantId]);
       await ownerPool.query("DELETE FROM users WHERE id = $1", [developerId]);
@@ -57,7 +62,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
       fullName: "Cliente de Integración",
       country: "CO",
       documentType: "CC",
-      documentNumber: "1.234.567.890",
+      documentNumber: formattedDocumentNumber,
       phone: "+57 300 222 3344",
       homeAddress: "Calle 1 # 2-3",
       workAddress: "Carrera 4 # 5-6",
@@ -76,13 +81,13 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
       status: "created",
       borrower: {
         fullName: "Cliente de Integración",
-        identity: { documentType: "CC", documentLast4: "7890" },
+        identity: { documentType: "CC", documentLast4: documentNumber.slice(-4) },
       },
     });
     if (created.status !== "created") throw new Error("Borrower was not created");
-    expect(JSON.stringify(created)).not.toContain("1234567890");
+    expect(JSON.stringify(created)).not.toContain(documentNumber);
     await expect(
-      service.verifyShared(actor, tenantId, "1234567890", "borrower-verification-test"),
+      service.verifyShared(actor, tenantId, documentNumber, "borrower-verification-test"),
     ).resolves.toMatchObject({
       registered: true,
       fullName: "Cliente de Integración",
@@ -105,7 +110,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
         fullName: "Cliente Duplicado",
         country: "CO",
         documentType: "CC",
-        documentNumber: "1234567890",
+        documentNumber,
         phone: "+57 300 111 0000",
         homeAddress: "Calle 1 # 2-3",
         workAddress: "Carrera 4 # 5-6",
@@ -121,6 +126,46 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
         requestId: "borrower-create-duplicate-test",
       }),
     ).resolves.toEqual({ status: "duplicate_identity" });
+
+    const creditService = createPostgresCreditService(runtimePool);
+    const product = await creditService.createProduct(actor, tenantId, {
+      name: "Crédito de integración",
+      principalMin: "1",
+      principalMax: "500000",
+      termCount: 30,
+      paymentFrequency: "daily",
+      rateBasis: "flat_total",
+      nominalRate: "20",
+      documentationFeeRate: "0",
+      complianceSourceRef: "integration-test",
+      requestId: "credit-product-create-test",
+    });
+    expect(product.status).toBe("created");
+    if (product.status !== "created") throw new Error("Loan product was not created");
+    const application = await creditService.createApplication(actor, tenantId, {
+      borrowerId: created.borrower.id,
+      loanProductId: product.product.id,
+      requestedPrincipal: "400000",
+      paymentFrequency: "daily",
+      requestedTermCount: 30,
+      purpose: null,
+      requestId: "loan-application-create-test",
+    });
+    expect(application).toMatchObject({
+      status: "created",
+      application: { requestedPrincipal: "400000.00", status: "active" },
+    });
+    const applicationAudit = await ownerPool.query<{ metadata: Record<string, unknown> }>(
+      `SELECT metadata FROM audit_events
+        WHERE tenant_id = $1 AND request_id = 'loan-application-create-test'`,
+      [tenantId],
+    );
+    expect(applicationAudit.rows[0]?.metadata).toMatchObject({
+      status: "active",
+      actorRole: "owner",
+      requestedPrincipal: 400000,
+      nominalRate: 20,
+    });
 
     const documentKeyPrefix = `tenant/${tenantId}/borrowers/${created.borrower.id}/documents`;
     for (const document of [

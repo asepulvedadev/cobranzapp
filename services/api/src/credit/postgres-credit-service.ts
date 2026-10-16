@@ -325,8 +325,8 @@ export function createPostgresCreditService(pool: Pool): CreditService {
             `INSERT INTO audit_events
                (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
              VALUES ($1, $2, 'loan_product.draft_updated', 'loan_product', $3, $4,
-                     jsonb_build_object('status', 'draft', 'rateBasis', $5,
-                       'paymentFrequency', $6))`,
+                     jsonb_build_object('status', 'draft', 'rateBasis', $5::text,
+                       'paymentFrequency', $6::text))`,
             [
               tenantId,
               actor.userId,
@@ -386,7 +386,8 @@ export function createPostgresCreditService(pool: Pool): CreditService {
           `INSERT INTO audit_events
              (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
            VALUES ($1, $2, 'loan_product.submitted_for_review', 'loan_product', $3, $4,
-                   jsonb_build_object('status', 'under_review', 'complianceSourceRef', $5))`,
+                   jsonb_build_object('status', 'under_review',
+                     'complianceSourceRef', $5::text))`,
           [tenantId, actor.userId, productId, requestId, product.compliance_source_ref],
         );
         return { status: "submitted", product: mapProduct(row) };
@@ -711,10 +712,12 @@ export function createPostgresCreditService(pool: Pool): CreditService {
           `INSERT INTO audit_events
              (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
              VALUES ($1, $2, $5, 'loan_application', $3, $4,
-                   jsonb_build_object('status', $6, 'actorRole', $7, 'approvalMode', $8,
-                     'borrowerId', $9, 'loanProductId', $10, 'requestedPrincipal', $11,
-                     'paymentFrequency', $12, 'termCount', $13, 'rateBasis', $14,
-                     'nominalRate', $15, 'documentationFeeRate', $16))`,
+                   jsonb_build_object('status', $6::text, 'actorRole', $7::text,
+                     'approvalMode', $8::text, 'borrowerId', $9::uuid,
+                     'loanProductId', $10::uuid, 'requestedPrincipal', $11::numeric,
+                     'paymentFrequency', $12::text, 'termCount', $13::integer,
+                     'rateBasis', $14::text, 'nominalRate', $15::numeric,
+                     'documentationFeeRate', $16::numeric))`,
           [
             tenantId,
             actor.userId,
@@ -859,7 +862,8 @@ export function createPostgresCreditService(pool: Pool): CreditService {
           `INSERT INTO audit_events
              (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
            VALUES ($1, $2, 'loan_payment.recorded', 'loan_application', $3, $4,
-                   jsonb_build_object('installmentNumber', $5, 'amount', $6, 'status', $7))`,
+                   jsonb_build_object('installmentNumber', $5::integer,
+                     'amount', $6::numeric, 'status', $7::text))`,
           [
             tenantId,
             actor.userId,
@@ -1022,9 +1026,10 @@ export function createPostgresCreditService(pool: Pool): CreditService {
           `INSERT INTO audit_events
              (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
            VALUES ($1, $2, 'loan_application.renewed', 'loan_application', $3, $4,
-                   jsonb_build_object('renewedFromId', $5, 'outstanding', $6,
-                     'excessAmount', $7, 'renewedPrincipal', $8, 'status', $9,
-                     'actorRole', $10, 'approvalMode', $11))`,
+                   jsonb_build_object('renewedFromId', $5::uuid, 'outstanding', $6::numeric,
+                     'excessAmount', $7::numeric, 'renewedPrincipal', $8::numeric,
+                     'status', $9::text, 'actorRole', $10::text,
+                     'approvalMode', $11::text))`,
           [
             tenantId,
             actor.userId,
@@ -1281,12 +1286,13 @@ export function createPostgresCreditService(pool: Pool): CreditService {
           `INSERT INTO audit_events
              (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
            VALUES ($1, $2, 'loan_application.approved', 'loan_application', $3, $4,
-                   jsonb_build_object('fromStatus', $5, 'status', 'active',
-                     'approverRole', $6, 'approvalMode', $7, 'createdByRole', $8,
-                     'borrowerId', $9, 'loanProductId', $10, 'requestedPrincipal', $11,
-                     'paymentFrequency', $12, 'termCount', $13, 'rateBasis', $14,
-                     'nominalRate', $15, 'documentationFeeRate', $16,
-                     'renewedFromId', $17))`,
+                   jsonb_build_object('fromStatus', $5::text, 'status', 'active',
+                     'approverRole', $6::text, 'approvalMode', $7::text,
+                     'createdByRole', $8::text, 'borrowerId', $9::uuid,
+                     'loanProductId', $10::uuid, 'requestedPrincipal', $11::numeric,
+                     'paymentFrequency', $12::text, 'termCount', $13::integer,
+                     'rateBasis', $14::text, 'nominalRate', $15::numeric,
+                     'documentationFeeRate', $16::numeric, 'renewedFromId', $17::uuid))`,
           [
             tenantId,
             actor.userId,
