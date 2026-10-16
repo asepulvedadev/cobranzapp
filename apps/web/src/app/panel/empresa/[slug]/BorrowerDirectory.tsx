@@ -585,7 +585,7 @@ export function BorrowerDirectory({
     const createdName = String(form.get("fullName") ?? "").trim();
     event.currentTarget.reset();
     setMessage(
-      "Cliente creado. Las imágenes quedaron privadas y el OCR se procesará en segundo plano para revisión humana.",
+      "Cliente creado. Las imágenes quedaron privadas y el OCR se procesará en segundo plano.",
     );
     setToastMessage(`${createdName || "Cliente"} creado correctamente.`);
     setIsError(false);

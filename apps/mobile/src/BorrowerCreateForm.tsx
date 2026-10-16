@@ -325,7 +325,7 @@ export function BorrowerCreateForm({
         });
         setUploadedUploads((current) => [...current, upload.key]);
       }
-      setMessage("Cliente creado. Sus documentos quedaron en revisión humana.");
+      setMessage("Cliente creado. Sus documentos quedaron guardados de forma privada.");
       setFullName("");
       setDocumentNumber("");
       setPhone("");

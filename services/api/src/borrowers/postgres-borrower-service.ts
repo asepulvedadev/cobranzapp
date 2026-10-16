@@ -288,6 +288,16 @@ function mapOcrRow(row: OcrRow, identitySecret: string): BorrowerOcrExtraction {
   };
 }
 
+export function borrowerCreationPolicy(role: TenantActor["tenantRole"]) {
+  if (role === "owner" || role === "supervisor") {
+    return { verificationState: "reviewed" as const, approvalMode: "role_auto" as const };
+  }
+  if (role === "collector") {
+    return { verificationState: "manual_pending" as const, approvalMode: null };
+  }
+  throw new Error("UNSUPPORTED_BORROWER_CREATOR_ROLE");
+}
+
 export function createPostgresBorrowerService(
   pool: Pool,
   identitySecret: string,
@@ -369,6 +379,79 @@ export function createPostgresBorrowerService(
           side: input.side,
         }),
       ],
+    );
+  }
+
+  async function applyAutomaticBorrowerApproval(
+    client: Pick<PoolClient, "query">,
+    tenantId: string,
+    borrowerId: string,
+    requestId: string,
+  ) {
+    const state = await client.query<{
+      created_by: string;
+      created_by_role: "owner" | "supervisor" | "collector" | "legacy";
+      verification_state: Borrower["identity"]["verificationState"];
+    }>(
+      `SELECT borrower.created_by, borrower.created_by_role, identity.verification_state
+         FROM borrowers borrower
+         JOIN borrower_identities identity
+           ON identity.tenant_id = borrower.tenant_id
+          AND identity.borrower_id = borrower.id
+        WHERE borrower.tenant_id = $1 AND borrower.id = $2
+        FOR UPDATE OF identity`,
+      [tenantId, borrowerId],
+    );
+    const borrower = state.rows[0];
+    if (
+      !borrower ||
+      !["owner", "supervisor"].includes(borrower.created_by_role) ||
+      borrower.verification_state !== "manual_pending"
+    ) {
+      return;
+    }
+    const documents = await client.query<{ identity_front: boolean; profile_photo: boolean }>(
+      `SELECT
+         COALESCE(bool_or(category = 'identity' AND side = 'front'), false) AS identity_front,
+         COALESCE(bool_or(category = 'profile_photo'), false) AS profile_photo
+         FROM borrower_documents
+        WHERE tenant_id = $1 AND borrower_id = $2`,
+      [tenantId, borrowerId],
+    );
+    const required = documents.rows[0];
+    if (!required?.identity_front || !required.profile_photo) return;
+
+    await client.query(
+      `UPDATE borrower_identities
+          SET verification_state = 'reviewed', updated_at = now()
+        WHERE tenant_id = $1 AND borrower_id = $2`,
+      [tenantId, borrowerId],
+    );
+    const checklist = {
+      legalNameConfirmed: true,
+      identityFrontConfirmed: true,
+      identityBackConfirmed: false,
+      profilePhotoConfirmed: true,
+      approvalMode: "role_auto",
+      creatorRole: borrower.created_by_role,
+    };
+    await client.query(
+      `INSERT INTO borrower_identity_reviews
+         (tenant_id, borrower_id, reviewer_user_id, decision, notes, checklist)
+       VALUES ($1, $2, $3, 'reviewed', $4, $5::jsonb)`,
+      [
+        tenantId,
+        borrowerId,
+        borrower.created_by,
+        "Aprobación automática por rol creador.",
+        JSON.stringify(checklist),
+      ],
+    );
+    await client.query(
+      `INSERT INTO audit_events
+         (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+       VALUES ($1, $2, 'borrower.created_and_approved', 'borrower', $3, $4, $5::jsonb)`,
+      [tenantId, borrower.created_by, borrowerId, requestId, JSON.stringify(checklist)],
     );
   }
 
@@ -465,6 +548,7 @@ export function createPostgresBorrowerService(
       const normalizedNumber = normalizeBorrowerDocumentNumber(input.documentNumber);
       const homeAddress = normalizeBorrowerAddress(input.homeAddress);
       const workAddress = normalizeBorrowerAddress(input.workAddress);
+      const creationPolicy = borrowerCreationPolicy(actor.tenantRole);
       try {
         return await withTransaction(actor, tenantId, async (client) => {
           const borrowerId = randomUUID();
@@ -504,7 +588,8 @@ export function createPostgresBorrowerService(
                (tenant_id, id, full_name, phone, whatsapp_phone, home_address, work_address,
                 home_address_status, work_address_status, home_address_confirmed_at,
                 work_address_confirmed_at, home_address_confirmed_by, work_address_confirmed_by,
-                profile_photo_object_key, consent_version, consent_evidence_ref, created_by)
+                profile_photo_object_key, consent_version, consent_evidence_ref, created_by,
+                created_by_role)
              VALUES ($1, $2, $3, $4, $5, $6, $7,
                      CASE WHEN $8 THEN 'confirmed' ELSE 'pending' END,
                      CASE WHEN $9 THEN 'confirmed' ELSE 'pending' END,
@@ -512,7 +597,7 @@ export function createPostgresBorrowerService(
                      CASE WHEN $9 THEN now() ELSE NULL END,
                      CASE WHEN $8 THEN $10::uuid ELSE NULL END,
                      CASE WHEN $9 THEN $10::uuid ELSE NULL END,
-                     $11, $12, $13, $10)`,
+                     $11, $12, $13, $10, $14)`,
               [
                 tenantId,
                 borrowerId,
@@ -527,6 +612,7 @@ export function createPostgresBorrowerService(
                 profileKey,
                 input.consentVersion,
                 input.consentEvidenceRef,
+                actor.tenantRole,
               ],
             );
             await client.query(
@@ -606,6 +692,9 @@ export function createPostgresBorrowerService(
                     (document) => document.category === "identity",
                   ).length,
                   emergencyContactCount: input.emergencyContacts.length,
+                  creatorRole: actor.tenantRole,
+                  approvalMode: creationPolicy.approvalMode,
+                  verificationState: creationPolicy.verificationState,
                 }),
               ],
             );
@@ -786,6 +875,7 @@ export function createPostgresBorrowerService(
             category: row.category,
             side: row.side,
           });
+          await applyAutomaticBorrowerApproval(client, tenantId, borrowerId, input.requestId);
           return {
             status: "created",
             document: {
