@@ -1125,11 +1125,35 @@ export const borrowerOcrExtractionStatusSchema = z.enum([
   "rejected",
   "failed",
 ]);
-export const borrowerOcrFieldsSchema = z.object({
+export const identityDocumentFieldsSchema = z.object({
+  firstNames: z.string().min(1).max(160).nullable(),
+  lastNames: z.string().min(1).max(160).nullable(),
   fullName: z.string().min(2).max(160).nullable(),
   documentNumber: z.string().min(4).max(32).nullable(),
   country: z.string().length(2).nullable(),
   documentType: z.string().min(2).max(30).nullable(),
+  nationality: z.string().min(1).max(80).nullable(),
+  birthDate: z.iso.date().nullable(),
+  birthPlace: z.string().min(1).max(160).nullable(),
+  sex: z.string().min(1).max(30).nullable(),
+  height: z.string().min(1).max(30).nullable(),
+  bloodType: z.string().min(1).max(30).nullable(),
+  issueDate: z.iso.date().nullable(),
+  issuePlace: z.string().min(1).max(160).nullable(),
+  expirationDate: z.iso.date().nullable(),
+  serialNumber: z.string().min(1).max(120).nullable(),
+  mrzLines: z.array(z.string().min(1).max(90)).max(3),
+  barcodeData: z.string().min(1).max(2_000).nullable(),
+});
+export const borrowerOcrFieldsSchema = identityDocumentFieldsSchema;
+export const identityDocumentExtractionSchema = z.object({
+  fields: identityDocumentFieldsSchema,
+  confidence: z.number().min(0).max(1),
+  warnings: z.array(z.string().min(1).max(240)).max(12),
+  sources: z.object({ front: z.boolean(), back: z.boolean() }),
+});
+export const identityDocumentExtractionResponseSchema = z.object({
+  extraction: identityDocumentExtractionSchema,
 });
 export const borrowerOcrExtractionSchema = z.object({
   id: z.uuid(),
@@ -1352,6 +1376,11 @@ export type BorrowerDocument = z.infer<typeof borrowerDocumentSchema>;
 export type BorrowerCreateRequest = z.infer<typeof borrowerCreateRequestSchema>;
 export type BorrowerReviewRequest = z.infer<typeof borrowerReviewRequestSchema>;
 export type BorrowerDocumentResponse = z.infer<typeof borrowerDocumentResponseSchema>;
+export type IdentityDocumentFields = z.infer<typeof identityDocumentFieldsSchema>;
+export type IdentityDocumentExtraction = z.infer<typeof identityDocumentExtractionSchema>;
+export type IdentityDocumentExtractionResponse = z.infer<
+  typeof identityDocumentExtractionResponseSchema
+>;
 export type BorrowerOcrExtraction = z.infer<typeof borrowerOcrExtractionSchema>;
 export type BorrowerOcrResponse = z.infer<typeof borrowerOcrResponseSchema>;
 export type BorrowerOcrConfirmRequest = z.infer<typeof borrowerOcrConfirmRequestSchema>;
