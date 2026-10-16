@@ -5,6 +5,7 @@ import {
   type BorrowerDirectory as BorrowerDirectoryData,
   borrowerAddressUpdateRequestSchema,
   borrowerCreateRequestSchema,
+  type IdentityDocumentExtraction,
 } from "@cobranzapp/contracts";
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, type FormEvent, useRef, useState } from "react";
@@ -63,78 +64,42 @@ const CREATE_STEPS = [
   { label: "Revisión", detail: "Confirma y guarda" },
 ] as const;
 
-const OCR_LABELS = new Set([
-  "REPUBLICA",
-  "REPUBLICA DE COLOMBIA",
-  "COLOMBIA",
-  "CEDULA",
-  "CEDULA DE CIUDADANIA",
-  "CIUDADANIA",
-  "IDENTIFICACION",
-  "IDENTIDAD",
-  "APELLIDOS",
-  "NOMBRES",
-  "SEXO",
-  "FECHA DE NACIMIENTO",
-  "LUGAR DE NACIMIENTO",
-  "FECHA DE EXPEDICION",
-  "LUGAR DE EXPEDICION",
-]);
-
-function cleanOcrLine(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toUpperCase();
+async function prepareOcrUpload(file: File) {
+  if (file.size <= 2_400_000) return file;
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("IMAGE_PROCESSING_UNAVAILABLE");
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.86),
+  );
+  if (!blob) throw new Error("IMAGE_PROCESSING_UNAVAILABLE");
+  return new File([blob], `${file.name.replace(/\.[^.]+$/, "") || "cedula"}.jpg`, {
+    type: "image/jpeg",
+  });
 }
 
-export function extractOcrIdentityFields(text: string) {
-  const normalized = text.replace(/\r/g, "\n");
-  const lines = normalized
-    .split("\n")
-    .map((line) => cleanOcrLine(line))
-    .filter(Boolean);
-  const numberCandidates = [
-    ...Array.from(
-      normalized.matchAll(
-        /(?:CC|CEDULA|CEDULA DE CIUDADANIA|DOCUMENTO|IDENTIFICACION|NUIP|NO\.?|NRO\.?)\s*[:#.-]?\s*([0-9][0-9 .-]{5,})/gi,
-      ),
-    ).map((match) => match[1] ?? ""),
-    ...Array.from(normalized.matchAll(/\b[0-9][0-9 .-]{6,12}[0-9]\b/g)).map((match) => match[0]),
-  ]
-    .map((value) => value.replace(/\D/g, ""))
-    .filter((value) => value.length >= 7 && value.length <= 12);
-
-  const afterLabel = (label: string) => {
-    const lineIndex = lines.findIndex((line) => line.includes(label));
-    if (lineIndex < 0) return "";
-    const sameLine = lines[lineIndex].replace(label, "").trim();
-    return sameLine || lines[lineIndex + 1] || "";
-  };
-  const surnames = afterLabel("APELLIDOS");
-  const names = afterLabel("NOMBRES");
-  const labelledName = [names, surnames].filter(Boolean).join(" ").trim();
-  const fallbackName = lines
-    .filter((line) => {
-      const words = line.split(" ");
-      return (
-        words.length >= 2 &&
-        words.length <= 6 &&
-        line.length >= 5 &&
-        !OCR_LABELS.has(line) &&
-        !/\d/.test(line) &&
-        !line.includes("REPUBLICA")
-      );
-    })
-    .sort((left, right) => right.length - left.length)[0];
-
-  return {
-    fullName: (labelledName || fallbackName || "").trim(),
-    documentNumber: numberCandidates[0] ?? "",
-  };
+function identityDetailRows(extraction: IdentityDocumentExtraction) {
+  const fields = extraction.fields;
+  return [
+    ["Nombres", fields.firstNames],
+    ["Apellidos", fields.lastNames],
+    ["Nacionalidad", fields.nationality],
+    ["Fecha de nacimiento", fields.birthDate],
+    ["Lugar de nacimiento", fields.birthPlace],
+    ["Sexo", fields.sex],
+    ["Estatura", fields.height],
+    ["Grupo sanguíneo / RH", fields.bloodType],
+    ["Fecha de expedición", fields.issueDate],
+    ["Lugar de expedición", fields.issuePlace],
+    ["Fecha de vencimiento", fields.expirationDate],
+    ["Número serial", fields.serialNumber],
+  ].filter((row): row is [string, string] => Boolean(row[1]));
 }
 
 export function BorrowerDirectory({
@@ -181,6 +146,7 @@ export function BorrowerDirectory({
   );
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrMessage, setOcrMessage] = useState("");
+  const [ocrExtraction, setOcrExtraction] = useState<IdentityDocumentExtraction | null>(null);
   const ocrRunRef = useRef(0);
   const createFormRef = useRef<HTMLFormElement>(null);
   const hasIdentityFrontPhoto = Boolean(selectedUploadNames.identityFront);
@@ -195,6 +161,7 @@ export function BorrowerDirectory({
     setOcrStatus("idle");
     setOcrProgress(0);
     setOcrMessage("");
+    setOcrExtraction(null);
     setIncludeSecondContact(false);
     setHomeAddressConfirmed(false);
     setWorkAddressConfirmed(false);
@@ -217,6 +184,7 @@ export function BorrowerDirectory({
     setIsError(false);
     if (file && (field === "identityFront" || field === "identityBack")) {
       setIdentityConfirmed(false);
+      setOcrExtraction(null);
       const nameInput = createFormRef.current?.elements.namedItem("fullName");
       const numberInput = createFormRef.current?.elements.namedItem("documentNumber");
       if (nameInput instanceof HTMLInputElement) nameInput.value = "";
@@ -246,52 +214,57 @@ export function BorrowerDirectory({
     setOcrMessage(
       back ? "Leyendo frente y reverso de la cédula…" : "Leyendo el frente de la cédula…",
     );
-    let completedImages = 0;
-    let worker: {
-      recognize: (image: File) => Promise<{ data: { text: string } }>;
-      terminate: () => Promise<unknown>;
-    } | null = null;
     try {
-      const { createWorker } = await import("tesseract.js");
-      worker = await createWorker("spa", 1, {
-        logger: (progress) => {
-          if (run !== ocrRunRef.current) return;
-          const currentProgress = Math.max(0, Math.min(1, progress.progress ?? 0));
-          const totalProgress = back
-            ? ((completedImages + currentProgress) / 2) * 100
-            : currentProgress * 100;
-          setOcrProgress(Math.round(totalProgress));
-        },
-      });
-      const frontResult = await worker.recognize(front);
+      const formData = new FormData();
+      const preparedFront = await prepareOcrUpload(front);
+      formData.append("front", preparedFront);
+      setOcrProgress(30);
+      if (back) formData.append("back", await prepareOcrUpload(back));
       if (run !== ocrRunRef.current) return;
-      completedImages = 1;
-      setOcrProgress(back ? 50 : 100);
-      const backText = back ? (await worker.recognize(back)).data.text : "";
+      setOcrProgress(55);
+      const response = await sensitiveFetch(
+        `/api/v1/tenants/${tenantId}/borrowers/identity-extract`,
+        { method: "POST", body: formData },
+      );
+      if (!response) throw new Error("No fue posible conectar con Hermes.");
+      const body = (await response.json().catch(() => ({}))) as {
+        extraction?: IdentityDocumentExtraction;
+        error?: { message?: string };
+      };
+      if (!response.ok || !body.extraction) {
+        throw new Error(formatApiError(body, "Hermes no pudo leer la cédula."));
+      }
       if (run !== ocrRunRef.current) return;
-      const fields = extractOcrIdentityFields(`${frontResult.data.text}\n${backText}`);
+      const extraction = body.extraction;
+      const fields = extraction.fields;
       const nameInput = createFormRef.current?.elements.namedItem("fullName");
       const numberInput = createFormRef.current?.elements.namedItem("documentNumber");
-      if (nameInput instanceof HTMLInputElement) nameInput.value = fields.fullName;
-      if (numberInput instanceof HTMLInputElement) numberInput.value = fields.documentNumber;
+      const typeInput = createFormRef.current?.elements.namedItem("documentType");
+      if (nameInput instanceof HTMLInputElement) nameInput.value = fields.fullName ?? "";
+      if (numberInput instanceof HTMLInputElement) numberInput.value = fields.documentNumber ?? "";
+      if (typeInput instanceof HTMLSelectElement && fields.documentType) {
+        typeInput.value = fields.documentType;
+      }
+      setOcrExtraction(extraction);
       const foundCount = Number(Boolean(fields.fullName)) + Number(Boolean(fields.documentNumber));
       setOcrStatus(foundCount === 2 ? "ready" : foundCount === 1 ? "partial" : "error");
       setOcrMessage(
         foundCount === 2
-          ? "Datos detectados automáticamente. Revísalos antes de continuar."
+          ? `Hermes organizó los datos con ${Math.round(extraction.confidence * 100)}% de confianza. Revísalos antes de continuar.`
           : foundCount === 1
-            ? "Detectamos un dato. Completa o corrige el otro antes de continuar."
-            : "No pudimos leer los datos. Toma fotos más nítidas o escríbelos manualmente.",
+            ? "Hermes detectó información parcial. Completa o corrige lo faltante."
+            : "Hermes no pudo identificar el nombre y número. Toma fotos más nítidas o escríbelos manualmente.",
       );
       setOcrProgress(100);
-    } catch {
+    } catch (error) {
       if (run !== ocrRunRef.current) return;
       setOcrStatus("error");
+      setOcrExtraction(null);
       setOcrMessage(
-        "No pudimos ejecutar la lectura automática. Puedes escribir los datos manualmente.",
+        error instanceof Error
+          ? error.message
+          : "Hermes no pudo ejecutar la lectura. Puedes escribir los datos manualmente.",
       );
-    } finally {
-      if (worker) await worker.terminate().catch(() => undefined);
     }
   }
 
@@ -1110,6 +1083,46 @@ export function BorrowerDirectory({
                       />
                     </label>
                   </div>
+                  {ocrExtraction ? (
+                    <div className="borrower-identity-all-data">
+                      <div className="borrower-identity-all-data-heading">
+                        <strong>Todos los datos leídos por Hermes</strong>
+                        <small>
+                          {ocrExtraction.sources.back ? "Frente y reverso" : "Solo frente"}
+                        </small>
+                      </div>
+                      {identityDetailRows(ocrExtraction).length ? (
+                        <dl>
+                          {identityDetailRows(ocrExtraction).map(([label, value]) => (
+                            <div key={label}>
+                              <dt>{label}</dt>
+                              <dd>{value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      ) : (
+                        <small>No se detectaron otros campos legibles.</small>
+                      )}
+                      {ocrExtraction.fields.mrzLines.length || ocrExtraction.fields.barcodeData ? (
+                        <details>
+                          <summary>Datos del reverso y lectura mecánica</summary>
+                          {ocrExtraction.fields.mrzLines.length ? (
+                            <pre>{ocrExtraction.fields.mrzLines.join("\n")}</pre>
+                          ) : null}
+                          {ocrExtraction.fields.barcodeData ? (
+                            <p>{ocrExtraction.fields.barcodeData}</p>
+                          ) : null}
+                        </details>
+                      ) : null}
+                      {ocrExtraction.warnings.length ? (
+                        <ul className="borrower-identity-warnings">
+                          {ocrExtraction.warnings.map((warning) => (
+                            <li key={warning}>{warning}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <label className="checkbox-row borrower-identity-confirmation">
                     <input
                       checked={identityConfirmed}

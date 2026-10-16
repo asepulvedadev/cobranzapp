@@ -19,6 +19,25 @@ function statusLabel(status: BorrowerOcrExtraction["status"]) {
   }[status];
 }
 
+function extractedDetailRows(extraction: BorrowerOcrExtraction) {
+  if (!extraction.fields) return [];
+  const fields = extraction.fields;
+  return [
+    ["Nombres", fields.firstNames],
+    ["Apellidos", fields.lastNames],
+    ["Nacionalidad", fields.nationality],
+    ["Nacimiento", fields.birthDate],
+    ["Lugar de nacimiento", fields.birthPlace],
+    ["Sexo", fields.sex],
+    ["Estatura", fields.height],
+    ["RH", fields.bloodType],
+    ["Expedición", fields.issueDate],
+    ["Lugar de expedición", fields.issuePlace],
+    ["Vencimiento", fields.expirationDate],
+    ["Serial", fields.serialNumber],
+  ].filter((row): row is [string, string] => Boolean(row[1]));
+}
+
 export function BorrowerOcrControl({
   borrowerId,
   tenantId,
@@ -128,6 +147,25 @@ export function BorrowerOcrControl({
                       ? "sin dato"
                       : `${Math.round(extraction.confidence * 100)}%`}
                   </small>
+                  {extractedDetailRows(extraction).length ? (
+                    <details>
+                      <summary>Ver todos los datos extraídos</summary>
+                      <dl>
+                        {extractedDetailRows(extraction).map(([label, value]) => (
+                          <div key={label}>
+                            <dt>{label}</dt>
+                            <dd>{value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                      {extraction.fields.mrzLines.length ? (
+                        <pre>{extraction.fields.mrzLines.join("\n")}</pre>
+                      ) : null}
+                      {extraction.fields.barcodeData ? (
+                        <p>{extraction.fields.barcodeData}</p>
+                      ) : null}
+                    </details>
+                  ) : null}
                   {extraction.status === "ready" ? (
                     <button disabled={busy} type="submit">
                       Confirmar datos
