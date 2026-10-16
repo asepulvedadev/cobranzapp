@@ -1051,6 +1051,9 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL tenant isolation", () => {
       teams: 1,
       pendingInvitations: 0,
       activeEmployeeSeats: 0,
+      activeCredits: 0,
+      creditApplicationsInReview: 0,
+      overdueInstallments: 0,
     });
     expect(collectorOverview?.branches.map((item) => item.id)).toEqual([branch?.id]);
     expect(collectorOverview?.teams.map((item) => item.id)).toEqual([team?.id]);
