@@ -5,6 +5,7 @@ import type { TenantActor } from "../tenancy/types.js";
 import { operationalPaymentState } from "./operational-schedule.js";
 import type {
   CreditService,
+  LoanApplicationApprovalResult,
   LoanApplicationResult,
   LoanApplicationReviewResult,
   LoanApplicationReviewStartResult,
@@ -46,6 +47,9 @@ type LoanApplicationRow = {
   paid_installments: number;
   purpose: string | null;
   status: LoanApplication["status"];
+  rate_basis: LoanProduct["rateBasis"];
+  nominal_rate: string;
+  documentation_fee_rate: string;
   created_at: Date;
   updated_at: Date;
 };
@@ -64,6 +68,20 @@ function canManageApplications(actor: TenantActor) {
 
 function canReviewApplications(actor: TenantActor) {
   return actor.tenantRole === "owner" || actor.tenantRole === "supervisor";
+}
+
+export function loanCreationPolicy(role: TenantActor["tenantRole"]) {
+  if (role === "collector") {
+    return { status: "submitted" as const, approvalMode: null, approvedByCreator: false };
+  }
+  if (role === "owner" || role === "supervisor") {
+    return {
+      status: "active" as const,
+      approvalMode: "role_auto" as const,
+      approvedByCreator: true,
+    };
+  }
+  throw new Error("UNSUPPORTED_LOAN_CREATOR_ROLE");
 }
 
 function mapProduct(row: LoanProductRow): LoanProduct {
@@ -87,6 +105,15 @@ function mapProduct(row: LoanProductRow): LoanProduct {
 }
 
 function mapApplication(row: LoanApplicationRow): LoanApplication {
+  const schedule = buildSchedulePreview({
+    principal: row.requested_principal,
+    termCount: row.requested_term_count,
+    paymentFrequency: row.payment_frequency,
+    rateBasis: row.rate_basis,
+    nominalRate: row.nominal_rate,
+    documentationFeeRate: row.documentation_fee_rate,
+    startDate: row.created_at.toISOString().slice(0, 10),
+  });
   const operationalState = operationalPaymentState({
     status: row.status,
     paymentFrequency: row.payment_frequency,
@@ -103,6 +130,12 @@ function mapApplication(row: LoanApplicationRow): LoanApplication {
     requestedPrincipal: row.requested_principal,
     paymentFrequency: row.payment_frequency,
     requestedTermCount: row.requested_term_count,
+    rateBasis: row.rate_basis,
+    nominalRate: row.nominal_rate,
+    documentationFeeRate: row.documentation_fee_rate,
+    interestTotal: schedule.interestTotal,
+    scheduledTotal: schedule.scheduledTotal,
+    installmentAmount: schedule.periods[0]?.installment ?? "0.00",
     paidInstallments: row.paid_installments,
     ...operationalState,
     purpose: row.purpose,
@@ -406,6 +439,9 @@ export function createPostgresCreditService(pool: Pool): CreditService {
                   application.paid_installments,
                   application.purpose,
                   application.status,
+                  application.rate_basis,
+                  application.nominal_rate,
+                  application.documentation_fee_rate,
                   application.created_at,
                   application.updated_at
              FROM loan_applications application
@@ -426,6 +462,7 @@ export function createPostgresCreditService(pool: Pool): CreditService {
     async createApplication(actor, tenantId, input): Promise<LoanApplicationResult> {
       if (!canManageApplications(actor)) return { status: "forbidden" };
       return withTransaction(actor, tenantId, async (client) => {
+        const creationPolicy = loanCreationPolicy(actor.tenantRole);
         const borrowerResult = await client.query<{ id: string }>(
           `SELECT id FROM borrowers
             WHERE tenant_id = $1 AND id = $2 AND status = 'active'`,
@@ -466,8 +503,10 @@ export function createPostgresCreditService(pool: Pool): CreditService {
           `INSERT INTO loan_applications
              (tenant_id, borrower_id, loan_product_id, requested_principal,
               payment_frequency, requested_term_count, purpose, status, created_by,
+              created_by_role, submitted_at, approved_by, approved_at, approval_mode,
               rate_basis, nominal_rate, documentation_fee_rate)
-           VALUES ($1, $2, $3, $4::numeric, $5, $6, $7, 'active', $8, $9, $10::numeric, $11::numeric)
+           VALUES ($1, $2, $3, $4::numeric, $5, $6, $7, $8, $9, $10, now(), $11,
+                   CASE WHEN $11::uuid IS NULL THEN NULL ELSE now() END, $12, $13, $14::numeric, $15::numeric)
            RETURNING id`,
           [
             tenantId,
@@ -477,7 +516,11 @@ export function createPostgresCreditService(pool: Pool): CreditService {
             input.paymentFrequency,
             input.requestedTermCount,
             input.purpose,
+            creationPolicy.status,
             actor.userId,
+            actor.tenantRole,
+            creationPolicy.approvedByCreator ? actor.userId : null,
+            creationPolicy.approvalMode,
             product.rate_basis,
             product.nominal_rate,
             product.documentation_fee_rate,
@@ -497,6 +540,9 @@ export function createPostgresCreditService(pool: Pool): CreditService {
                   application.paid_installments,
                   application.purpose,
                   application.status,
+                  application.rate_basis,
+                  application.nominal_rate,
+                  application.documentation_fee_rate,
                   application.created_at,
                   application.updated_at
              FROM loan_applications application
@@ -514,18 +560,30 @@ export function createPostgresCreditService(pool: Pool): CreditService {
         await client.query(
           `INSERT INTO audit_events
              (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
-             VALUES ($1, $2, 'loan_application.created_active', 'loan_application', $3, $4,
-                   jsonb_build_object('status', 'active', 'borrowerId', $5, 'loanProductId', $6,
-                     'paymentFrequency', $7, 'termCount', $8))`,
+             VALUES ($1, $2, $5, 'loan_application', $3, $4,
+                   jsonb_build_object('status', $6, 'actorRole', $7, 'approvalMode', $8,
+                     'borrowerId', $9, 'loanProductId', $10, 'requestedPrincipal', $11,
+                     'paymentFrequency', $12, 'termCount', $13, 'rateBasis', $14,
+                     'nominalRate', $15, 'documentationFeeRate', $16))`,
           [
             tenantId,
             actor.userId,
             applicationId,
             input.requestId,
+            creationPolicy.status === "active"
+              ? "loan_application.created_and_approved"
+              : "loan_application.created_pending_approval",
+            creationPolicy.status,
+            actor.tenantRole,
+            creationPolicy.approvalMode,
             input.borrowerId,
             input.loanProductId,
+            input.requestedPrincipal,
             input.paymentFrequency,
             input.requestedTermCount,
+            product.rate_basis,
+            product.nominal_rate,
+            product.documentation_fee_rate,
           ],
         );
         return { status: "created", application: mapApplication(row) };
@@ -564,11 +622,11 @@ export function createPostgresCreditService(pool: Pool): CreditService {
                   application.paid_installments,
                   application.purpose,
                   application.status,
-                  application.created_at,
-                  application.updated_at,
                   application.rate_basis,
                   application.nominal_rate,
-                  application.documentation_fee_rate
+                  application.documentation_fee_rate,
+                  application.created_at,
+                  application.updated_at
              FROM loan_applications application
              JOIN borrowers borrower
                ON borrower.tenant_id = application.tenant_id
@@ -630,6 +688,9 @@ export function createPostgresCreditService(pool: Pool): CreditService {
                   application.paid_installments,
                   application.purpose,
                   application.status,
+                  application.rate_basis,
+                  application.nominal_rate,
+                  application.documentation_fee_rate,
                   application.created_at,
                   application.updated_at
              FROM loan_applications application
@@ -670,6 +731,7 @@ export function createPostgresCreditService(pool: Pool): CreditService {
     async renewApplication(actor, tenantId, applicationId, input): Promise<LoanRenewalResult> {
       if (!canManageApplications(actor)) return { status: "forbidden" };
       return withTransaction(actor, tenantId, async (client) => {
+        const creationPolicy = loanCreationPolicy(actor.tenantRole);
         const current = await client.query<{
           id: string;
           borrower_id: string;
@@ -737,9 +799,11 @@ export function createPostgresCreditService(pool: Pool): CreditService {
         const inserted = await client.query<{ id: string }>(
           `INSERT INTO loan_applications
              (tenant_id, borrower_id, loan_product_id, requested_principal,
-              payment_frequency, requested_term_count, purpose, status, created_by, renewed_from_id,
+              payment_frequency, requested_term_count, purpose, status, created_by, created_by_role,
+              renewed_from_id, submitted_at, approved_by, approved_at, approval_mode,
               rate_basis, nominal_rate, documentation_fee_rate)
-           VALUES ($1, $2, $3, $4::numeric, $5, $6, $7, 'active', $8, $9, $10, $11::numeric, $12::numeric)
+           VALUES ($1, $2, $3, $4::numeric, $5, $6, $7, $8, $9, $10, $11, now(), $12,
+                   CASE WHEN $12::uuid IS NULL THEN NULL ELSE now() END, $13, $14, $15::numeric, $16::numeric)
            RETURNING id`,
           [
             tenantId,
@@ -749,8 +813,12 @@ export function createPostgresCreditService(pool: Pool): CreditService {
             state.payment_frequency,
             state.requested_term_count,
             state.purpose,
+            creationPolicy.status,
             actor.userId,
+            actor.tenantRole,
             applicationId,
+            creationPolicy.approvedByCreator ? actor.userId : null,
+            creationPolicy.approvedByCreator ? "renewal" : null,
             state.rate_basis,
             state.nominal_rate,
             state.documentation_fee_rate,
@@ -758,12 +826,14 @@ export function createPostgresCreditService(pool: Pool): CreditService {
         );
         const newId = inserted.rows[0]?.id;
         if (!newId) throw new Error("LOAN_RENEWAL_NOT_CREATED");
-        await client.query(
-          `UPDATE loan_applications
-              SET status = 'paid', updated_at = now()
-            WHERE tenant_id = $1 AND id = $2`,
-          [tenantId, applicationId],
-        );
+        if (creationPolicy.status === "active") {
+          await client.query(
+            `UPDATE loan_applications
+                SET status = 'paid', updated_at = now()
+              WHERE tenant_id = $1 AND id = $2`,
+            [tenantId, applicationId],
+          );
+        }
         const complete = await client.query<LoanApplicationRow>(
           `SELECT application.id,
                   application.borrower_id,
@@ -776,6 +846,9 @@ export function createPostgresCreditService(pool: Pool): CreditService {
                   application.paid_installments,
                   application.purpose,
                   application.status,
+                  application.rate_basis,
+                  application.nominal_rate,
+                  application.documentation_fee_rate,
                   application.created_at,
                   application.updated_at
              FROM loan_applications application
@@ -795,7 +868,8 @@ export function createPostgresCreditService(pool: Pool): CreditService {
              (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
            VALUES ($1, $2, 'loan_application.renewed', 'loan_application', $3, $4,
                    jsonb_build_object('renewedFromId', $5, 'outstanding', $6,
-                     'excessAmount', $7, 'renewedPrincipal', $8))`,
+                     'excessAmount', $7, 'renewedPrincipal', $8, 'status', $9,
+                     'actorRole', $10, 'approvalMode', $11))`,
           [
             tenantId,
             actor.userId,
@@ -805,6 +879,9 @@ export function createPostgresCreditService(pool: Pool): CreditService {
             formatCents(outstanding),
             input.excessAmount,
             renewedPrincipal,
+            creationPolicy.status,
+            actor.tenantRole,
+            creationPolicy.approvedByCreator ? "renewal" : null,
           ],
         );
         return {
@@ -874,6 +951,9 @@ export function createPostgresCreditService(pool: Pool): CreditService {
                   application.paid_installments,
                   application.purpose,
                   application.status,
+                  application.rate_basis,
+                  application.nominal_rate,
+                  application.documentation_fee_rate,
                   application.created_at,
                   application.updated_at
              FROM loan_applications application
@@ -935,6 +1015,9 @@ export function createPostgresCreditService(pool: Pool): CreditService {
                   application.paid_installments,
                   application.purpose,
                   application.status,
+                  application.rate_basis,
+                  application.nominal_rate,
+                  application.documentation_fee_rate,
                   application.created_at,
                   application.updated_at
              FROM loan_applications application
@@ -957,6 +1040,119 @@ export function createPostgresCreditService(pool: Pool): CreditService {
           [tenantId, actor.userId, applicationId, requestId],
         );
         return { status: "review_started", application: mapApplication(application) };
+      });
+    },
+
+    async approveApplication(
+      actor,
+      tenantId,
+      applicationId,
+      requestId,
+    ): Promise<LoanApplicationApprovalResult> {
+      if (!canReviewApplications(actor)) return { status: "forbidden" };
+      return withTransaction(actor, tenantId, async (client) => {
+        const current = await client.query<{
+          status: LoanApplication["status"];
+          created_by_role: string;
+          renewed_from_id: string | null;
+          borrower_id: string;
+          loan_product_id: string;
+          requested_principal: string;
+          payment_frequency: LoanApplication["paymentFrequency"];
+          requested_term_count: number;
+          rate_basis: LoanProduct["rateBasis"];
+          nominal_rate: string;
+          documentation_fee_rate: string;
+        }>(
+          `SELECT status, created_by_role, renewed_from_id, borrower_id, loan_product_id,
+                  requested_principal, payment_frequency, requested_term_count, rate_basis,
+                  nominal_rate, documentation_fee_rate
+             FROM loan_applications
+            WHERE tenant_id = $1 AND id = $2
+            FOR UPDATE`,
+          [tenantId, applicationId],
+        );
+        const state = current.rows[0];
+        if (!state) return { status: "not_found" };
+        if (!["submitted", "under_review"].includes(state.status)) {
+          return { status: "invalid_state" };
+        }
+        const approvalMode = actor.tenantRole === "owner" ? "owner_review" : "supervisor_review";
+        await client.query(
+          `UPDATE loan_applications
+              SET status = 'active', reviewed_by = $3, approved_by = $3,
+                  approved_at = now(), approval_mode = $4, updated_at = now()
+            WHERE tenant_id = $1 AND id = $2`,
+          [tenantId, applicationId, actor.userId, approvalMode],
+        );
+        if (state.renewed_from_id) {
+          await client.query(
+            `UPDATE loan_applications
+                SET status = 'paid', updated_at = now()
+              WHERE tenant_id = $1 AND id = $2 AND status = 'active'`,
+            [tenantId, state.renewed_from_id],
+          );
+        }
+        const complete = await client.query<LoanApplicationRow>(
+          `SELECT application.id,
+                  application.borrower_id,
+                  borrower.full_name AS borrower_name,
+                  application.loan_product_id,
+                  product.name AS loan_product_name,
+                  application.requested_principal,
+                  application.payment_frequency,
+                  application.requested_term_count,
+                  application.paid_installments,
+                  application.purpose,
+                  application.status,
+                  application.rate_basis,
+                  application.nominal_rate,
+                  application.documentation_fee_rate,
+                  application.created_at,
+                  application.updated_at
+             FROM loan_applications application
+             JOIN borrowers borrower
+               ON borrower.tenant_id = application.tenant_id
+              AND borrower.id = application.borrower_id
+             JOIN loan_products product
+               ON product.tenant_id = application.tenant_id
+              AND product.id = application.loan_product_id
+            WHERE application.tenant_id = $1 AND application.id = $2`,
+          [tenantId, applicationId],
+        );
+        const application = complete.rows[0];
+        if (!application) throw new Error("LOAN_APPLICATION_NOT_FOUND_AFTER_APPROVAL");
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'loan_application.approved', 'loan_application', $3, $4,
+                   jsonb_build_object('fromStatus', $5, 'status', 'active',
+                     'approverRole', $6, 'approvalMode', $7, 'createdByRole', $8,
+                     'borrowerId', $9, 'loanProductId', $10, 'requestedPrincipal', $11,
+                     'paymentFrequency', $12, 'termCount', $13, 'rateBasis', $14,
+                     'nominalRate', $15, 'documentationFeeRate', $16,
+                     'renewedFromId', $17))`,
+          [
+            tenantId,
+            actor.userId,
+            applicationId,
+            requestId,
+            state.status,
+            actor.tenantRole,
+            approvalMode,
+            state.created_by_role,
+            state.borrower_id,
+            state.loan_product_id,
+            state.requested_principal,
+            state.payment_frequency,
+            state.requested_term_count,
+            state.rate_basis,
+            state.nominal_rate,
+            state.documentation_fee_rate,
+            state.renewed_from_id,
+          ],
+        );
+        return { status: "approved", application: mapApplication(application) };
       });
     },
   };

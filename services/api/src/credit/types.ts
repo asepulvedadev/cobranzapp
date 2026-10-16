@@ -57,6 +57,12 @@ export type LoanApplicationReviewStartResult =
   | { status: "forbidden" }
   | { status: "invalid_state" };
 
+export type LoanApplicationApprovalResult =
+  | { status: "approved"; application: LoanApplication }
+  | { status: "not_found" }
+  | { status: "forbidden" }
+  | { status: "invalid_state" };
+
 export type LoanPaymentResult =
   | { status: "recorded"; application: LoanApplication; amount: string }
   | { status: "not_found" }
@@ -137,4 +143,10 @@ export interface CreditService {
     applicationId: string,
     requestId: string,
   ): Promise<LoanApplicationReviewStartResult>;
+  approveApplication(
+    actor: TenantActor,
+    tenantId: string,
+    applicationId: string,
+    requestId: string,
+  ): Promise<LoanApplicationApprovalResult>;
 }

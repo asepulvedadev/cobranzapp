@@ -941,6 +941,12 @@ export const loanApplicationSchema = z.object({
   requestedPrincipal: decimalAmountSchema,
   paymentFrequency: loanProductFrequencySchema,
   requestedTermCount: z.number().int().positive(),
+  rateBasis: loanProductRateBasisSchema,
+  nominalRate: decimalRateSchema,
+  documentationFeeRate: decimalRateSchema,
+  interestTotal: decimalAmountSchema,
+  scheduledTotal: decimalAmountSchema,
+  installmentAmount: decimalAmountSchema,
   paidInstallments: z.number().int().nonnegative().default(0),
   /** Operational projection only; it is not a posted financial balance. */
   nextDueDate: z
