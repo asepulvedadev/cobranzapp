@@ -126,17 +126,25 @@ comercial en una regla financiera vigente sin revisión legal, contable y de cal
 
 ### Creación y aprobación operativa de créditos
 
-Después de registrar un cliente, la interfaz abre el flujo de su primer crédito con el cliente ya
-seleccionado. La API valida el rango, la frecuencia y el plazo, y congela en el crédito el monto,
-la base de tasa, el porcentaje, el cargo y el calendario confirmados. Si el creador es cobrador, la
-solicitud nace como `submitted` y solo un propietario o supervisor puede aprobarla y activarla. Si
-el creador es propietario o supervisor, queda aprobada y activa de inmediato.
+Después de registrar un cliente, la interfaz conserva su perfil. Si lo creó un cobrador, un
+propietario o supervisor debe aprobar la identidad desde esa tarjeta; si lo creó un propietario o
+supervisor, queda aprobado automáticamente cuando existen el frente de la cédula y la selfie. Solo
+un cliente aprobado muestra la acción para crear crédito, y esa acción abre el formulario con el
+cliente bloqueado para impedir cambiarlo fuera de su perfil. La API aplica la misma restricción.
+
+La API valida el rango, la frecuencia y el plazo, y congela en el crédito el monto, la base de tasa,
+el porcentaje, el cargo y el calendario confirmado. Las primeras cuotas cubren todo el interés
+calculado antes de amortizar capital. Si el creador es cobrador, la solicitud nace como `submitted`
+y solo un propietario o supervisor puede aprobarla y activarla. Si el creador es propietario o
+supervisor, queda aprobada y activa de inmediato.
 
 La base de datos conserva creador, rol de creación, aprobador, fecha y modo de aprobación. Cada
 creación y aprobación también genera un evento de auditoría con la transición y las condiciones
 financieras exactas. Las renovaciones siguen la misma regla: una renovación creada por cobrador no
-cierra el crédito anterior hasta que sea aprobada. Esta aprobación es operativa; no prueba un
-desembolso, un recibo de dinero ni un asiento contable.
+cierra el crédito anterior hasta que sea aprobada. El principal renovado suma el capital pendiente
+y el dinero adicional entregado al cliente; sobre ese nuevo total se calcula nuevamente el interés
+completo. Esta aprobación es operativa; no prueba un desembolso, un recibo de dinero ni un asiento
+contable.
 
 ## Document capture and Hermes OCR
 

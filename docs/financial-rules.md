@@ -57,19 +57,22 @@ draft for review. The catalog supports:
 - Flat total interest, simple interest per period on the opening balance, or effective annual interest converted to the selected frequency.
 - A configurable documentation charge withheld from the nominal amount and shown separately as net disbursement.
 - Exact COP-cent output with the remainder absorbed by the final installment.
+- Interest-first allocation: the earliest installments pay all scheduled interest before reducing principal.
 - Monthly dates that preserve the end of month (for example, January 31 → February 28).
 
 The web panel exposes **Ajustar intereses y cobro** for drafts and a non-binding **Ver proyección de cuotas** action. The API endpoint `/v1/tenants/{tenantId}/loan-products/{productId}/schedule-preview` only calculates a preview; it never creates a debt, journal, receipt, payment or disbursement. Editing a draft resets its compliance state and requires the product to be reviewed again.
 
-The operational pilot also lets an owner, supervisor or collector create an active credit using the selected amount, frequency and one-month/five-week term options. The API snapshots the rate rules on the credit, calculates the same deterministic schedule and records an installment marker when the expected installment is confirmed. These markers drive progress and the shared verification summary; they are **not** cash receipts, accounting journals, disbursements or proof that money changed hands.
+The operational pilot lets an owner, supervisor or collector start credit only from an approved customer profile using the selected amount, frequency and one-month/five-week term options. The API rejects credit creation while identity review is pending or rejected. It snapshots the rate rules, calculates the deterministic interest-first schedule and records an installment marker when the expected installment is confirmed. These markers drive progress and the shared verification summary; they are **not** cash receipts, accounting journals, disbursements or proof that money changed hands.
 
-This preview is deliberately not the final financial engine. Before activation, the owner and legal/accounting reviewers must approve the rate basis, day-count convention, first due date, rounding policy, component allocation, early/late/partial/overpayment handling and posting templates. Approved terms must be snapshotted before any money movement is enabled.
+Renewal remains available only after at least 40% of principal plus interest has been paid. The renewed principal is the remaining principal plus the new cash delivered to the customer. The renewed credit then charges a complete new interest cycle over that renewed principal; it does not reuse or prorate the prior credit's interest.
+
+This preview is deliberately not the final accounting engine. The owner defined interest-first component allocation and the renewal base on 2026-10-16. Before money movement is enabled, legal/accounting reviewers must still approve the available rate bases, day-count convention, first due date, rounding policy, early/late/partial/overpayment handling and posting templates. Approved terms must be snapshotted.
 
 ### Accounting and loan invariants
 
 - Money uses `numeric(20,2)` for the proposed single-currency pilot and decimal arithmetic; API money values are strings, never JavaScript binary floating-point numbers. Scale must be reviewed before supporting currencies with other minor units.
 - Rates use explicit decimal units, basis, effective dates, day-count convention, and rounding policy. No unspecified “20%” field or baked-in assumed lawful interest rate.
-- Choose exactly one initial interest/amortization model with legal/accounting approval. Flat interest and declining-balance interest are not interchangeable; final choice remains open.
+- Products retain an explicit approved rate basis; flat interest, periodic simple interest and effective annual interest are not interchangeable. Regardless of basis, the operational schedule allocates the calculated interest to the earliest installments before capital.
 - Separate agreed interest, accrued/earned interest, due interest, collected interest, fees, outstanding principal, and borrower credit. Total collections are not profit.
 - Freeze approved terms and schedules; allocations identify installment/component and policy version. Define early payment, partial payment, overpayment, holiday handling, missed payment, and rounding remainder behavior before coding.
 - Double-entry journals must balance per tenant and currency; principal disbursement, collection, treasury transfers, fees, write-offs, and reversals have reviewed posting templates.
