@@ -10,8 +10,11 @@ describe("OwnerCreditAnalytics", () => {
           period: { from: "2026-10-01", to: "2026-10-16", preset: "month" },
           metrics: {
             activePrincipalOutstanding: "850000.00",
+            activeInterestOutstanding: "170000.00",
             approvedPrincipal: "1200000.00",
             collectedAmount: "350000.00",
+            collectedInterest: "70000.00",
+            weightedAverageNominalRate: "20.00",
             renewalCount: 3,
             activeCreditCount: 8,
           },
@@ -32,6 +35,9 @@ describe("OwnerCreditAnalytics", () => {
     );
     expect(html).toContain("Cartera vigente");
     expect(html).toContain("Recaudado");
+    expect(html).toContain("Ganancia pendiente");
+    expect(html).toContain("Interés ganado");
+    expect(html).toContain("Interés promedio");
     expect(html).toContain("Renovaciones por cobrador y supervisor");
     expect(html).toContain("Cobrador Uno");
   });

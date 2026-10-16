@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { fetchWithTimeout } from "../../../../lib/fetch-with-timeout";
-import { formatCop } from "../../../../lib/financial-display";
+import { formatCop, formatPercentage } from "../../../../lib/financial-display";
 import type { LoanAnalytics, LoanAnalyticsPreset } from "../../../../lib/platform";
 import { Modal } from "../../Modal";
 
@@ -125,6 +125,21 @@ export function OwnerCreditAnalytics({
           <span>Recaudado</span>
           <strong>{formatCop(analytics.metrics.collectedAmount)}</strong>
           <small>Pagos registrados en el periodo</small>
+        </article>
+        <article className="metric-accent">
+          <span>Interés ganado</span>
+          <strong>{formatCop(analytics.metrics.collectedInterest)}</strong>
+          <small>Interés incluido en las cuotas cobradas durante el periodo</small>
+        </article>
+        <article>
+          <span>Ganancia pendiente</span>
+          <strong>{formatCop(analytics.metrics.activeInterestOutstanding)}</strong>
+          <small>Interés aún por recaudar en los créditos activos</small>
+        </article>
+        <article>
+          <span>Interés promedio</span>
+          <strong>{formatPercentage(analytics.metrics.weightedAverageNominalRate)}%</strong>
+          <small>Promedio ponderado por el valor de los créditos activos</small>
         </article>
         <article>
           <span>Renovaciones</span>
