@@ -509,8 +509,8 @@ export function createPostgresBorrowerService(
                      CASE WHEN $9 THEN 'confirmed' ELSE 'pending' END,
                      CASE WHEN $8 THEN now() ELSE NULL END,
                      CASE WHEN $9 THEN now() ELSE NULL END,
-                     CASE WHEN $8 THEN $10 ELSE NULL END,
-                     CASE WHEN $9 THEN $10 ELSE NULL END,
+                     CASE WHEN $8 THEN $10::uuid ELSE NULL END,
+                     CASE WHEN $9 THEN $10::uuid ELSE NULL END,
                      $11, $12, $13, $10)`,
               [
                 tenantId,
@@ -659,12 +659,10 @@ export function createPostgresBorrowerService(
           identity_back: false,
           profile_photo: false,
         };
-        const missing: Array<"identity_front" | "identity_back" | "profile_photo"> = [];
+        const missing: Array<"identity_front" | "profile_photo"> = [];
         if (input.decision === "reviewed") {
           if (!accepted.identity_front || !input.identityFrontConfirmed)
             missing.push("identity_front");
-          if (!accepted.identity_back || !input.identityBackConfirmed)
-            missing.push("identity_back");
           if (!accepted.profile_photo || !input.profilePhotoConfirmed)
             missing.push("profile_photo");
           if (missing.length) return { status: "missing_documents", missing };
@@ -1241,8 +1239,8 @@ export function createPostgresBorrowerService(
                   work_address_status = CASE WHEN $6 THEN 'confirmed' ELSE 'pending' END,
                   home_address_confirmed_at = CASE WHEN $5 THEN now() ELSE NULL END,
                   work_address_confirmed_at = CASE WHEN $6 THEN now() ELSE NULL END,
-                  home_address_confirmed_by = CASE WHEN $5 THEN $7 ELSE NULL END,
-                  work_address_confirmed_by = CASE WHEN $6 THEN $7 ELSE NULL END,
+                  home_address_confirmed_by = CASE WHEN $5 THEN $7::uuid ELSE NULL END,
+                  work_address_confirmed_by = CASE WHEN $6 THEN $7::uuid ELSE NULL END,
                   updated_at = now()
             WHERE tenant_id = $1 AND id = $2`,
           [

@@ -39,8 +39,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Permite a cobranzapp seleccionar documentos y fotos de perfil para el expediente del cliente.",
-          "cameraPermission": "Permite a cobranzapp tomar fotos del documento y de la foto de perfil del cliente."
+          "photosPermission": "Permite a cobranzapp seleccionar el documento y la selfie para el expediente del cliente.",
+          "cameraPermission": "Permite a cobranzapp tomar fotos del documento y la selfie del cliente."
         }
       ],
       [

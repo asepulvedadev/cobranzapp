@@ -24,7 +24,7 @@ function statusLabel(status: Borrower["identity"]["verificationState"]) {
 }
 
 function documentLabel(category: Borrower["documents"][number]["category"], side: string | null) {
-  if (category === "profile_photo") return "Foto designada de perfil";
+  if (category === "profile_photo") return "Selfie del cliente";
   return side === "front" ? "Documento · frente" : "Documento · reverso";
 }
 
@@ -183,9 +183,7 @@ export function BorrowerDirectory({
   const [ocrMessage, setOcrMessage] = useState("");
   const ocrRunRef = useRef(0);
   const createFormRef = useRef<HTMLFormElement>(null);
-  const hasIdentityDocumentPhotos = Boolean(
-    selectedUploadNames.identityFront && selectedUploadNames.identityBack,
-  );
+  const hasIdentityFrontPhoto = Boolean(selectedUploadNames.identityFront);
 
   function closeCreateModal(force = false) {
     if (isSubmitting && !force) return;
@@ -223,22 +221,32 @@ export function BorrowerDirectory({
       const numberInput = createFormRef.current?.elements.namedItem("documentNumber");
       if (nameInput instanceof HTMLInputElement) nameInput.value = "";
       if (numberInput instanceof HTMLInputElement) numberInput.value = "";
-      const otherField = field === "identityFront" ? "identityBack" : "identityFront";
-      const otherElement = createFormRef.current?.elements.namedItem(otherField);
-      const otherFile = otherElement instanceof HTMLInputElement ? otherElement.files?.[0] : null;
-      if (otherFile)
-        void scanIdentityDocuments(
-          field === "identityFront" ? file : otherFile,
-          field === "identityBack" ? file : otherFile,
-        );
+      const frontElement = createFormRef.current?.elements.namedItem("identityFront");
+      const backElement = createFormRef.current?.elements.namedItem("identityBack");
+      const front =
+        field === "identityFront"
+          ? file
+          : frontElement instanceof HTMLInputElement
+            ? frontElement.files?.[0]
+            : null;
+      const back =
+        field === "identityBack"
+          ? file
+          : backElement instanceof HTMLInputElement
+            ? backElement.files?.[0]
+            : null;
+      if (front) void scanIdentityDocuments(front, back ?? undefined);
     }
   }
 
-  async function scanIdentityDocuments(front: File, back: File) {
+  async function scanIdentityDocuments(front: File, back?: File) {
     const run = ++ocrRunRef.current;
     setOcrStatus("processing");
     setOcrProgress(0);
-    setOcrMessage("Leyendo frente y reverso de la cédula…");
+    setOcrMessage(
+      back ? "Leyendo frente y reverso de la cédula…" : "Leyendo el frente de la cédula…",
+    );
+    let completedImages = 0;
     let worker: {
       recognize: (image: File) => Promise<{ data: { text: string } }>;
       terminate: () => Promise<unknown>;
@@ -248,15 +256,20 @@ export function BorrowerDirectory({
       worker = await createWorker("spa", 1, {
         logger: (progress) => {
           if (run !== ocrRunRef.current) return;
-          setOcrProgress(Math.round(Math.max(0, Math.min(1, progress.progress ?? 0)) * 100));
+          const currentProgress = Math.max(0, Math.min(1, progress.progress ?? 0));
+          const totalProgress = back
+            ? ((completedImages + currentProgress) / 2) * 100
+            : currentProgress * 100;
+          setOcrProgress(Math.round(totalProgress));
         },
       });
       const frontResult = await worker.recognize(front);
       if (run !== ocrRunRef.current) return;
-      setOcrProgress(50);
-      const backResult = await worker.recognize(back);
+      completedImages = 1;
+      setOcrProgress(back ? 50 : 100);
+      const backText = back ? (await worker.recognize(back)).data.text : "";
       if (run !== ocrRunRef.current) return;
-      const fields = extractOcrIdentityFields(`${frontResult.data.text}\n${backResult.data.text}`);
+      const fields = extractOcrIdentityFields(`${frontResult.data.text}\n${backText}`);
       const nameInput = createFormRef.current?.elements.namedItem("fullName");
       const numberInput = createFormRef.current?.elements.namedItem("documentNumber");
       if (nameInput instanceof HTMLInputElement) nameInput.value = fields.fullName;
@@ -284,12 +297,12 @@ export function BorrowerDirectory({
 
   function validateCreateStep(step: number) {
     const errors: Record<number, string> = {
-      1: "Adjunta las fotos, revisa el nombre y el número detectados y confirma que coinciden con el documento.",
+      1: "Adjunta el frente de la cédula y la selfie, revisa los datos detectados y confirma que coinciden.",
       2: "Completa el celular, WhatsApp, cada dirección y su barrio/municipio; luego confirma que fueron verificadas con el cliente.",
       3: "Registra al menos una referencia y el consentimiento del cliente.",
     };
     if (step === 1) {
-      const files = ["identityFront", "identityBack", "profilePhoto"].map((name) =>
+      const files = ["identityFront", "profilePhoto"].map((name) =>
         createFormRef.current?.elements.namedItem(name),
       );
       const hasFiles = files.every(
@@ -471,14 +484,14 @@ export function BorrowerDirectory({
       setIsSubmitting(false);
       return;
     }
-    const requiredFiles = ["identityFront", "identityBack", "profilePhoto"];
+    const requiredFiles = ["identityFront", "profilePhoto"];
     if (
       requiredFiles.some((field) => {
         const file = form.get(field);
         return !(file instanceof File) || file.size === 0;
       })
     ) {
-      setMessage("Adjunta frente, reverso y foto designada de perfil antes de guardar.");
+      setMessage("Adjunta el frente de la cédula y la selfie antes de guardar.");
       setIsError(true);
       setIsSubmitting(false);
       return;
@@ -552,10 +565,11 @@ export function BorrowerDirectory({
       field: string;
       category: "identity" | "profile_photo";
       side?: "front" | "back";
+      required: boolean;
     }> = [
-      { field: "identityFront", category: "identity", side: "front" },
-      { field: "identityBack", category: "identity", side: "back" },
-      { field: "profilePhoto", category: "profile_photo" },
+      { field: "identityFront", category: "identity", side: "front", required: true },
+      { field: "identityBack", category: "identity", side: "back", required: false },
+      { field: "profilePhoto", category: "profile_photo", required: true },
     ];
     let uploadFailure = !borrowerId;
     const uploadedFields = new Set(uploadedDocumentFields);
@@ -564,7 +578,7 @@ export function BorrowerDirectory({
         if (uploadedFields.has(upload.field)) continue;
         const file = form.get(upload.field);
         if (!(file instanceof File) || file.size === 0) {
-          uploadFailure = true;
+          if (upload.required) uploadFailure = true;
           continue;
         }
         const body = new FormData();
@@ -952,11 +966,11 @@ export function BorrowerDirectory({
                   <span className="borrower-section-kicker">Paso 1 · Documento</span>
                   <h3 id="borrower-step-document">Primero, toma las fotos</h3>
                 </div>
-                <span className="borrower-required-note">Todo es obligatorio</span>
+                <span className="borrower-required-note">Frente + selfie obligatorios</span>
               </div>
               <p className="borrower-section-help">
-                Captura el frente y el reverso de la cédula. Cuando estén listas, completaremos el
-                nombre y el número debajo para que los verifiques.
+                Captura primero el frente de la cédula para leer el nombre y el número. El reverso
+                es opcional; la selfie actual del cliente sí es obligatoria.
               </p>
               <div className="borrower-upload-grid">
                 <label
@@ -974,6 +988,7 @@ export function BorrowerDirectory({
                     capture="environment"
                     name="identityFront"
                     onChange={(event) => selectUpload(event, "identityFront")}
+                    required
                     type="file"
                   />
                   <span className="borrower-upload-cta">
@@ -987,10 +1002,12 @@ export function BorrowerDirectory({
                     2
                   </span>
                   <strong>
-                    {selectedUploadNames.identityBack ? "Reverso listo" : "Reverso de la cédula"}
+                    {selectedUploadNames.identityBack
+                      ? "Reverso listo"
+                      : "Reverso de la cédula · opcional"}
                   </strong>
                   <small>
-                    {selectedUploadNames.identityBack ?? "Incluye todos los datos visibles"}
+                    {selectedUploadNames.identityBack ?? "Agrégalo solo si necesitas conservarlo"}
                   </small>
                   <input
                     accept="image/jpeg,image/png,image/webp"
@@ -1010,15 +1027,17 @@ export function BorrowerDirectory({
                     3
                   </span>
                   <strong>
-                    {selectedUploadNames.profilePhoto ? "Foto lista" : "Foto de perfil"}
+                    {selectedUploadNames.profilePhoto ? "Selfie lista" : "Selfie del cliente"}
                   </strong>
                   <small>
-                    {selectedUploadNames.profilePhoto ?? "La foto que el cliente designe"}
+                    {selectedUploadNames.profilePhoto ?? "Foto actual y clara del rostro"}
                   </small>
                   <input
                     accept="image/jpeg,image/png,image/webp"
+                    capture="user"
                     name="profilePhoto"
                     onChange={(event) => selectUpload(event, "profilePhoto")}
+                    required
                     type="file"
                   />
                   <span className="borrower-upload-cta">
@@ -1043,7 +1062,7 @@ export function BorrowerDirectory({
                   </div>
                 </div>
               ) : null}
-              {hasIdentityDocumentPhotos ? (
+              {hasIdentityFrontPhoto ? (
                 <div className="borrower-identity-review">
                   <div>
                     <span className="borrower-section-kicker">Datos detectados</span>
@@ -1103,14 +1122,12 @@ export function BorrowerDirectory({
                 </div>
               ) : (
                 <div className="borrower-photo-gate" role="status">
-                  Adjunta frente y reverso para leer automáticamente los datos del cliente.
+                  Adjunta el frente para leer automáticamente los datos del cliente.
                 </div>
               )}
               <div className="borrower-inline-tip">
                 <span aria-hidden="true">i</span>
-                <span>
-                  No es una selfie obligatoria: usa la foto de perfil que el cliente designe.
-                </span>
+                <span>El reverso es opcional. La selfie del cliente sí es obligatoria.</span>
               </div>
             </section>
 
@@ -1273,11 +1290,12 @@ export function BorrowerDirectory({
                 <span className="borrower-required-note">Listo para guardar</span>
               </div>
               <p className="borrower-section-help">
-                Se guardarán los datos diligenciados, las dos caras del documento, la foto de perfil
-                y las referencias.
+                Se guardarán los datos diligenciados, el frente del documento, la selfie, el reverso
+                si lo adjuntaste y las referencias.
               </p>
               <ul className="borrower-confirmation-list">
-                <li>Documento frente y reverso en almacenamiento privado.</li>
+                <li>Frente obligatorio y reverso opcional en almacenamiento privado.</li>
+                <li>Selfie actual del cliente en almacenamiento privado.</li>
                 <li>Celular, WhatsApp y direcciones completas con barrio y municipio.</li>
                 <li>Una o dos referencias de contacto.</li>
               </ul>

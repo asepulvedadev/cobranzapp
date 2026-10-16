@@ -11,7 +11,7 @@ guardan direcciones y coordenadas, pero Waze sigue siendo la navegación final.
 ### 1. Captura y datos básicos — implementada
 
 - Alta de cliente dividida en cuatro pasos.
-- Captura móvil de frente y reverso del documento.
+- Captura móvil del frente obligatorio, reverso opcional y selfie obligatoria del cliente.
 - Almacenamiento privado de las imágenes en el VPS.
 - La carga móvil se puede reanudar: si falla una imagen o la reautenticación, el expediente ya
   creado no se duplica y solo se vuelven a enviar los documentos pendientes.

@@ -45,7 +45,7 @@ const modules = [
   {
     number: "06",
     title: "Documentos y OCR asistivo",
-    text: "Guarda frente, reverso y foto designada del cliente en almacenamiento privado; el OCR propone datos para revisión humana.",
+    text: "Guarda el frente y la selfie obligatorios, con reverso opcional, en almacenamiento privado; el OCR propone datos para revisión humana.",
     detail: "Evidencia privada",
   },
   {

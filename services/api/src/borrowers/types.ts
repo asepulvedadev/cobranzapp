@@ -42,7 +42,7 @@ export type BorrowerReviewResult =
   | { status: "forbidden" }
   | {
       status: "missing_documents";
-      missing: Array<"identity_front" | "identity_back" | "profile_photo">;
+      missing: Array<"identity_front" | "profile_photo">;
     };
 
 export type BorrowerDocumentResult =

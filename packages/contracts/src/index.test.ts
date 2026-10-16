@@ -170,6 +170,31 @@ describe("shared API contracts", () => {
         ],
       }).success,
     ).toBe(false);
+    const emergencyContacts = [
+      { fullName: "Contacto", relationship: "Hermano", phone: "+57 300 444 5566" },
+    ];
+    const identityDocument = {
+      category: "identity" as const,
+      side: "front" as const,
+      objectKey: "tenant/example/borrowers/example/front",
+      mediaType: "image/jpeg",
+      sizeBytes: 1024,
+      sha256: "a".repeat(64),
+    };
+    expect(
+      borrowerCreateRequestSchema.safeParse({
+        ...base,
+        emergencyContacts,
+        documents: [identityDocument],
+      }).success,
+    ).toBe(true);
+    expect(
+      borrowerCreateRequestSchema.safeParse({
+        ...base,
+        emergencyContacts,
+        documents: [{ ...identityDocument, side: "back" }],
+      }).success,
+    ).toBe(false);
     expect(
       borrowerCreateRequestSchema.safeParse({
         ...base,
@@ -195,13 +220,13 @@ describe("shared API contracts", () => {
     ).toBe(false);
   });
 
-  it("requires the full checklist before approving a borrower identity", () => {
+  it("requires the front and selfie but keeps the back optional for identity review", () => {
     const review = {
       decision: "reviewed" as const,
       notes: "La evidencia coincide con la ficha manual.",
       legalNameConfirmed: true,
       identityFrontConfirmed: true,
-      identityBackConfirmed: true,
+      identityBackConfirmed: false,
       profilePhotoConfirmed: true,
     };
     expect(borrowerReviewRequestSchema.safeParse(review).success).toBe(true);

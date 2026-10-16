@@ -87,18 +87,19 @@ aceptan rutas de objetos arbitrarias.
 
 La consola empresarial ya incluye una captura rápida de clientes con nombre legal, tipo y número
 de documento, celular, direcciones de casa/trabajo, uno o dos contactos de emergencia, referencia
-de consentimiento y los archivos de frente, reverso y foto designada de perfil. El número se cifra
-en reposo y se busca mediante HMAC con alcance de tenant; las respuestas solo muestran los últimos
-cuatro dígitos. La captura crea primero el expediente y luego carga cada archivo al prefijo privado
-del cliente; si una carga falla, la ficha queda disponible para reintento y nunca se presenta como
-identidad revisada. El OCR asistivo descrito más abajo no afirma autenticidad documental ni
-reemplaza esta revisión humana.
+de consentimiento, frente obligatorio de la cédula, selfie obligatoria y reverso opcional. El
+número se cifra en reposo y se busca mediante HMAC con alcance de tenant; las respuestas solo
+muestran los últimos cuatro dígitos. La captura crea primero el expediente y luego carga cada
+archivo al prefijo privado del cliente; si una carga obligatoria falla, la ficha queda disponible
+para reintento y nunca se presenta como identidad revisada. El OCR asistivo descrito más abajo no
+afirma autenticidad documental ni reemplaza esta revisión humana.
 
 La revisión manual ya cuenta con un historial append-only por cliente. Propietario o supervisor
-deben confirmar por separado el nombre, frente, reverso y foto designada antes de marcar la
-identidad como revisada; si falta un documento aceptado, la API rechaza la aprobación y conserva
-el estado pendiente. Un rechazo requiere una nota de al menos diez caracteres y también queda
-auditado. La revisión no equivale a una certificación de autenticidad.
+deben confirmar el nombre, el frente y la selfie antes de marcar la identidad como revisada. Si el
+reverso fue adjuntado, permanece disponible como evidencia opcional y también puede registrarse en
+la lista de revisión. Si falta el frente o la selfie aceptados, la API rechaza la aprobación y
+conserva el estado pendiente. Un rechazo requiere una nota de al menos diez caracteres y también
+queda auditado. La revisión no equivale a una certificación de autenticidad.
 
 La carga de documentos ya pasa por un endpoint multipart con límite de 10 MB, validación de tipo
 declarado contra los bytes iniciales, clave opaca por tenant/cliente y permisos de archivo

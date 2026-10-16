@@ -3216,7 +3216,7 @@ export function buildApp(dependencies: AppDependencies) {
         reply,
         400,
         "INVALID_DOCUMENT_CATEGORY",
-        "Indica si es frente, reverso o foto de perfil.",
+        "Indica si es frente, reverso o selfie del cliente.",
         request.id,
       );
     }
@@ -3474,7 +3474,7 @@ export function buildApp(dependencies: AppDependencies) {
       return reply.code(409).send({
         error: {
           code: "BORROWER_DOCUMENTS_INCOMPLETE",
-          message: "La aprobación exige frente, reverso y foto de perfil aceptados.",
+          message: "La aprobación exige el frente de la cédula y la selfie aceptados.",
           requestId: request.id,
         },
         missing: result.missing,

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
 
 function documentLabel(document: Borrower["documents"][number]) {
-  if (document.category === "profile_photo") return "Foto de perfil";
+  if (document.category === "profile_photo") return "Selfie del cliente";
   return document.side === "front" ? "Documento · frente" : "Documento · reverso";
 }
 
@@ -40,6 +40,9 @@ export function BorrowerReviewControl({
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const hasIdentityBack = borrower.documents.some(
+    (document) => document.category === "identity" && document.side === "back",
+  );
 
   if (!canReview) return <span className="table-muted">Revisión restringida</span>;
 
@@ -110,21 +113,23 @@ export function BorrowerReviewControl({
             />
             Revisé el frente del documento.
           </label>
-          <label className="review-check">
-            <input
-              checked={identityBackConfirmed}
-              onChange={(event) => setIdentityBackConfirmed(event.target.checked)}
-              type="checkbox"
-            />
-            Revisé el reverso del documento.
-          </label>
+          {hasIdentityBack ? (
+            <label className="review-check">
+              <input
+                checked={identityBackConfirmed}
+                onChange={(event) => setIdentityBackConfirmed(event.target.checked)}
+                type="checkbox"
+              />
+              Revisé el reverso opcional adjunto.
+            </label>
+          ) : null}
           <label className="review-check">
             <input
               checked={profilePhotoConfirmed}
               onChange={(event) => setProfilePhotoConfirmed(event.target.checked)}
               type="checkbox"
             />
-            Confirmo que existe la foto designada de perfil.
+            Confirmo que existe la selfie actual del cliente.
           </label>
           <label>
             Nota de revisión

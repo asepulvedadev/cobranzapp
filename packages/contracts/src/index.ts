@@ -1024,11 +1024,11 @@ export const borrowerCreateRequestSchema = z
       (document) => document.category === "identity",
     );
     const sides = new Set(identityDocuments.map((document) => document.side));
-    if (identityDocuments.length > 0 && (!sides.has("front") || !sides.has("back"))) {
+    if (identityDocuments.length > 0 && !sides.has("front")) {
       context.addIssue({
         code: "custom",
         path: ["documents"],
-        message: "Los documentos de identidad deben incluir frente y reverso.",
+        message: "Los documentos de identidad deben incluir el frente.",
       });
     }
     if (
@@ -1038,7 +1038,7 @@ export const borrowerCreateRequestSchema = z
       context.addIssue({
         code: "custom",
         path: ["documents"],
-        message: "La foto de perfil debe registrarse también como documento privado.",
+        message: "La selfie del cliente debe registrarse también como documento privado.",
       });
     }
   });
@@ -1173,15 +1173,12 @@ export const borrowerReviewRequestSchema = z
   .superRefine((value, context) => {
     if (
       value.decision === "reviewed" &&
-      (!value.legalNameConfirmed ||
-        !value.identityFrontConfirmed ||
-        !value.identityBackConfirmed ||
-        !value.profilePhotoConfirmed)
+      (!value.legalNameConfirmed || !value.identityFrontConfirmed || !value.profilePhotoConfirmed)
     ) {
       context.addIssue({
         code: "custom",
         path: ["decision"],
-        message: "La revisión aprobada debe confirmar nombre, frente, reverso y foto de perfil.",
+        message: "La revisión aprobada debe confirmar nombre, frente y selfie del cliente.",
       });
     }
   });

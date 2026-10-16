@@ -153,8 +153,8 @@ export function BorrowerCreateForm({
   function stepError(stepToValidate: number) {
     if (stepToValidate === 1) {
       if (!fullName.trim() || !documentNumber.trim()) return "Completa el nombre y la cédula.";
-      if (!identityFront || !identityBack || !profilePhoto) {
-        return "Carga el frente, reverso y foto de perfil del cliente.";
+      if (!identityFront || !profilePhoto) {
+        return "Carga el frente de la cédula y la selfie del cliente.";
       }
     }
     if (stepToValidate === 2) {
@@ -204,9 +204,7 @@ export function BorrowerCreateForm({
 
   async function submit() {
     if (missingFields()) {
-      setMessage(
-        "Completa celular, WhatsApp, direcciones verificadas, contactos, consentimiento y las tres imágenes.",
-      );
+      setMessage("Completa los datos requeridos, el frente de la cédula y la selfie del cliente.");
       return;
     }
     setBusy(true);
@@ -264,17 +262,25 @@ export function BorrowerCreateForm({
           image: identityFront,
           category: "identity" as const,
           side: "front" as const,
+          optional: false,
         },
         {
           key: "identity-back" as const,
           image: identityBack,
           category: "identity" as const,
           side: "back" as const,
+          optional: true,
         },
-        { key: "profile-photo" as const, image: profilePhoto, category: "profile_photo" as const },
+        {
+          key: "profile-photo" as const,
+          image: profilePhoto,
+          category: "profile_photo" as const,
+          optional: false,
+        },
       ];
       for (const upload of uploads) {
         if (uploadedUploads.includes(upload.key)) continue;
+        if (!upload.image && upload.optional) continue;
         if (!upload.image) throw new Error("MISSING_BORROWER_IMAGE");
         await api.uploadBorrowerDocument(tenantId, borrower.id, {
           ...upload.image,
@@ -418,16 +424,16 @@ export function BorrowerCreateForm({
                   />
                   <ImageButton
                     label={
-                      identityBack ? `✓ Reverso · ${identityBack.name}` : "Cargar cédula · reverso"
+                      identityBack
+                        ? `✓ Reverso · ${identityBack.name}`
+                        : "Cargar cédula · reverso opcional"
                     }
                     onPress={() => void pickImage(setIdentityBack, "cedula-reverso.jpg")}
                     onCamera={() => void captureImage(setIdentityBack, "cedula-reverso.jpg")}
                   />
                   <ImageButton
                     label={
-                      profilePhoto
-                        ? `✓ Foto · ${profilePhoto.name}`
-                        : "Cargar foto designada de perfil"
+                      profilePhoto ? `✓ Selfie · ${profilePhoto.name}` : "Cargar selfie obligatoria"
                     }
                     onPress={() => void pickImage(setProfilePhoto, "foto-perfil.jpg")}
                     onCamera={() => void captureImage(setProfilePhoto, "foto-perfil.jpg")}
@@ -609,7 +615,8 @@ export function BorrowerCreateForm({
                       Trabajo: {composeAddress(workAddress, workAddressLocality) || "Sin registrar"}
                     </Text>
                     <Text style={styles.reviewText}>
-                      Referencias: {secondContact ? "2" : "1"} · Documentos: 3
+                      Referencias: {secondContact ? "2" : "1"} · Imágenes:{" "}
+                      {identityBack ? "3" : "2"}
                     </Text>
                   </View>
                   <Text style={styles.addressHint}>

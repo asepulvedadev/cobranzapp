@@ -125,7 +125,6 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
     const documentKeyPrefix = `tenant/${tenantId}/borrowers/${created.borrower.id}/documents`;
     for (const document of [
       ["identity", "front", `${documentKeyPrefix}/front`] as const,
-      ["identity", "back", `${documentKeyPrefix}/back`] as const,
       ["profile_photo", null, `${documentKeyPrefix}/profile`] as const,
     ]) {
       await ownerPool.query(
@@ -140,7 +139,7 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
       notes: "La revisión manual coincide con la evidencia cargada.",
       legalNameConfirmed: true,
       identityFrontConfirmed: true,
-      identityBackConfirmed: true,
+      identityBackConfirmed: false,
       profilePhotoConfirmed: true,
       requestId: "borrower-review-test",
     });
