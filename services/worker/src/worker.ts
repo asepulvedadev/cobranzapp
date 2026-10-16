@@ -1,4 +1,5 @@
 import { hostname } from "node:os";
+import { createHermesIdentityExtractor } from "@cobranzapp/hermes-ocr";
 import pg from "pg";
 import { z } from "zod";
 import {
@@ -17,6 +18,9 @@ const config = z
     WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(1_000).max(60_000).default(10_000),
     BORROWER_DOCUMENTS_ROOT: z.string().min(1).default("/var/lib/cobranzapp/documents"),
     BORROWER_IDENTITY_KEY: z.string().min(32).optional(),
+    HERMES_OCR_URL: z.url().optional(),
+    HERMES_OCR_API_KEY: z.string().min(32).optional(),
+    HERMES_OCR_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(45_000),
   })
   .parse(process.env);
 
@@ -29,6 +33,14 @@ const workerId = config.WORKER_ID ?? `${hostname()}:${process.pid}`;
 let stopping = false;
 let wakeSleep: (() => void) | null = null;
 let lastHeartbeat = 0;
+const identityExtractor =
+  config.HERMES_OCR_URL && config.HERMES_OCR_API_KEY
+    ? createHermesIdentityExtractor({
+        endpoint: config.HERMES_OCR_URL,
+        apiKey: config.HERMES_OCR_API_KEY,
+        timeoutMs: config.HERMES_OCR_TIMEOUT_MS,
+      })
+    : undefined;
 
 function log(level: "info" | "error", event: string, fields: Record<string, unknown> = {}) {
   const output = JSON.stringify({
@@ -71,6 +83,7 @@ async function tick() {
     const result = await processClaimedOutboxEvent(pool, claimed, workerId, {
       documentsRoot: config.BORROWER_DOCUMENTS_ROOT,
       identitySecret: config.BORROWER_IDENTITY_KEY,
+      identityExtractor,
     });
     log("info", "outbox_processed", {
       outboxEventId: claimed.id,

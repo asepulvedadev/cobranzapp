@@ -3,6 +3,11 @@ import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import type {
+  IdentityDocumentFields,
+  IdentityExtractor,
+  IdentityImage,
+} from "@cobranzapp/hermes-ocr";
 import type { Pool } from "pg";
 
 export type ClaimedOutboxEvent = {
@@ -42,12 +47,7 @@ function toClaimedEvent(row: OutboxRow): ClaimedOutboxEvent {
 
 const execFileAsync = promisify(execFile);
 
-type OcrFields = {
-  fullName: string | null;
-  documentNumber: string | null;
-  country: string | null;
-  documentType: string | null;
-};
+type OcrFields = IdentityDocumentFields;
 
 function deriveOcrKey(secret: string) {
   return createHash("sha256").update(`borrower-ocr\0${secret}`).digest();
@@ -103,10 +103,24 @@ export function extractOcrFields(text: string): {
     .filter((line) => line.length >= 3 && /[A-Z]/.test(line));
   const fullName = labelledNames.join(" ").trim() || null;
   const fields: OcrFields = {
+    firstNames: null,
+    lastNames: null,
     fullName: fullName?.slice(0, 160) ?? null,
     documentNumber,
     country: "CO",
     documentType: "CC",
+    nationality: null,
+    birthDate: null,
+    birthPlace: null,
+    sex: null,
+    height: null,
+    bloodType: null,
+    issueDate: null,
+    issuePlace: null,
+    expirationDate: null,
+    serialNumber: null,
+    mrzLines: [],
+    barcodeData: null,
   };
   const confidence = Math.min(
     0.99,
@@ -115,31 +129,37 @@ export function extractOcrFields(text: string): {
   return { fields, confidence, text };
 }
 
-async function recognizeImage(bytes: Buffer, mediaType: string) {
+async function prepareOcrImage(
+  bytes: Buffer,
+  mediaType: string,
+  side: "front" | "back",
+): Promise<IdentityImage> {
   if (!mediaType.startsWith("image/") && mediaType !== "application/pdf") {
     throw new Error("UNSUPPORTED_OCR_MEDIA_TYPE");
   }
+  if (mediaType !== "application/pdf") {
+    if (!(["image/jpeg", "image/png", "image/webp"] as const).includes(mediaType as never)) {
+      throw new Error("UNSUPPORTED_OCR_MEDIA_TYPE");
+    }
+    return {
+      bytes,
+      mediaType: mediaType as IdentityImage["mediaType"],
+      side,
+    };
+  }
   const directory = await mkdtemp(path.join("/tmp", "cobranzapp-ocr-"));
-  const inputPath = path.join(
-    directory,
-    mediaType === "application/pdf" ? "document.pdf" : "document.bin",
-  );
-  let ocrInputPath = inputPath;
+  const inputPath = path.join(directory, "document.pdf");
   try {
     await writeFile(inputPath, bytes, { mode: 0o600 });
-    if (mediaType === "application/pdf") {
-      const outputBase = path.join(directory, "page");
-      await execFileAsync("pdftoppm", ["-f", "1", "-singlefile", "-png", inputPath, outputBase], {
-        timeout: 20_000,
-      });
-      ocrInputPath = `${outputBase}.png`;
-    }
-    const result = await execFileAsync(
-      "tesseract",
-      [ocrInputPath, "stdout", "--dpi", "300", "--psm", "6", "-l", "spa"],
-      { maxBuffer: 1_000_000, timeout: 25_000 },
-    );
-    return extractOcrFields(result.stdout);
+    const outputBase = path.join(directory, "page");
+    await execFileAsync("pdftoppm", ["-f", "1", "-singlefile", "-png", inputPath, outputBase], {
+      timeout: 20_000,
+    });
+    return {
+      bytes: await readFile(`${outputBase}.png`),
+      mediaType: "image/png",
+      side,
+    };
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
       throw new Error("OCR_ENGINE_UNAVAILABLE");
@@ -156,6 +176,7 @@ async function processBorrowerOcrEvent(
   workerId: string,
   documentsRoot: string,
   identitySecret: string,
+  identityExtractor: IdentityExtractor,
 ): Promise<"ocr_ready" | "ocr_skipped" | "lost_lease"> {
   const extractionId =
     typeof event.payload.extractionId === "string" ? event.payload.extractionId : "";
@@ -164,6 +185,7 @@ async function processBorrowerOcrEvent(
     typeof event.payload.documentId === "string" ? event.payload.documentId : event.aggregateId;
   const objectKey = typeof event.payload.objectKey === "string" ? event.payload.objectKey : "";
   const mediaType = typeof event.payload.mediaType === "string" ? event.payload.mediaType : "";
+  const side = event.payload.side === "back" ? "back" : "front";
   if (!extractionId || !borrowerId || !documentId || !objectKey || !mediaType) {
     throw new Error("INVALID_OCR_EVENT_PAYLOAD");
   }
@@ -212,10 +234,14 @@ async function processBorrowerOcrEvent(
   }
   begin.release();
 
-  let result: { fields: OcrFields; confidence: number; text: string };
+  let result: { fields: OcrFields; confidence: number };
   try {
     const bytes = await readFile(safeObjectPath(documentsRoot, objectKey));
-    result = await recognizeImage(bytes, mediaType);
+    const image = await prepareOcrImage(bytes, mediaType, side);
+    const extraction = await identityExtractor.extract(
+      side === "front" ? { front: image } : { back: image },
+    );
+    result = { fields: extraction.fields, confidence: extraction.confidence };
   } catch (error) {
     const failed = await pool.query(
       `UPDATE borrower_document_ocr_extractions
@@ -243,14 +269,14 @@ async function processBorrowerOcrEvent(
     await finish.query(
       `UPDATE borrower_document_ocr_extractions
           SET status = 'ready', fields_ciphertext = $4, text_hash = $5,
-              confidence = $6, model_name = 'tesseract-spa-v1', error_code = NULL, updated_at = now()
+              confidence = $6, model_name = 'hermes-cobranzapp-ocr-v1', error_code = NULL, updated_at = now()
         WHERE tenant_id = $1 AND borrower_id = $2 AND id = $3`,
       [
         event.tenantId,
         borrowerId,
         extractionId,
         encryptOcrFields(identitySecret, result.fields),
-        createHash("sha256").update(result.text, "utf8").digest("hex"),
+        createHash("sha256").update(JSON.stringify(result.fields), "utf8").digest("hex"),
         result.confidence,
       ],
     );
@@ -336,10 +362,14 @@ export async function processClaimedOutboxEvent(
   pool: Pool,
   event: ClaimedOutboxEvent,
   workerId: string,
-  options: { documentsRoot?: string; identitySecret?: string } = {},
+  options: {
+    documentsRoot?: string;
+    identitySecret?: string;
+    identityExtractor?: IdentityExtractor;
+  } = {},
 ): Promise<"expired" | "skipped" | "lost_lease" | "ocr_ready" | "ocr_skipped"> {
   if (event.eventType === "borrower.document.ocr_requested") {
-    if (!options.documentsRoot || !options.identitySecret) {
+    if (!options.documentsRoot || !options.identitySecret || !options.identityExtractor) {
       throw new Error("OCR_WORKER_NOT_CONFIGURED");
     }
     return processBorrowerOcrEvent(
@@ -348,6 +378,7 @@ export async function processClaimedOutboxEvent(
       workerId,
       options.documentsRoot,
       options.identitySecret,
+      options.identityExtractor,
     );
   }
   if (event.eventType !== "support_access.expire") {
