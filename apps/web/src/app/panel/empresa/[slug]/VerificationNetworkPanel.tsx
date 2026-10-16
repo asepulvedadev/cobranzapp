@@ -1,5 +1,6 @@
 "use client";
 
+import { IdentificationCard, MagnifyingGlass } from "@phosphor-icons/react";
 import { type FormEvent, useState } from "react";
 import { fetchWithTimeout } from "../../../../lib/fetch-with-timeout";
 import type { SharedClientVerification } from "../../../../lib/platform";
@@ -65,27 +66,40 @@ export function ClientVerificationSearch({ tenantId }: { tenantId: string }) {
         calificación y si existe un reporte negativo.
       </p>
       <form className="verification-search-form" onSubmit={submit}>
-        <label>
-          Número de cédula
-          <input
-            autoComplete="off"
-            inputMode="numeric"
-            maxLength={32}
-            name="documentNumber"
-            placeholder="Ej. 1020304050"
-            required
-          />
-        </label>
+        <div className="verification-document-field">
+          <label htmlFor="verification-document-number">Escribe la cédula</label>
+          <div className="verification-document-input">
+            <IdentificationCard aria-hidden="true" size={28} weight="duotone" />
+            <input
+              aria-describedby="verification-document-help"
+              autoComplete="off"
+              id="verification-document-number"
+              inputMode="numeric"
+              maxLength={32}
+              name="documentNumber"
+              onInput={(event) => {
+                event.currentTarget.value = event.currentTarget.value.replace(/\D/g, "");
+              }}
+              placeholder="1020304050"
+              required
+            />
+          </div>
+          <small id="verification-document-help">Solo números, sin puntos ni espacios.</small>
+        </div>
         <label className="checkbox-row verification-consent">
           <input
             checked={consentConfirmed}
             onChange={(event) => setConsentConfirmed(event.target.checked)}
             type="checkbox"
           />
-          <span>Confirmo que el cliente autorizó esta consulta compartida.</span>
+          <span>
+            <strong>Consulta autorizada</strong>
+            Confirmo que el cliente permitió verificar su información.
+          </span>
         </label>
-        <button disabled={isBusy} type="submit">
-          {isBusy ? "Verificando…" : "Verificar"}
+        <button className="verification-submit" disabled={isBusy} type="submit">
+          <MagnifyingGlass aria-hidden="true" size={21} weight="bold" />
+          {isBusy ? "Verificando cliente…" : "Verificar cliente"}
         </button>
       </form>
       {message ? <p className="form-message form-message-error">{message}</p> : null}
