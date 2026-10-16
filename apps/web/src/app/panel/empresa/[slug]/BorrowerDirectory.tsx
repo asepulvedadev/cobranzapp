@@ -18,19 +18,6 @@ import { BorrowerReviewControl } from "./BorrowerReviewControl";
 import { borrowerDirectoryHref } from "./borrower-directory-query";
 import { CollectorBorrowerCard } from "./CollectorBorrowerCard";
 
-function statusLabel(status: Borrower["identity"]["verificationState"]) {
-  return status === "reviewed"
-    ? "Revisado"
-    : status === "rejected"
-      ? "Rechazado"
-      : "Pendiente de revisión";
-}
-
-function documentLabel(category: Borrower["documents"][number]["category"], side: string | null) {
-  if (category === "profile_photo") return "Selfie del cliente";
-  return side === "front" ? "Documento · frente" : "Documento · reverso";
-}
-
 function wazeUrl(address: string, location: Borrower["addressLocations"]["home"]) {
   if (location.status === "ready" && location.latitude !== null && location.longitude !== null) {
     return `https://www.waze.com/ul?ll=${location.latitude},${location.longitude}&navigate=yes`;
@@ -136,7 +123,6 @@ export function BorrowerDirectory({
   const [addressEditHomeConfirmed, setAddressEditHomeConfirmed] = useState(false);
   const [addressEditWorkConfirmed, setAddressEditWorkConfirmed] = useState(false);
   const [isAddressSaving, setIsAddressSaving] = useState(false);
-  const [geocodeBusy, setGeocodeBusy] = useState("");
   const [includeSecondContact, setIncludeSecondContact] = useState(false);
   const [homeAddressConfirmed, setHomeAddressConfirmed] = useState(false);
   const [workAddressConfirmed, setWorkAddressConfirmed] = useState(false);
@@ -329,61 +315,6 @@ export function BorrowerDirectory({
 
   function nextCreateStep() {
     if (validateCreateStep(createStep)) setCreateStep((step) => Math.min(4, step + 1));
-  }
-
-  async function geocodeAddress(
-    borrowerId: string,
-    addressKind: "home" | "work",
-    coordinates?: { latitude: number; longitude: number },
-  ) {
-    const key = `${borrowerId}:${addressKind}`;
-    setGeocodeBusy(key);
-    const response = await sensitiveFetch(
-      `/api/v1/tenants/${tenantId}/borrowers/${borrowerId}/geocode`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ addressKind, ...coordinates }),
-      },
-    ).catch(() => null);
-    setGeocodeBusy("");
-    if (!response?.ok) {
-      setMessage("No fue posible ubicar la dirección. Verifica el texto e inténtalo de nuevo.");
-      setIsError(true);
-      return;
-    }
-    setMessage("Dirección ubicada y guardada para las rutas.");
-    setIsError(false);
-    router.refresh();
-  }
-
-  function captureDeviceLocation(borrowerId: string, addressKind: "home" | "work") {
-    const key = `${borrowerId}:${addressKind}`;
-    if (!navigator.geolocation) {
-      setMessage(
-        "Este dispositivo no permite obtener la ubicación. Escribe la dirección y ubícala.",
-      );
-      setIsError(true);
-      return;
-    }
-    setGeocodeBusy(key);
-    setMessage("");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        void geocodeAddress(borrowerId, addressKind, {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-      },
-      () => {
-        setGeocodeBusy("");
-        setMessage(
-          "No se pudo obtener la ubicación. Permítela solo cuando estés frente al cliente.",
-        );
-        setIsError(true);
-      },
-      { enableHighAccuracy: true, maximumAge: 30_000, timeout: 15_000 },
-    );
   }
 
   function openAddressEditor(borrower: Borrower) {
@@ -591,13 +522,15 @@ export function BorrowerDirectory({
     setMessage(
       "Cliente creado. Las imágenes quedaron privadas y el OCR se procesará en segundo plano.",
     );
-    setToastMessage(`${createdName || "Cliente"} creado correctamente.`);
+    setToastMessage(
+      actorRole === "collector"
+        ? `${createdName || "Cliente"} quedó pendiente de aprobación.`
+        : `${createdName || "Cliente"} quedó aprobado y listo para crearle un crédito.`,
+    );
     setIsError(false);
     setIsSubmitting(false);
     closeCreateModal(true);
-    router.push(
-      `/panel/empresa/${tenantSlug}/creditos?cliente=${encodeURIComponent(borrowerId)}&nuevo=1`,
-    );
+    router.refresh();
   }
 
   return (
@@ -638,7 +571,7 @@ export function BorrowerDirectory({
             <span aria-hidden="true">✓</span>
             <div>
               <strong>{toastMessage}</strong>
-              <small>Ya puedes buscarlo en el directorio o crearle su primer crédito.</small>
+              <small>Abre su perfil para revisar el estado y continuar.</small>
             </div>
             <button aria-label="Cerrar aviso" onClick={() => setToastMessage("")} type="button">
               ×
@@ -670,211 +603,39 @@ export function BorrowerDirectory({
           </div>
         </form>
         {directory.borrowers.length ? (
-          <>
-            {actorRole === "collector" ? (
-              <div className="collector-client-mobile-list">
-                {directory.borrowers.map((borrower) => (
-                  <CollectorBorrowerCard
-                    borrower={borrower}
-                    creditHref={`/panel/empresa/${tenantSlug}/creditos?cliente=${encodeURIComponent(borrower.id)}&nuevo=1`}
-                    documentTools={
-                      <>
-                        <BorrowerDocumentUpload borrowerId={borrower.id} tenantId={tenantId} />
-                        <BorrowerOcrControl borrowerId={borrower.id} tenantId={tenantId} />
-                      </>
-                    }
-                    homeWazeHref={wazeUrl(borrower.homeAddress, borrower.addressLocations.home)}
-                    onEditAddresses={() => openAddressEditor(borrower)}
-                    tenantId={tenantId}
-                    whatsappHref={whatsappUrl(borrower.whatsappPhone ?? borrower.phone)}
-                    workWazeHref={wazeUrl(borrower.workAddress, borrower.addressLocations.work)}
-                    key={borrower.id}
-                  />
-                ))}
-              </div>
-            ) : null}
-            <div
-              className={`tenant-table-wrap${actorRole === "collector" ? " collector-client-desktop-list" : ""}`}
-            >
-              <table className="tenant-table borrower-table">
-                <thead>
-                  <tr>
-                    <th>Cliente</th>
-                    <th>Documento</th>
-                    <th>Contacto</th>
-                    <th>Estado de identidad</th>
-                    <th>Documentos</th>
-                    <th>Revisión</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {directory.borrowers.map((borrower) => (
-                    <tr key={borrower.id}>
-                      <td data-label="Cliente">
-                        <strong>{borrower.fullName}</strong>
-                        <small>{borrower.emergencyContacts.length} contacto(s) de emergencia</small>
-                        <details className="borrower-details">
-                          <summary>Ver ficha</summary>
-                          <div className="borrower-details-content">
-                            <div>
-                              <span>Casa</span>
-                              <strong>{borrower.homeAddress}</strong>
-                              <small>
-                                {borrower.homeAddressStatus === "confirmed"
-                                  ? "Dirección confirmada"
-                                  : "Pendiente de confirmar"}
-                              </small>
-                              <small>
-                                {borrower.addressLocations.home.status === "ready"
-                                  ? `Ubicada: ${borrower.addressLocations.home.formattedAddress}`
-                                  : borrower.addressLocations.home.status === "failed"
-                                    ? "No se pudo ubicar; puedes reintentar"
-                                    : "Sin coordenadas todavía"}
-                              </small>
-                              <button
-                                className="button-link"
-                                disabled={geocodeBusy === `${borrower.id}:home`}
-                                onClick={() => void geocodeAddress(borrower.id, "home")}
-                                type="button"
-                              >
-                                {geocodeBusy === `${borrower.id}:home`
-                                  ? "Ubicando…"
-                                  : borrower.addressLocations.home.status === "ready"
-                                    ? "Actualizar ubicación"
-                                    : "Ubicar dirección"}
-                              </button>
-                              <button
-                                className="button-link"
-                                disabled={geocodeBusy === `${borrower.id}:home`}
-                                onClick={() => captureDeviceLocation(borrower.id, "home")}
-                                type="button"
-                              >
-                                Usar GPS del dispositivo
-                              </button>
-                              <a
-                                href={wazeUrl(borrower.homeAddress, borrower.addressLocations.home)}
-                                rel="noreferrer"
-                                target="_blank"
-                              >
-                                Abrir en Waze
-                              </a>
-                            </div>
-                            <div>
-                              <span>Trabajo</span>
-                              <strong>{borrower.workAddress}</strong>
-                              <small>
-                                {borrower.workAddressStatus === "confirmed"
-                                  ? "Dirección confirmada"
-                                  : "Pendiente de confirmar"}
-                              </small>
-                              <small>
-                                {borrower.addressLocations.work.status === "ready"
-                                  ? `Ubicada: ${borrower.addressLocations.work.formattedAddress}`
-                                  : borrower.addressLocations.work.status === "failed"
-                                    ? "No se pudo ubicar; puedes reintentar"
-                                    : "Sin coordenadas todavía"}
-                              </small>
-                              <button
-                                className="button-link"
-                                disabled={geocodeBusy === `${borrower.id}:work`}
-                                onClick={() => void geocodeAddress(borrower.id, "work")}
-                                type="button"
-                              >
-                                {geocodeBusy === `${borrower.id}:work`
-                                  ? "Ubicando…"
-                                  : borrower.addressLocations.work.status === "ready"
-                                    ? "Actualizar ubicación"
-                                    : "Ubicar dirección"}
-                              </button>
-                              <button
-                                className="button-link"
-                                disabled={geocodeBusy === `${borrower.id}:work`}
-                                onClick={() => captureDeviceLocation(borrower.id, "work")}
-                                type="button"
-                              >
-                                Usar GPS del dispositivo
-                              </button>
-                              <a
-                                href={wazeUrl(borrower.workAddress, borrower.addressLocations.work)}
-                                rel="noreferrer"
-                                target="_blank"
-                              >
-                                Abrir en Waze
-                              </a>
-                            </div>
-                            <button
-                              className="button-secondary borrower-address-edit-button"
-                              onClick={() => openAddressEditor(borrower)}
-                              type="button"
-                            >
-                              Corregir direcciones
-                            </button>
-                            <div>
-                              <span>Contactos de emergencia</span>
-                              {borrower.emergencyContacts.map((contact) => (
-                                <strong key={contact.id}>
-                                  {contact.fullName} · {contact.relationship} · {contact.phone}
-                                </strong>
-                              ))}
-                            </div>
-                            <div>
-                              <span>Documentos privados</span>
-                              {borrower.documents.length ? (
-                                borrower.documents.map((document) => (
-                                  <strong key={document.id}>
-                                    {documentLabel(document.category, document.side)} ·{" "}
-                                    {document.scanStatus}
-                                  </strong>
-                                ))
-                              ) : (
-                                <strong>Pendientes de carga</strong>
-                              )}
-                              <BorrowerOcrControl borrowerId={borrower.id} tenantId={tenantId} />
-                            </div>
-                          </div>
-                        </details>
-                      </td>
-                      <td data-label="Documento">
-                        <strong>{borrower.identity.documentType}</strong>
-                        <small>•••• {borrower.identity.documentLast4}</small>
-                      </td>
-                      <td data-label="Contacto">
-                        <strong>{borrower.phone}</strong>
-                        <small>WhatsApp: {borrower.whatsappPhone ?? borrower.phone}</small>
-                        {whatsappUrl(borrower.whatsappPhone ?? borrower.phone) ? (
-                          <a
-                            href={
-                              whatsappUrl(borrower.whatsappPhone ?? borrower.phone) ?? undefined
-                            }
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            Abrir WhatsApp
-                          </a>
-                        ) : null}
-                        <small>{borrower.documents.length} documento(s) privado(s)</small>
-                      </td>
-                      <td data-label="Estado de identidad">
-                        <span className={`status status-${borrower.identity.verificationState}`}>
-                          {statusLabel(borrower.identity.verificationState)}
-                        </span>
-                      </td>
-                      <td data-label="Documentos">
-                        <BorrowerDocumentUpload borrowerId={borrower.id} tenantId={tenantId} />
-                      </td>
-                      <td data-label="Revisión">
-                        <BorrowerReviewControl
-                          borrower={borrower}
-                          canReview={canReview}
-                          tenantId={tenantId}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+          <div className="collector-client-mobile-list borrower-profile-list">
+            {directory.borrowers.map((borrower) => (
+              <CollectorBorrowerCard
+                borrower={borrower}
+                creditHref={
+                  borrower.identity.verificationState === "reviewed"
+                    ? `/panel/empresa/${tenantSlug}/creditos?cliente=${encodeURIComponent(borrower.id)}&nuevo=1`
+                    : null
+                }
+                documentTools={
+                  <>
+                    <BorrowerDocumentUpload borrowerId={borrower.id} tenantId={tenantId} />
+                    <BorrowerOcrControl borrowerId={borrower.id} tenantId={tenantId} />
+                  </>
+                }
+                homeWazeHref={wazeUrl(borrower.homeAddress, borrower.addressLocations.home)}
+                onEditAddresses={() => openAddressEditor(borrower)}
+                reviewTools={
+                  canReview ? (
+                    <BorrowerReviewControl
+                      borrower={borrower}
+                      canReview={canReview}
+                      tenantId={tenantId}
+                    />
+                  ) : undefined
+                }
+                tenantId={tenantId}
+                whatsappHref={whatsappUrl(borrower.whatsappPhone ?? borrower.phone)}
+                workWazeHref={wazeUrl(borrower.workAddress, borrower.addressLocations.work)}
+                key={borrower.id}
+              />
+            ))}
+          </div>
         ) : (
           <div className="empty-state">
             <span aria-hidden="true">◇</span>

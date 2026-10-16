@@ -4630,7 +4630,21 @@ html:has(.panel-shell) {
 }
 
 .collector-client-mobile-list {
-  display: none;
+  display: grid;
+  gap: 12px;
+  padding: 4px 12px 14px;
+}
+
+@media (min-width: 761px) {
+  .borrower-profile-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1180px) {
+  .borrower-profile-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .borrower-toast {
