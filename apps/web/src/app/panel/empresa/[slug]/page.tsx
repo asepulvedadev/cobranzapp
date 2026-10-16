@@ -2,9 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { CSSProperties } from "react";
-import type { BorrowerDirectory, CurrentUser, TenantOverview } from "../../../../lib/platform";
+import type {
+  BorrowerDirectory,
+  CurrentUser,
+  LoanAnalytics,
+  TenantOverview,
+} from "../../../../lib/platform";
 import { serverApi } from "../../../../lib/server-api";
 import { CustomerWorkspace } from "./CustomerWorkspace";
+import { OwnerCreditAnalytics } from "./OwnerCreditAnalytics";
 
 export const metadata: Metadata = { title: "Inicio" };
 
@@ -68,6 +74,22 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
   const overdueInstallments = overview.metrics.overdueInstallments ?? 0;
   const isCollector = overview.actorRole === "collector";
   const firstName = user.displayName.trim().split(/\s+/)[0] ?? user.displayName;
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: overview.tenant.timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  let ownerAnalytics: LoanAnalytics | null = null;
+  if (overview.actorRole === "owner") {
+    const from = `${today.slice(0, 7)}-01`;
+    const analyticsResponse = await serverApi(
+      `/v1/tenants/${membership.tenantId}/credit-analytics?from=${from}&to=${today}&preset=month`,
+    );
+    if (analyticsResponse.ok) {
+      ownerAnalytics = ((await analyticsResponse.json()) as { analytics: LoanAnalytics }).analytics;
+    }
+  }
 
   const priorities = [
     ...(overdueInstallments > 0
@@ -173,6 +195,14 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
           </article>
         ) : null}
       </section>
+
+      {ownerAnalytics ? (
+        <OwnerCreditAnalytics
+          initialAnalytics={ownerAnalytics}
+          tenantId={membership.tenantId}
+          today={today}
+        />
+      ) : null}
 
       <div className="role-dashboard-grid">
         <section className="dashboard-card priority-card">
