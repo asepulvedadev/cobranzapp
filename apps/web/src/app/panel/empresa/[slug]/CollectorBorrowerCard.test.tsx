@@ -37,6 +37,8 @@ const borrower: Borrower = {
     },
   },
   profilePhotoObjectKey: null,
+  assignedCollectorId: null,
+  assignedCollectorName: null,
   consentVersion: "2026-01",
   identity: {
     country: "CO",

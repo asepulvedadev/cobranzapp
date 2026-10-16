@@ -28,6 +28,7 @@ async function errorMessage(response: Response | null, fallback: string) {
 export function CollectionRouteBoard({
   borrowers,
   canManage,
+  canReorder,
   collectors,
   onChanged,
   routes,
@@ -35,6 +36,7 @@ export function CollectionRouteBoard({
 }: {
   borrowers: Borrower[];
   canManage: boolean;
+  canReorder: boolean;
   collectors: TenantOverview["members"];
   onChanged?: () => void;
   routes: Route[];
@@ -198,7 +200,7 @@ export function CollectionRouteBoard({
   async function updateStopVisit(
     route: Route,
     stopId: string,
-    status: "pending" | "visited" | "skipped",
+    status: "pending" | "visited" | "not_home",
   ) {
     setIsBusy(true);
     setMessage("");
@@ -217,9 +219,7 @@ export function CollectionRouteBoard({
       setIsBusy(false);
       return;
     }
-    setMessage(
-      status === "visited" ? "Visita marcada como realizada." : "Estado de visita actualizado.",
-    );
+    setMessage(status === "visited" ? "Visita realizada." : "Estado actualizado.");
     setIsBusy(false);
     refreshData();
   }
@@ -258,11 +258,6 @@ export function CollectionRouteBoard({
         </div>
         <span>{routes.length} configuradas</span>
       </div>
-      <p className="operational-note">
-        Organiza visitas por empresa y dirección. Registra el estado de cada visita, pero no pagos,
-        efectivo, geolocalización ni operación sin conexión.
-      </p>
-
       {routes.length ? (
         <div className="route-board-list">
           {routes.map((route) => (
@@ -271,6 +266,7 @@ export function CollectionRouteBoard({
                 <div>
                   <strong>{route.name}</strong>
                   <small>{route.stops.length} parada(s)</small>
+                  {route.serviceDate ? <small>Fecha: {route.serviceDate}</small> : null}
                   <small>
                     {route.assignedCollectorName
                       ? `Cobrador: ${route.assignedCollectorName}`
@@ -303,8 +299,8 @@ export function CollectionRouteBoard({
                         <span className={`route-visit-status route-visit-${stop.visitStatus}`}>
                           {stop.visitStatus === "visited"
                             ? "Visita realizada"
-                            : stop.visitStatus === "skipped"
-                              ? "Visita omitida"
+                            : stop.visitStatus === "not_home"
+                              ? "No estaba"
                               : "Pendiente"}
                         </span>
                         <div className="route-stop-visit-actions">
@@ -322,14 +318,14 @@ export function CollectionRouteBoard({
                           >
                             {stop.visitStatus === "visited" ? "Deshacer visita" : "Marcar visita"}
                           </button>
-                          {stop.visitStatus !== "skipped" ? (
+                          {stop.visitStatus !== "not_home" ? (
                             <button
                               className="button-link"
                               disabled={isBusy}
-                              onClick={() => void updateStopVisit(route, stop.id, "skipped")}
+                              onClick={() => void updateStopVisit(route, stop.id, "not_home")}
                               type="button"
                             >
-                              Omitir
+                              No estaba
                             </button>
                           ) : (
                             <button
@@ -342,7 +338,7 @@ export function CollectionRouteBoard({
                             </button>
                           )}
                         </div>
-                        {canManage ? (
+                        {canReorder ? (
                           <div className="route-stop-order-actions">
                             <button
                               aria-label={`Subir ${stop.borrowerName}`}

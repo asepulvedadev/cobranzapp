@@ -48,6 +48,7 @@ export function CollectorBorrowerCard({
   workWazeHref,
   onEditAddresses,
   documentTools,
+  assignmentTools,
   reviewTools,
 }: {
   borrower: Borrower;
@@ -58,6 +59,7 @@ export function CollectorBorrowerCard({
   workWazeHref: string;
   onEditAddresses: () => void;
   documentTools: ReactNode;
+  assignmentTools?: ReactNode;
   reviewTools?: ReactNode;
 }) {
   const sensitiveFetch = useSensitiveFetch();
@@ -233,6 +235,9 @@ export function CollectorBorrowerCard({
               <small>{borrower.documents.length} archivo(s) privado(s)</small>
               {documentTools}
             </section>
+            {assignmentTools ? (
+              <section className="collector-client-assignment">{assignmentTools}</section>
+            ) : null}
             {reviewTools ? (
               <section className="collector-client-review">{reviewTools}</section>
             ) : null}
@@ -285,7 +290,7 @@ export function CollectorBorrowerCard({
             <section className="collector-evidence-data">
               <div className="collector-evidence-data-heading">
                 <div>
-                  <span>Lectura de Hermes</span>
+                  <span>Documento</span>
                   <h3>Datos extraídos de la cédula</h3>
                 </div>
                 <button
@@ -299,7 +304,7 @@ export function CollectorBorrowerCard({
 
               {ocrState === "loading" ? (
                 <p className="collector-evidence-message" role="status">
-                  Consultando los datos reconocidos por Hermes…
+                  Consultando datos…
                 </p>
               ) : bestExtraction?.fields ? (
                 <>
@@ -330,7 +335,7 @@ export function CollectorBorrowerCard({
                 <p className="collector-evidence-message" role="status">
                   {ocrState === "error"
                     ? "No fue posible consultar la lectura. Pulsa Actualizar para reintentar."
-                    : "Hermes todavía no ha generado datos para este documento."}
+                    : "Todavía no hay datos extraídos para este documento."}
                 </p>
               )}
             </section>

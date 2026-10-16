@@ -62,13 +62,15 @@ export function RouteWorkspace({
         <div>
           <span className="panel-eyebrow">{tenantName}</span>
           <h1>Rutas de cobranza</h1>
-          <p>Organiza las visitas por dirección y abre la navegación en Waze.</p>
         </div>
       </header>
       {routes && borrowers ? (
         <CollectionRouteBoard
           borrowers={borrowers.borrowers}
           canManage={actorRole === "owner" || actorRole === "supervisor"}
+          canReorder={
+            actorRole === "owner" || actorRole === "supervisor" || actorRole === "collector"
+          }
           collectors={collectors.filter((member) => member.role === "collector")}
           onChanged={() => void load()}
           routes={routes}
@@ -77,9 +79,7 @@ export function RouteWorkspace({
       ) : (
         <section className="dashboard-card">
           <h2>{message ? "No se pudieron cargar las rutas" : "Cargando rutas…"}</h2>
-          <p className="operational-note">
-            {message ?? "Estamos consultando clientes y rutas asignadas."}
-          </p>
+          {message ? <p className="tenant-form-message form-message-error">{message}</p> : null}
           {message ? (
             <button onClick={() => void load()} type="button">
               Reintentar

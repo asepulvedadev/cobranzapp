@@ -6,6 +6,7 @@ import {
   borrowerAddressUpdateRequestSchema,
   borrowerCreateRequestSchema,
   type IdentityDocumentExtraction,
+  type TenantOverview,
 } from "@cobranzapp/contracts";
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, type FormEvent, useRef, useState } from "react";
@@ -99,6 +100,7 @@ export function BorrowerDirectory({
   search,
   tenantSlug,
   actorRole,
+  collectors,
 }: {
   tenantId: string;
   directory: BorrowerDirectoryData;
@@ -107,6 +109,7 @@ export function BorrowerDirectory({
   search: string;
   tenantSlug: string;
   actorRole: "owner" | "supervisor" | "collector";
+  collectors: TenantOverview["members"];
 }) {
   const router = useRouter();
   const sensitiveFetch = useSensitiveFetch();
@@ -140,6 +143,25 @@ export function BorrowerDirectory({
   const ocrRunRef = useRef(0);
   const createFormRef = useRef<HTMLFormElement>(null);
   const hasIdentityFrontPhoto = Boolean(selectedUploadNames.identityFront);
+
+  async function assignCollector(event: FormEvent<HTMLFormElement>, borrower: Borrower) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/borrowers/${borrower.id}/assignment`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ collectorId: String(form.get("collectorId") ?? "") || null }),
+      },
+    ).catch(() => null);
+    if (!response?.ok) {
+      setToastMessage("No fue posible asignar el cobrador.");
+      return;
+    }
+    setToastMessage("Cobrador asignado.");
+    router.refresh();
+  }
 
   function closeCreateModal(force = false) {
     if (isSubmitting && !force) return;
@@ -216,13 +238,13 @@ export function BorrowerDirectory({
         `/api/v1/tenants/${tenantId}/borrowers/identity-extract`,
         { method: "POST", body: formData },
       );
-      if (!response) throw new Error("No fue posible conectar con Hermes.");
+      if (!response) throw new Error("No fue posible iniciar la lectura.");
       const body = (await response.json().catch(() => ({}))) as {
         extraction?: IdentityDocumentExtraction;
         error?: { message?: string };
       };
       if (!response.ok || !body.extraction) {
-        throw new Error(formatApiError(body, "Hermes no pudo leer la cédula."));
+        throw new Error(formatApiError(body, "No fue posible leer la cédula."));
       }
       if (run !== ocrRunRef.current) return;
       const extraction = body.extraction;
@@ -240,10 +262,10 @@ export function BorrowerDirectory({
       setOcrStatus(foundCount === 2 ? "ready" : foundCount === 1 ? "partial" : "error");
       setOcrMessage(
         foundCount === 2
-          ? `Hermes organizó los datos con ${Math.round(extraction.confidence * 100)}% de confianza. Revísalos antes de continuar.`
+          ? ""
           : foundCount === 1
-            ? "Hermes detectó información parcial. Completa o corrige lo faltante."
-            : "Hermes no pudo identificar el nombre y número. Toma fotos más nítidas o escríbelos manualmente.",
+            ? "Completa o corrige los datos faltantes."
+            : "No se identificaron el nombre y el número. Toma fotos más nítidas o escríbelos manualmente.",
       );
       setOcrProgress(100);
     } catch (error) {
@@ -253,7 +275,7 @@ export function BorrowerDirectory({
       setOcrMessage(
         error instanceof Error
           ? error.message
-          : "Hermes no pudo ejecutar la lectura. Puedes escribir los datos manualmente.",
+          : "No fue posible leer el documento. Escribe los datos manualmente.",
       );
     }
   }
@@ -571,17 +593,12 @@ export function BorrowerDirectory({
             <span aria-hidden="true">✓</span>
             <div>
               <strong>{toastMessage}</strong>
-              <small>Abre su perfil para revisar el estado y continuar.</small>
             </div>
             <button aria-label="Cerrar aviso" onClick={() => setToastMessage("")} type="button">
               ×
             </button>
           </div>
         ) : null}
-        <p className="operational-note">
-          La búsqueda muestra el nombre y los últimos cuatro dígitos. Nunca se expone el número
-          completo.
-        </p>
         <form
           className="tenant-directory-filters"
           action={borrowerDirectoryHref(tenantSlug)}
@@ -606,6 +623,31 @@ export function BorrowerDirectory({
           <div className="collector-client-mobile-list borrower-profile-list">
             {directory.borrowers.map((borrower) => (
               <CollectorBorrowerCard
+                assignmentTools={
+                  canReview ? (
+                    <form
+                      className="borrower-assignment-form"
+                      onSubmit={(event) => void assignCollector(event, borrower)}
+                    >
+                      <label htmlFor={`borrower-collector-${borrower.id}`}>Cobrador</label>
+                      <select
+                        defaultValue={borrower.assignedCollectorId ?? ""}
+                        id={`borrower-collector-${borrower.id}`}
+                        name="collectorId"
+                      >
+                        <option value="">Sin asignar</option>
+                        {collectors.map((collector) => (
+                          <option key={collector.userId} value={collector.userId}>
+                            {collector.displayName}
+                          </option>
+                        ))}
+                      </select>
+                      <button type="submit">Guardar</button>
+                    </form>
+                  ) : borrower.assignedCollectorName ? (
+                    <p>Cobrador: {borrower.assignedCollectorName}</p>
+                  ) : undefined
+                }
                 borrower={borrower}
                 creditHref={
                   borrower.identity.verificationState === "reviewed"
@@ -675,10 +717,6 @@ export function BorrowerDirectory({
           <div className="borrower-modal-intro">
             <div>
               <span className="panel-eyebrow">Registro guiado · 4 pasos</span>
-              <p>
-                Empieza con las fotos del documento. La app leerá los datos y te pedirá confirmarlos
-                antes de continuar. Las imágenes quedan privadas para revisión.
-              </p>
             </div>
             <span className="borrower-step-counter">Paso {createStep} de 4</span>
           </div>
@@ -818,7 +856,7 @@ export function BorrowerDirectory({
                           ? "Lectura automática completada"
                           : "Revisión necesaria"}
                     </strong>
-                    <small>{ocrMessage}</small>
+                    {ocrMessage ? <small>{ocrMessage}</small> : null}
                   </div>
                 </div>
               ) : null}
@@ -873,7 +911,7 @@ export function BorrowerDirectory({
                   {ocrExtraction ? (
                     <div className="borrower-identity-all-data">
                       <div className="borrower-identity-all-data-heading">
-                        <strong>Todos los datos leídos por Hermes</strong>
+                        <strong>Datos extraídos del documento</strong>
                         <small>
                           {ocrExtraction.sources.back ? "Frente y reverso" : "Solo frente"}
                         </small>

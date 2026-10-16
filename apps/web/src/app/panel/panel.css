@@ -2198,7 +2198,7 @@ html:has(.panel-shell) {
   color: #17663a;
 }
 
-.route-visit-skipped {
+.route-visit-not_home {
   background: #fff0d7;
   color: #8b5b00;
 }
@@ -2218,8 +2218,8 @@ html:has(.panel-shell) {
 
 .route-stop-order-actions button {
   display: grid;
-  width: 24px;
-  height: 24px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   padding: 0;
   border: 1px solid var(--panel-line);
@@ -6287,6 +6287,7 @@ html:has(.panel-shell) {
   .collector-client-address,
   .collector-client-emergency,
   .collector-client-documents,
+  .collector-client-assignment,
   .collector-client-review {
     display: grid;
     gap: 8px;
@@ -6304,7 +6305,8 @@ html:has(.panel-shell) {
 
   .collector-client-address span,
   .collector-client-emergency > span,
-  .collector-client-documents > span {
+  .collector-client-documents > span,
+  .collector-client-assignment label {
     color: var(--panel-muted);
     font-size: 10px;
     font-weight: 850;
@@ -6379,6 +6381,16 @@ html:has(.panel-shell) {
     min-height: 44px;
     align-content: center;
   }
+
+  .borrower-assignment-form {
+    display: grid;
+    gap: 8px;
+  }
+
+  .borrower-assignment-form select,
+  .borrower-assignment-form button {
+    min-height: 44px;
+  }
 }
 
 @media (min-width: 761px) {
@@ -6400,7 +6412,8 @@ html:has(.panel-shell) {
   }
 
   .collector-client-review,
-  .collector-client-documents {
+  .collector-client-documents,
+  .collector-client-assignment {
     grid-column: 1 / -1;
   }
 }

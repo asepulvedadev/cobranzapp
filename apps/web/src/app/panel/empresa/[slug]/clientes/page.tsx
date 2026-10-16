@@ -41,7 +41,6 @@ export default async function CustomersPage({
         <div>
           <span className="panel-eyebrow">{overview.tenant.displayName}</span>
           <h1>Clientes</h1>
-          <p>Busca, verifica y revisa la cartera sin cargar el resto de la operación.</p>
         </div>
       </header>
       <section className="dashboard-card borrower-directory-card">
@@ -54,6 +53,9 @@ export default async function CustomersPage({
               overview.actorRole === "collector"
             }
             canReview={overview.actorRole === "owner" || overview.actorRole === "supervisor"}
+            collectors={overview.members.filter(
+              (member) => member.role === "collector" && member.status === "active",
+            )}
             directory={directory}
             search={search}
             tenantSlug={slug}

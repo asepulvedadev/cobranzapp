@@ -361,7 +361,7 @@ export class MobileApi {
     });
     if (!response.ok) {
       throw new MobileApiError(
-        await apiError(response, "Hermes no pudo leer la cédula."),
+        await apiError(response, "No fue posible leer la cédula."),
         response.status,
       );
     }

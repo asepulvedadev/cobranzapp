@@ -125,7 +125,7 @@ export function BorrowerCreateForm({
   async function scanIdentity(front: SelectedImage, back?: SelectedImage | null) {
     setOcrBusy(true);
     setOcrExtraction(null);
-    setMessage("Hermes está leyendo y organizando todos los datos de la cédula…");
+    setMessage("Leyendo la cédula…");
     try {
       const extraction = await api.extractIdentityDocument(tenantId, front, back ?? undefined);
       setOcrExtraction(extraction);
@@ -134,18 +134,18 @@ export function BorrowerCreateForm({
       if (extraction.fields.documentType) setDocumentType(extraction.fields.documentType);
       setMessage(
         extraction.fields.fullName && extraction.fields.documentNumber
-          ? `Hermes completó la lectura con ${Math.round(extraction.confidence * 100)}% de confianza. Verifica los datos.`
-          : "Hermes encontró datos parciales. Completa lo que falte y verifica la cédula.",
+          ? `Lectura completada. Verifica los datos.`
+          : "Completa los datos faltantes.",
       );
     } catch (error) {
       if (error instanceof MobileApiError && error.status === 428) {
         onNeedsReauthentication();
-        setMessage("Confirma tu contraseña para que Hermes pueda leer el documento.");
+        setMessage("Vuelve a intentar la lectura.");
       } else {
         setMessage(
           error instanceof MobileApiError
             ? error.message
-            : "Hermes no pudo leer la imagen. Puedes completar los datos manualmente.",
+            : "No fue posible leer la imagen. Completa los datos manualmente.",
         );
       }
     } finally {
@@ -496,9 +496,7 @@ export function BorrowerCreateForm({
                     onPress={() => void pickImage(setProfilePhoto, "foto-perfil.jpg")}
                     onCamera={() => void captureImage(setProfilePhoto, "foto-perfil.jpg")}
                   />
-                  {ocrBusy ? (
-                    <Text style={styles.ocrStatus}>Hermes está leyendo la cédula…</Text>
-                  ) : null}
+                  {ocrBusy ? <Text style={styles.ocrStatus}>Leyendo la cédula…</Text> : null}
                   {ocrExtraction ? (
                     <View style={styles.ocrDetails}>
                       <Text style={styles.ocrTitle}>Todos los datos detectados</Text>
