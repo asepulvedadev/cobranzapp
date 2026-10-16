@@ -3,6 +3,7 @@ import type { IdentityExtractor } from "@cobranzapp/hermes-ocr";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "./app.js";
 import type { AuthenticatedUser, AuthService } from "./auth/types.js";
+import type { BorrowerDocumentStorage } from "./borrowers/document-storage.js";
 import type { BorrowerService } from "./borrowers/types.js";
 import type { CreditService } from "./credit/types.js";
 import type { PlatformService } from "./platform/types.js";
@@ -71,6 +72,7 @@ function dependencies(overrides?: {
   routeService?: RouteService;
   supportAccessService?: Partial<SupportAccessService>;
   identityExtractor?: IdentityExtractor;
+  documentStorage?: BorrowerDocumentStorage;
 }) {
   const authService: AuthService = {
     login: vi.fn(async () => ({
@@ -375,6 +377,7 @@ function dependencies(overrides?: {
     allowedWebOrigins: ["https://cobranzaap.tech"],
     authService,
     borrowerService: overrides?.borrowerService,
+    documentStorage: overrides?.documentStorage,
     identityExtractor: overrides?.identityExtractor,
     creditService: overrides?.creditService,
     routeService: overrides?.routeService,
@@ -569,6 +572,93 @@ describe("borrower creation security", () => {
     expect(extract).toHaveBeenCalledWith({
       front: expect.objectContaining({ mediaType: "image/jpeg", side: "front" }),
     });
+  });
+
+  it("serves a private borrower document only through its authenticated tenant scope", async () => {
+    const tenantId = tenantOwner.memberships[0]?.tenantId ?? "";
+    const borrowerId = "193a2db4-2349-4a48-8833-746a2a334260";
+    const documentId = "73d33f0e-b1a8-4a55-9061-2ccf283ce0f5";
+    const objectKey = `tenant/${tenantId}/borrowers/${borrowerId}/quarantine/private.bin`;
+    const get = vi.fn(async () => ({
+      id: borrowerId,
+      fullName: "Cliente de prueba",
+      status: "active" as const,
+      phone: "3000000000",
+      whatsappPhone: "3000000000",
+      homeAddress: "Calle 1 # 2-3",
+      workAddress: "Carrera 4 # 5-6",
+      homeAddressStatus: "confirmed" as const,
+      workAddressStatus: "confirmed" as const,
+      addressLocations: {
+        home: {
+          status: "pending" as const,
+          latitude: null,
+          longitude: null,
+          formattedAddress: null,
+          provider: null,
+          precision: null,
+          errorCode: null,
+          geocodedAt: null,
+        },
+        work: {
+          status: "pending" as const,
+          latitude: null,
+          longitude: null,
+          formattedAddress: null,
+          provider: null,
+          precision: null,
+          errorCode: null,
+          geocodedAt: null,
+        },
+      },
+      profilePhotoObjectKey: objectKey,
+      consentVersion: "borrower-dossier-v1",
+      identity: {
+        country: "CO",
+        documentType: "CC",
+        documentLast4: "7890",
+        verificationState: "reviewed" as const,
+      },
+      emergencyContacts: [],
+      documents: [
+        {
+          id: documentId,
+          category: "profile_photo" as const,
+          side: null,
+          objectKey,
+          mediaType: "image/jpeg",
+          sizeBytes: 4,
+          sha256: "a".repeat(64),
+          scanStatus: "accepted" as const,
+          createdAt: "2026-10-16T12:00:00.000Z",
+        },
+      ],
+      createdAt: "2026-10-16T12:00:00.000Z",
+    }));
+    const read = vi.fn(async () => ({
+      bytes: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+      mediaType: "image/jpeg",
+    }));
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => tenantOwner) },
+        borrowerService: { get } as unknown as BorrowerService,
+        documentStorage: { read } as unknown as BorrowerDocumentStorage,
+      }),
+    );
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/tenants/${tenantId}/borrowers/${borrowerId}/documents/${documentId}`,
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("image/jpeg");
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+    expect(response.rawPayload).toEqual(Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+    expect(read).toHaveBeenCalledWith(objectKey);
   });
 
   it("requires recent reauthentication before creating a dossier", async () => {

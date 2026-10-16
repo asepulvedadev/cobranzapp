@@ -1881,6 +1881,40 @@ export function createOpenApiDocument(version: string) {
           },
         },
       },
+      "/v1/tenants/{tenantId}/borrowers/{borrowerId}/documents/{documentId}": {
+        get: {
+          tags: ["Clientes"],
+          operationId: "getBorrowerDocument",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "borrowerId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "documentId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": { description: "Archivo privado del expediente." },
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("El archivo no existe.", schemaReference("ApiError")),
+            "503": response("El almacenamiento no está habilitado.", schemaReference("ApiError")),
+          },
+        },
+      },
       "/v1/tenants/{tenantId}/borrowers/{borrowerId}/review": {
         patch: {
           tags: ["Clientes"],

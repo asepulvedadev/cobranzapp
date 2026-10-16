@@ -101,6 +101,9 @@ const tenantTeamMemberParamsSchema = z.object({
 const tenantBranchParamsSchema = z.object({ tenantId: z.uuid(), branchId: z.uuid() });
 const tenantTeamParamsSchema = z.object({ tenantId: z.uuid(), teamId: z.uuid() });
 const tenantBorrowerParamsSchema = z.object({ tenantId: z.uuid(), borrowerId: z.uuid() });
+const tenantBorrowerDocumentParamsSchema = tenantBorrowerParamsSchema.extend({
+  documentId: z.uuid(),
+});
 const tenantBorrowerOcrParamsSchema = z.object({
   tenantId: z.uuid(),
   borrowerId: z.uuid(),
@@ -3281,6 +3284,79 @@ export function buildApp(dependencies: AppDependencies) {
         );
       }
       return reply.code(202).send({ extraction: result.extraction });
+    },
+  );
+
+  app.get(
+    "/v1/tenants/:tenantId/borrowers/:borrowerId/documents/:documentId",
+    async (request, reply) => {
+      const session = await requireUser(request, reply);
+      if (!session) return;
+      const params = tenantBorrowerDocumentParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return sendError(
+          reply,
+          404,
+          "BORROWER_DOCUMENT_NOT_FOUND",
+          "El archivo no existe.",
+          request.id,
+        );
+      }
+      const membership = tenantMembershipForSession(session, params.data.tenantId);
+      if (!membership || !canManageBorrowers(membership.role)) {
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "No tienes acceso a este archivo.",
+          request.id,
+        );
+      }
+      if (!dependencies.borrowerService || !dependencies.documentStorage) {
+        return sendError(
+          reply,
+          503,
+          "BORROWER_DOCUMENT_STORAGE_UNAVAILABLE",
+          "Los documentos privados todavía no están disponibles.",
+          request.id,
+        );
+      }
+      const borrower = await dependencies.borrowerService.get(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.borrowerId,
+      );
+      const document = borrower?.documents.find((item) => item.id === params.data.documentId);
+      const expectedPrefix = `tenant/${params.data.tenantId}/borrowers/${params.data.borrowerId}/quarantine/`;
+      if (!document?.objectKey.startsWith(expectedPrefix)) {
+        return sendError(
+          reply,
+          404,
+          "BORROWER_DOCUMENT_NOT_FOUND",
+          "El archivo no existe.",
+          request.id,
+        );
+      }
+      const stored = await dependencies.documentStorage.read(document.objectKey);
+      if (!stored) {
+        return sendError(
+          reply,
+          404,
+          "BORROWER_DOCUMENT_NOT_FOUND",
+          "El archivo no existe.",
+          request.id,
+        );
+      }
+      return reply
+        .type(stored.mediaType)
+        .header("cache-control", "private, no-store")
+        .header("content-disposition", `inline; filename="cliente-${document.id}"`)
+        .header("content-security-policy", "sandbox; default-src 'none'")
+        .send(stored.bytes);
     },
   );
 
