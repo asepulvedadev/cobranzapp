@@ -76,7 +76,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    networks: [backend]
+    # The worker needs an egress-capable network to reach the host-only
+    # Hermes OCR service. Keep backend attached for PostgreSQL isolation.
+    networks: [frontend, backend]
     volumes:
       - documents_data:/var/lib/cobranzapp/documents:ro
     restart: unless-stopped
