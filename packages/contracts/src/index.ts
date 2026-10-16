@@ -976,6 +976,42 @@ export const loanRenewalRequestSchema = z.object({
   excessAmount: decimalAmountSchema,
 });
 
+export const loanAnalyticsPresetSchema = z.enum(["day", "week", "month", "custom"]);
+export const loanAnalyticsQuerySchema = z
+  .object({
+    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe usar AAAA-MM-DD."),
+    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La fecha debe usar AAAA-MM-DD."),
+    preset: loanAnalyticsPresetSchema.default("custom"),
+  })
+  .refine((value) => value.from <= value.to, {
+    message: "La fecha inicial debe ser anterior o igual a la fecha final.",
+  });
+export const loanAnalyticsSchema = z.object({
+  period: z.object({
+    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    preset: loanAnalyticsPresetSchema,
+  }),
+  metrics: z.object({
+    activePrincipalOutstanding: decimalAmountSchema,
+    approvedPrincipal: decimalAmountSchema,
+    collectedAmount: decimalAmountSchema,
+    renewalCount: z.number().int().nonnegative(),
+    activeCreditCount: z.number().int().nonnegative(),
+  }),
+  renewalsByMember: z.array(
+    z.object({
+      userId: z.uuid(),
+      displayName: z.string().min(1),
+      role: z.enum(["supervisor", "collector"]),
+      total: z.number().int().nonnegative(),
+      pending: z.number().int().nonnegative(),
+      activated: z.number().int().nonnegative(),
+    }),
+  ),
+});
+export const loanAnalyticsResponseSchema = z.object({ analytics: loanAnalyticsSchema });
+
 export const borrowerDocumentSideSchema = z.enum(["front", "back"]);
 export const borrowerDocumentSchema = z.object({
   id: z.uuid(),
@@ -1373,6 +1409,9 @@ export type LoanApplication = z.infer<typeof loanApplicationSchema>;
 export type LoanApplicationDirectory = z.infer<typeof loanApplicationDirectorySchema>;
 export type LoanPaymentCreateRequest = z.infer<typeof loanPaymentCreateRequestSchema>;
 export type LoanRenewalRequest = z.infer<typeof loanRenewalRequestSchema>;
+export type LoanAnalyticsPreset = z.infer<typeof loanAnalyticsPresetSchema>;
+export type LoanAnalyticsQuery = z.infer<typeof loanAnalyticsQuerySchema>;
+export type LoanAnalytics = z.infer<typeof loanAnalyticsSchema>;
 export type FinancialSchedulePreviewRequest = z.infer<typeof financialSchedulePreviewRequestSchema>;
 export type FinancialSchedulePeriod = z.infer<typeof financialSchedulePeriodSchema>;
 export type FinancialSchedulePreview = z.infer<typeof financialSchedulePreviewSchema>;

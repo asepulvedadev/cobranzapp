@@ -1,4 +1,4 @@
-import type { LoanProduct, Route } from "@cobranzapp/contracts";
+import type { LoanAnalytics, LoanProduct, Route } from "@cobranzapp/contracts";
 import type { IdentityExtractor } from "@cobranzapp/hermes-ocr";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "./app.js";
@@ -941,6 +941,76 @@ describe("loan application review queue", () => {
     expect(response.statusCode).toBe(403);
     expect(response.json()).toMatchObject({ error: { code: "SCOPE_DENIED" } });
     expect(approveApplication).not.toHaveBeenCalled();
+  });
+});
+
+describe("owner credit analytics", () => {
+  const analytics: LoanAnalytics = {
+    period: { from: "2026-10-01", to: "2026-10-16", preset: "month" },
+    metrics: {
+      activePrincipalOutstanding: "850000.00",
+      approvedPrincipal: "1200000.00",
+      collectedAmount: "350000.00",
+      renewalCount: 3,
+      activeCreditCount: 8,
+    },
+    renewalsByMember: [
+      {
+        userId: "8b8f4a23-3207-497f-a4b6-778cb8f4d1d0",
+        displayName: "Cobrador Uno",
+        role: "collector",
+        total: 3,
+        pending: 1,
+        activated: 2,
+      },
+    ],
+  };
+
+  it("returns date-filtered financial indicators only to the owner", async () => {
+    const getAnalytics = vi.fn(async () => ({ status: "found" as const, analytics }));
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => tenantOwner) },
+        creditService: { getAnalytics } as unknown as CreditService,
+      }),
+    );
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/tenants/${tenantOwner.memberships[0]?.tenantId}/credit-analytics?from=2026-10-01&to=2026-10-16&preset=month`,
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ analytics });
+    expect(getAnalytics).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: tenantOwner.id, tenantRole: "owner" }),
+      tenantOwner.memberships[0]?.tenantId,
+      { from: "2026-10-01", to: "2026-10-16", preset: "month" },
+    );
+  });
+
+  it("does not expose company financial indicators to collectors", async () => {
+    const getAnalytics = vi.fn();
+    const collector: AuthenticatedUser = {
+      ...tenantOwner,
+      memberships: [{ ...tenantOwner.memberships[0], role: "collector" }],
+    };
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => collector) },
+        creditService: { getAnalytics } as unknown as CreditService,
+      }),
+    );
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/tenants/${tenantOwner.memberships[0]?.tenantId}/credit-analytics?from=2026-10-01&to=2026-10-16&preset=month`,
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(getAnalytics).not.toHaveBeenCalled();
   });
 });
 

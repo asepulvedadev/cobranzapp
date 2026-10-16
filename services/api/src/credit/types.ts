@@ -1,4 +1,6 @@
 import type {
+  LoanAnalytics,
+  LoanAnalyticsQuery,
   LoanApplication,
   LoanApplicationCreateRequest,
   LoanPaymentCreateRequest,
@@ -84,6 +86,10 @@ export type LoanRenewalResult =
   | { status: "insufficient_payment"; paidPercentage: number }
   | { status: "amount_out_of_range" };
 
+export type LoanAnalyticsResult =
+  | { status: "found"; analytics: LoanAnalytics }
+  | { status: "forbidden" };
+
 export interface CreditService {
   listProducts(actor: TenantActor, tenantId: string): Promise<LoanProduct[]>;
   createProduct(
@@ -115,6 +121,11 @@ export interface CreditService {
     },
   ): Promise<LoanProductSchedulePreviewResult>;
   listApplications(actor: TenantActor, tenantId: string): Promise<LoanApplication[]>;
+  getAnalytics(
+    actor: TenantActor,
+    tenantId: string,
+    query: LoanAnalyticsQuery,
+  ): Promise<LoanAnalyticsResult>;
   createApplication(
     actor: TenantActor,
     tenantId: string,

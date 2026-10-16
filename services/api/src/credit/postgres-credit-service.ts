@@ -1,4 +1,4 @@
-import type { LoanApplication, LoanProduct } from "@cobranzapp/contracts";
+import type { LoanAnalytics, LoanApplication, LoanProduct } from "@cobranzapp/contracts";
 import { buildSchedulePreview } from "@cobranzapp/financial";
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
@@ -6,6 +6,7 @@ import { operationalPaymentState } from "./operational-schedule.js";
 import { renewalPaymentProgress } from "./renewal-policy.js";
 import type {
   CreditService,
+  LoanAnalyticsResult,
   LoanApplicationApprovalResult,
   LoanApplicationResult,
   LoanApplicationReviewResult,
@@ -69,6 +70,10 @@ function canManageApplications(actor: TenantActor) {
 
 function canReviewApplications(actor: TenantActor) {
   return actor.tenantRole === "owner" || actor.tenantRole === "supervisor";
+}
+
+function canReadAnalytics(actor: TenantActor) {
+  return actor.tenantRole === "owner";
 }
 
 export function loanCreationPolicy(role: TenantActor["tenantRole"]) {
@@ -462,6 +467,145 @@ export function createPostgresCreditService(pool: Pool): CreditService {
           [tenantId],
         );
         return result.rows.map(mapApplication);
+      });
+    },
+
+    async getAnalytics(actor, tenantId, query): Promise<LoanAnalyticsResult> {
+      if (!canReadAnalytics(actor)) return { status: "forbidden" };
+      return withTransaction(actor, tenantId, async (client) => {
+        const activeApplications = await client.query<LoanApplicationRow>(
+          `SELECT application.id,
+                  application.borrower_id,
+                  borrower.full_name AS borrower_name,
+                  application.loan_product_id,
+                  product.name AS loan_product_name,
+                  application.requested_principal,
+                  application.payment_frequency,
+                  application.requested_term_count,
+                  application.paid_installments,
+                  application.purpose,
+                  application.status,
+                  application.rate_basis,
+                  application.nominal_rate,
+                  application.documentation_fee_rate,
+                  application.created_at,
+                  application.updated_at
+             FROM loan_applications application
+             JOIN borrowers borrower
+               ON borrower.tenant_id = application.tenant_id
+              AND borrower.id = application.borrower_id
+             JOIN loan_products product
+               ON product.tenant_id = application.tenant_id
+              AND product.id = application.loan_product_id
+            WHERE application.tenant_id = $1 AND application.status = 'active'`,
+          [tenantId],
+        );
+        const activePrincipalOutstanding = activeApplications.rows.reduce((total, row) => {
+          const schedule = buildSchedulePreview({
+            principal: row.requested_principal,
+            termCount: row.requested_term_count,
+            paymentFrequency: row.payment_frequency,
+            rateBasis: row.rate_basis,
+            nominalRate: row.nominal_rate,
+            documentationFeeRate: row.documentation_fee_rate,
+            startDate: row.created_at.toISOString().slice(0, 10),
+          });
+          return (
+            total +
+            schedule.periods
+              .slice(row.paid_installments)
+              .reduce((subtotal, period) => subtotal + parseCents(period.principal), 0n)
+          );
+        }, 0n);
+        const totals = await client.query<{
+          approved_principal: string;
+          collected_amount: string;
+          renewal_count: string;
+        }>(
+          `SELECT
+             COALESCE((
+               SELECT sum(application.requested_principal)
+                 FROM loan_applications application
+                 JOIN tenants tenant ON tenant.id = application.tenant_id
+                WHERE application.tenant_id = $1
+                  AND application.status IN ('active', 'paid')
+                  AND application.approved_at IS NOT NULL
+                  AND (application.approved_at AT TIME ZONE tenant.timezone)::date
+                      BETWEEN $2::date AND $3::date
+             ), 0)::text AS approved_principal,
+             COALESCE((
+               SELECT sum(payment.amount)
+                 FROM loan_payments payment
+                 JOIN tenants tenant ON tenant.id = payment.tenant_id
+                WHERE payment.tenant_id = $1
+                  AND (payment.paid_at AT TIME ZONE tenant.timezone)::date
+                      BETWEEN $2::date AND $3::date
+             ), 0)::text AS collected_amount,
+             (
+               SELECT count(*)
+                 FROM loan_applications application
+                 JOIN tenants tenant ON tenant.id = application.tenant_id
+                WHERE application.tenant_id = $1
+                  AND application.renewed_from_id IS NOT NULL
+                  AND (application.created_at AT TIME ZONE tenant.timezone)::date
+                      BETWEEN $2::date AND $3::date
+             )::text AS renewal_count`,
+          [tenantId, query.from, query.to],
+        );
+        const renewalsByMember = await client.query<{
+          user_id: string;
+          display_name: string;
+          role: "supervisor" | "collector";
+          total: string;
+          pending: string;
+          activated: string;
+        }>(
+          `SELECT membership.user_id,
+                  users.display_name,
+                  membership.role,
+                  count(application.id)::text AS total,
+                  count(application.id) FILTER (
+                    WHERE application.status IN ('draft', 'submitted', 'under_review')
+                  )::text AS pending,
+                  count(application.id) FILTER (
+                    WHERE application.status IN ('active', 'paid')
+                  )::text AS activated
+             FROM tenant_memberships membership
+             JOIN users ON users.id = membership.user_id
+             JOIN tenants tenant ON tenant.id = membership.tenant_id
+             LEFT JOIN loan_applications application
+               ON application.tenant_id = membership.tenant_id
+              AND application.created_by = membership.user_id
+              AND application.renewed_from_id IS NOT NULL
+              AND (application.created_at AT TIME ZONE tenant.timezone)::date
+                  BETWEEN $2::date AND $3::date
+            WHERE membership.tenant_id = $1
+              AND membership.status = 'active'
+              AND membership.role IN ('supervisor', 'collector')
+            GROUP BY membership.user_id, users.display_name, membership.role
+            ORDER BY count(application.id) DESC, users.display_name`,
+          [tenantId, query.from, query.to],
+        );
+        const periodTotals = totals.rows[0];
+        const analytics: LoanAnalytics = {
+          period: query,
+          metrics: {
+            activePrincipalOutstanding: formatCents(activePrincipalOutstanding),
+            approvedPrincipal: periodTotals?.approved_principal ?? "0.00",
+            collectedAmount: periodTotals?.collected_amount ?? "0.00",
+            renewalCount: Number(periodTotals?.renewal_count ?? 0),
+            activeCreditCount: activeApplications.rowCount ?? activeApplications.rows.length,
+          },
+          renewalsByMember: renewalsByMember.rows.map((row) => ({
+            userId: row.user_id,
+            displayName: row.display_name,
+            role: row.role,
+            total: Number(row.total),
+            pending: Number(row.pending),
+            activated: Number(row.activated),
+          })),
+        };
+        return { status: "found", analytics };
       });
     },
 

@@ -13,6 +13,7 @@ import {
   createPlatformTenantRequestSchema,
   createTeamRequestSchema,
   financialSchedulePreviewRequestSchema,
+  loanAnalyticsQuerySchema,
   loanApplicationCreateRequestSchema,
   loanPaymentCreateRequestSchema,
   loanProductCreateRequestSchema,
@@ -4623,6 +4624,56 @@ export function buildApp(dependencies: AppDependencies) {
       params.data.tenantId,
     );
     return reply.send({ applications });
+  });
+
+  app.get("/v1/tenants/:tenantId/credit-analytics", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const query = loanAnalyticsQuerySchema.safeParse(request.query);
+    if (!params.success || !query.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_ANALYTICS_RANGE",
+        "Revisa las fechas del reporte.",
+        request.id,
+      );
+    }
+    const membership = session.user.memberships.find(
+      (item) => item.tenantId === params.data.tenantId,
+    );
+    if (membership?.role !== "owner") {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo el propietario puede consultar los datos financieros de la empresa.",
+        request.id,
+      );
+    }
+    if (!dependencies.creditService) {
+      return sendError(
+        reply,
+        503,
+        "CREDIT_ANALYTICS_UNAVAILABLE",
+        "Los indicadores financieros todavía no están configurados.",
+        request.id,
+      );
+    }
+    const result = await dependencies.creditService.getAnalytics(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+      query.data,
+    );
+    if (result.status === "forbidden") {
+      return sendError(reply, 403, "SCOPE_DENIED", "No puedes consultar este reporte.", request.id);
+    }
+    return reply.send({ analytics: result.analytics });
   });
 
   app.post("/v1/tenants/:tenantId/loan-applications", async (request, reply) => {

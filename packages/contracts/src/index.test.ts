@@ -8,6 +8,7 @@ import {
   createBranchRequestSchema,
   createPlatformTenantRequestSchema,
   currentUserSchema,
+  loanAnalyticsQuerySchema,
   loanProductCreateRequestSchema,
   loginRequestSchema,
   platformSystemStatusSchema,
@@ -404,6 +405,15 @@ describe("shared API contracts", () => {
       activity: [],
     });
     expect(result.success).toBe(true);
+  });
+
+  it("accepts bounded analytics dates and rejects inverted ranges", () => {
+    expect(
+      loanAnalyticsQuerySchema.parse({ from: "2026-10-01", to: "2026-10-16", preset: "month" }),
+    ).toEqual({ from: "2026-10-01", to: "2026-10-16", preset: "month" });
+    expect(
+      loanAnalyticsQuerySchema.safeParse({ from: "2026-10-17", to: "2026-10-16" }).success,
+    ).toBe(false);
   });
 
   it("normalizes workspace settings and branch inputs", () => {
