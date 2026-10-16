@@ -165,8 +165,8 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
     ]) {
       await ownerPool.query(
         `INSERT INTO borrower_documents
-           (tenant_id, borrower_id, category, side, object_key, media_type, size_bytes, sha256, scan_status, created_by)
-         VALUES ($1, $2, $3, $4, $5, 'image/jpeg', 1024, repeat('a', 64), 'accepted', $6)`,
+           (tenant_id, borrower_id, category, side, object_key, media_type, size_bytes, sha256, created_by)
+         VALUES ($1, $2, $3, $4, $5, 'image/jpeg', 1024, repeat('a', 64), $6)`,
         [tenantId, created.borrower.id, document[0], document[1], document[2], developerId],
       );
     }
@@ -181,7 +181,13 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
     });
     expect(reviewed).toMatchObject({
       status: "updated",
-      borrower: { identity: { verificationState: "reviewed" } },
+      borrower: {
+        identity: { verificationState: "reviewed" },
+        documents: expect.arrayContaining([
+          expect.objectContaining({ category: "identity", side: "front", scanStatus: "accepted" }),
+          expect.objectContaining({ category: "profile_photo", scanStatus: "accepted" }),
+        ]),
+      },
     });
     const application = await creditService.createApplication(actor, tenantId, {
       borrowerId: created.borrower.id,

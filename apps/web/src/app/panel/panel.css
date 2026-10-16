@@ -5876,6 +5876,21 @@ html:has(.panel-shell) {
   color: var(--panel-muted);
 }
 
+.borrower-review-help {
+  margin: 0;
+  color: var(--panel-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.borrower-review-help.is-missing {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff0d7;
+  color: #7a4c00;
+  font-weight: 700;
+}
+
 .borrower-review-body form {
   display: grid;
   gap: 8px;
@@ -5901,13 +5916,14 @@ html:has(.panel-shell) {
 }
 
 .borrower-review-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
 .borrower-review-actions button {
-  min-height: 36px;
+  width: 100%;
+  min-height: 44px;
   padding: 0 12px;
   border: 0;
   border-radius: 9px;
@@ -5916,6 +5932,15 @@ html:has(.panel-shell) {
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
+}
+
+.borrower-review-actions .review-approve-button {
+  background: #176b43;
+}
+
+.borrower-review-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .borrower-review-actions .review-reject-button {

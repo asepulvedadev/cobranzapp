@@ -54,8 +54,10 @@ const CREATE_STEPS = [
   { label: "Revisión", detail: "Confirma y guarda" },
 ] as const;
 
-async function prepareOcrUpload(file: File) {
-  if (file.size <= 2_400_000) return file;
+const browserReadyImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+async function prepareImageUpload(file: File) {
+  if (file.size <= 2_400_000 && browserReadyImageTypes.has(file.type)) return file;
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
@@ -142,7 +144,16 @@ export function BorrowerDirectory({
   const [ocrExtraction, setOcrExtraction] = useState<IdentityDocumentExtraction | null>(null);
   const ocrRunRef = useRef(0);
   const createFormRef = useRef<HTMLFormElement>(null);
+  const preparedUploadsRef = useRef(new Map<string, { original: File; prepared: File }>());
   const hasIdentityFrontPhoto = Boolean(selectedUploadNames.identityFront);
+
+  async function prepareSelectedUpload(field: string, file: File) {
+    const cached = preparedUploadsRef.current.get(field);
+    if (cached?.original === file) return cached.prepared;
+    const prepared = await prepareImageUpload(file);
+    preparedUploadsRef.current.set(field, { original: file, prepared });
+    return prepared;
+  }
 
   async function assignCollector(event: FormEvent<HTMLFormElement>, borrower: Borrower) {
     event.preventDefault();
@@ -170,6 +181,7 @@ export function BorrowerDirectory({
     setCreatedBorrowerId(null);
     setUploadedDocumentFields([]);
     setSelectedUploadNames({});
+    preparedUploadsRef.current.clear();
     setOcrStatus("idle");
     setOcrProgress(0);
     setOcrMessage("");
@@ -188,6 +200,7 @@ export function BorrowerDirectory({
 
   function selectUpload(event: ChangeEvent<HTMLInputElement>, field: string) {
     const file = event.currentTarget.files?.[0] ?? null;
+    preparedUploadsRef.current.delete(field);
     setSelectedUploadNames((current) => ({
       ...current,
       [field]: file?.name ?? "",
@@ -228,10 +241,10 @@ export function BorrowerDirectory({
     );
     try {
       const formData = new FormData();
-      const preparedFront = await prepareOcrUpload(front);
+      const preparedFront = await prepareSelectedUpload("identityFront", front);
       formData.append("front", preparedFront);
       setOcrProgress(30);
-      if (back) formData.append("back", await prepareOcrUpload(back));
+      if (back) formData.append("back", await prepareSelectedUpload("identityBack", back));
       if (run !== ocrRunRef.current) return;
       setOcrProgress(55);
       const response = await sensitiveFetch(
@@ -502,6 +515,7 @@ export function BorrowerDirectory({
       { field: "profilePhoto", category: "profile_photo", required: true },
     ];
     let uploadFailure = !borrowerId;
+    const failedUploadLabels: string[] = [];
     const uploadedFields = new Set(uploadedDocumentFields);
     if (borrowerId) {
       for (const upload of uploads) {
@@ -512,7 +526,21 @@ export function BorrowerDirectory({
           continue;
         }
         const body = new FormData();
-        body.append("file", file);
+        let preparedFile: File;
+        try {
+          preparedFile = await prepareSelectedUpload(upload.field, file);
+        } catch {
+          uploadFailure = true;
+          failedUploadLabels.push(
+            upload.field === "identityFront"
+              ? "frente de la cédula"
+              : upload.field === "identityBack"
+                ? "reverso"
+                : "selfie",
+          );
+          continue;
+        }
+        body.append("file", preparedFile);
         body.append("category", upload.category);
         if (upload.side) body.append("side", upload.side);
         const uploadResponse = await sensitiveFetch(
@@ -521,6 +549,13 @@ export function BorrowerDirectory({
         ).catch(() => null);
         if (!uploadResponse?.ok) {
           uploadFailure = true;
+          failedUploadLabels.push(
+            upload.field === "identityFront"
+              ? "frente de la cédula"
+              : upload.field === "identityBack"
+                ? "reverso"
+                : "selfie",
+          );
         } else {
           uploadedFields.add(upload.field);
         }
@@ -530,7 +565,7 @@ export function BorrowerDirectory({
     if (uploadFailure) {
       setMessage(
         borrowerId
-          ? "El cliente quedó creado, pero faltan imágenes por guardar. Mantén esta ventana abierta y pulsa reintentar; no se volverá a crear el cliente."
+          ? `El cliente quedó creado, pero faltó guardar: ${failedUploadLabels.join(", ") || "una imagen obligatoria"}. Mantén esta ventana abierta y pulsa reintentar; no se volverá a crear el cliente.`
           : "No fue posible crear el cliente. Revisa la conexión e inténtalo de nuevo.",
       );
       setIsError(true);

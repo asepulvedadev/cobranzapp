@@ -429,6 +429,19 @@ export function createPostgresBorrowerService(
     if (!required?.identity_front || !required.profile_photo) return;
 
     await client.query(
+      `UPDATE borrower_documents
+          SET scan_status = 'accepted'
+        WHERE tenant_id = $1
+          AND borrower_id = $2
+          AND scan_status = 'pending'
+          AND (
+            (category = 'identity' AND side = 'front')
+            OR category = 'profile_photo'
+          )`,
+      [tenantId, borrowerId],
+    );
+
+    await client.query(
       `UPDATE borrower_identities
           SET verification_state = 'reviewed', updated_at = now()
         WHERE tenant_id = $1 AND borrower_id = $2`,
@@ -743,32 +756,46 @@ export function createPostgresBorrowerService(
         );
         if (!borrower.rows[0]) return { status: "not_found" };
 
-        const acceptedDocuments = await client.query<{
+        const reviewableDocuments = await client.query<{
           identity_front: boolean;
           identity_back: boolean;
           profile_photo: boolean;
         }>(
           `SELECT
-             COALESCE(bool_or(category = 'identity' AND side = 'front' AND scan_status = 'accepted'), false) AS identity_front,
-             COALESCE(bool_or(category = 'identity' AND side = 'back' AND scan_status = 'accepted'), false) AS identity_back,
-             COALESCE(bool_or(category = 'profile_photo' AND scan_status = 'accepted'), false) AS profile_photo
+             COALESCE(bool_or(category = 'identity' AND side = 'front' AND scan_status <> 'rejected'), false) AS identity_front,
+             COALESCE(bool_or(category = 'identity' AND side = 'back' AND scan_status <> 'rejected'), false) AS identity_back,
+             COALESCE(bool_or(category = 'profile_photo' AND scan_status <> 'rejected'), false) AS profile_photo
              FROM borrower_documents
             WHERE tenant_id = $1 AND borrower_id = $2`,
           [tenantId, borrowerId],
         );
-        const accepted = acceptedDocuments.rows[0] ?? {
+        const reviewable = reviewableDocuments.rows[0] ?? {
           identity_front: false,
           identity_back: false,
           profile_photo: false,
         };
         const missing: Array<"identity_front" | "profile_photo"> = [];
         if (input.decision === "reviewed") {
-          if (!accepted.identity_front || !input.identityFrontConfirmed)
+          if (!reviewable.identity_front || !input.identityFrontConfirmed)
             missing.push("identity_front");
-          if (!accepted.profile_photo || !input.profilePhotoConfirmed)
+          if (!reviewable.profile_photo || !input.profilePhotoConfirmed)
             missing.push("profile_photo");
           if (missing.length) return { status: "missing_documents", missing };
           if (!input.legalNameConfirmed) return { status: "missing_documents", missing: [] };
+
+          await client.query(
+            `UPDATE borrower_documents
+                SET scan_status = 'accepted'
+              WHERE tenant_id = $1
+                AND borrower_id = $2
+                AND scan_status = 'pending'
+                AND (
+                  (category = 'identity' AND side = 'front')
+                  OR category = 'profile_photo'
+                  OR (category = 'identity' AND side = 'back' AND $3::boolean)
+                )`,
+            [tenantId, borrowerId, input.identityBackConfirmed],
+          );
         }
 
         await client.query(

@@ -11,7 +11,7 @@ function documentLabel(document: Borrower["documents"][number]) {
 }
 
 function scanLabel(status: Borrower["documents"][number]["scanStatus"]) {
-  return status === "accepted" ? "Aceptado" : status === "rejected" ? "Rechazado" : "Pendiente";
+  return status === "accepted" ? "Revisado" : status === "rejected" ? "Rechazado" : "Por revisar";
 }
 
 async function responseMessage(response: Response | null, fallback: string) {
@@ -40,6 +40,10 @@ export function BorrowerReviewControl({
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const identityFront = borrower.documents.find(
+    (document) => document.category === "identity" && document.side === "front",
+  );
+  const profilePhoto = borrower.documents.find((document) => document.category === "profile_photo");
   const hasIdentityBack = borrower.documents.some(
     (document) => document.category === "identity" && document.side === "back",
   );
@@ -103,20 +107,36 @@ export function BorrowerReviewControl({
       </div>
       <div className="borrower-review-body">
         <ul className="borrower-document-checklist">
-          {borrower.documents.length ? (
-            borrower.documents.map((document) => (
+          <li>
+            <span>Documento · frente</span>
+            <small>{identityFront ? scanLabel(identityFront.scanStatus) : "Falta cargar"}</small>
+          </li>
+          <li>
+            <span>Selfie del cliente</span>
+            <small>{profilePhoto ? scanLabel(profilePhoto.scanStatus) : "Falta cargar"}</small>
+          </li>
+          {borrower.documents
+            .filter((document) => document.category === "identity" && document.side === "back")
+            .map((document) => (
               <li key={document.id}>
                 <span>{documentLabel(document)}</span>
                 <small>{scanLabel(document.scanStatus)}</small>
               </li>
-            ))
-          ) : (
-            <li>
-              <span>Sin documentos privados</span>
-              <small>Pendiente</small>
-            </li>
-          )}
+            ))}
         </ul>
+        {!identityFront || !profilePhoto ? (
+          <p className="borrower-review-help is-missing">
+            {!identityFront && !profilePhoto
+              ? "Falta cargar el frente de la cédula y la selfie. Usa “Agregar documento” antes de aprobar."
+              : !identityFront
+                ? "Falta cargar el frente de la cédula. Usa “Agregar documento” antes de aprobar."
+                : "Falta cargar la selfie. Usa “Agregar documento” antes de aprobar."}
+          </p>
+        ) : (
+          <p className="borrower-review-help">
+            Al aprobar, el frente y la selfie marcados quedarán revisados.
+          </p>
+        )}
         <form onSubmit={(event) => void submit(event, "reviewed")}>
           <label className="review-check">
             <input
@@ -163,7 +183,11 @@ export function BorrowerReviewControl({
             />
           </label>
           <div className="borrower-review-actions">
-            <button disabled={isBusy} type="submit">
+            <button
+              className="review-approve-button"
+              disabled={isBusy || !identityFront || !profilePhoto}
+              type="submit"
+            >
               {isBusy ? "Guardando…" : "Aprobar cliente"}
             </button>
             <button

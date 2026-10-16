@@ -3994,10 +3994,19 @@ export function buildApp(dependencies: AppDependencies) {
       return sendError(reply, 403, "SCOPE_DENIED", "No puedes revisar esta identidad.", request.id);
     }
     if (result.status === "missing_documents") {
+      const missingFront = result.missing.includes("identity_front");
+      const missingSelfie = result.missing.includes("profile_photo");
       return reply.code(409).send({
         error: {
           code: "BORROWER_DOCUMENTS_INCOMPLETE",
-          message: "La aprobación exige el frente de la cédula y la selfie aceptados.",
+          message:
+            missingFront && missingSelfie
+              ? "Falta cargar el frente de la cédula y la selfie."
+              : missingFront
+                ? "Falta cargar el frente de la cédula."
+                : missingSelfie
+                  ? "Falta cargar la selfie del cliente."
+                  : "Completa la lista de comprobación antes de aprobar al cliente.",
           requestId: request.id,
         },
         missing: result.missing,
