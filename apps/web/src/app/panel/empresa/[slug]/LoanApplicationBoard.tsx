@@ -32,6 +32,13 @@ const frequencyLabels: Record<LoanApplication["paymentFrequency"], string> = {
   monthly: "mensual",
 };
 
+function renewalProgress(application: LoanApplication) {
+  return (
+    application.paidPercentage ??
+    Math.min(100, (application.paidInstallments / application.requestedTermCount) * 100)
+  );
+}
+
 async function errorMessage(response: Response | null) {
   const body = await response?.json().catch(() => ({}));
   return formatApiError(body, "No fue posible operar el crédito.");
@@ -364,7 +371,7 @@ export function LoanApplicationBoard({
                       ? "Registrando…"
                       : `Registrar cuota ${application.paidInstallments + 1}`}
                   </button>
-                  {application.paidInstallments >= 2 ? (
+                  {application.renewalEligible === true ? (
                     <form onSubmit={(event) => void renewApplication(event, application)}>
                       <label>
                         Excedente de renovación (COP)
@@ -381,7 +388,12 @@ export function LoanApplicationBoard({
                           : "Renovar crédito"}
                       </button>
                     </form>
-                  ) : null}
+                  ) : (
+                    <p className="renewal-progress-note">
+                      Renovación disponible al pagar 40 % del total con intereses. Lleva{" "}
+                      {renewalProgress(application).toFixed(2)} %.
+                    </p>
+                  )}
                 </div>
               ) : null}
             </article>

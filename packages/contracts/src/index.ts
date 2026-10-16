@@ -948,6 +948,10 @@ export const loanApplicationSchema = z.object({
   scheduledTotal: decimalAmountSchema,
   installmentAmount: decimalAmountSchema,
   paidInstallments: z.number().int().nonnegative().default(0),
+  paidAmount: decimalAmountSchema.optional(),
+  paidPercentage: z.number().min(0).max(100).optional(),
+  renewalEligible: z.boolean().optional(),
+  renewalRequiredPercentage: z.literal(40).optional(),
   /** Operational projection only; it is not a posted financial balance. */
   nextDueDate: z
     .string()

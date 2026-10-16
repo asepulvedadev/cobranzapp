@@ -33,6 +33,13 @@ const statusLabels: Record<LoanApplication["status"], string> = {
   cancelled: "Cancelada",
 };
 
+function renewalProgress(application: LoanApplication) {
+  return (
+    application.paidPercentage ??
+    Math.min(100, (application.paidInstallments / application.requestedTermCount) * 100)
+  );
+}
+
 export function CreditWorkspace({
   api,
   borrowers,
@@ -340,7 +347,7 @@ export function CreditWorkspace({
                     : `Registrar cuota ${application.paidInstallments + 1}`}
                 </Text>
               </Pressable>
-              {application.paidInstallments >= 2 ? (
+              {application.renewalEligible === true ? (
                 <View style={styles.renewRow}>
                   <TextInput
                     inputMode="decimal"
@@ -361,7 +368,12 @@ export function CreditWorkspace({
                     </Text>
                   </Pressable>
                 </View>
-              ) : null}
+              ) : (
+                <Text style={styles.muted}>
+                  Renovación disponible al pagar 40 % del total con intereses. Lleva{" "}
+                  {renewalProgress(application).toFixed(2)} %.
+                </Text>
+              )}
             </>
           ) : null}
         </View>

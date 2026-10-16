@@ -3,6 +3,7 @@ import { buildSchedulePreview } from "@cobranzapp/financial";
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
 import { operationalPaymentState } from "./operational-schedule.js";
+import { renewalPaymentProgress } from "./renewal-policy.js";
 import type {
   CreditService,
   LoanApplicationApprovalResult,
@@ -121,6 +122,7 @@ function mapApplication(row: LoanApplicationRow): LoanApplication {
     paidInstallments: row.paid_installments,
     createdAt: row.created_at,
   });
+  const renewalProgress = renewalPaymentProgress(schedule, row.paid_installments);
   return {
     id: row.id,
     borrowerId: row.borrower_id,
@@ -137,6 +139,10 @@ function mapApplication(row: LoanApplicationRow): LoanApplication {
     scheduledTotal: schedule.scheduledTotal,
     installmentAmount: schedule.periods[0]?.installment ?? "0.00",
     paidInstallments: row.paid_installments,
+    paidAmount: renewalProgress.paidAmount,
+    paidPercentage: renewalProgress.paidPercentage,
+    renewalEligible: renewalProgress.eligible,
+    renewalRequiredPercentage: renewalProgress.requiredPercentage,
     ...operationalState,
     purpose: row.purpose,
     status: row.status,
@@ -774,9 +780,7 @@ export function createPostgresCreditService(pool: Pool): CreditService {
         );
         const state = current.rows[0];
         if (!state) return { status: "not_found" };
-        if (state.status !== "active" || state.paid_installments < 2) {
-          return { status: "invalid_state" };
-        }
+        if (state.status !== "active") return { status: "invalid_state" };
         const preview = buildSchedulePreview({
           principal: state.requested_principal,
           termCount: state.requested_term_count,
@@ -786,6 +790,13 @@ export function createPostgresCreditService(pool: Pool): CreditService {
           documentationFeeRate: state.documentation_fee_rate,
           startDate: state.created_at.toISOString().slice(0, 10),
         });
+        const paymentProgress = renewalPaymentProgress(preview, state.paid_installments);
+        if (!paymentProgress.eligible) {
+          return {
+            status: "insufficient_payment",
+            paidPercentage: paymentProgress.paidPercentage,
+          };
+        }
         const outstanding = preview.periods
           .slice(state.paid_installments)
           .reduce((sum, period) => sum + parseCents(period.principal), 0n);

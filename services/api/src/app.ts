@@ -4849,8 +4849,17 @@ export function buildApp(dependencies: AppDependencies) {
         return sendError(
           reply,
           409,
-          "LOAN_RENEWAL_REQUIRES_TWO_PAYMENTS",
-          "La renovación está disponible después de dos cuotas pagadas.",
+          "LOAN_RENEWAL_INVALID_STATE",
+          "Solo se pueden renovar créditos activos.",
+          request.id,
+        );
+      }
+      if (result.status === "insufficient_payment") {
+        return sendError(
+          reply,
+          409,
+          "LOAN_RENEWAL_REQUIRES_FORTY_PERCENT",
+          `El cliente ha pagado ${result.paidPercentage.toFixed(2)} %. Debe completar al menos el 40 % del crédito con intereses.`,
           request.id,
         );
       }

@@ -81,6 +81,7 @@ export type LoanRenewalResult =
   | { status: "not_found" }
   | { status: "forbidden" }
   | { status: "invalid_state" }
+  | { status: "insufficient_payment"; paidPercentage: number }
   | { status: "amount_out_of_range" };
 
 export interface CreditService {
