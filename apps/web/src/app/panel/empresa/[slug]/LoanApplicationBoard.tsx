@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { fetchWithTimeout } from "../../../../lib/fetch-with-timeout";
+import { formatCop, normalizeCopInput } from "../../../../lib/financial-display";
 import type {
   Borrower,
   FinancialSchedulePreview,
@@ -60,6 +61,10 @@ export function LoanApplicationBoard({
   const [paymentConfirmation, setPaymentConfirmation] = useState<LoanApplication | null>(null);
   const [renewingApplicationId, setRenewingApplicationId] = useState<string | null>(null);
   const [schedulePreview, setSchedulePreview] = useState<FinancialSchedulePreview | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [borrowerId, setBorrowerId] = useState("");
+  const [productId, setProductId] = useState("");
+  const [requestedPrincipal, setRequestedPrincipal] = useState("");
   const [frequency, setFrequency] = useState<LoanProduct["paymentFrequency"]>("daily");
   const [termCount, setTermCount] = useState(30);
   const activeBorrowers = borrowers.filter((borrower) => borrower.status === "active");
@@ -78,22 +83,73 @@ export function LoanApplicationBoard({
     monthly: [{ value: 1, label: "1 mes · 1 cuota mensual" }],
   };
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  const selectedProduct = availableProducts.find((product) => product.id === productId) ?? null;
+
+  function clearPreview() {
+    setSchedulePreview(null);
+    setMessage("");
+    setIsError(false);
+  }
+
+  async function previewCredit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsBusy(true);
     setMessage("");
     setIsError(false);
-    const form = new FormData(event.currentTarget);
+    const principal = normalizeCopInput(requestedPrincipal);
+    if (
+      !selectedProduct ||
+      Number(principal) < Number(selectedProduct.principalMin) ||
+      Number(principal) > Number(selectedProduct.principalMax)
+    ) {
+      setMessage(
+        selectedProduct
+          ? `El monto debe estar entre ${formatCop(selectedProduct.principalMin)} y ${formatCop(selectedProduct.principalMax)}.`
+          : "Selecciona un producto de crédito.",
+      );
+      setIsError(true);
+      setIsBusy(false);
+      return;
+    }
+    const previewResponse = await fetchWithTimeout(
+      `/api/v1/tenants/${tenantId}/loan-products/${productId}/schedule-preview`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          principal,
+          termCount,
+          paymentFrequency: frequency,
+          startDate: new Date().toISOString().slice(0, 10),
+        }),
+      },
+    );
+    if (!previewResponse?.ok) {
+      setMessage(await errorMessage(previewResponse));
+      setIsError(true);
+      setIsBusy(false);
+      return;
+    }
+    const previewBody = (await previewResponse.json()) as { preview?: FinancialSchedulePreview };
+    setSchedulePreview(previewBody.preview ?? null);
+    setIsBusy(false);
+  }
+
+  async function createCredit() {
+    if (!schedulePreview) return;
+    setIsBusy(true);
+    setMessage("");
+    setIsError(false);
     const response = await sensitiveFetch(`/api/v1/tenants/${tenantId}/loan-applications`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        borrowerId: String(form.get("borrowerId") ?? ""),
-        loanProductId: String(form.get("loanProductId") ?? ""),
-        requestedPrincipal: String(form.get("requestedPrincipal") ?? "").trim(),
-        paymentFrequency: String(form.get("paymentFrequency") ?? "daily"),
-        requestedTermCount: Number(form.get("requestedTermCount") ?? termCount),
-        purpose: String(form.get("purpose") ?? "").trim() || null,
+        borrowerId,
+        loanProductId: productId,
+        requestedPrincipal: normalizeCopInput(requestedPrincipal),
+        paymentFrequency: frequency,
+        requestedTermCount: termCount,
+        purpose: null,
       }),
     }).catch(() => null);
     if (!response?.ok) {
@@ -102,29 +158,14 @@ export function LoanApplicationBoard({
       setIsBusy(false);
       return;
     }
-    const productId = String(form.get("loanProductId") ?? "");
-    const principal = String(form.get("requestedPrincipal") ?? "").trim();
-    const previewResponse = await fetchWithTimeout(
-      `/api/v1/tenants/${tenantId}/loan-products/${productId}/schedule-preview`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          principal,
-          termCount: Number(form.get("requestedTermCount") ?? termCount),
-          paymentFrequency: String(form.get("paymentFrequency") ?? frequency),
-          startDate: new Date().toISOString().slice(0, 10),
-        }),
-      },
-    );
-    if (previewResponse?.ok) {
-      const previewBody = (await previewResponse.json()) as { preview?: FinancialSchedulePreview };
-      setSchedulePreview(previewBody.preview ?? null);
-    }
-    event.currentTarget.reset();
+    setBorrowerId("");
+    setProductId("");
+    setRequestedPrincipal("");
     setFrequency("daily");
     setTermCount(30);
-    setMessage("Crédito creado y activo. El calendario quedó calculado automáticamente.");
+    setSchedulePreview(null);
+    setCreateOpen(false);
+    setMessage("Crédito creado con el calendario que confirmaste.");
     setIsBusy(false);
     router.refresh();
   }
@@ -219,14 +260,27 @@ export function LoanApplicationBoard({
     <section className="dashboard-card loan-application-card" id="solicitudes-credito">
       <div className="card-heading">
         <div>
-          <span className="panel-eyebrow">Originación controlada</span>
+          <span className="panel-eyebrow">Operación</span>
           <h2>Créditos activos</h2>
         </div>
-        <span>{applications.length} registradas</span>
+        <div className="directory-header-actions">
+          <span>{applications.length} registrados</span>
+          {activeBorrowers.length && availableProducts.length ? (
+            <button
+              className="primary-action"
+              onClick={() => {
+                clearPreview();
+                setCreateOpen(true);
+              }}
+              type="button"
+            >
+              Nuevo crédito
+            </button>
+          ) : null}
+        </div>
       </div>
       <p className="operational-note">
-        El monto y el interés los define el propietario. La frecuencia y el plazo mensual se aplican
-        automáticamente.
+        Cada crédito se simula primero y solo se crea después de confirmar el total y las cuotas.
       </p>
       {applications.length ? (
         <div className="loan-application-list">
@@ -236,7 +290,7 @@ export function LoanApplicationBoard({
                 <div>
                   <strong>{application.borrowerName}</strong>
                   <small>
-                    {application.loanProductName} · COP {application.requestedPrincipal} ·{" "}
+                    {application.loanProductName} · {formatCop(application.requestedPrincipal)} ·{" "}
                     {frequencyLabels[application.paymentFrequency]} · {application.paidInstallments}
                     /{application.requestedTermCount} cuotas
                   </small>
@@ -305,13 +359,33 @@ export function LoanApplicationBoard({
           ))}
         </div>
       ) : null}
-      {activeBorrowers.length && availableProducts.length ? (
-        <form className="tenant-form loan-application-form" onSubmit={submit}>
-          <h3>Crear crédito</h3>
-          <div className="borrower-form-row">
+      {!activeBorrowers.length || !availableProducts.length ? (
+        <p className="form-help">
+          Para crear una solicitud necesitas al menos un cliente activo y un producto de crédito.
+        </p>
+      ) : null}
+      {createOpen ? (
+        <Modal
+          className="credit-create-modal"
+          onClose={() => setCreateOpen(false)}
+          title="Nuevo crédito"
+        >
+          <form className="tenant-form loan-application-form" onSubmit={previewCredit}>
+            <div className="financial-form-intro">
+              <strong>Primero simula, después confirma</strong>
+              <p>El crédito no se crea hasta que revises el total y pulses “Confirmar crédito”.</p>
+            </div>
             <label>
               Cliente
-              <select defaultValue="" name="borrowerId" required>
+              <select
+                name="borrowerId"
+                onChange={(event) => {
+                  setBorrowerId(event.target.value);
+                  clearPreview();
+                }}
+                required
+                value={borrowerId}
+              >
                 <option disabled value="">
                   Selecciona un cliente
                 </option>
@@ -325,87 +399,133 @@ export function LoanApplicationBoard({
             </label>
             <label>
               Producto
-              <select defaultValue="" name="loanProductId" required>
+              <select
+                name="loanProductId"
+                onChange={(event) => {
+                  setProductId(event.target.value);
+                  clearPreview();
+                }}
+                required
+                value={productId}
+              >
                 <option disabled value="">
                   Selecciona un producto
                 </option>
                 {availableProducts.map((product) => (
                   <option key={product.id} value={product.id}>
-                    {product.name} · hasta COP {product.principalMax}
+                    {product.name} · {product.nominalRate}% · máximo{" "}
+                    {formatCop(product.principalMax)}
                   </option>
                 ))}
               </select>
             </label>
-          </div>
-          <div className="borrower-form-row">
             <label>
-              Monto solicitado (COP)
-              <input
-                inputMode="decimal"
-                name="requestedPrincipal"
-                pattern="[0-9]+(\\.[0-9]{1,2})?"
-                required
-              />
+              Monto a prestar
+              <span className="financial-input-shell">
+                <b>COP</b>
+                <input
+                  inputMode="numeric"
+                  name="requestedPrincipal"
+                  onChange={(event) => {
+                    setRequestedPrincipal(event.target.value);
+                    clearPreview();
+                  }}
+                  pattern="[0-9]+"
+                  placeholder="500000"
+                  required
+                  value={requestedPrincipal}
+                />
+              </span>
+              {selectedProduct ? (
+                <small>
+                  Permitido: {formatCop(selectedProduct.principalMin)} a{" "}
+                  {formatCop(selectedProduct.principalMax)}.
+                </small>
+              ) : null}
             </label>
-            <label>
-              Frecuencia de pago
-              <select
-                name="paymentFrequency"
-                onChange={(event) => {
-                  const next = event.target.value as LoanProduct["paymentFrequency"];
-                  setFrequency(next);
-                  setTermCount(termOptions[next][0]?.value ?? 30);
-                }}
-                value={frequency}
+            <div className="borrower-form-row">
+              <label>
+                Frecuencia
+                <select
+                  name="paymentFrequency"
+                  onChange={(event) => {
+                    const next = event.target.value as LoanProduct["paymentFrequency"];
+                    setFrequency(next);
+                    setTermCount(termOptions[next][0]?.value ?? 30);
+                    clearPreview();
+                  }}
+                  value={frequency}
+                >
+                  <option value="daily">Diaria</option>
+                  <option value="weekly">Semanal</option>
+                  <option value="fortnightly">Quincenal</option>
+                  <option value="monthly">Mensual</option>
+                </select>
+              </label>
+              <label>
+                Plazo
+                <select
+                  name="requestedTermCount"
+                  onChange={(event) => {
+                    setTermCount(Number(event.target.value));
+                    clearPreview();
+                  }}
+                  value={termCount}
+                >
+                  {termOptions[frequency].map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {message ? (
+              <p
+                className={`tenant-form-message${isError ? " form-message-error" : ""}`}
+                role="status"
               >
-                <option value="daily">Diaria</option>
-                <option value="weekly">Semanal</option>
-                <option value="fortnightly">Quincenal</option>
-                <option value="monthly">Mensual</option>
-              </select>
-            </label>
-          </div>
-          <div className="borrower-form-row">
-            <label>
-              Plazo automático
-              <select
-                name="requestedTermCount"
-                onChange={(event) => setTermCount(Number(event.target.value))}
-                value={termCount}
-              >
-                {termOptions[frequency].map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          {message ? (
-            <p
-              className={`tenant-form-message${isError ? " form-message-error" : ""}`}
-              role="status"
-            >
-              {message}
-            </p>
-          ) : null}
-          <button disabled={isBusy} type="submit">
-            {isBusy ? "Calculando…" : "Crear crédito"}
-          </button>
-        </form>
-      ) : (
-        <p className="form-help">
-          Para crear una solicitud necesitas al menos un cliente activo y un producto de crédito.
+                {message}
+              </p>
+            ) : null}
+            {schedulePreview ? (
+              <div className="credit-confirmation-summary" role="status">
+                <span>Confirma estos valores</span>
+                <dl>
+                  <div>
+                    <dt>Monto prestado</dt>
+                    <dd>{formatCop(requestedPrincipal)}</dd>
+                  </div>
+                  <div>
+                    <dt>Interés total</dt>
+                    <dd>{formatCop(schedulePreview.interestTotal)}</dd>
+                  </div>
+                  <div>
+                    <dt>{schedulePreview.periods.length} cuotas</dt>
+                    <dd>{formatCop(schedulePreview.periods[0]?.installment ?? "0")}</dd>
+                  </div>
+                  <div>
+                    <dt>Total a pagar</dt>
+                    <dd>{formatCop(schedulePreview.scheduledTotal)}</dd>
+                  </div>
+                </dl>
+                <small>La última cuota puede variar unos pesos por el redondeo.</small>
+                <button disabled={isBusy} onClick={() => void createCredit()} type="button">
+                  {isBusy ? "Creando…" : "Confirmar crédito"}
+                </button>
+              </div>
+            ) : (
+              <button disabled={isBusy} type="submit">
+                {isBusy ? "Calculando…" : "Revisar total y cuotas"}
+              </button>
+            )}
+          </form>
+        </Modal>
+      ) : null}
+      {message && !createOpen ? (
+        <p className={`tenant-form-message${isError ? " form-message-error" : ""}`} role="status">
+          {message}
         </p>
-      )}
-      {schedulePreview ? (
-        <div className="loan-schedule-summary" role="status">
-          <strong>Calendario calculado</strong>
-          <span>
-            Total a pagar: COP {schedulePreview.scheduledTotal} · Cuota aproximada: COP{" "}
-            {schedulePreview.periods[0]?.installment}
-          </span>
-        </div>
       ) : null}
       {paymentConfirmation ? (
         <Modal onClose={() => setPaymentConfirmation(null)} title="Confirmar avance de cuota">

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
 import type { TenantMemberProfile } from "../../../../../lib/platform";
 import { serverApi } from "../../../../../lib/server-api";
@@ -34,6 +35,7 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const { user, overview } = await loadTenantContext(slug);
   const canManage = overview.actorRole === "owner" || overview.actorRole === "supervisor";
+  if (!canManage) notFound();
   const profiles = canManage
     ? (
         await Promise.all(

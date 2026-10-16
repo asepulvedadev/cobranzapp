@@ -44,7 +44,7 @@ describe("CustomerWorkspace", () => {
   it("shows the personal boundary without internal organization data", () => {
     const html = renderToStaticMarkup(<CustomerWorkspace overview={overview} />);
 
-    expect(html).toContain("Tu acceso está separado de la operación interna.");
+    expect(html).toContain("La información de otros clientes, rutas y personal nunca se muestra");
     expect(html).toContain("contacto@example.com");
     expect(html).not.toContain("Integrantes activos");
     expect(html).not.toContain("Sedes y equipos");

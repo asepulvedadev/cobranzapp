@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Brand } from "../../components/Brand";
+import { serverApi } from "../../lib/server-api";
+import { InstallAppButton } from "./InstallAppButton";
 import { LoginForm } from "./LoginForm";
 import "./login.css";
 
@@ -10,7 +13,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const session = await serverApi("/v1/auth/me").catch(() => null);
+  if (session?.ok) redirect("/panel");
+
   return (
     <main className="login-page" id="contenido">
       <section className="login-stage" aria-labelledby="login-heading">
@@ -24,6 +30,7 @@ export default function LoginPage() {
             <p>Usa tu nombre de usuario o correo electrónico.</p>
           </div>
           <LoginForm />
+          <InstallAppButton />
           <div className="login-support">
             <p>¿Tienes problemas para ingresar?</p>
             <a href="/contacto?source=soporte">info@cobranzaap.tech</a>

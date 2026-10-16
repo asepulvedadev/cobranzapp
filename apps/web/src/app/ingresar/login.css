@@ -323,3 +323,58 @@
     font-size: 30px;
   }
 }
+
+.login-install {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 16px;
+  border: 1px solid #cfd4cf;
+  border-radius: 10px;
+  background: #fff;
+  color: #171917;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.login-install:hover {
+  background: #f4f6f4;
+}
+
+.login-install:focus-visible {
+  outline: 3px solid #fbbf24;
+  outline-offset: 3px;
+}
+
+.login-install-hint {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #e4d18f;
+  border-radius: 10px;
+  background: #fff8dd;
+  color: #6e5a21;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (display-mode: standalone) {
+  .login-back,
+  .login-context {
+    display: none;
+  }
+
+  .login-stage {
+    grid-template-columns: 1fr;
+    grid-template-areas: "form";
+  }
+
+  .login-form-shell {
+    width: min(100%, 560px);
+    min-height: 100dvh;
+    margin: 0 auto;
+  }
+}

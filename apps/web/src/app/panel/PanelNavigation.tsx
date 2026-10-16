@@ -4,6 +4,7 @@ import {
   Buildings,
   ChartBar,
   CurrencyDollar,
+  DotsThreeCircle,
   Gauge,
   MapPin,
   Pulse,
@@ -16,6 +17,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { CurrentUser } from "../../lib/platform";
+import { Modal } from "./Modal";
 
 type NavigationItem = {
   href: string;
@@ -34,6 +36,7 @@ export function PanelNavigation({
 }) {
   const pathname = usePathname();
   const [hash, setHash] = useState("");
+  const [moreOpen, setMoreOpen] = useState(false);
   const currentTenantPath = pathname.match(/^\/panel\/empresa\/[^/]+/)?.[0];
   const effectiveDashboardHref = isDeveloper ? dashboardHref : (currentTenantPath ?? dashboardHref);
   const currentMembership =
@@ -52,93 +55,104 @@ export function PanelNavigation({
     };
   }, []);
 
-  if (!isDeveloper && !currentMembership) {
-    const onboardingItems: NavigationItem[] = [
-      { href: "/panel/onboarding", label: "Crear empresa", icon: Buildings },
-      { href: "/panel/perfil", label: "Mi perfil", icon: UserCircle },
-      { href: "/panel/seguridad", label: "Seguridad", icon: ShieldCheck },
-    ];
-    function onboardingNavigation(className: string) {
-      return (
-        <nav
-          aria-label="Navegación del panel"
-          className={`${className} panel-nav-count-${onboardingItems.length}`}
-        >
-          {onboardingItems.map((item) => {
-            const Icon = item.icon;
-            const active = pathname === item.href;
-            return (
-              <Link aria-current={active ? "page" : undefined} href={item.href} key={item.href}>
-                <Icon aria-hidden="true" size={22} weight={active ? "fill" : "regular"} />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-      );
-    }
-    return (
-      <>
-        {onboardingNavigation("panel-nav panel-nav-desktop")}
-        {onboardingNavigation("panel-mobile-nav")}
-      </>
-    );
-  }
-
-  const standardTenantItems: NavigationItem[] = [
-    { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },
-    { href: `${effectiveDashboardHref}/equipo`, label: "Personal", icon: UsersThree },
-    { href: `${effectiveDashboardHref}/clientes`, label: "Clientes", icon: Buildings },
-    ...(currentMembership && ["owner", "supervisor", "collector"].includes(currentMembership.role)
-      ? [{ href: `${effectiveDashboardHref}/creditos`, label: "Créditos", icon: CurrencyDollar }]
-      : []),
-    ...(currentMembership && ["owner", "supervisor", "collector"].includes(currentMembership.role)
-      ? [{ href: `${effectiveDashboardHref}/reportes`, label: "Reportes", icon: ChartBar }]
-      : []),
-    ...(currentMembership && ["owner", "supervisor", "collector"].includes(currentMembership.role)
-      ? [{ href: `${effectiveDashboardHref}/rutas`, label: "Rutas", icon: MapPin }]
-      : []),
-    ...(currentMembership && ["owner", "supervisor", "collector"].includes(currentMembership.role)
-      ? [
-          {
-            href: `${effectiveDashboardHref}/verificacion`,
-            label: "Verificar cliente",
-            icon: ShieldCheck,
-          },
-        ]
-      : []),
-    {
-      href: `${effectiveDashboardHref}/configuracion`,
-      label: "Configurar",
-      icon: SlidersHorizontal,
-    },
+  const accountItems: NavigationItem[] = [
     { href: "/panel/seguridad", label: "Seguridad", icon: ShieldCheck },
     { href: "/panel/perfil", label: "Mi perfil", icon: UserCircle },
   ];
-  if (!isDeveloper && currentMembership?.role === "owner") {
-    standardTenantItems.splice(4, 0, {
-      href: "/panel/onboarding",
-      label: "Nueva empresa",
-      icon: Buildings,
-    });
+
+  let primaryItems: NavigationItem[] = [];
+  let secondaryItems: NavigationItem[] = [];
+
+  if (!isDeveloper && !currentMembership) {
+    primaryItems = [
+      { href: "/panel/onboarding", label: "Crear empresa", icon: Buildings },
+      ...accountItems,
+    ];
+  } else if (isDeveloper) {
+    primaryItems = [
+      { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },
+      { href: "/panel/desarrollador#empresas", label: "Empresas", icon: Buildings },
+      { href: "/panel/desarrollador#usuarios", label: "Usuarios", icon: UsersThree },
+    ];
+    secondaryItems = [
+      { href: "/panel/desarrollador#actividad", label: "Actividad", icon: Pulse },
+      ...accountItems,
+    ];
+  } else if (currentMembership?.role === "customer") {
+    primaryItems = [
+      { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },
+      { href: "/panel/perfil", label: "Mi perfil", icon: UserCircle },
+      { href: "/panel/seguridad", label: "Seguridad", icon: ShieldCheck },
+    ];
+  } else {
+    const role = currentMembership?.role;
+    const tenantItems = {
+      home: {
+        href: effectiveDashboardHref,
+        label: role === "collector" ? "Hoy" : "Inicio",
+        icon: Gauge,
+      },
+      clients: { href: `${effectiveDashboardHref}/clientes`, label: "Clientes", icon: Buildings },
+      credits: {
+        href: `${effectiveDashboardHref}/creditos`,
+        label: "Créditos",
+        icon: CurrencyDollar,
+      },
+      routes: { href: `${effectiveDashboardHref}/rutas`, label: "Rutas", icon: MapPin },
+      verify: {
+        href: `${effectiveDashboardHref}/verificacion`,
+        label: "Verificar",
+        icon: ShieldCheck,
+      },
+      team: { href: `${effectiveDashboardHref}/equipo`, label: "Personal", icon: UsersThree },
+      reports: {
+        href: `${effectiveDashboardHref}/reportes`,
+        label: "Reportes",
+        icon: ChartBar,
+      },
+      settings: {
+        href: `${effectiveDashboardHref}/configuracion`,
+        label: "Empresa",
+        icon: SlidersHorizontal,
+      },
+    } satisfies Record<string, NavigationItem>;
+
+    if (role === "collector") {
+      primaryItems = [
+        tenantItems.home,
+        tenantItems.clients,
+        tenantItems.routes,
+        tenantItems.verify,
+      ];
+      secondaryItems = [tenantItems.credits, tenantItems.reports, ...accountItems];
+    } else if (role === "supervisor") {
+      primaryItems = [
+        tenantItems.home,
+        tenantItems.clients,
+        tenantItems.credits,
+        tenantItems.routes,
+      ];
+      secondaryItems = [
+        tenantItems.team,
+        tenantItems.reports,
+        tenantItems.verify,
+        tenantItems.settings,
+        ...accountItems,
+      ];
+    } else {
+      primaryItems = [tenantItems.home, tenantItems.clients, tenantItems.credits, tenantItems.team];
+      secondaryItems = [
+        tenantItems.reports,
+        tenantItems.routes,
+        tenantItems.verify,
+        tenantItems.settings,
+        { href: "/panel/onboarding", label: "Nueva empresa", icon: Buildings },
+        ...accountItems,
+      ];
+    }
   }
-  const items: NavigationItem[] = isDeveloper
-    ? [
-        { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },
-        { href: "/panel/desarrollador#empresas", label: "Empresas", icon: Buildings },
-        { href: "/panel/desarrollador#usuarios", label: "Usuarios", icon: UsersThree },
-        { href: "/panel/desarrollador#actividad", label: "Actividad", icon: Pulse },
-        { href: "/panel/seguridad", label: "Seguridad", icon: ShieldCheck },
-        { href: "/panel/perfil", label: "Mi perfil", icon: UserCircle },
-      ]
-    : currentMembership?.role === "customer"
-      ? [
-          { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },
-          { href: `${effectiveDashboardHref}/clientes`, label: "Clientes", icon: Buildings },
-          { href: "/panel/seguridad", label: "Seguridad", icon: ShieldCheck },
-          { href: "/panel/perfil", label: "Mi perfil", icon: UserCircle },
-        ]
-      : standardTenantItems;
+
+  const desktopItems = [...primaryItems, ...secondaryItems];
 
   function isActive(href: string) {
     const [path, itemHash = ""] = href.split("#");
@@ -146,35 +160,60 @@ export function PanelNavigation({
     return path === pathname;
   }
 
-  function navigation(className: string) {
+  function navLink(item: NavigationItem, closeSheet = false) {
+    const Icon = item.icon;
+    const active = isActive(item.href);
     return (
-      <nav
-        aria-label="Navegación del panel"
-        className={`${className} panel-nav-count-${items.length}`}
+      <Link
+        aria-current={active ? "page" : undefined}
+        href={item.href}
+        key={item.href}
+        onClick={() => {
+          setHash(item.href.includes("#") ? `#${item.href.split("#")[1]}` : "");
+          if (closeSheet) setMoreOpen(false);
+        }}
       >
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          return (
-            <Link
-              aria-current={active ? "page" : undefined}
-              href={item.href}
-              key={item.href}
-              onClick={() => setHash(item.href.includes("#") ? `#${item.href.split("#")[1]}` : "")}
-            >
-              <Icon aria-hidden="true" size={22} weight={active ? "fill" : "regular"} />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+        <Icon aria-hidden="true" size={22} weight={active ? "fill" : "regular"} />
+        <span>{item.label}</span>
+      </Link>
     );
   }
 
+  const secondaryActive = secondaryItems.some((item) => isActive(item.href));
+
   return (
     <>
-      {navigation("panel-nav panel-nav-desktop")}
-      {navigation("panel-mobile-nav")}
+      <nav aria-label="Navegación principal" className="panel-nav panel-nav-desktop">
+        {desktopItems.map((item) => navLink(item))}
+      </nav>
+      <nav
+        aria-label="Navegación principal"
+        className={`panel-mobile-nav panel-nav-count-${primaryItems.length + (secondaryItems.length ? 1 : 0)}`}
+      >
+        {primaryItems.map((item) => navLink(item))}
+        {secondaryItems.length ? (
+          <button
+            aria-current={secondaryActive ? "page" : undefined}
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen(true)}
+            type="button"
+          >
+            <DotsThreeCircle
+              aria-hidden="true"
+              size={22}
+              weight={secondaryActive ? "fill" : "regular"}
+            />
+            <span>Más</span>
+          </button>
+        ) : null}
+      </nav>
+      {moreOpen ? (
+        <Modal className="navigation-sheet" onClose={() => setMoreOpen(false)} title="Más opciones">
+          <nav aria-label="Opciones adicionales" className="navigation-sheet-list">
+            {secondaryItems.map((item) => navLink(item, true))}
+          </nav>
+        </Modal>
+      ) : null}
     </>
   );
 }

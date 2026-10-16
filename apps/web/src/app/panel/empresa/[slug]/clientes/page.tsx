@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
 import type { BorrowerDirectory } from "../../../../../lib/platform";
 import { serverApi } from "../../../../../lib/server-api";
@@ -10,6 +11,7 @@ export const metadata: Metadata = { title: "Clientes" };
 export default async function CustomersPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { overview } = await loadTenantContext(slug);
+  if (!["owner", "supervisor", "collector"].includes(overview.actorRole)) notFound();
   const response = await serverApi(
     `/v1/tenants/${overview.tenant.id}/borrowers?page=1&pageSize=20`,
   );

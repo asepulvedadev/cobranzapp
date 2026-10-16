@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Manrope } from "next/font/google";
 import type { ReactNode } from "react";
+import { ServiceWorkerRegistration } from "../components/ServiceWorkerRegistration";
 import "./styles.css";
 
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope", display: "swap" });
@@ -13,6 +14,11 @@ export const metadata: Metadata = {
   },
   description: "Clientes, rutas, verificación y seguimiento operativo para empresas colombianas.",
   applicationName: "cobranzapp",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "cobranzapp",
+  },
   keywords: ["cobranza", "cartera", "rutas de cobro", "software de cobranza", "Colombia"],
   alternates: { canonical: "/" },
   openGraph: {
@@ -31,10 +37,20 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#171a18",
+};
+
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html data-scroll-behavior="smooth" lang="es-CO">
-      <body className={manrope.variable}>{children}</body>
+      <body className={manrope.variable}>
+        {children}
+        <ServiceWorkerRegistration />
+      </body>
     </html>
   );
 }

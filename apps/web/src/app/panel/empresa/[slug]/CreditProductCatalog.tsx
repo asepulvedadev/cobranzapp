@@ -2,9 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import {
+  formatCop,
+  normalizeCopInput,
+  normalizeRateInput,
+} from "../../../../lib/financial-display";
 import type { LoanProduct } from "../../../../lib/platform";
 import { Modal } from "../../Modal";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
+import { FinancialRuleSummary } from "./FinancialRuleSummary";
 import { LoanProductDraftEditor } from "./LoanProductDraftEditor";
 import { LoanSchedulePreview } from "./LoanSchedulePreview";
 
@@ -13,19 +19,6 @@ const statusLabels: Record<LoanProduct["status"], string> = {
   under_review: "En revisión",
   approved: "Aprobado",
   retired: "Retirado",
-};
-
-const frequencyLabels: Record<LoanProduct["paymentFrequency"], string> = {
-  daily: "Diaria",
-  weekly: "Semanal",
-  fortnightly: "Quincenal",
-  monthly: "Mensual",
-};
-
-const rateBasisLabels: Record<LoanProduct["rateBasis"], string> = {
-  flat_total: "Tasa plana total",
-  periodic_simple: "Tasa simple periódica",
-  effective_annual: "Efectiva anual",
 };
 
 async function errorMessage(response: Response | null) {
@@ -53,24 +46,25 @@ export function CreditProductCatalog({
   const [isBusy, setIsBusy] = useState(false);
   const [reviewingProductId, setReviewingProductId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [principalMax, setPrincipalMax] = useState("");
+  const [nominalRate, setNominalRate] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsBusy(true);
     setMessage("");
     setIsError(false);
-    const form = new FormData(event.currentTarget);
     const response = await sensitiveFetch(`/api/v1/tenants/${tenantId}/loan-products`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         name: "Crédito estándar",
         principalMin: "1",
-        principalMax: String(form.get("principalMax") ?? "").trim(),
+        principalMax: normalizeCopInput(principalMax),
         termCount: 30,
         paymentFrequency: "daily",
         rateBasis: "flat_total",
-        nominalRate: String(form.get("nominalRate") ?? "").trim(),
+        nominalRate: normalizeRateInput(nominalRate),
         documentationFeeRate: "0",
         complianceSourceRef: "configuracion-automatica",
       }),
@@ -81,9 +75,10 @@ export function CreditProductCatalog({
       setIsBusy(false);
       return;
     }
-    event.currentTarget.reset();
+    setPrincipalMax("");
+    setNominalRate("");
     setIsCreateOpen(false);
-    setMessage("Regla guardada. Los cobradores podrán elegir la frecuencia al crear cada crédito.");
+    setMessage("Regla guardada. Revisa la simulación antes de usarla en una solicitud.");
     setIsBusy(false);
     router.refresh();
   }
@@ -111,7 +106,7 @@ export function CreditProductCatalog({
     <section className="dashboard-card credit-product-card" id="productos-credito">
       <div className="card-heading">
         <div>
-          <span className="panel-eyebrow">Núcleo financiero</span>
+          <span className="panel-eyebrow">Reglas del negocio</span>
           <h2>Productos de crédito</h2>
         </div>
         <div className="directory-header-actions">
@@ -124,8 +119,8 @@ export function CreditProductCatalog({
         </div>
       </div>
       <p className="operational-note">
-        El propietario solo define el monto máximo y el porcentaje. El equipo elige la frecuencia y
-        el plazo al crear cada crédito.
+        El porcentaje es interés total sobre el monto prestado. La frecuencia y el plazo se eligen
+        al crear cada solicitud.
       </p>
       {products.length ? (
         <div className="credit-product-list">
@@ -134,98 +129,108 @@ export function CreditProductCatalog({
               <div className="credit-product-item-heading">
                 <div>
                   <strong>{product.name}</strong>
-                  <small>
-                    {frequencyLabels[product.paymentFrequency]} · {product.termCount} periodos
-                  </small>
+                  <small>Hasta {formatCop(product.principalMax)}</small>
                 </div>
                 <span className={`status status-${product.status}`}>
                   {statusLabels[product.status]}
                 </span>
               </div>
-              <dl>
+              <dl className="credit-product-facts">
                 <div>
-                  <dt>Rango</dt>
-                  <dd>
-                    {product.currency} {product.principalMin} – {product.principalMax}
-                  </dd>
+                  <dt>Interés total</dt>
+                  <dd>{product.nominalRate}%</dd>
                 </div>
                 <div>
-                  <dt>Base de tasa</dt>
-                  <dd>{rateBasisLabels[product.rateBasis]}</dd>
+                  <dt>Cargo adicional</dt>
+                  <dd>{product.documentationFeeRate}%</dd>
                 </div>
                 <div>
-                  <dt>Tasa nominal</dt>
-                  <dd>{product.nominalRate}</dd>
-                </div>
-                <div>
-                  <dt>Regla</dt>
-                  <dd>
-                    {product.complianceStatus === "approved"
-                      ? "Fuente aprobada"
-                      : "Pendiente de revisión"}
-                  </dd>
+                  <dt>Validación</dt>
+                  <dd>{product.complianceStatus === "approved" ? "Aprobada" : "Pendiente"}</dd>
                 </div>
               </dl>
-              {product.status === "draft" && (canReview || canConfigure) ? (
-                <div className="credit-product-review-actions">
-                  {canReview && product.complianceSourceRef ? (
-                    <button
-                      disabled={reviewingProductId !== null}
-                      onClick={() => void submitForReview(product)}
-                      type="button"
-                    >
-                      {reviewingProductId === product.id ? "Enviando…" : "Enviar a revisión"}
-                    </button>
-                  ) : (
-                    <small className="form-help">
-                      Agrega una referencia normativa para habilitar la revisión.
-                    </small>
-                  )}
-                  {canConfigure ? (
-                    <LoanProductDraftEditor product={product} tenantId={tenantId} />
-                  ) : null}
-                </div>
-              ) : null}
-              <LoanSchedulePreview product={product} tenantId={tenantId} />
+              <div className="credit-product-actions">
+                <LoanSchedulePreview product={product} tenantId={tenantId} />
+                {product.status === "draft" && canConfigure ? (
+                  <LoanProductDraftEditor product={product} tenantId={tenantId} />
+                ) : null}
+                {product.status === "draft" && canReview && product.complianceSourceRef ? (
+                  <button
+                    className="secondary-action-button"
+                    disabled={reviewingProductId !== null}
+                    onClick={() => void submitForReview(product)}
+                    type="button"
+                  >
+                    {reviewingProductId === product.id ? "Enviando…" : "Enviar a revisión"}
+                  </button>
+                ) : null}
+              </div>
             </article>
           ))}
         </div>
-      ) : null}
-      {canConfigure ? (
-        isCreateOpen ? (
-          <Modal onClose={() => setIsCreateOpen(false)} title="Nuevo producto de crédito">
-            <form className="tenant-form credit-product-form" onSubmit={submit}>
-              <p className="form-help">
-                Solo debes indicar el monto máximo y el porcentaje de interés. La frecuencia y el
-                plazo se eligen al crear cada crédito.
+      ) : (
+        <div className="dashboard-empty-compact">
+          <div>
+            <strong>No hay productos configurados</strong>
+            <p>Crea la primera regla para poder simular y registrar créditos.</p>
+          </div>
+        </div>
+      )}
+      {canConfigure && isCreateOpen ? (
+        <Modal
+          className="financial-rule-modal"
+          onClose={() => setIsCreateOpen(false)}
+          title="Nuevo producto de crédito"
+        >
+          <form className="tenant-form credit-product-form" onSubmit={submit}>
+            <div className="financial-form-intro">
+              <strong>Define solo dos valores</strong>
+              <p>
+                Comprueba el ejemplo antes de guardar. Aquí no se crea deuda ni se mueve dinero.
               </p>
-              <label>
-                Monto máximo por crédito (COP)
+            </div>
+            <label>
+              Monto máximo por crédito
+              <span className="financial-input-shell">
+                <b>COP</b>
                 <input
-                  inputMode="decimal"
+                  inputMode="numeric"
                   name="principalMax"
-                  pattern="[0-9]+(\\.[0-9]{1,2})?"
+                  onChange={(event) => setPrincipalMax(event.target.value)}
+                  pattern="[0-9]+"
+                  placeholder="5000000"
                   required
+                  value={principalMax}
                 />
-              </label>
-              <label>
-                Porcentaje de interés total
+              </span>
+              <small>Escribe solo números, sin puntos ni comas.</small>
+            </label>
+            <label>
+              Interés total sobre el préstamo
+              <span className="financial-input-shell financial-rate-input">
                 <input
                   inputMode="decimal"
                   name="nominalRate"
-                  pattern="[0-9]+(\\.[0-9]{1,8})?"
+                  onChange={(event) => setNominalRate(event.target.value)}
+                  pattern="[0-9]+([.,][0-9]{1,2})?"
+                  placeholder="10"
                   required
+                  value={nominalRate}
                 />
-              </label>
-              <button disabled={isBusy} type="submit">
-                {isBusy ? "Guardando…" : "Guardar regla"}
-              </button>
-            </form>
-          </Modal>
-        ) : null
-      ) : (
-        <p className="operational-note">Solo el propietario puede ajustar monto y porcentaje.</p>
-      )}
+                <b>%</b>
+              </span>
+              <small>Ejemplo: 10 significa diez por ciento total, no 0,10.</small>
+            </label>
+            <FinancialRuleSummary principal={principalMax} rate={nominalRate} />
+            <button disabled={isBusy} type="submit">
+              {isBusy ? "Guardando…" : "Guardar producto"}
+            </button>
+          </form>
+        </Modal>
+      ) : null}
+      {!canConfigure ? (
+        <p className="operational-note">Solo el propietario puede cambiar montos y porcentajes.</p>
+      ) : null}
       {message ? (
         <p className={`tenant-form-message${isError ? " form-message-error" : ""}`} role="status">
           {message}
