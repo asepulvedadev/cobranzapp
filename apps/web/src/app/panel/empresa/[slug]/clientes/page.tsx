@@ -11,7 +11,13 @@ export const metadata: Metadata = { title: "Clientes" };
 export default async function CustomersPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { overview } = await loadTenantContext(slug);
-  if (!["owner", "supervisor", "collector"].includes(overview.actorRole)) notFound();
+  if (
+    overview.actorRole !== "owner" &&
+    overview.actorRole !== "supervisor" &&
+    overview.actorRole !== "collector"
+  ) {
+    notFound();
+  }
   const response = await serverApi(
     `/v1/tenants/${overview.tenant.id}/borrowers?page=1&pageSize=20`,
   );
@@ -32,6 +38,7 @@ export default async function CustomersPage({ params }: { params: Promise<{ slug
       <section className="dashboard-card borrower-directory-card">
         {directory ? (
           <BorrowerDirectoryView
+            actorRole={overview.actorRole}
             canCreate={
               overview.actorRole === "owner" ||
               overview.actorRole === "supervisor" ||
