@@ -284,7 +284,7 @@ html:has(.panel-shell) {
   font: inherit;
 }
 
-@media (max-width: 760px) {
+@media (min-width: 0) {
   .account-profile-grid,
   .account-profile-summary {
     grid-template-columns: 1fr;
@@ -4630,21 +4630,7 @@ html:has(.panel-shell) {
 }
 
 .collector-client-mobile-list {
-  display: grid;
-  gap: 12px;
-  padding: 4px 12px 14px;
-}
-
-@media (min-width: 761px) {
-  .borrower-profile-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1180px) {
-  .borrower-profile-list {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+  display: none;
 }
 
 .borrower-toast {
@@ -5471,6 +5457,38 @@ html:has(.panel-shell) {
   font-weight: 700;
 }
 
+.borrower-review-heading {
+  display: grid;
+  gap: 3px;
+}
+
+.borrower-review-heading span {
+  color: var(--panel-muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.borrower-review-heading strong {
+  color: var(--panel-ink);
+  font-size: 15px;
+}
+
+.borrower-review-approved {
+  display: grid;
+  gap: 2px;
+  padding: 12px;
+  border: 1px solid #b9ddc9;
+  border-radius: 12px;
+  background: #effaf3;
+  color: #176b43;
+}
+
+.borrower-review-approved small {
+  color: inherit;
+}
+
 .borrower-document-upload summary {
   color: var(--panel-ink);
   cursor: pointer;
@@ -5575,8 +5593,34 @@ html:has(.panel-shell) {
 .borrower-review-body {
   display: grid;
   gap: 12px;
-  min-width: 250px;
+  min-width: 0;
   padding-top: 12px;
+}
+
+.credit-selected-borrower {
+  display: grid;
+  gap: 3px;
+  padding: 14px;
+  border: 1px solid #b9ddc9;
+  border-radius: 13px;
+  background: #effaf3;
+}
+
+.credit-selected-borrower span {
+  color: #176b43;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.credit-selected-borrower strong {
+  color: var(--panel-ink);
+  font-size: 16px;
+}
+
+.credit-selected-borrower small {
+  color: var(--panel-muted);
 }
 
 .borrower-document-checklist {
@@ -6188,6 +6232,11 @@ html:has(.panel-shell) {
     color: #fff;
   }
 
+  .collector-client-action-disabled {
+    cursor: not-allowed;
+    opacity: 0.68;
+  }
+
   .collector-client-action:focus-visible,
   .collector-client-avatar:focus-visible,
   .collector-client-details summary:focus-visible,
@@ -6237,7 +6286,8 @@ html:has(.panel-shell) {
 
   .collector-client-address,
   .collector-client-emergency,
-  .collector-client-documents {
+  .collector-client-documents,
+  .collector-client-review {
     display: grid;
     gap: 8px;
     padding: 12px;
@@ -6328,6 +6378,36 @@ html:has(.panel-shell) {
   .collector-client-documents .borrower-ocr-control > button {
     min-height: 44px;
     align-content: center;
+  }
+}
+
+@media (min-width: 761px) {
+  .borrower-profile-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 6px 18px 20px;
+  }
+
+  .collector-client-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .collector-client-action-primary {
+    grid-column: span 2;
+  }
+
+  .collector-client-details-body {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .collector-client-review,
+  .collector-client-documents {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1180px) {
+  .borrower-profile-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

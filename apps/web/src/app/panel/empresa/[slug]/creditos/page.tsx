@@ -74,7 +74,13 @@ export default async function CreditsPage({
                 : undefined
             }
             openCreate={
-              query.nuevo === "1" && borrowers.some((borrower) => borrower.id === query.cliente)
+              query.nuevo === "1" &&
+              borrowers.some(
+                (borrower) =>
+                  borrower.id === query.cliente &&
+                  borrower.status === "active" &&
+                  borrower.identity.verificationState === "reviewed",
+              )
             }
             products={products}
             tenantId={overview.tenant.id}

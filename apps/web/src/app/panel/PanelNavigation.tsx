@@ -3,7 +3,6 @@
 import {
   Buildings,
   ChartBar,
-  CurrencyDollar,
   DotsThreeCircle,
   Gauge,
   MapPin,
@@ -93,11 +92,6 @@ export function PanelNavigation({
         icon: Gauge,
       },
       clients: { href: `${effectiveDashboardHref}/clientes`, label: "Clientes", icon: Buildings },
-      credits: {
-        href: `${effectiveDashboardHref}/creditos`,
-        label: "Créditos",
-        icon: CurrencyDollar,
-      },
       routes: { href: `${effectiveDashboardHref}/rutas`, label: "Rutas", icon: MapPin },
       verify: {
         href: `${effectiveDashboardHref}/verificacion`,
@@ -124,25 +118,18 @@ export function PanelNavigation({
         tenantItems.routes,
         tenantItems.verify,
       ];
-      secondaryItems = [tenantItems.credits, tenantItems.reports, ...accountItems];
+      secondaryItems = [tenantItems.reports, ...accountItems];
     } else if (role === "supervisor") {
-      primaryItems = [
-        tenantItems.home,
-        tenantItems.clients,
-        tenantItems.credits,
-        tenantItems.routes,
-      ];
+      primaryItems = [tenantItems.home, tenantItems.clients, tenantItems.routes, tenantItems.team];
       secondaryItems = [
-        tenantItems.team,
         tenantItems.reports,
         tenantItems.verify,
         tenantItems.settings,
         ...accountItems,
       ];
     } else {
-      primaryItems = [tenantItems.home, tenantItems.clients, tenantItems.credits, tenantItems.team];
+      primaryItems = [tenantItems.home, tenantItems.clients, tenantItems.team, tenantItems.reports];
       secondaryItems = [
-        tenantItems.reports,
         tenantItems.routes,
         tenantItems.verify,
         tenantItems.settings,

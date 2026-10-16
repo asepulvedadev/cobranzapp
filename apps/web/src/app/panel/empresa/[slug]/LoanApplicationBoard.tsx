@@ -86,7 +86,12 @@ export function LoanApplicationBoard({
   const [requestedPrincipal, setRequestedPrincipal] = useState("");
   const [frequency, setFrequency] = useState<LoanProduct["paymentFrequency"]>("daily");
   const [termCount, setTermCount] = useState(30);
-  const activeBorrowers = borrowers.filter((borrower) => borrower.status === "active");
+  const selectedBorrower = borrowers.find(
+    (borrower) =>
+      borrower.id === initialBorrowerId &&
+      borrower.status === "active" &&
+      borrower.identity.verificationState === "reviewed",
+  );
   const availableProducts = products.filter((product) => product.status !== "retired");
 
   const termOptions: Record<LoanProduct["paymentFrequency"], { value: number; label: string }[]> = {
@@ -246,8 +251,8 @@ export function LoanApplicationBoard({
     } | null;
     setMessage(
       body?.application?.status === "submitted"
-        ? "Renovación enviada. El crédito anterior seguirá activo hasta que un propietario o supervisor la apruebe."
-        : "Crédito renovado. Se creó y aprobó el nuevo calendario.",
+        ? "Renovación enviada. El nuevo crédito será el saldo de capital más el dinero adicional y cobrará un nuevo interés completo."
+        : "Crédito renovado. Se sumó el saldo de capital y el dinero adicional; el nuevo interés se calculó sobre ese total.",
     );
     setRenewingApplicationId(null);
     router.refresh();
@@ -300,18 +305,6 @@ export function LoanApplicationBoard({
         </div>
         <div className="directory-header-actions">
           <span>{applications.length} registrados</span>
-          {activeBorrowers.length && availableProducts.length ? (
-            <button
-              className="primary-action"
-              onClick={() => {
-                clearPreview();
-                setCreateOpen(true);
-              }}
-              type="button"
-            >
-              Nuevo crédito
-            </button>
-          ) : null}
         </div>
       </div>
       <p className="operational-note">
@@ -381,7 +374,7 @@ export function LoanApplicationBoard({
                   {application.renewalEligible === true ? (
                     <form onSubmit={(event) => void renewApplication(event, application)}>
                       <label>
-                        Excedente de renovación (COP)
+                        Dinero adicional para el cliente (COP)
                         <input
                           inputMode="numeric"
                           name="excessAmount"
@@ -395,8 +388,12 @@ export function LoanApplicationBoard({
                       <button disabled={renewingApplicationId !== null} type="submit">
                         {renewingApplicationId === application.id
                           ? "Renovando…"
-                          : "Renovar crédito"}
+                          : "Renovar con nuevo interés"}
                       </button>
+                      <small>
+                        El nuevo crédito será el capital pendiente más este valor y cobrará el
+                        interés completo otra vez.
+                      </small>
                     </form>
                   ) : (
                     <p className="renewal-progress-note">
@@ -410,12 +407,12 @@ export function LoanApplicationBoard({
           ))}
         </div>
       ) : null}
-      {!activeBorrowers.length || !availableProducts.length ? (
+      {!availableProducts.length ? (
         <p className="form-help">
-          Para crear una solicitud necesitas al menos un cliente activo y un producto de crédito.
+          Para crear una solicitud necesitas un producto de crédito disponible.
         </p>
       ) : null}
-      {createOpen ? (
+      {createOpen && selectedBorrower ? (
         <Modal
           className="credit-create-modal"
           onClose={() => setCreateOpen(false)}
@@ -430,28 +427,14 @@ export function LoanApplicationBoard({
                   : "Al confirmar quedará aprobado y activo de inmediato."}
               </p>
             </div>
-            <label>
-              Cliente
-              <select
-                name="borrowerId"
-                onChange={(event) => {
-                  setBorrowerId(event.target.value);
-                  clearPreview();
-                }}
-                required
-                value={borrowerId}
-              >
-                <option disabled value="">
-                  Selecciona un cliente
-                </option>
-                {activeBorrowers.map((borrower) => (
-                  <option key={borrower.id} value={borrower.id}>
-                    {borrower.fullName} · {borrower.identity.documentType} ****
-                    {borrower.identity.documentLast4}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="credit-selected-borrower">
+              <span>Cliente aprobado</span>
+              <strong>{selectedBorrower.fullName}</strong>
+              <small>
+                {selectedBorrower.identity.documentType} · ••••{" "}
+                {selectedBorrower.identity.documentLast4}
+              </small>
+            </div>
             <label>
               Producto
               <select
@@ -564,7 +547,10 @@ export function LoanApplicationBoard({
                     <dd>{formatCop(schedulePreview.scheduledTotal)}</dd>
                   </div>
                 </dl>
-                <small>La última cuota puede variar unos pesos por el redondeo.</small>
+                <small>
+                  Las primeras cuotas pagan primero el interés; después amortizan capital. La última
+                  cuota puede variar unos pesos por el redondeo.
+                </small>
                 <button disabled={isBusy} onClick={() => void createCredit()} type="button">
                   {isBusy
                     ? "Creando…"

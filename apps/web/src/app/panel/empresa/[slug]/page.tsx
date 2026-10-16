@@ -140,7 +140,11 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
           href: `${basePath}/verificacion`,
           detail: "Valida una cédula",
         },
-        { label: "Crear solicitud", href: `${basePath}/creditos`, detail: "Registra un crédito" },
+        {
+          label: "Crear crédito",
+          href: `${basePath}/clientes`,
+          detail: "Ábrelo desde el perfil del cliente",
+        },
       ]
     : [
         { label: "Nuevo cliente", href: `${basePath}/clientes`, detail: "Registra sus datos" },
