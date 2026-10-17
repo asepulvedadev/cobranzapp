@@ -181,18 +181,35 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
       }),
     ).resolves.toEqual({ status: "borrower_not_verified" });
 
-    const documentKeyPrefix = `tenant/${tenantId}/borrowers/${created.borrower.id}/documents`;
-    for (const document of [
-      ["identity", "front", `${documentKeyPrefix}/front`] as const,
-      ["profile_photo", null, `${documentKeyPrefix}/profile`] as const,
-    ]) {
-      await ownerPool.query(
-        `INSERT INTO borrower_documents
-           (tenant_id, borrower_id, category, side, object_key, media_type, size_bytes, sha256, created_by)
-         VALUES ($1, $2, $3, $4, $5, 'image/jpeg', 1024, repeat('a', 64), $6)`,
-        [tenantId, created.borrower.id, document[0], document[1], document[2], developerId],
-      );
-    }
+    const documentKeyPrefix = `tenant/${tenantId}/borrowers/${created.borrower.id}/quarantine`;
+    await expect(
+      service.addDocument(actor, tenantId, created.borrower.id, {
+        category: "identity",
+        side: "front",
+        objectKey: `${documentKeyPrefix}/front.jpg`,
+        mediaType: "image/jpeg",
+        sizeBytes: 1024,
+        sha256: "a".repeat(64),
+        requestId: "borrower-identity-front-upload-test",
+      }),
+    ).resolves.toMatchObject({
+      status: "created",
+      document: { category: "identity", side: "front" },
+    });
+    await expect(
+      service.addDocument(actor, tenantId, created.borrower.id, {
+        category: "profile_photo",
+        side: null,
+        objectKey: `${documentKeyPrefix}/selfie.jpg`,
+        mediaType: "image/jpeg",
+        sizeBytes: 1024,
+        sha256: "b".repeat(64),
+        requestId: "borrower-selfie-upload-test",
+      }),
+    ).resolves.toMatchObject({
+      status: "created",
+      document: { category: "profile_photo", side: null },
+    });
     const reviewed = await service.review(actor, tenantId, created.borrower.id, {
       decision: "reviewed",
       notes: "La revisión manual coincide con la evidencia cargada.",

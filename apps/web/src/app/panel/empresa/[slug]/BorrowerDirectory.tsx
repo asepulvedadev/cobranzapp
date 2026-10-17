@@ -18,6 +18,7 @@ import { BorrowerOcrControl } from "./BorrowerOcrControl";
 import { BorrowerReviewControl } from "./BorrowerReviewControl";
 import { borrowerDirectoryHref } from "./borrower-directory-query";
 import { CollectorBorrowerCard } from "./CollectorBorrowerCard";
+import { prepareImageUpload } from "./image-upload";
 
 function wazeUrl(address: string, location: Borrower["addressLocations"]["home"]) {
   if (location.status === "ready" && location.latitude !== null && location.longitude !== null) {
@@ -53,28 +54,6 @@ const CREATE_STEPS = [
   { label: "Referencias", detail: "Personas de confianza" },
   { label: "Revisión", detail: "Confirma y guarda" },
 ] as const;
-
-const browserReadyImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
-
-async function prepareImageUpload(file: File) {
-  if (file.size <= 2_400_000 && browserReadyImageTypes.has(file.type)) return file;
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("IMAGE_PROCESSING_UNAVAILABLE");
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/jpeg", 0.86),
-  );
-  if (!blob) throw new Error("IMAGE_PROCESSING_UNAVAILABLE");
-  return new File([blob], `${file.name.replace(/\.[^.]+$/, "") || "cedula"}.jpg`, {
-    type: "image/jpeg",
-  });
-}
 
 function identityDetailRows(extraction: IdentityDocumentExtraction) {
   const fields = extraction.fields;
@@ -817,8 +796,7 @@ export function BorrowerDirectory({
                   </strong>
                   <small>{selectedUploadNames.identityFront ?? "Foto nítida, sin reflejos"}</small>
                   <input
-                    accept="image/jpeg,image/png,image/webp"
-                    capture="environment"
+                    accept="image/*"
                     name="identityFront"
                     onChange={(event) => selectUpload(event, "identityFront")}
                     required
@@ -843,8 +821,7 @@ export function BorrowerDirectory({
                     {selectedUploadNames.identityBack ?? "Agrégalo solo si necesitas conservarlo"}
                   </small>
                   <input
-                    accept="image/jpeg,image/png,image/webp"
-                    capture="environment"
+                    accept="image/*"
                     name="identityBack"
                     onChange={(event) => selectUpload(event, "identityBack")}
                     type="file"
@@ -866,8 +843,7 @@ export function BorrowerDirectory({
                     {selectedUploadNames.profilePhoto ?? "Foto actual y clara del rostro"}
                   </small>
                   <input
-                    accept="image/jpeg,image/png,image/webp"
-                    capture="user"
+                    accept="image/*"
                     name="profilePhoto"
                     onChange={(event) => selectUpload(event, "profilePhoto")}
                     required

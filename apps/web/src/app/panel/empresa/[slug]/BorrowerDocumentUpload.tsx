@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
+import { prepareImageOrPdfUpload } from "./image-upload";
 
 type DocumentCategory = "identity" | "profile_photo";
 type DocumentSide = "front" | "back" | "";
@@ -45,8 +46,17 @@ export function BorrowerDocumentUpload({
     setIsBusy(true);
     setMessage("");
     setIsError(false);
+    let preparedFile: File;
+    try {
+      preparedFile = await prepareImageOrPdfUpload(file);
+    } catch {
+      setMessage("No pudimos abrir esa imagen. Elige otra foto de la galería o tómala nuevamente.");
+      setIsError(true);
+      setIsBusy(false);
+      return;
+    }
     const body = new FormData();
-    body.append("file", file);
+    body.append("file", preparedFile);
     body.append("category", category);
     if (side) body.append("side", side);
     const response = await sensitiveFetch(
@@ -93,12 +103,7 @@ export function BorrowerDocumentUpload({
         ) : null}
         <label>
           Archivo
-          <input
-            accept="image/jpeg,image/png,image/webp,application/pdf"
-            name="file"
-            required
-            type="file"
-          />
+          <input accept="image/*,application/pdf" name="file" required type="file" />
         </label>
         <small>Máximo 10 MB. Se valida formato y contenido antes de dejarlo pendiente.</small>
         <button disabled={isBusy} type="submit">
