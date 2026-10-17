@@ -542,7 +542,8 @@ export function createPostgresTenancyService(
           paid_installments: number;
           created_at: Date;
         }>(
-          `SELECT payment_frequency, requested_term_count, paid_installments, created_at
+          `SELECT application.payment_frequency, application.requested_term_count,
+                  application.paid_installments, application.created_at
              FROM loan_applications application
              JOIN borrowers borrower
                ON borrower.tenant_id = application.tenant_id
