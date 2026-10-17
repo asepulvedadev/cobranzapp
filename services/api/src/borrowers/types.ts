@@ -3,6 +3,8 @@ import type {
   BorrowerAddressLocation,
   BorrowerAddressUpdateRequest,
   BorrowerAssignmentUpdateRequest,
+  BorrowerCollectionReport,
+  BorrowerCollectionReportCreateRequest,
   BorrowerCreateRequest,
   BorrowerDirectory,
   BorrowerDocument,
@@ -93,6 +95,11 @@ export type BorrowerAssignmentResult =
   | { status: "collector_not_found" }
   | { status: "collector_inactive" };
 
+export type BorrowerCollectionReportResult =
+  | { status: "created"; report: BorrowerCollectionReport }
+  | { status: "not_found" }
+  | { status: "forbidden" };
+
 export type SharedClientVerification = {
   registered: boolean;
   fullName: string | null;
@@ -162,6 +169,12 @@ export interface BorrowerService {
     borrowerId: string,
     input: BorrowerAssignmentUpdateRequest & { requestId: string },
   ): Promise<BorrowerAssignmentResult>;
+  reportCollection(
+    actor: TenantActor,
+    tenantId: string,
+    borrowerId: string,
+    input: BorrowerCollectionReportCreateRequest & { requestId: string },
+  ): Promise<BorrowerCollectionReportResult>;
   verifyShared(
     actor: TenantActor,
     tenantId: string,

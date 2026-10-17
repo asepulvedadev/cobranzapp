@@ -37,8 +37,8 @@ const borrower: Borrower = {
     },
   },
   profilePhotoObjectKey: null,
-  assignedCollectorId: null,
-  assignedCollectorName: null,
+  assignedCollectorId: "f4b43928-5925-49ca-84cb-f5f4f376da3e",
+  assignedCollectorName: "Carlos Cobrador",
   consentVersion: "2026-01",
   identity: {
     country: "CO",
@@ -133,6 +133,8 @@ describe("CollectorBorrowerCard", () => {
     expect(html).toContain("Crear crédito");
     expect(html).toContain("Llamar");
     expect(html).toContain("WhatsApp");
+    expect(html).toContain("Cobrador asignado");
+    expect(html).toContain("Carlos Cobrador");
     expect(html).toContain("Ver perfil completo");
     expect(html).toContain('aria-label="Ver fotos de Laura Walteros"');
     expect(html).toContain(

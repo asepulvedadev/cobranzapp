@@ -543,22 +543,68 @@ export function createPostgresTenancyService(
           created_at: Date;
         }>(
           `SELECT payment_frequency, requested_term_count, paid_installments, created_at
-             FROM loan_applications
-            WHERE tenant_id = $1 AND status = 'active'`,
-          [tenantId],
+             FROM loan_applications application
+             JOIN borrowers borrower
+               ON borrower.tenant_id = application.tenant_id
+              AND borrower.id = application.borrower_id
+            WHERE application.tenant_id = $1
+              AND application.status = 'active'
+              AND ($2::text <> 'collector' OR borrower.assigned_collector_id = $3)`,
+          [tenantId, actor.tenantRole ?? "support", actor.userId],
         );
-        const overdueInstallments = activeCreditRows.rows.reduce(
-          (total, row) =>
-            total +
-            operationalPaymentState({
-              status: "active",
-              paymentFrequency: row.payment_frequency,
-              requestedTermCount: row.requested_term_count,
-              paidInstallments: row.paid_installments,
-              createdAt: row.created_at,
-            }).overdueInstallments,
+        const operationalCreditStates = activeCreditRows.rows.map((row) =>
+          operationalPaymentState({
+            status: "active",
+            paymentFrequency: row.payment_frequency,
+            requestedTermCount: row.requested_term_count,
+            paidInstallments: row.paid_installments,
+            createdAt: row.created_at,
+          }),
+        );
+        const overdueInstallments = operationalCreditStates.reduce(
+          (total, state) => total + state.overdueInstallments,
           0,
         );
+        const today = new Intl.DateTimeFormat("en-CA", {
+          timeZone: tenantRow.timezone,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date());
+        const dueTodayCredits = operationalCreditStates.filter(
+          (state) => state.nextDueDate === today,
+        ).length;
+        const postponed = await client.query<{ total: string }>(
+          `WITH latest AS (
+             SELECT DISTINCT ON (report.borrower_id)
+                    report.borrower_id, report.reason, report.follow_up_date,
+                    report.created_at
+               FROM borrower_collection_reports report
+               JOIN borrowers borrower
+                 ON borrower.tenant_id = report.tenant_id
+                AND borrower.id = report.borrower_id
+              WHERE report.tenant_id = $1
+                AND ($2::text <> 'collector' OR borrower.assigned_collector_id = $3)
+              ORDER BY report.borrower_id, report.created_at DESC, report.id DESC
+           )
+           SELECT count(*)::text AS total
+             FROM latest report
+             JOIN tenants tenant ON tenant.id = $1
+            WHERE report.reason = 'payment_postponed'
+              AND report.follow_up_date >= (now() AT TIME ZONE tenant.timezone)::date
+              AND NOT EXISTS (
+                SELECT 1
+                  FROM loan_payments payment
+                  JOIN loan_applications application
+                    ON application.tenant_id = payment.tenant_id
+                   AND application.id = payment.application_id
+                 WHERE application.tenant_id = $1
+                   AND application.borrower_id = report.borrower_id
+                   AND payment.paid_at > report.created_at
+              )`,
+          [tenantId, actor.tenantRole ?? "support", actor.userId],
+        );
+        const postponedCollections = Number(postponed.rows[0]?.total ?? 0);
         const settings = await client.query<{
           primary_color: string;
           accent_color: string;
@@ -719,9 +765,13 @@ export function createPostgresTenancyService(
             teams: Number(counts?.teams ?? 0),
             pendingInvitations: maySeeOrganization ? Number(counts?.pending_invitations ?? 0) : 0,
             activeEmployeeSeats: maySeeOrganization ? activeEmployeeSeats : 0,
-            activeCredits: Number(counts?.active_credits ?? 0),
-            creditApplicationsInReview: Number(counts?.credit_applications_in_review ?? 0),
-            overdueInstallments,
+            ...(actor.tenantRole === "collector"
+              ? { dueTodayCredits, postponedCollections }
+              : {
+                  activeCredits: Number(counts?.active_credits ?? 0),
+                  creditApplicationsInReview: Number(counts?.credit_applications_in_review ?? 0),
+                  overdueInstallments,
+                }),
           },
           membershipEntitlement: entitlement
             ? {

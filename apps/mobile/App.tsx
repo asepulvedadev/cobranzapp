@@ -31,6 +31,7 @@ import { AccountProfileForm } from "./src/AccountProfileForm";
 import { MobileApi, MobileApiError } from "./src/api";
 import { BorrowerAddressControl } from "./src/BorrowerAddressControl";
 import { BorrowerAddressEditor } from "./src/BorrowerAddressEditor";
+import { BorrowerCollectionReportControl } from "./src/BorrowerCollectionReportControl";
 import { BorrowerCreateForm } from "./src/BorrowerCreateForm";
 import { BorrowerOcrControl } from "./src/BorrowerOcrControl";
 import { CreditWorkspace } from "./src/CreditWorkspace";
@@ -422,7 +423,13 @@ function TenantBrandMark({ api, overview }: { api: MobileApi; overview: TenantOv
 }
 
 function TenantHome({ api, overview }: { api: MobileApi; overview: TenantOverview }) {
-  const metrics = [["Personal", overview.metrics.members]] as const;
+  const metrics =
+    overview.actorRole === "collector"
+      ? [
+          ["Cobros para hoy", overview.metrics.dueTodayCredits ?? 0],
+          ["Cobros aplazados", overview.metrics.postponedCollections ?? 0],
+        ]
+      : [["Personal", overview.metrics.members]];
   return (
     <View style={styles.stack}>
       <View style={[styles.tenantAccent, { backgroundColor: overview.settings.primaryColor }]} />
@@ -625,6 +632,9 @@ function TenantClients({
                     ? "Identidad revisada"
                     : "Pendiente de revisión"}
                 </Text>
+                <Text style={styles.muted}>
+                  Cobrador: {borrower.assignedCollectorName ?? "Sin asignar"}
+                </Text>
                 <View style={styles.contactActions}>
                   <Pressable
                     accessibilityRole="button"
@@ -664,6 +674,11 @@ function TenantClients({
                   borrower={borrower}
                   onNeedsReauthentication={onNeedsReauthentication}
                   onUpdated={onBorrowerCreated}
+                  tenantId={tenantId}
+                />
+                <BorrowerCollectionReportControl
+                  api={api}
+                  borrowerId={borrower.id}
                   tenantId={tenantId}
                 />
               </View>

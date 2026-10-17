@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   borrowerAddressGeocodeRequestSchema,
   borrowerAddressUpdateRequestSchema,
+  borrowerCollectionReportCreateRequestSchema,
   borrowerCreateRequestSchema,
   borrowerDirectorySchema,
   borrowerReviewRequestSchema,
@@ -370,6 +371,25 @@ describe("shared API contracts", () => {
     expect(routeAssignmentUpdateRequestSchema.parse({ collectorId: null })).toEqual({
       collectorId: null,
     });
+  });
+
+  it("requires a follow-up date only when a collection was postponed", () => {
+    expect(
+      borrowerCollectionReportCreateRequestSchema.parse({
+        reason: "payment_postponed",
+        followUpDate: "2026-10-20",
+      }),
+    ).toMatchObject({ reason: "payment_postponed", followUpDate: "2026-10-20" });
+    expect(
+      borrowerCollectionReportCreateRequestSchema.safeParse({ reason: "payment_postponed" })
+        .success,
+    ).toBe(false);
+    expect(
+      borrowerCollectionReportCreateRequestSchema.safeParse({
+        reason: "unreachable",
+        followUpDate: "2026-10-20",
+      }).success,
+    ).toBe(false);
   });
 
   it("keeps tenant overview scope and branding fields explicit", () => {

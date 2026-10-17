@@ -655,7 +655,7 @@ export function BorrowerDirectory({
           </div>
         </form>
         {directory.borrowers.length ? (
-          <div className="collector-client-mobile-list borrower-profile-list">
+          <div className="collector-client-list borrower-profile-list">
             {directory.borrowers.map((borrower) => (
               <CollectorBorrowerCard
                 assignmentTools={

@@ -1,8 +1,10 @@
 import {
   authenticatedResponseSchema,
   type BorrowerAddressUpdateRequest,
+  type BorrowerCollectionReportCreateRequest,
   type BorrowerCreateRequest,
   type BorrowerDirectory,
+  borrowerCollectionReportResponseSchema,
   borrowerDirectorySchema,
   borrowerDocumentResponseSchema,
   borrowerOcrConfirmResponseSchema,
@@ -492,6 +494,28 @@ export class MobileApi {
       );
     }
     return borrowerResponseSchema.parse(await response.json()).borrower;
+  }
+
+  async reportBorrowerCollection(
+    tenantId: string,
+    borrowerId: string,
+    input: BorrowerCollectionReportCreateRequest,
+  ) {
+    const response = await this.request(
+      `/v1/tenants/${tenantId}/borrowers/${borrowerId}/collection-reports`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    );
+    if (!response.ok) {
+      throw new MobileApiError(
+        await apiError(response, "No fue posible guardar el reporte."),
+        response.status,
+      );
+    }
+    return borrowerCollectionReportResponseSchema.parse(await response.json()).report;
   }
 
   async uploadBorrowerDocument(

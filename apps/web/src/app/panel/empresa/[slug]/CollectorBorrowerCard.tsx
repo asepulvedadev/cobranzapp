@@ -2,7 +2,7 @@
 
 import type { Borrower, BorrowerOcrExtraction } from "@cobranzapp/contracts";
 import Image from "next/image";
-import { type ReactNode, useState } from "react";
+import { type FormEvent, type ReactNode, useState } from "react";
 import { Modal } from "../../Modal";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
 import { ClientPortalLink } from "./ClientPortalLink";
@@ -67,6 +67,13 @@ export function CollectorBorrowerCard({
   const [isEvidenceOpen, setIsEvidenceOpen] = useState(false);
   const [ocrState, setOcrState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [ocrExtractions, setOcrExtractions] = useState<BorrowerOcrExtraction[]>([]);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState<
+    "payment_postponed" | "refuses_payment" | "unreachable"
+  >("payment_postponed");
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportMessage, setReportMessage] = useState("");
+  const [reportError, setReportError] = useState("");
   const initials = borrower.fullName
     .split(/\s+/)
     .filter(Boolean)
@@ -105,6 +112,45 @@ export function CollectorBorrowerCard({
     if (ocrState === "idle" || ocrState === "error") void loadOcrEvidence();
   }
 
+  async function submitCollectionReport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setReportBusy(true);
+    setReportError("");
+    const form = new FormData(event.currentTarget);
+    const response = await sensitiveFetch(
+      `/api/v1/tenants/${tenantId}/borrowers/${borrower.id}/collection-reports`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          reason: reportReason,
+          followUpDate:
+            reportReason === "payment_postponed"
+              ? String(form.get("followUpDate") ?? "") || null
+              : null,
+          notes: String(form.get("notes") ?? "").trim() || null,
+        }),
+      },
+    ).catch(() => null);
+    if (!response?.ok) {
+      const body = (await response?.json().catch(() => ({}))) as {
+        error?: { message?: string };
+      };
+      setReportError(body.error?.message ?? "No fue posible guardar el reporte.");
+      setReportBusy(false);
+      return;
+    }
+    const label =
+      reportReason === "payment_postponed"
+        ? "Cobro aplazado"
+        : reportReason === "refuses_payment"
+          ? "Negativa de pago"
+          : "Cliente no localizado";
+    setReportMessage(`${label} registrado.`);
+    setReportBusy(false);
+    setIsReportOpen(false);
+  }
+
   return (
     <>
       <article className="collector-client-card">
@@ -137,6 +183,11 @@ export function CollectorBorrowerCard({
         <div className="collector-client-contact">
           <span>Teléfono</span>
           <strong>{borrower.phone}</strong>
+        </div>
+
+        <div className="collector-client-assignee">
+          <span>Cobrador asignado</span>
+          <strong>{borrower.assignedCollectorName ?? "Sin asignar"}</strong>
         </div>
 
         <div className="collector-client-actions">
@@ -176,6 +227,16 @@ export function CollectorBorrowerCard({
             tenantId={tenantId}
             whatsappPhone={borrower.whatsappPhone ?? borrower.phone}
           />
+          <button
+            className="collector-client-action"
+            onClick={() => {
+              setReportError("");
+              setIsReportOpen(true);
+            }}
+            type="button"
+          >
+            Reportar gestión
+          </button>
           <a
             className="collector-client-action"
             href={homeWazeHref}
@@ -185,6 +246,11 @@ export function CollectorBorrowerCard({
             Ir a casa
           </a>
         </div>
+        {reportMessage ? (
+          <p className="collector-client-report-status" role="status">
+            {reportMessage}
+          </p>
+        ) : null}
 
         <details className="collector-client-details">
           <summary>
@@ -251,6 +317,67 @@ export function CollectorBorrowerCard({
           </div>
         </details>
       </article>
+
+      {isReportOpen ? (
+        <Modal
+          className="collection-report-modal"
+          onClose={() => {
+            if (!reportBusy) setIsReportOpen(false);
+          }}
+          title={`Reportar gestión · ${borrower.fullName}`}
+        >
+          <form className="tenant-form collection-report-form" onSubmit={submitCollectionReport}>
+            <label>
+              Resultado de la gestión
+              <select
+                onChange={(event) =>
+                  setReportReason(
+                    event.target.value as "payment_postponed" | "refuses_payment" | "unreachable",
+                  )
+                }
+                value={reportReason}
+              >
+                <option value="payment_postponed">Aplazó el pago</option>
+                <option value="refuses_payment">No quiere pagar</option>
+                <option value="unreachable">No se logra localizar</option>
+              </select>
+            </label>
+            {reportReason === "payment_postponed" ? (
+              <label>
+                Nueva fecha de cobro
+                <input
+                  min={new Date().toISOString().slice(0, 10)}
+                  name="followUpDate"
+                  required
+                  type="date"
+                />
+              </label>
+            ) : null}
+            <label>
+              Nota (opcional)
+              <textarea
+                maxLength={500}
+                name="notes"
+                placeholder="Describe brevemente lo ocurrido."
+                rows={3}
+              />
+            </label>
+            {reportError ? (
+              <p className="form-message form-message-error" role="alert">
+                {reportError}
+              </p>
+            ) : null}
+            <div className="collection-report-actions">
+              <button disabled={reportBusy} type="button" onClick={() => setIsReportOpen(false)}>
+                Cancelar
+              </button>
+              <button className="primary-action" disabled={reportBusy} type="submit">
+                {reportBusy ? "Guardando…" : "Guardar reporte"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
 
       {isEvidenceOpen ? (
         <Modal

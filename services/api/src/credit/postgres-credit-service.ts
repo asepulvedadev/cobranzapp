@@ -493,8 +493,9 @@ export function createPostgresCreditService(
                ON product.tenant_id = application.tenant_id
               AND product.id = application.loan_product_id
             WHERE application.tenant_id = $1
+              AND ($2::text <> 'collector' OR borrower.assigned_collector_id = $3)
             ORDER BY application.updated_at DESC, application.id DESC`,
-          [tenantId],
+          [tenantId, actor.tenantRole ?? "", actor.userId],
         );
         return result.rows.map(mapApplication);
       });
@@ -722,8 +723,10 @@ export function createPostgresCreditService(
           id: string;
           status: "active" | "archived";
           verification_state: "manual_pending" | "reviewed" | "rejected";
+          assigned_collector_id: string | null;
         }>(
-          `SELECT borrower.id, borrower.status, identity.verification_state
+          `SELECT borrower.id, borrower.status, identity.verification_state,
+                  borrower.assigned_collector_id
              FROM borrowers borrower
              JOIN borrower_identities identity
                ON identity.tenant_id = borrower.tenant_id
@@ -733,6 +736,9 @@ export function createPostgresCreditService(
         );
         const borrower = borrowerResult.rows[0];
         if (borrower?.status !== "active") return { status: "not_found" };
+        if (actor.tenantRole === "collector" && borrower.assigned_collector_id !== actor.userId) {
+          return { status: "not_found" };
+        }
         if (borrower.verification_state !== "reviewed") {
           return { status: "borrower_not_verified" };
         }

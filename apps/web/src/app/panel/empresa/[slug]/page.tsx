@@ -73,6 +73,8 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
   const applicationsInReview = overview.metrics.creditApplicationsInReview ?? 0;
   const overdueInstallments = overview.metrics.overdueInstallments ?? 0;
   const isCollector = overview.actorRole === "collector";
+  const dueTodayCredits = overview.metrics.dueTodayCredits ?? 0;
+  const postponedCollections = overview.metrics.postponedCollections ?? 0;
   const firstName = user.displayName.trim().split(/\s+/)[0] ?? user.displayName;
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: overview.tenant.timezone,
@@ -92,7 +94,29 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
   }
 
   const priorities = [
-    ...(overdueInstallments > 0
+    ...(isCollector && dueTodayCredits > 0
+      ? [
+          {
+            value: dueTodayCredits,
+            label: "Cobros para hoy",
+            detail: "Revisa los clientes asignados.",
+            href: `${basePath}/creditos`,
+            tone: "warning",
+          },
+        ]
+      : []),
+    ...(isCollector && postponedCollections > 0
+      ? [
+          {
+            value: postponedCollections,
+            label: "Cobros aplazados",
+            detail: "Tienen una nueva fecha de seguimiento.",
+            href: `${basePath}/clientes`,
+            tone: "danger",
+          },
+        ]
+      : []),
+    ...(!isCollector && overdueInstallments > 0
       ? [
           {
             value: overdueInstallments,
@@ -176,20 +200,37 @@ export default async function TenantDashboard({ params }: { params: Promise<{ sl
 
       <section aria-label="Resumen operativo" className="metric-grid role-metrics">
         <article>
-          <span>Clientes activos</span>
+          <span>{isCollector ? "Clientes asignados" : "Clientes activos"}</span>
           <strong>{activeClients}</strong>
           <small>{isCollector ? "Disponibles para tu gestión" : "En la operación"}</small>
         </article>
-        <article>
-          <span>Créditos activos</span>
-          <strong>{activeCredits}</strong>
-          <small>Seguimiento vigente</small>
-        </article>
-        <article className={overdueInstallments > 0 ? "metric-alert" : "metric-accent"}>
-          <span>Cuotas vencidas</span>
-          <strong>{overdueInstallments}</strong>
-          <small>{overdueInstallments > 0 ? "Necesitan gestión" : "Sin pendientes"}</small>
-        </article>
+        {isCollector ? (
+          <>
+            <article className={dueTodayCredits > 0 ? "metric-attention" : "metric-accent"}>
+              <span>Cobros para hoy</span>
+              <strong>{dueTodayCredits}</strong>
+              <small>{dueTodayCredits > 0 ? "Cuotas programadas" : "Sin cobros pendientes"}</small>
+            </article>
+            <article className={postponedCollections > 0 ? "metric-alert" : "metric-accent"}>
+              <span>Cobros aplazados</span>
+              <strong>{postponedCollections}</strong>
+              <small>{postponedCollections > 0 ? "Requieren seguimiento" : "Ninguno"}</small>
+            </article>
+          </>
+        ) : (
+          <>
+            <article>
+              <span>Créditos activos</span>
+              <strong>{activeCredits}</strong>
+              <small>Seguimiento vigente</small>
+            </article>
+            <article className={overdueInstallments > 0 ? "metric-alert" : "metric-accent"}>
+              <span>Cuotas vencidas</span>
+              <strong>{overdueInstallments}</strong>
+              <small>{overdueInstallments > 0 ? "Necesitan gestión" : "Sin pendientes"}</small>
+            </article>
+          </>
+        )}
         {!isCollector ? (
           <article className={applicationsInReview > 0 ? "metric-attention" : undefined}>
             <span>Por revisar</span>

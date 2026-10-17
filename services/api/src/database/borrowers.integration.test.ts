@@ -101,6 +101,29 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
       pageSize: 20,
     });
     expect(directory.borrowers).toHaveLength(1);
+    const directoryByFullDocument = await service.list(actor, tenantId, {
+      search: formattedDocumentNumber,
+      page: 1,
+      pageSize: 20,
+    });
+    expect(directoryByFullDocument.borrowers).toHaveLength(1);
+    const directoryByPhone = await service.list(actor, tenantId, {
+      search: "3002223344",
+      page: 1,
+      pageSize: 20,
+    });
+    expect(directoryByPhone.borrowers).toHaveLength(1);
+    await expect(
+      service.reportCollection(actor, tenantId, created.borrower.id, {
+        reason: "unreachable",
+        followUpDate: null,
+        notes: "No fue posible localizar al cliente.",
+        requestId: "borrower-collection-report-test",
+      }),
+    ).resolves.toMatchObject({ status: "created", report: { reason: "unreachable" } });
+    await expect(
+      service.verifyShared(actor, tenantId, documentNumber, "borrower-adverse-verification-test"),
+    ).resolves.toMatchObject({ registered: true, payerRating: "low", negativeReport: true });
     await expect(service.get(actor, tenantId, created.borrower.id)).resolves.toMatchObject({
       id: created.borrower.id,
       phone: "+57 300 222 3344",

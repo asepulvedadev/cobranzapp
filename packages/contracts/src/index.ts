@@ -461,6 +461,8 @@ export const tenantOverviewSchema = z.object({
     activeCredits: z.number().int().nonnegative().optional(),
     creditApplicationsInReview: z.number().int().nonnegative().optional(),
     overdueInstallments: z.number().int().nonnegative().optional(),
+    dueTodayCredits: z.number().int().nonnegative().optional(),
+    postponedCollections: z.number().int().nonnegative().optional(),
   }),
   membershipEntitlement: membershipEntitlementSchema
     .extend({ availableEmployeeSeats: z.number().int().nonnegative() })
@@ -1239,6 +1241,46 @@ export const borrowerAssignmentUpdateRequestSchema = z.object({
   collectorId: z.uuid().nullable(),
 });
 
+export const borrowerCollectionReportReasonSchema = z.enum([
+  "payment_postponed",
+  "refuses_payment",
+  "unreachable",
+]);
+export const borrowerCollectionReportCreateRequestSchema = z
+  .object({
+    reason: borrowerCollectionReportReasonSchema,
+    followUpDate: z.iso.date().nullable().optional().default(null),
+    notes: z.string().trim().min(3).max(500).nullable().optional().default(null),
+  })
+  .superRefine((value, context) => {
+    if (value.reason === "payment_postponed" && !value.followUpDate) {
+      context.addIssue({
+        code: "custom",
+        path: ["followUpDate"],
+        message: "Selecciona la nueva fecha de cobro.",
+      });
+    }
+    if (value.reason !== "payment_postponed" && value.followUpDate) {
+      context.addIssue({
+        code: "custom",
+        path: ["followUpDate"],
+        message: "La fecha de seguimiento solo aplica a cobros aplazados.",
+      });
+    }
+  });
+export const borrowerCollectionReportSchema = z.object({
+  id: z.uuid(),
+  borrowerId: z.uuid(),
+  reason: borrowerCollectionReportReasonSchema,
+  followUpDate: z.iso.date().nullable(),
+  notes: z.string().nullable(),
+  reportedByName: z.string().min(2),
+  createdAt: z.iso.datetime(),
+});
+export const borrowerCollectionReportResponseSchema = z.object({
+  report: borrowerCollectionReportSchema,
+});
+
 export const borrowerResponseSchema = z.object({ borrower: borrowerSchema });
 export const borrowerDocumentResponseSchema = z.object({ document: borrowerDocumentSchema });
 export const borrowerOcrExtractionStatusSchema = z.enum([
@@ -1505,6 +1547,11 @@ export type FinancialSchedulePreview = z.infer<typeof financialSchedulePreviewSc
 export type BorrowerDocument = z.infer<typeof borrowerDocumentSchema>;
 export type BorrowerCreateRequest = z.infer<typeof borrowerCreateRequestSchema>;
 export type BorrowerAssignmentUpdateRequest = z.infer<typeof borrowerAssignmentUpdateRequestSchema>;
+export type BorrowerCollectionReportReason = z.infer<typeof borrowerCollectionReportReasonSchema>;
+export type BorrowerCollectionReportCreateRequest = z.infer<
+  typeof borrowerCollectionReportCreateRequestSchema
+>;
+export type BorrowerCollectionReport = z.infer<typeof borrowerCollectionReportSchema>;
 export type BorrowerReviewRequest = z.infer<typeof borrowerReviewRequestSchema>;
 export type BorrowerDocumentResponse = z.infer<typeof borrowerDocumentResponseSchema>;
 export type IdentityDocumentFields = z.infer<typeof identityDocumentFieldsSchema>;

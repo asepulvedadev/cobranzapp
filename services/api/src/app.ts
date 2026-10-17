@@ -2,6 +2,7 @@ import {
   borrowerAddressGeocodeRequestSchema,
   borrowerAddressUpdateRequestSchema,
   borrowerAssignmentUpdateRequestSchema,
+  borrowerCollectionReportCreateRequestSchema,
   borrowerCreateRequestSchema,
   borrowerDirectoryQuerySchema,
   borrowerOcrConfirmRequestSchema,
@@ -3126,6 +3127,68 @@ export function buildApp(dependencies: AppDependencies) {
     }
     return reply.send({ borrower: result.borrower });
   });
+
+  app.post(
+    "/v1/tenants/:tenantId/borrowers/:borrowerId/collection-reports",
+    async (request, reply) => {
+      if (!requireAllowedOrigin(request, reply)) return;
+      const session = await requireUser(request, reply);
+      if (!session) return;
+      const params = tenantBorrowerParamsSchema.safeParse(request.params);
+      const body = borrowerCollectionReportCreateRequestSchema.safeParse(request.body);
+      if (!params.success || !body.success) {
+        return sendError(
+          reply,
+          400,
+          "INVALID_COLLECTION_REPORT",
+          "Selecciona un resultado válido y completa la fecha cuando el cobro fue aplazado.",
+          request.id,
+        );
+      }
+      const membership = tenantMembershipForSession(session, params.data.tenantId);
+      if (!membership || !canManageBorrowers(membership.role)) {
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "No puedes reportar gestiones de este cliente.",
+          request.id,
+        );
+      }
+      if (!dependencies.borrowerService) {
+        return sendError(
+          reply,
+          503,
+          "BORROWER_DOSSIER_UNAVAILABLE",
+          "El módulo de clientes no está disponible.",
+          request.id,
+        );
+      }
+      const result = await dependencies.borrowerService.reportCollection(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.borrowerId,
+        { ...body.data, requestId: request.id },
+      );
+      if (result.status === "not_found") {
+        return sendError(reply, 404, "BORROWER_NOT_FOUND", "El cliente no existe.", request.id);
+      }
+      if (result.status === "forbidden") {
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "Solo puedes reportar clientes asignados a tu gestión.",
+          request.id,
+        );
+      }
+      return reply.code(201).send({ report: result.report });
+    },
+  );
 
   app.post("/v1/tenants/:tenantId/borrowers/:borrowerId/geocode", async (request, reply) => {
     if (!requireAllowedOrigin(request, reply)) return;

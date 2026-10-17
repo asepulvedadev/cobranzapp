@@ -758,6 +758,54 @@ describe("borrower creation security", () => {
     });
   });
 
+  it("records a collection outcome without asking the active session for another password", async () => {
+    const reportCollection = vi.fn(async () => ({
+      status: "created" as const,
+      report: {
+        id: "1fbcf4df-8755-427a-b401-95a35f6578b7",
+        borrowerId: "193a2db4-2349-4a48-8833-746a2a334260",
+        reason: "unreachable" as const,
+        followUpDate: null,
+        notes: "No fue posible ubicarlo en las direcciones registradas.",
+        reportedByName: "Propietario",
+        createdAt: "2026-10-17T12:00:00.000Z",
+      },
+    }));
+    const app = buildApp(
+      dependencies({
+        authService: {
+          authenticate: vi.fn(async () => tenantOwner),
+          isRecentlyReauthenticated: vi.fn(async () => false),
+        },
+        borrowerService: { reportCollection } as unknown as BorrowerService,
+      }),
+    );
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/borrowers/193a2db4-2349-4a48-8833-746a2a334260/collection-reports",
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+      },
+      payload: {
+        reason: "unreachable",
+        followUpDate: null,
+        notes: "No fue posible ubicarlo en las direcciones registradas.",
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({ report: { reason: "unreachable" } });
+    expect(reportCollection).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantRole: "owner" }),
+      "5c58269f-ce16-4250-82e2-c0c16621b0fb",
+      "193a2db4-2349-4a48-8833-746a2a334260",
+      expect.objectContaining({ reason: "unreachable", followUpDate: null }),
+    );
+  });
+
   it("updates home and work addresses together after reauthentication", async () => {
     const updatedBorrower = {
       id: "193a2db4-2349-4a48-8833-746a2a334260",

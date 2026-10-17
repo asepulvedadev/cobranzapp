@@ -23,6 +23,7 @@ import type {
   BorrowerAddressUpdateInput,
   BorrowerAddressUpdateResult,
   BorrowerAssignmentResult,
+  BorrowerCollectionReportResult,
   BorrowerCreateInput,
   BorrowerCreateResult,
   BorrowerDocumentInput,
@@ -152,6 +153,18 @@ class DuplicateBorrowerIdentityError extends Error {
   constructor() {
     super("DUPLICATE_BORROWER_IDENTITY");
   }
+}
+
+export function borrowerDirectorySearchParts(search: string | null) {
+  const text = search?.trim() || null;
+  if (!text) return { text: null, digits: null, documentLast4: null };
+  const numericSearch = /^[\d\s+().-]+$/.test(text);
+  const digits = numericSearch ? text.replace(/\D/g, "") || null : null;
+  return {
+    text,
+    digits,
+    documentLast4: digits ? digits.slice(-4) : null,
+  };
 }
 
 async function loadBorrower(
@@ -478,14 +491,26 @@ export function createPostgresBorrowerService(
   return {
     async list(actor, tenantId, query) {
       return withTransaction(actor, tenantId, async (client) => {
-        const filter = `$1::text IS NULL OR borrower.full_name ILIKE '%' || $1 || '%' OR identity.document_last4 ILIKE '%' || $1 || '%'`;
+        const search = borrowerDirectorySearchParts(query.search);
+        const assignedCollectorId = actor.tenantRole === "collector" ? actor.userId : null;
+        const filter = `$1::text IS NULL
+          OR borrower.full_name ILIKE '%' || $1 || '%'
+          OR assigned_user.display_name ILIKE '%' || $1 || '%'
+          OR ($3::text IS NOT NULL AND (
+            regexp_replace(borrower.phone, '\\D', '', 'g') LIKE '%' || $3 || '%'
+            OR regexp_replace(COALESCE(borrower.whatsapp_phone, ''), '\\D', '', 'g') LIKE '%' || $3 || '%'
+          ))
+          OR ($4::text IS NOT NULL AND identity.document_last4 ILIKE '%' || $4 || '%')`;
         const count = await client.query<{ total: string }>(
           `SELECT count(*) AS total
              FROM borrowers borrower
              JOIN borrower_identities identity
                ON identity.tenant_id = borrower.tenant_id AND identity.borrower_id = borrower.id
-            WHERE borrower.tenant_id = $2 AND (${filter})`,
-          [query.search, tenantId],
+             LEFT JOIN users assigned_user ON assigned_user.id = borrower.assigned_collector_id
+            WHERE borrower.tenant_id = $2
+              AND ($5::uuid IS NULL OR borrower.assigned_collector_id = $5)
+              AND (${filter})`,
+          [search.text, tenantId, search.digits, search.documentLast4, assignedCollectorId],
         );
         const total = Number(count.rows[0]?.total ?? 0);
         const totalPages = Math.max(1, Math.ceil(total / query.pageSize));
@@ -498,9 +523,12 @@ export function createPostgresBorrowerService(
              FROM borrowers borrower
              JOIN borrower_identities identity
                ON identity.tenant_id = borrower.tenant_id AND identity.borrower_id = borrower.id
-            WHERE borrower.tenant_id = $2 AND (${filter})
+             LEFT JOIN users assigned_user ON assigned_user.id = borrower.assigned_collector_id
+            WHERE borrower.tenant_id = $2
+              AND ($5::uuid IS NULL OR borrower.assigned_collector_id = $5)
+              AND (${filter})
             GROUP BY identity.verification_state`,
-          [query.search, tenantId],
+          [search.text, tenantId, search.digits, search.documentLast4, assignedCollectorId],
         );
         const identitySummary = { pending: 0, reviewed: 0, rejected: 0 };
         for (const row of summaryRows.rows) {
@@ -520,9 +548,12 @@ export function createPostgresBorrowerService(
              FROM borrowers borrower
              JOIN borrower_identities identity
                ON identity.tenant_id = borrower.tenant_id AND identity.borrower_id = borrower.id
-            WHERE borrower.tenant_id = $2 AND (${filter})
+             LEFT JOIN users assigned_user ON assigned_user.id = borrower.assigned_collector_id
+            WHERE borrower.tenant_id = $2
+              AND ($5::uuid IS NULL OR borrower.assigned_collector_id = $5)
+              AND (${filter})
             GROUP BY borrower.status`,
-          [query.search, tenantId],
+          [search.text, tenantId, search.digits, search.documentLast4, assignedCollectorId],
         );
         const borrowerSummary = { active: 0, archived: 0 };
         for (const row of statusRows.rows) borrowerSummary[row.status] = Number(row.total);
@@ -538,10 +569,20 @@ export function createPostgresBorrowerService(
              JOIN borrower_identities identity
                ON identity.tenant_id = borrower.tenant_id AND identity.borrower_id = borrower.id
              LEFT JOIN users assigned_user ON assigned_user.id = borrower.assigned_collector_id
-            WHERE borrower.tenant_id = $2 AND (${filter})
+            WHERE borrower.tenant_id = $2
+              AND ($5::uuid IS NULL OR borrower.assigned_collector_id = $5)
+              AND (${filter})
             ORDER BY borrower.created_at DESC, borrower.id DESC
-            LIMIT $3 OFFSET $4`,
-          [query.search, tenantId, query.pageSize, (page - 1) * query.pageSize],
+            LIMIT $6 OFFSET $7`,
+          [
+            search.text,
+            tenantId,
+            search.digits,
+            search.documentLast4,
+            assignedCollectorId,
+            query.pageSize,
+            (page - 1) * query.pageSize,
+          ],
         );
         const borrowers = await Promise.all(
           rows.rows.map((row) => loadBorrower(client, tenantId, row.id)),
@@ -1473,6 +1514,77 @@ export function createPostgresBorrowerService(
       });
     },
 
+    async reportCollection(
+      actor,
+      tenantId,
+      borrowerId,
+      input,
+    ): Promise<BorrowerCollectionReportResult> {
+      if (!actor.tenantRole || !["owner", "supervisor", "collector"].includes(actor.tenantRole)) {
+        return { status: "forbidden" };
+      }
+      return withTransaction(actor, tenantId, async (client) => {
+        const borrower = await client.query<{ assigned_collector_id: string | null }>(
+          `SELECT assigned_collector_id
+             FROM borrowers
+            WHERE tenant_id = $1 AND id = $2 AND status = 'active'`,
+          [tenantId, borrowerId],
+        );
+        const assignedCollectorId = borrower.rows[0]?.assigned_collector_id;
+        if (assignedCollectorId === undefined) return { status: "not_found" };
+        if (actor.tenantRole === "collector" && assignedCollectorId !== actor.userId) {
+          return { status: "forbidden" };
+        }
+        const created = await client.query<{
+          id: string;
+          borrower_id: string;
+          reason: "payment_postponed" | "refuses_payment" | "unreachable";
+          follow_up_date: string | null;
+          notes: string | null;
+          reported_by_name: string;
+          created_at: Date;
+        }>(
+          `INSERT INTO borrower_collection_reports
+             (tenant_id, borrower_id, reason, follow_up_date, notes, reported_by)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id, borrower_id, reason, follow_up_date::text, notes,
+             (SELECT display_name FROM users WHERE id = reported_by) AS reported_by_name,
+             created_at`,
+          [tenantId, borrowerId, input.reason, input.followUpDate, input.notes, actor.userId],
+        );
+        const row = created.rows[0];
+        if (!row) throw new Error("BORROWER_COLLECTION_REPORT_NOT_CREATED");
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'borrower.collection_reported', 'borrower_collection_report', $3, $4,
+                   jsonb_build_object('borrowerId', $5::text, 'reason', $6::text,
+                                      'followUpDate', $7::text))`,
+          [
+            tenantId,
+            actor.userId,
+            row.id,
+            input.requestId,
+            borrowerId,
+            input.reason,
+            input.followUpDate,
+          ],
+        );
+        return {
+          status: "created",
+          report: {
+            id: row.id,
+            borrowerId: row.borrower_id,
+            reason: row.reason,
+            followUpDate: row.follow_up_date,
+            notes: row.notes,
+            reportedByName: row.reported_by_name,
+            createdAt: row.created_at.toISOString(),
+          },
+        };
+      });
+    },
+
     async verifyShared(
       actor,
       tenantId,
@@ -1492,13 +1604,23 @@ export function createPostgresBorrowerService(
           negative_report: boolean;
         }>("SELECT * FROM shared_client_verification($1)", [sharedLookupHmac]);
         const row = result.rows[0];
+        const adverseCollectionReport = row
+          ? Boolean(
+              (
+                await client.query<{ adverse: boolean }>(
+                  "SELECT shared_client_adverse_collection_report($1) AS adverse",
+                  [sharedLookupHmac],
+                )
+              ).rows[0]?.adverse,
+            )
+          : false;
         const verification: SharedClientVerification = row
           ? {
               registered: true,
               fullName: row.full_name,
               activeCreditCount: Number(row.active_credit_count),
-              payerRating: row.payer_rating,
-              negativeReport: row.negative_report,
+              payerRating: adverseCollectionReport ? "low" : row.payer_rating,
+              negativeReport: adverseCollectionReport || row.negative_report,
             }
           : {
               registered: false,
