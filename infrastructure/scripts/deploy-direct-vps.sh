@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 cd "$ROOT_DIR"
 
-host=${COBRANZAPP_VPS_HOST:-2.24.115.58}
+host=${COBRANZAPP_VPS_HOST:-2.24.111.40}
 user=${COBRANZAPP_VPS_USER:-root}
 password_file=${COBRANZAPP_VPS_PASSWORD_FILE:-$HOME/.autoking-vps-password}
 release=$(git rev-parse HEAD)

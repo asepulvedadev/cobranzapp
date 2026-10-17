@@ -63,7 +63,7 @@ Consulte la [configuración de desarrollo](docs/development-setup.md) para conoc
 
 - Repositorio público: `https://github.com/asepulvedadev/cobranzapp`
 - Aplicación: `https://cobranzaap.tech`
-- Dirección técnica de respaldo: `https://cobranzapp.2.24.115.58.sslip.io`
+- Dirección técnica de respaldo: `https://cobranzapp-copy.2.24.111.40.sslip.io`
 - Correo institucional aprobado: `info@cobranzaap.tech`
 
 ## Despliegue directo al VPS
