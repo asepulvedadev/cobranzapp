@@ -1210,9 +1210,12 @@ export const borrowerDocumentInputSchema = z.object({
   sha256: z.string().regex(/^[a-f0-9]{64}$/i),
 });
 
+export const borrowerRegistrationTypeSchema = z.enum(["new", "legacy"]);
+
 export const borrowerCreateRequestSchema = z
   .object({
     fullName: z.string().trim().min(2).max(160),
+    registrationType: borrowerRegistrationTypeSchema.default("new"),
     /** Identity data may be entered without attaching a document image. */
     country: z.string().trim().length(2).toUpperCase().nullable().optional().default(null),
     documentType: z.string().trim().min(2).max(30).nullable().optional().default(null),
@@ -1227,7 +1230,7 @@ export const borrowerCreateRequestSchema = z
     profilePhotoObjectKey: z.string().trim().min(1).max(500).nullable(),
     consentVersion: z.string().trim().min(1).max(40),
     consentEvidenceRef: z.string().trim().min(1).max(240),
-    emergencyContacts: z.array(borrowerEmergencyContactInputSchema).min(1).max(2),
+    emergencyContacts: z.array(borrowerEmergencyContactInputSchema).max(2),
     documents: z.array(borrowerDocumentInputSchema).max(3),
   })
   .superRefine((value, context) => {
@@ -1244,6 +1247,13 @@ export const borrowerCreateRequestSchema = z
         path: ["documentNumber"],
         message:
           "Completa país, tipo y número del documento, o déjalos vacíos para registrarlo manualmente.",
+      });
+    }
+    if (value.registrationType === "new" && value.emergencyContacts.length < 1) {
+      context.addIssue({
+        code: "custom",
+        path: ["emergencyContacts"],
+        message: "Un cliente nuevo requiere al menos un contacto de emergencia.",
       });
     }
     const identityDocuments = value.documents.filter(
@@ -1322,6 +1332,7 @@ export const borrowerAddressLocationResponseSchema = z.object({
 export const borrowerSchema = z.object({
   id: z.uuid(),
   fullName: z.string().min(2),
+  registrationType: borrowerRegistrationTypeSchema.optional(),
   status: z.enum(["active", "archived"]),
   phone: z.string().min(7),
   whatsappPhone: z.string().min(7).nullable().optional(),
@@ -1467,14 +1478,11 @@ export const borrowerReviewRequestSchema = z
     profilePhotoConfirmed: z.boolean(),
   })
   .superRefine((value, context) => {
-    if (
-      value.decision === "reviewed" &&
-      (!value.legalNameConfirmed || !value.identityFrontConfirmed || !value.profilePhotoConfirmed)
-    ) {
+    if (value.decision === "reviewed" && !value.legalNameConfirmed) {
       context.addIssue({
         code: "custom",
         path: ["decision"],
-        message: "La revisión aprobada debe confirmar nombre, frente y selfie del cliente.",
+        message: "La revisión aprobada debe confirmar el nombre del cliente.",
       });
     }
   });

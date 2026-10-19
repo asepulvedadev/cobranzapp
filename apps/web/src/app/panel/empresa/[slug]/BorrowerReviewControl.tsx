@@ -47,6 +47,7 @@ export function BorrowerReviewControl({
   const hasIdentityBack = borrower.documents.some(
     (document) => document.category === "identity" && document.side === "back",
   );
+  const isLegacy = borrower.registrationType === "legacy";
 
   if (!canReview) return <span className="table-muted">Revisión restringida</span>;
 
@@ -76,7 +77,11 @@ export function BorrowerReviewControl({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           decision,
-          notes: notes.trim() || "Identidad aprobada tras revisar la cédula frontal y la selfie.",
+          notes:
+            notes.trim() ||
+            (isLegacy
+              ? "Cliente antiguo aprobado tras revisar los datos básicos."
+              : "Identidad aprobada tras revisar la cédula frontal y la selfie."),
           legalNameConfirmed,
           identityFrontConfirmed,
           identityBackConfirmed,
@@ -107,14 +112,20 @@ export function BorrowerReviewControl({
       </div>
       <div className="borrower-review-body">
         <ul className="borrower-document-checklist">
-          <li>
-            <span>Documento · frente</span>
-            <small>{identityFront ? scanLabel(identityFront.scanStatus) : "Falta cargar"}</small>
-          </li>
-          <li>
-            <span>Selfie del cliente</span>
-            <small>{profilePhoto ? scanLabel(profilePhoto.scanStatus) : "Falta cargar"}</small>
-          </li>
+          {!isLegacy ? (
+            <>
+              <li>
+                <span>Documento · frente</span>
+                <small>
+                  {identityFront ? scanLabel(identityFront.scanStatus) : "Falta cargar"}
+                </small>
+              </li>
+              <li>
+                <span>Selfie del cliente</span>
+                <small>{profilePhoto ? scanLabel(profilePhoto.scanStatus) : "Falta cargar"}</small>
+              </li>
+            </>
+          ) : null}
           {borrower.documents
             .filter((document) => document.category === "identity" && document.side === "back")
             .map((document) => (
@@ -124,7 +135,11 @@ export function BorrowerReviewControl({
               </li>
             ))}
         </ul>
-        {!identityFront || !profilePhoto ? (
+        {isLegacy ? (
+          <p className="borrower-review-help">
+            Cliente antiguo: solo se revisarán los datos básicos registrados.
+          </p>
+        ) : !identityFront || !profilePhoto ? (
           <p className="borrower-review-help is-missing">
             {!identityFront && !profilePhoto
               ? "Falta cargar el frente de la cédula y la selfie. Usa “Agregar documento” antes de aprobar."
@@ -144,16 +159,20 @@ export function BorrowerReviewControl({
               onChange={(event) => setLegalNameConfirmed(event.target.checked)}
               type="checkbox"
             />
-            Confirmo que el nombre coincide con la evidencia disponible.
+            {isLegacy
+              ? "Confirmo que el nombre coincide con los datos básicos registrados."
+              : "Confirmo que el nombre coincide con la evidencia disponible."}
           </label>
-          <label className="review-check">
-            <input
-              checked={identityFrontConfirmed}
-              onChange={(event) => setIdentityFrontConfirmed(event.target.checked)}
-              type="checkbox"
-            />
-            Revisé el frente del documento.
-          </label>
+          {!isLegacy ? (
+            <label className="review-check">
+              <input
+                checked={identityFrontConfirmed}
+                onChange={(event) => setIdentityFrontConfirmed(event.target.checked)}
+                type="checkbox"
+              />
+              Revisé el frente del documento.
+            </label>
+          ) : null}
           {hasIdentityBack ? (
             <label className="review-check">
               <input
@@ -164,14 +183,16 @@ export function BorrowerReviewControl({
               Revisé el reverso opcional adjunto.
             </label>
           ) : null}
-          <label className="review-check">
-            <input
-              checked={profilePhotoConfirmed}
-              onChange={(event) => setProfilePhotoConfirmed(event.target.checked)}
-              type="checkbox"
-            />
-            Confirmo que existe la selfie actual del cliente.
-          </label>
+          {!isLegacy ? (
+            <label className="review-check">
+              <input
+                checked={profilePhotoConfirmed}
+                onChange={(event) => setProfilePhotoConfirmed(event.target.checked)}
+                type="checkbox"
+              />
+              Confirmo que existe la selfie actual del cliente.
+            </label>
+          ) : null}
           <label>
             Nota de revisión <small>(opcional al aprobar)</small>
             <textarea
@@ -185,7 +206,9 @@ export function BorrowerReviewControl({
           <div className="borrower-review-actions">
             <button
               className="review-approve-button"
-              disabled={isBusy || !identityFront || !profilePhoto}
+              disabled={
+                isBusy || !legalNameConfirmed || (!isLegacy && (!identityFront || !profilePhoto))
+              }
               type="submit"
             >
               {isBusy ? "Guardando…" : "Aprobar cliente"}

@@ -112,6 +112,7 @@ export function BorrowerDirectory({
   const [workAddressConfirmed, setWorkAddressConfirmed] = useState(false);
   const [identityConfirmed, setIdentityConfirmed] = useState(false);
   const [manualIdentity, setManualIdentity] = useState(false);
+  const [registrationType, setRegistrationType] = useState<"new" | "legacy">("new");
   const [createStep, setCreateStep] = useState(1);
   const [createdBorrowerId, setCreatedBorrowerId] = useState<string | null>(null);
   const [uploadedDocumentFields, setUploadedDocumentFields] = useState<string[]>([]);
@@ -171,6 +172,7 @@ export function BorrowerDirectory({
     setWorkAddressConfirmed(false);
     setIdentityConfirmed(false);
     setManualIdentity(false);
+    setRegistrationType("new");
     setCreateStep(1);
   }
 
@@ -317,7 +319,11 @@ export function BorrowerDirectory({
       if (
         !fieldValue("fullName") ||
         !hasFiles ||
-        (!manualIdentity && (!fieldValue("documentNumber") || !identityConfirmed))
+        (registrationType === "legacy"
+          ? !fieldValue("documentNumber")
+          : registrationType === "new" &&
+            !manualIdentity &&
+            (!fieldValue("documentNumber") || !identityConfirmed))
       ) {
         setMessage(errors[step]);
         setIsError(true);
@@ -327,7 +333,7 @@ export function BorrowerDirectory({
     if (
       step === 2 &&
       (!fieldValue("phone") ||
-        !fieldValue("whatsappPhone") ||
+        (registrationType === "new" && !fieldValue("whatsappPhone")) ||
         !fieldValue("homeAddress") ||
         !fieldValue("homeAddressLocality") ||
         !fieldValue("workAddress") ||
@@ -341,6 +347,7 @@ export function BorrowerDirectory({
     }
     if (
       step === 3 &&
+      registrationType === "new" &&
       (!fieldValue("contactName") ||
         !fieldValue("contactRelationship") ||
         !fieldValue("contactPhone") ||
@@ -427,14 +434,14 @@ export function BorrowerDirectory({
     setIsError(false);
     setIsSubmitting(true);
     const form = new FormData(event.currentTarget);
-    if (!manualIdentity && !identityConfirmed) {
+    if (registrationType === "new" && !manualIdentity && !identityConfirmed) {
       setCreateStep(1);
       setMessage("Vuelve a revisar y confirmar los datos detectados en el documento.");
       setIsError(true);
       setIsSubmitting(false);
       return;
     }
-    const requiredFiles = ["profilePhoto"];
+    const requiredFiles = registrationType === "new" ? ["profilePhoto"] : [];
     if (
       requiredFiles.some((field) => {
         const file = form.get(field);
@@ -454,6 +461,7 @@ export function BorrowerDirectory({
     if (!borrowerId) {
       const payload = {
         fullName: String(form.get("fullName") ?? "").trim(),
+        registrationType,
         country: manualIdentity && !String(form.get("documentNumber") ?? "").trim() ? null : "CO",
         documentType:
           manualIdentity && !String(form.get("documentNumber") ?? "").trim()
@@ -461,7 +469,7 @@ export function BorrowerDirectory({
             : String(form.get("documentType") ?? "CC"),
         documentNumber: String(form.get("documentNumber") ?? "").trim() || null,
         phone: String(form.get("phone") ?? "").trim(),
-        whatsappPhone: String(form.get("whatsappPhone") ?? "").trim(),
+        whatsappPhone: String(form.get("whatsappPhone") ?? "").trim() || null,
         homeAddress: composeAddress(
           String(form.get("homeAddress") ?? ""),
           String(form.get("homeAddressLocality") ?? ""),
@@ -474,23 +482,29 @@ export function BorrowerDirectory({
         workAddressConfirmed,
         profilePhotoObjectKey: null,
         consentVersion: "borrower-dossier-v1",
-        consentEvidenceRef: String(form.get("consentEvidenceRef") ?? "").trim(),
-        emergencyContacts: [
-          {
-            fullName: String(form.get("contactName") ?? "").trim(),
-            relationship: String(form.get("contactRelationship") ?? "").trim(),
-            phone: String(form.get("contactPhone") ?? "").trim(),
-          },
-          ...(includeSecondContact
-            ? [
+        consentEvidenceRef:
+          registrationType === "legacy"
+            ? "legacy-client-registration"
+            : String(form.get("consentEvidenceRef") ?? "").trim(),
+        emergencyContacts:
+          registrationType === "legacy"
+            ? []
+            : [
                 {
-                  fullName: String(form.get("secondContactName") ?? "").trim(),
-                  relationship: String(form.get("secondContactRelationship") ?? "").trim(),
-                  phone: String(form.get("secondContactPhone") ?? "").trim(),
+                  fullName: String(form.get("contactName") ?? "").trim(),
+                  relationship: String(form.get("contactRelationship") ?? "").trim(),
+                  phone: String(form.get("contactPhone") ?? "").trim(),
                 },
-              ]
-            : []),
-        ],
+                ...(includeSecondContact
+                  ? [
+                      {
+                        fullName: String(form.get("secondContactName") ?? "").trim(),
+                        relationship: String(form.get("secondContactRelationship") ?? "").trim(),
+                        phone: String(form.get("secondContactPhone") ?? "").trim(),
+                      },
+                    ]
+                  : []),
+              ],
         documents: [],
       };
       const parsedPayload = borrowerCreateRequestSchema.safeParse(payload);
@@ -524,9 +538,14 @@ export function BorrowerDirectory({
       side?: "front" | "back";
       required: boolean;
     }> = [
-      { field: "identityFront", category: "identity", side: "front", required: !manualIdentity },
+      {
+        field: "identityFront",
+        category: "identity",
+        side: "front",
+        required: registrationType === "new" && !manualIdentity,
+      },
       { field: "identityBack", category: "identity", side: "back", required: false },
-      { field: "profilePhoto", category: "profile_photo", required: true },
+      { field: "profilePhoto", category: "profile_photo", required: registrationType === "new" },
     ];
     let uploadFailure = !borrowerId;
     const failedUploadLabels: string[] = [];
@@ -814,98 +833,143 @@ export function BorrowerDirectory({
                   <h3 id="borrower-step-document">Registra los datos del cliente</h3>
                 </div>
                 <span className="borrower-required-note">
-                  {manualIdentity ? "Nombre + selfie obligatorios" : "Frente + selfie obligatorios"}
+                  {registrationType === "legacy"
+                    ? "Datos básicos"
+                    : manualIdentity
+                      ? "Nombre + selfie obligatorios"
+                      : "Frente + selfie obligatorios"}
                 </span>
               </div>
               <p className="borrower-section-help">
-                {manualIdentity
-                  ? "No tienes que adjuntar la cédula ahora. Escribe los datos disponibles y podrás agregar el documento después desde el perfil."
-                  : "Captura primero el frente de la cédula para leer el nombre y el número. El reverso es opcional; la selfie actual del cliente sí es obligatoria."}
+                {registrationType === "legacy"
+                  ? "Para un cliente antiguo registra solo nombre, número de cédula, teléfono y direcciones."
+                  : manualIdentity
+                    ? "No tienes que adjuntar la cédula ahora. Escribe los datos disponibles y podrás agregar el documento después desde el perfil."
+                    : "Captura primero el frente de la cédula para leer el nombre y el número. El reverso es opcional; la selfie actual del cliente sí es obligatoria."}
               </p>
-              <div className="borrower-manual-id-action">
-                {manualIdentity ? (
-                  <>
-                    <span>Registro manual activo · la foto de cédula queda pendiente.</span>
-                    <button onClick={useIdentityDocument} type="button">
-                      Usar foto de cédula
+              <fieldset className="borrower-registration-type">
+                <legend>Tipo de cliente</legend>
+                <label>
+                  <input
+                    checked={registrationType === "new"}
+                    onChange={() => {
+                      setRegistrationType("new");
+                      setManualIdentity(false);
+                    }}
+                    type="radio"
+                  />
+                  <span>Cliente nuevo</span>
+                  <small>Requiere frente y selfie.</small>
+                </label>
+                <label>
+                  <input
+                    checked={registrationType === "legacy"}
+                    onChange={() => {
+                      setRegistrationType("legacy");
+                      setIdentityConfirmed(false);
+                    }}
+                    type="radio"
+                  />
+                  <span>Cliente antiguo</span>
+                  <small>La selfie y la cédula pueden agregarse después.</small>
+                </label>
+              </fieldset>
+              {registrationType === "new" ? (
+                <div className="borrower-manual-id-action">
+                  {manualIdentity ? (
+                    <>
+                      <span>Registro manual activo · la foto de cédula queda pendiente.</span>
+                      <button onClick={useIdentityDocument} type="button">
+                        Usar foto de cédula
+                      </button>
+                    </>
+                  ) : (
+                    <button onClick={enableManualIdentity} type="button">
+                      Registrar datos manualmente (sin foto de cédula)
                     </button>
-                  </>
-                ) : (
-                  <button onClick={enableManualIdentity} type="button">
-                    Registrar datos manualmente (sin foto de cédula)
-                  </button>
-                )}
-              </div>
-              <div className="borrower-upload-grid">
-                <label
-                  className={`borrower-upload-card${selectedUploadNames.identityFront ? " is-selected" : ""}`}
-                >
-                  <span className="borrower-upload-icon" aria-hidden="true">
-                    1
-                  </span>
-                  <strong>
-                    {selectedUploadNames.identityFront ? "Frente listo" : "Frente de la cédula"}
-                  </strong>
-                  <small>{selectedUploadNames.identityFront ?? "Foto nítida, sin reflejos"}</small>
-                  <input
-                    accept="image/*"
-                    name="identityFront"
-                    onChange={(event) => selectUpload(event, "identityFront")}
-                    required={!manualIdentity}
-                    type="file"
-                  />
-                  <span className="borrower-upload-cta">
-                    {selectedUploadNames.identityFront ? "Cambiar archivo" : "Tomar o elegir foto"}
-                  </span>
-                </label>
-                <label
-                  className={`borrower-upload-card${selectedUploadNames.identityBack ? " is-selected" : ""}`}
-                >
-                  <span className="borrower-upload-icon" aria-hidden="true">
-                    2
-                  </span>
-                  <strong>
-                    {selectedUploadNames.identityBack
-                      ? "Reverso listo"
-                      : "Reverso de la cédula · opcional"}
-                  </strong>
-                  <small>
-                    {selectedUploadNames.identityBack ?? "Agrégalo solo si necesitas conservarlo"}
-                  </small>
-                  <input
-                    accept="image/*"
-                    name="identityBack"
-                    onChange={(event) => selectUpload(event, "identityBack")}
-                    type="file"
-                  />
-                  <span className="borrower-upload-cta">
-                    {selectedUploadNames.identityBack ? "Cambiar archivo" : "Tomar o elegir foto"}
-                  </span>
-                </label>
-                <label
-                  className={`borrower-upload-card${selectedUploadNames.profilePhoto ? " is-selected" : ""}`}
-                >
-                  <span className="borrower-upload-icon" aria-hidden="true">
-                    3
-                  </span>
-                  <strong>
-                    {selectedUploadNames.profilePhoto ? "Selfie lista" : "Selfie del cliente"}
-                  </strong>
-                  <small>
-                    {selectedUploadNames.profilePhoto ?? "Foto actual y clara del rostro"}
-                  </small>
-                  <input
-                    accept="image/*"
-                    name="profilePhoto"
-                    onChange={(event) => selectUpload(event, "profilePhoto")}
-                    required
-                    type="file"
-                  />
-                  <span className="borrower-upload-cta">
-                    {selectedUploadNames.profilePhoto ? "Cambiar archivo" : "Tomar o elegir foto"}
-                  </span>
-                </label>
-              </div>
+                  )}
+                </div>
+              ) : null}
+              {registrationType === "new" ? (
+                <div className="borrower-upload-grid">
+                  <label
+                    className={`borrower-upload-card${selectedUploadNames.identityFront ? " is-selected" : ""}`}
+                  >
+                    <span className="borrower-upload-icon" aria-hidden="true">
+                      1
+                    </span>
+                    <strong>
+                      {selectedUploadNames.identityFront ? "Frente listo" : "Frente de la cédula"}
+                    </strong>
+                    <small>
+                      {selectedUploadNames.identityFront ?? "Foto nítida, sin reflejos"}
+                    </small>
+                    <input
+                      accept="image/*"
+                      name="identityFront"
+                      onChange={(event) => selectUpload(event, "identityFront")}
+                      required={registrationType === "new" && !manualIdentity}
+                      type="file"
+                    />
+                    <span className="borrower-upload-cta">
+                      {selectedUploadNames.identityFront
+                        ? "Cambiar archivo"
+                        : "Tomar o elegir foto"}
+                    </span>
+                  </label>
+                  <label
+                    className={`borrower-upload-card${selectedUploadNames.identityBack ? " is-selected" : ""}`}
+                  >
+                    <span className="borrower-upload-icon" aria-hidden="true">
+                      2
+                    </span>
+                    <strong>
+                      {selectedUploadNames.identityBack
+                        ? "Reverso listo"
+                        : "Reverso de la cédula · opcional"}
+                    </strong>
+                    <small>
+                      {selectedUploadNames.identityBack ?? "Agrégalo solo si necesitas conservarlo"}
+                    </small>
+                    <input
+                      accept="image/*"
+                      name="identityBack"
+                      onChange={(event) => selectUpload(event, "identityBack")}
+                      type="file"
+                    />
+                    <span className="borrower-upload-cta">
+                      {selectedUploadNames.identityBack ? "Cambiar archivo" : "Tomar o elegir foto"}
+                    </span>
+                  </label>
+                  <label
+                    className={`borrower-upload-card${selectedUploadNames.profilePhoto ? " is-selected" : ""}`}
+                  >
+                    <span className="borrower-upload-icon" aria-hidden="true">
+                      3
+                    </span>
+                    <strong>
+                      {selectedUploadNames.profilePhoto ? "Selfie lista" : "Selfie del cliente"}
+                    </strong>
+                    <small>
+                      {selectedUploadNames.profilePhoto ?? "Foto actual y clara del rostro"}
+                    </small>
+                    <input
+                      accept="image/*"
+                      name="profilePhoto"
+                      onChange={(event) => selectUpload(event, "profilePhoto")}
+                      required={registrationType === "new"}
+                      type="file"
+                    />
+                    <span className="borrower-upload-cta">
+                      {selectedUploadNames.profilePhoto ? "Cambiar archivo" : "Tomar o elegir foto"}
+                    </span>
+                  </label>
+                </div>
+              ) : (
+                <div className="borrower-photo-gate" role="status">
+                  Cliente antiguo: no se solicitarán fotos de cédula ni selfie.
+                </div>
+              )}
               {ocrStatus !== "idle" ? (
                 <div className={`borrower-autofill-status is-${ocrStatus}`} role="status">
                   <span className="borrower-autofill-icon" aria-hidden="true">
@@ -923,19 +987,21 @@ export function BorrowerDirectory({
                   </div>
                 </div>
               ) : null}
-              {manualIdentity || hasIdentityFrontPhoto ? (
+              {registrationType === "legacy" || manualIdentity || hasIdentityFrontPhoto ? (
                 <div className="borrower-identity-review">
                   <div>
                     <span className="borrower-section-kicker">
-                      {manualIdentity ? "Datos ingresados manualmente" : "Datos detectados"}
+                      {registrationType === "legacy" || manualIdentity
+                        ? "Datos ingresados manualmente"
+                        : "Datos detectados"}
                     </span>
                     <h4>
-                      {manualIdentity
+                      {registrationType === "legacy" || manualIdentity
                         ? "Completa los datos disponibles"
                         : "Verifica antes de continuar"}
                     </h4>
                     <p>
-                      {manualIdentity
+                      {registrationType === "legacy" || manualIdentity
                         ? "Puedes completar el tipo y número o dejarlos vacíos para agregarlos después."
                         : "Corrige cualquier error de lectura. Estos datos se usarán para identificar al cliente."}
                     </p>
@@ -1018,7 +1084,7 @@ export function BorrowerDirectory({
                       ) : null}
                     </div>
                   ) : null}
-                  {!manualIdentity ? (
+                  {registrationType === "new" && !manualIdentity ? (
                     <label className="checkbox-row borrower-identity-confirmation">
                       <input
                         checked={identityConfirmed}
@@ -1038,9 +1104,11 @@ export function BorrowerDirectory({
               <div className="borrower-inline-tip">
                 <span aria-hidden="true">i</span>
                 <span>
-                  {manualIdentity
-                    ? "La selfie sigue siendo obligatoria. Sin documento, el cliente queda pendiente de verificación."
-                    : "El reverso es opcional. La selfie del cliente sí es obligatoria."}
+                  {registrationType === "legacy"
+                    ? "Cliente antiguo: solo se solicitarán los datos básicos."
+                    : manualIdentity
+                      ? "La selfie sigue siendo obligatoria. Sin documento, el cliente queda pendiente de verificación."
+                      : "El reverso es opcional. La selfie del cliente sí es obligatoria."}
                 </span>
               </div>
             </section>
@@ -1062,11 +1130,13 @@ export function BorrowerDirectory({
                   Celular principal
                   <input id="borrower-phone" name="phone" maxLength={30} type="tel" />
                 </label>
-                <label className="borrower-field" htmlFor="borrower-whatsapp">
-                  WhatsApp
-                  <input id="borrower-whatsapp" name="whatsappPhone" maxLength={30} type="tel" />
-                  <small>Puede ser el mismo número</small>
-                </label>
+                {registrationType === "new" ? (
+                  <label className="borrower-field" htmlFor="borrower-whatsapp">
+                    WhatsApp
+                    <input id="borrower-whatsapp" name="whatsappPhone" maxLength={30} type="tel" />
+                    <small>Puede ser el mismo número</small>
+                  </label>
+                ) : null}
               </div>
               <div className="borrower-address-grid">
                 <fieldset className="borrower-address-card">
@@ -1126,73 +1196,90 @@ export function BorrowerDirectory({
               <div className="borrower-section-heading">
                 <div>
                   <span className="borrower-section-kicker">Paso 3 · Referencias</span>
-                  <h3 id="borrower-step-references">¿A quién podemos llamar?</h3>
+                  <h3 id="borrower-step-references">
+                    {registrationType === "legacy"
+                      ? "Registro antiguo"
+                      : "¿A quién podemos llamar?"}
+                  </h3>
                 </div>
-                <span className="borrower-required-note">Mínimo 1</span>
+                <span className="borrower-required-note">
+                  {registrationType === "legacy" ? "Sin referencias" : "Mínimo 1"}
+                </span>
               </div>
               <p className="borrower-section-help">
-                Registra una referencia como mínimo. Puedes añadir una segunda si la necesitas.
+                {registrationType === "legacy"
+                  ? "Los clientes antiguos solo requieren nombre, documento, teléfono y direcciones."
+                  : "Registra una referencia como mínimo. Puedes añadir una segunda si la necesitas."}
               </p>
-              <fieldset className="borrower-contact-fieldset">
-                <legend>Referencia principal</legend>
-                <input
-                  aria-label="Nombre de la referencia"
-                  name="contactName"
-                  placeholder="Nombre completo"
-                  maxLength={120}
-                />
-                <input
-                  aria-label="Relación de la referencia"
-                  name="contactRelationship"
-                  placeholder="Relación"
-                  maxLength={80}
-                />
-                <input
-                  aria-label="Celular de la referencia"
-                  name="contactPhone"
-                  placeholder="Celular"
-                  maxLength={30}
-                  type="tel"
-                />
-                <label className="checkbox-row">
-                  <input
-                    checked={includeSecondContact}
-                    onChange={(event) => setIncludeSecondContact(event.target.checked)}
-                    type="checkbox"
-                  />
-                  <span>Agregar una segunda referencia</span>
-                </label>
-                {includeSecondContact ? (
-                  <>
+              {registrationType === "legacy" ? (
+                <div className="borrower-photo-gate" role="status">
+                  No se solicitarán referencias, selfie ni fotos de cédula para este cliente
+                  antiguo.
+                </div>
+              ) : (
+                <>
+                  <fieldset className="borrower-contact-fieldset">
+                    <legend>Referencia principal</legend>
                     <input
-                      aria-label="Nombre de la segunda referencia"
-                      name="secondContactName"
+                      aria-label="Nombre de la referencia"
+                      name="contactName"
                       placeholder="Nombre completo"
                       maxLength={120}
                     />
                     <input
-                      aria-label="Relación de la segunda referencia"
-                      name="secondContactRelationship"
+                      aria-label="Relación de la referencia"
+                      name="contactRelationship"
                       placeholder="Relación"
                       maxLength={80}
                     />
                     <input
-                      aria-label="Celular de la segunda referencia"
-                      name="secondContactPhone"
+                      aria-label="Celular de la referencia"
+                      name="contactPhone"
                       placeholder="Celular"
                       maxLength={30}
                       type="tel"
                     />
-                  </>
-                ) : null}
-              </fieldset>
-              <label htmlFor="borrower-consent">Referencia de consentimiento</label>
-              <input
-                id="borrower-consent"
-                name="consentEvidenceRef"
-                placeholder="Ej. formulario físico 2026-10-12"
-                maxLength={240}
-              />
+                    <label className="checkbox-row">
+                      <input
+                        checked={includeSecondContact}
+                        onChange={(event) => setIncludeSecondContact(event.target.checked)}
+                        type="checkbox"
+                      />
+                      <span>Agregar una segunda referencia</span>
+                    </label>
+                    {includeSecondContact ? (
+                      <>
+                        <input
+                          aria-label="Nombre de la segunda referencia"
+                          name="secondContactName"
+                          placeholder="Nombre completo"
+                          maxLength={120}
+                        />
+                        <input
+                          aria-label="Relación de la segunda referencia"
+                          name="secondContactRelationship"
+                          placeholder="Relación"
+                          maxLength={80}
+                        />
+                        <input
+                          aria-label="Celular de la segunda referencia"
+                          name="secondContactPhone"
+                          placeholder="Celular"
+                          maxLength={30}
+                          type="tel"
+                        />
+                      </>
+                    ) : null}
+                  </fieldset>
+                  <label htmlFor="borrower-consent">Referencia de consentimiento</label>
+                  <input
+                    id="borrower-consent"
+                    name="consentEvidenceRef"
+                    placeholder="Ej. formulario físico 2026-10-12"
+                    maxLength={240}
+                  />
+                </>
+              )}
             </section>
 
             <section aria-labelledby="borrower-step-confirm" hidden={createStep !== 4}>
@@ -1204,14 +1291,21 @@ export function BorrowerDirectory({
                 <span className="borrower-required-note">Listo para guardar</span>
               </div>
               <p className="borrower-section-help">
-                Se guardarán los datos diligenciados, el frente del documento, la selfie, el reverso
-                si lo adjuntaste y las referencias.
+                {registrationType === "legacy"
+                  ? "Se guardarán únicamente los datos básicos del cliente antiguo."
+                  : "Se guardarán los datos diligenciados, el frente del documento, la selfie, el reverso si lo adjuntaste y las referencias."}
               </p>
               <ul className="borrower-confirmation-list">
-                <li>Frente obligatorio y reverso opcional en almacenamiento privado.</li>
-                <li>Selfie actual del cliente en almacenamiento privado.</li>
-                <li>Celular, WhatsApp y direcciones completas con barrio y municipio.</li>
-                <li>Una o dos referencias de contacto.</li>
+                {registrationType === "legacy" ? (
+                  <li>Nombre, número de cédula, teléfono y direcciones verificadas.</li>
+                ) : (
+                  <>
+                    <li>Frente obligatorio y reverso opcional en almacenamiento privado.</li>
+                    <li>Selfie actual del cliente en almacenamiento privado.</li>
+                    <li>Celular, WhatsApp y direcciones completas con barrio y municipio.</li>
+                    <li>Una o dos referencias de contacto.</li>
+                  </>
+                )}
               </ul>
             </section>
 

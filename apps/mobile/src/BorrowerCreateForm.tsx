@@ -63,6 +63,7 @@ export function BorrowerCreateForm({
   const [identityBack, setIdentityBack] = useState<SelectedImage | null>(null);
   const [profilePhoto, setProfilePhoto] = useState<SelectedImage | null>(null);
   const [manualIdentity, setManualIdentity] = useState(false);
+  const [registrationType, setRegistrationType] = useState<"new" | "legacy">("new");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
@@ -78,6 +79,7 @@ export function BorrowerCreateForm({
     setStep(1);
     setMessage("");
     setManualIdentity(false);
+    setRegistrationType("new");
     setIdentityFront(null);
     setIdentityBack(null);
     setOcrExtraction(null);
@@ -208,15 +210,24 @@ export function BorrowerCreateForm({
   function stepError(stepToValidate: number) {
     if (stepToValidate === 1) {
       if (!fullName.trim()) return "Completa el nombre del cliente.";
-      if (!profilePhoto) {
+      if (registrationType === "new" && !profilePhoto) {
         return "Carga la selfie del cliente.";
       }
-      if (!manualIdentity && (!documentNumber.trim() || !identityFront)) {
+      if (
+        (registrationType === "legacy" && !documentNumber.trim()) ||
+        (registrationType === "new" &&
+          !manualIdentity &&
+          (!documentNumber.trim() || !identityFront))
+      ) {
         return "Carga el frente de la cédula y completa su número.";
       }
     }
     if (stepToValidate === 2) {
-      if (!phone.trim() || !whatsappPhone.trim()) return "Completa el celular y WhatsApp.";
+      if (!phone.trim() || (registrationType === "new" && !whatsappPhone.trim())) {
+        return registrationType === "legacy"
+          ? "Completa el teléfono del cliente."
+          : "Completa el celular y WhatsApp.";
+      }
       if (
         !homeAddress.trim() ||
         !homeAddressLocality.trim() ||
@@ -230,10 +241,14 @@ export function BorrowerCreateForm({
       }
     }
     if (stepToValidate === 3) {
-      if (!contactName.trim() || !contactRelationship.trim() || !contactPhone.trim()) {
+      if (
+        registrationType === "new" &&
+        (!contactName.trim() || !contactRelationship.trim() || !contactPhone.trim())
+      ) {
         return "Registra al menos un contacto de emergencia completo.";
       }
       if (
+        registrationType === "new" &&
         secondContact &&
         (!secondContactName.trim() ||
           !secondContactRelationship.trim() ||
@@ -241,7 +256,7 @@ export function BorrowerCreateForm({
       ) {
         return "Completa los datos del segundo contacto o quítalo.";
       }
-      if (!consent) return "Confirma el consentimiento del cliente.";
+      if (registrationType === "new" && !consent) return "Confirma el consentimiento del cliente.";
     }
     return "";
   }
@@ -263,9 +278,11 @@ export function BorrowerCreateForm({
   async function submit() {
     if (missingFields()) {
       setMessage(
-        manualIdentity
-          ? "Completa los datos requeridos y la selfie del cliente."
-          : "Completa los datos requeridos, el frente de la cédula y la selfie del cliente.",
+        registrationType === "legacy"
+          ? "Completa nombre, documento, teléfono y direcciones."
+          : manualIdentity
+            ? "Completa los datos requeridos y la selfie del cliente."
+            : "Completa los datos requeridos, el frente de la cédula y la selfie del cliente.",
       );
       return;
     }
@@ -279,34 +296,41 @@ export function BorrowerCreateForm({
       } else {
         const payload = {
           fullName: fullName.trim(),
+          registrationType,
           country: documentNumber.trim() ? "CO" : null,
           documentType: documentNumber.trim() ? documentType.trim().toUpperCase() : null,
           documentNumber: documentNumber.trim() || null,
           phone: phone.trim(),
-          whatsappPhone: whatsappPhone.trim(),
+          whatsappPhone: whatsappPhone.trim() || null,
           homeAddress: composeAddress(homeAddress, homeAddressLocality),
           workAddress: composeAddress(workAddress, workAddressLocality),
           homeAddressConfirmed,
           workAddressConfirmed,
           profilePhotoObjectKey: null,
           consentVersion: "borrower-dossier-v1",
-          consentEvidenceRef: `mobile-consent-${Date.now()}`,
-          emergencyContacts: [
-            {
-              fullName: contactName.trim(),
-              relationship: contactRelationship.trim(),
-              phone: contactPhone.trim(),
-            },
-            ...(secondContact
-              ? [
+          consentEvidenceRef:
+            registrationType === "legacy"
+              ? "legacy-client-registration"
+              : `mobile-consent-${Date.now()}`,
+          emergencyContacts:
+            registrationType === "legacy"
+              ? []
+              : [
                   {
-                    fullName: secondContactName.trim(),
-                    relationship: secondContactRelationship.trim(),
-                    phone: secondContactPhone.trim(),
+                    fullName: contactName.trim(),
+                    relationship: contactRelationship.trim(),
+                    phone: contactPhone.trim(),
                   },
-                ]
-              : []),
-          ],
+                  ...(secondContact
+                    ? [
+                        {
+                          fullName: secondContactName.trim(),
+                          relationship: secondContactRelationship.trim(),
+                          phone: secondContactPhone.trim(),
+                        },
+                      ]
+                    : []),
+                ],
           documents: [],
         };
         const parsed = borrowerCreateRequestSchema.safeParse(payload);
@@ -324,7 +348,7 @@ export function BorrowerCreateForm({
           image: identityFront,
           category: "identity" as const,
           side: "front" as const,
-          optional: manualIdentity,
+          optional: registrationType === "legacy" || manualIdentity,
         },
         {
           key: "identity-back" as const,
@@ -337,7 +361,7 @@ export function BorrowerCreateForm({
           key: "profile-photo" as const,
           image: profilePhoto,
           category: "profile_photo" as const,
-          optional: false,
+          optional: registrationType === "new",
         },
       ];
       for (const upload of uploads) {
@@ -374,6 +398,7 @@ export function BorrowerCreateForm({
       setIdentityBack(null);
       setProfilePhoto(null);
       setManualIdentity(false);
+      setRegistrationType("new");
       setOcrExtraction(null);
       setStep(1);
       setCreatedBorrowerId(null);
@@ -450,21 +475,56 @@ export function BorrowerCreateForm({
               {step === 1 ? (
                 <>
                   <Text style={styles.sectionTitle}>Identidad</Text>
+                  <Text style={styles.label}>Tipo de cliente</Text>
+                  <View style={styles.registrationChoices}>
+                    <Pressable
+                      onPress={() => {
+                        setRegistrationType("new");
+                        setManualIdentity(false);
+                      }}
+                      style={[
+                        styles.registrationChoice,
+                        registrationType === "new" && styles.registrationChoiceActive,
+                      ]}
+                    >
+                      <Text style={styles.registrationChoiceText}>Nuevo</Text>
+                      <Text style={styles.registrationChoiceHint}>
+                        Selfie, cédula y referencias
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        setRegistrationType("legacy");
+                        setManualIdentity(true);
+                      }}
+                      style={[
+                        styles.registrationChoice,
+                        registrationType === "legacy" && styles.registrationChoiceActive,
+                      ]}
+                    >
+                      <Text style={styles.registrationChoiceText}>Antiguo</Text>
+                      <Text style={styles.registrationChoiceHint}>Solo datos básicos</Text>
+                    </Pressable>
+                  </View>
                   <Text style={styles.addressHint}>
                     {manualIdentity
-                      ? "Registro manual activo: la cédula puede agregarse después desde el perfil."
+                      ? registrationType === "legacy"
+                        ? "Cliente antiguo: no se solicitarán fotos ni referencias."
+                        : "Registro manual activo: la cédula puede agregarse después desde el perfil."
                       : "Puedes leer la cédula automáticamente o ingresar los datos sin foto."}
                   </Text>
-                  <Pressable
-                    onPress={manualIdentity ? useIdentityDocument : enableManualIdentity}
-                    style={styles.manualIdentityButton}
-                  >
-                    <Text style={styles.manualIdentityButtonText}>
-                      {manualIdentity
-                        ? "Usar foto de cédula"
-                        : "Registrar datos manualmente (sin foto de cédula)"}
-                    </Text>
-                  </Pressable>
+                  {registrationType === "new" ? (
+                    <Pressable
+                      onPress={manualIdentity ? useIdentityDocument : enableManualIdentity}
+                      style={styles.manualIdentityButton}
+                    >
+                      <Text style={styles.manualIdentityButtonText}>
+                        {manualIdentity
+                          ? "Usar foto de cédula"
+                          : "Registrar datos manualmente (sin foto de cédula)"}
+                      </Text>
+                    </Pressable>
+                  ) : null}
                   <Text style={styles.label}>Nombre completo</Text>
                   <TextInput
                     onChangeText={setFullName}
@@ -494,89 +554,97 @@ export function BorrowerCreateForm({
                       />
                     </View>
                   </View>
-                  <Text style={styles.label}>Documentos privados</Text>
-                  <ImageButton
-                    label={
-                      identityFront
-                        ? `✓ Frente · ${identityFront.name}`
-                        : manualIdentity
-                          ? "Cédula · frente (opcional)"
-                          : "Cargar cédula · frente"
-                    }
-                    onPress={() =>
-                      void pickImage((image) => {
-                        setIdentityFront(image);
-                        void scanIdentity(image, identityBack);
-                      }, "cedula-frente.jpg")
-                    }
-                    onCamera={() =>
-                      void captureImage((image) => {
-                        setIdentityFront(image);
-                        void scanIdentity(image, identityBack);
-                      }, "cedula-frente.jpg")
-                    }
-                  />
-                  <ImageButton
-                    label={
-                      identityBack
-                        ? `✓ Reverso · ${identityBack.name}`
-                        : "Cargar cédula · reverso opcional"
-                    }
-                    onPress={() =>
-                      void pickImage((image) => {
-                        setIdentityBack(image);
-                        if (identityFront) void scanIdentity(identityFront, image);
-                      }, "cedula-reverso.jpg")
-                    }
-                    onCamera={() =>
-                      void captureImage((image) => {
-                        setIdentityBack(image);
-                        if (identityFront) void scanIdentity(identityFront, image);
-                      }, "cedula-reverso.jpg")
-                    }
-                  />
-                  <ImageButton
-                    label={
-                      profilePhoto ? `✓ Selfie · ${profilePhoto.name}` : "Cargar selfie obligatoria"
-                    }
-                    onPress={() => void pickImage(setProfilePhoto, "foto-perfil.jpg")}
-                    onCamera={() => void captureImage(setProfilePhoto, "foto-perfil.jpg")}
-                  />
-                  {ocrBusy ? <Text style={styles.ocrStatus}>Leyendo la cédula…</Text> : null}
-                  {ocrExtraction ? (
-                    <View style={styles.ocrDetails}>
-                      <Text style={styles.ocrTitle}>Todos los datos detectados</Text>
-                      {[
-                        ["Nombres", ocrExtraction.fields.firstNames],
-                        ["Apellidos", ocrExtraction.fields.lastNames],
-                        ["Nacionalidad", ocrExtraction.fields.nationality],
-                        ["Nacimiento", ocrExtraction.fields.birthDate],
-                        ["Lugar de nacimiento", ocrExtraction.fields.birthPlace],
-                        ["Sexo", ocrExtraction.fields.sex],
-                        ["Estatura", ocrExtraction.fields.height],
-                        ["RH", ocrExtraction.fields.bloodType],
-                        ["Expedición", ocrExtraction.fields.issueDate],
-                        ["Lugar de expedición", ocrExtraction.fields.issuePlace],
-                        ["Vencimiento", ocrExtraction.fields.expirationDate],
-                        ["Serial", ocrExtraction.fields.serialNumber],
-                      ].map(([label, value]) =>
-                        value ? (
-                          <Text key={label} style={styles.ocrDetailText}>
-                            {label}: {value}
-                          </Text>
-                        ) : null,
-                      )}
-                      {ocrExtraction.fields.mrzLines.length ? (
-                        <Text style={styles.ocrMachineText}>
-                          MRZ: {ocrExtraction.fields.mrzLines.join(" / ")}
-                        </Text>
+                  {registrationType === "new" ? (
+                    <Text style={styles.label}>Documentos privados</Text>
+                  ) : null}
+                  {registrationType === "new" ? (
+                    <>
+                      <ImageButton
+                        label={
+                          identityFront
+                            ? `✓ Frente · ${identityFront.name}`
+                            : manualIdentity
+                              ? "Cédula · frente (opcional)"
+                              : "Cargar cédula · frente"
+                        }
+                        onPress={() =>
+                          void pickImage((image) => {
+                            setIdentityFront(image);
+                            void scanIdentity(image, identityBack);
+                          }, "cedula-frente.jpg")
+                        }
+                        onCamera={() =>
+                          void captureImage((image) => {
+                            setIdentityFront(image);
+                            void scanIdentity(image, identityBack);
+                          }, "cedula-frente.jpg")
+                        }
+                      />
+                      <ImageButton
+                        label={
+                          identityBack
+                            ? `✓ Reverso · ${identityBack.name}`
+                            : "Cargar cédula · reverso opcional"
+                        }
+                        onPress={() =>
+                          void pickImage((image) => {
+                            setIdentityBack(image);
+                            if (identityFront) void scanIdentity(identityFront, image);
+                          }, "cedula-reverso.jpg")
+                        }
+                        onCamera={() =>
+                          void captureImage((image) => {
+                            setIdentityBack(image);
+                            if (identityFront) void scanIdentity(identityFront, image);
+                          }, "cedula-reverso.jpg")
+                        }
+                      />
+                      <ImageButton
+                        label={
+                          profilePhoto
+                            ? `✓ Selfie · ${profilePhoto.name}`
+                            : "Cargar selfie obligatoria"
+                        }
+                        onPress={() => void pickImage(setProfilePhoto, "foto-perfil.jpg")}
+                        onCamera={() => void captureImage(setProfilePhoto, "foto-perfil.jpg")}
+                      />
+                      {ocrBusy ? <Text style={styles.ocrStatus}>Leyendo la cédula…</Text> : null}
+                      {ocrExtraction ? (
+                        <View style={styles.ocrDetails}>
+                          <Text style={styles.ocrTitle}>Todos los datos detectados</Text>
+                          {[
+                            ["Nombres", ocrExtraction.fields.firstNames],
+                            ["Apellidos", ocrExtraction.fields.lastNames],
+                            ["Nacionalidad", ocrExtraction.fields.nationality],
+                            ["Nacimiento", ocrExtraction.fields.birthDate],
+                            ["Lugar de nacimiento", ocrExtraction.fields.birthPlace],
+                            ["Sexo", ocrExtraction.fields.sex],
+                            ["Estatura", ocrExtraction.fields.height],
+                            ["RH", ocrExtraction.fields.bloodType],
+                            ["Expedición", ocrExtraction.fields.issueDate],
+                            ["Lugar de expedición", ocrExtraction.fields.issuePlace],
+                            ["Vencimiento", ocrExtraction.fields.expirationDate],
+                            ["Serial", ocrExtraction.fields.serialNumber],
+                          ].map(([label, value]) =>
+                            value ? (
+                              <Text key={label} style={styles.ocrDetailText}>
+                                {label}: {value}
+                              </Text>
+                            ) : null,
+                          )}
+                          {ocrExtraction.fields.mrzLines.length ? (
+                            <Text style={styles.ocrMachineText}>
+                              MRZ: {ocrExtraction.fields.mrzLines.join(" / ")}
+                            </Text>
+                          ) : null}
+                          {ocrExtraction.fields.barcodeData ? (
+                            <Text style={styles.ocrMachineText}>
+                              Código: {ocrExtraction.fields.barcodeData}
+                            </Text>
+                          ) : null}
+                        </View>
                       ) : null}
-                      {ocrExtraction.fields.barcodeData ? (
-                        <Text style={styles.ocrMachineText}>
-                          Código: {ocrExtraction.fields.barcodeData}
-                        </Text>
-                      ) : null}
-                    </View>
+                    </>
                   ) : null}
                 </>
               ) : null}
@@ -596,15 +664,19 @@ export function BorrowerCreateForm({
                     style={styles.input}
                     value={phone}
                   />
-                  <Text style={styles.label}>WhatsApp</Text>
-                  <TextInput
-                    keyboardType="phone-pad"
-                    onChangeText={setWhatsappPhone}
-                    placeholder="Número de WhatsApp"
-                    placeholderTextColor="#77817a"
-                    style={styles.input}
-                    value={whatsappPhone}
-                  />
+                  {registrationType === "new" ? (
+                    <>
+                      <Text style={styles.label}>WhatsApp</Text>
+                      <TextInput
+                        keyboardType="phone-pad"
+                        onChangeText={setWhatsappPhone}
+                        placeholder="Número de WhatsApp"
+                        placeholderTextColor="#77817a"
+                        style={styles.input}
+                        value={whatsappPhone}
+                      />
+                    </>
+                  ) : null}
                   <Text style={styles.label}>Dirección de casa</Text>
                   <TextInput
                     onChangeText={setHomeAddress}
@@ -666,73 +738,88 @@ export function BorrowerCreateForm({
 
               {step === 3 ? (
                 <>
-                  <Text style={styles.sectionTitle}>Referencias y autorización</Text>
-                  <Text style={styles.label}>Contacto de emergencia</Text>
-                  <TextInput
-                    onChangeText={setContactName}
-                    placeholder="Nombre completo"
-                    placeholderTextColor="#77817a"
-                    style={styles.input}
-                    value={contactName}
-                  />
-                  <TextInput
-                    onChangeText={setContactRelationship}
-                    placeholder="Relación"
-                    placeholderTextColor="#77817a"
-                    style={styles.input}
-                    value={contactRelationship}
-                  />
-                  <TextInput
-                    keyboardType="phone-pad"
-                    onChangeText={setContactPhone}
-                    placeholder="Celular"
-                    placeholderTextColor="#77817a"
-                    style={styles.input}
-                    value={contactPhone}
-                  />
-                  <Pressable
-                    onPress={() => setSecondContact((current) => !current)}
-                    style={styles.toggle}
-                  >
-                    <Text style={styles.toggleText}>
-                      {secondContact ? "− Quitar segundo contacto" : "+ Agregar segundo contacto"}
+                  <Text style={styles.sectionTitle}>
+                    {registrationType === "legacy"
+                      ? "Registro antiguo"
+                      : "Referencias y autorización"}
+                  </Text>
+                  {registrationType === "legacy" ? (
+                    <Text style={styles.addressHint}>
+                      No se requieren referencias ni autorización adicional para este registro
+                      antiguo.
                     </Text>
-                  </Pressable>
-                  {secondContact ? (
+                  ) : (
                     <>
+                      <Text style={styles.label}>Contacto de emergencia</Text>
                       <TextInput
-                        onChangeText={setSecondContactName}
-                        placeholder="Segundo contacto · nombre"
+                        onChangeText={setContactName}
+                        placeholder="Nombre completo"
                         placeholderTextColor="#77817a"
                         style={styles.input}
-                        value={secondContactName}
+                        value={contactName}
                       />
                       <TextInput
-                        onChangeText={setSecondContactRelationship}
-                        placeholder="Segundo contacto · relación"
+                        onChangeText={setContactRelationship}
+                        placeholder="Relación"
                         placeholderTextColor="#77817a"
                         style={styles.input}
-                        value={secondContactRelationship}
+                        value={contactRelationship}
                       />
                       <TextInput
                         keyboardType="phone-pad"
-                        onChangeText={setSecondContactPhone}
-                        placeholder="Segundo contacto · celular"
+                        onChangeText={setContactPhone}
+                        placeholder="Celular"
                         placeholderTextColor="#77817a"
                         style={styles.input}
-                        value={secondContactPhone}
+                        value={contactPhone}
                       />
+                      <Pressable
+                        onPress={() => setSecondContact((current) => !current)}
+                        style={styles.toggle}
+                      >
+                        <Text style={styles.toggleText}>
+                          {secondContact
+                            ? "− Quitar segundo contacto"
+                            : "+ Agregar segundo contacto"}
+                        </Text>
+                      </Pressable>
+                      {secondContact ? (
+                        <>
+                          <TextInput
+                            onChangeText={setSecondContactName}
+                            placeholder="Segundo contacto · nombre"
+                            placeholderTextColor="#77817a"
+                            style={styles.input}
+                            value={secondContactName}
+                          />
+                          <TextInput
+                            onChangeText={setSecondContactRelationship}
+                            placeholder="Segundo contacto · relación"
+                            placeholderTextColor="#77817a"
+                            style={styles.input}
+                            value={secondContactRelationship}
+                          />
+                          <TextInput
+                            keyboardType="phone-pad"
+                            onChangeText={setSecondContactPhone}
+                            placeholder="Segundo contacto · celular"
+                            placeholderTextColor="#77817a"
+                            style={styles.input}
+                            value={secondContactPhone}
+                          />
+                        </>
+                      ) : null}
+                      <Pressable
+                        onPress={() => setConsent((current) => !current)}
+                        style={styles.consentRow}
+                      >
+                        <Text style={styles.checkbox}>{consent ? "☑" : "☐"}</Text>
+                        <Text style={styles.consentText}>
+                          Confirmo que el cliente autorizó el registro de sus datos y documentos.
+                        </Text>
+                      </Pressable>
                     </>
-                  ) : null}
-                  <Pressable
-                    onPress={() => setConsent((current) => !current)}
-                    style={styles.consentRow}
-                  >
-                    <Text style={styles.checkbox}>{consent ? "☑" : "☐"}</Text>
-                    <Text style={styles.consentText}>
-                      Confirmo que el cliente autorizó el registro de sus datos y documentos.
-                    </Text>
-                  </Pressable>
+                  )}
                 </>
               ) : null}
 
@@ -748,9 +835,11 @@ export function BorrowerCreateForm({
                         : "Pendiente de registrar"}
                     </Text>
                     <Text style={styles.reviewText}>Celular: {phone || "Sin registrar"}</Text>
-                    <Text style={styles.reviewText}>
-                      WhatsApp: {whatsappPhone || "Sin registrar"}
-                    </Text>
+                    {registrationType === "new" ? (
+                      <Text style={styles.reviewText}>
+                        WhatsApp: {whatsappPhone || "Sin registrar"}
+                      </Text>
+                    ) : null}
                     <Text style={styles.reviewText}>
                       Casa: {composeAddress(homeAddress, homeAddressLocality) || "Sin registrar"}
                     </Text>
@@ -758,8 +847,9 @@ export function BorrowerCreateForm({
                       Trabajo: {composeAddress(workAddress, workAddressLocality) || "Sin registrar"}
                     </Text>
                     <Text style={styles.reviewText}>
-                      Referencias: {secondContact ? "2" : "1"} · Imágenes:{" "}
-                      {identityBack ? "3" : "2"}
+                      {registrationType === "legacy"
+                        ? "Registro antiguo: sin referencias ni imágenes"
+                        : `Referencias: ${secondContact ? "2" : "1"} · Imágenes: ${identityBack ? "3" : "2"}`}
                     </Text>
                   </View>
                   <Text style={styles.addressHint}>
@@ -864,6 +954,19 @@ const styles = {
   stepDotActive: { backgroundColor: "#fbbf24" },
   sectionTitle: { color: "#eef2ee", fontWeight: "800" as const, fontSize: 16, marginTop: 4 },
   addressHint: { color: "#99a39c", fontSize: 12, lineHeight: 18 },
+  registrationChoices: { flexDirection: "row" as const, gap: 8 },
+  registrationChoice: {
+    flex: 1,
+    minHeight: 58,
+    padding: 9,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#414a44",
+    backgroundColor: "#151817",
+  },
+  registrationChoiceActive: { borderColor: "#fbbf24", backgroundColor: "#2b2b20" },
+  registrationChoiceText: { color: "#eef2ee", fontSize: 13, fontWeight: "800" as const },
+  registrationChoiceHint: { color: "#99a39c", fontSize: 10, lineHeight: 14, marginTop: 3 },
   manualIdentityButton: {
     minHeight: 44,
     paddingHorizontal: 12,

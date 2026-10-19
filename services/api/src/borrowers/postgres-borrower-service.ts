@@ -38,6 +38,7 @@ import type {
 type BorrowerRow = {
   id: string;
   full_name: string;
+  registration_type: "new" | "legacy";
   status: Borrower["status"];
   phone: string;
   whatsapp_phone: string | null;
@@ -200,7 +201,7 @@ async function loadBorrower(
   borrowerId: string,
 ): Promise<Borrower | null> {
   const result = await client.query<BorrowerRow>(
-    `SELECT borrower.id, borrower.full_name, borrower.status,
+    `SELECT borrower.id, borrower.full_name, borrower.registration_type, borrower.status,
             borrower.phone, borrower.whatsapp_phone, borrower.home_address, borrower.work_address,
             borrower.home_address_status, borrower.work_address_status,
             borrower.profile_photo_object_key, borrower.assigned_collector_id,
@@ -268,6 +269,7 @@ async function loadBorrower(
   return {
     id: row.id,
     fullName: row.full_name,
+    registrationType: row.registration_type,
     status: row.status,
     phone: row.phone,
     whatsappPhone: row.whatsapp_phone,
@@ -585,7 +587,7 @@ export function createPostgresBorrowerService(
         const borrowerSummary = { active: 0, archived: 0 };
         for (const row of statusRows.rows) borrowerSummary[row.status] = Number(row.total);
         const rows = await client.query<BorrowerRow>(
-          `SELECT borrower.id, borrower.full_name, borrower.status,
+          `SELECT borrower.id, borrower.full_name, borrower.registration_type, borrower.status,
                   borrower.phone, borrower.whatsapp_phone, borrower.home_address, borrower.work_address,
                   borrower.home_address_status, borrower.work_address_status,
                   borrower.profile_photo_object_key, borrower.assigned_collector_id,
@@ -681,26 +683,27 @@ export function createPostgresBorrowerService(
           try {
             await client.query(
               `INSERT INTO borrowers
-               (tenant_id, id, full_name, phone, whatsapp_phone, home_address, work_address,
+               (tenant_id, id, full_name, registration_type, phone, whatsapp_phone, home_address, work_address,
                 home_address_status, work_address_status, home_address_confirmed_at,
                 work_address_confirmed_at, home_address_confirmed_by, work_address_confirmed_by,
                 profile_photo_object_key, consent_version, consent_evidence_ref, created_by,
                 assigned_collector_id,
                 created_by_role)
-             VALUES ($1, $2, $3, $4, $5, $6, $7,
-                     CASE WHEN $8 THEN 'confirmed' ELSE 'pending' END,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
                      CASE WHEN $9 THEN 'confirmed' ELSE 'pending' END,
-                     CASE WHEN $8 THEN now() ELSE NULL END,
+                     CASE WHEN $10 THEN 'confirmed' ELSE 'pending' END,
                      CASE WHEN $9 THEN now() ELSE NULL END,
-                     CASE WHEN $8 THEN $10::uuid ELSE NULL END,
-                     CASE WHEN $9 THEN $10::uuid ELSE NULL END,
-                     $11, $12, $13, $10,
-                     CASE WHEN $14 = 'collector' THEN $10::uuid ELSE NULL END,
-                     $14)`,
+                     CASE WHEN $10 THEN now() ELSE NULL END,
+                     CASE WHEN $9 THEN $11::uuid ELSE NULL END,
+                     CASE WHEN $10 THEN $11::uuid ELSE NULL END,
+                     $12, $13, $14, $11,
+                     CASE WHEN $15 = 'collector' THEN $11::uuid ELSE NULL END,
+                     $15)`,
               [
                 tenantId,
                 borrowerId,
                 input.fullName,
+                input.registrationType,
                 input.phone,
                 input.whatsappPhone ?? input.phone,
                 homeAddress,
@@ -789,6 +792,7 @@ export function createPostgresBorrowerService(
                 JSON.stringify({
                   documentType: input.documentType,
                   country: input.country,
+                  registrationType: input.registrationType,
                   identityEntryMode: normalizedNumber ? "document" : "manual",
                   documentSides: input.documents.filter(
                     (document) => document.category === "identity",
@@ -827,8 +831,8 @@ export function createPostgresBorrowerService(
         return { status: "forbidden" };
       }
       return withTransaction(actor, tenantId, async (client) => {
-        const borrower = await client.query<{ id: string }>(
-          `SELECT id FROM borrowers WHERE tenant_id = $1 AND id = $2`,
+        const borrower = await client.query<{ id: string; registration_type: "new" | "legacy" }>(
+          `SELECT id, registration_type FROM borrowers WHERE tenant_id = $1 AND id = $2`,
           [tenantId, borrowerId],
         );
         if (!borrower.rows[0]) return { status: "not_found" };
@@ -853,10 +857,12 @@ export function createPostgresBorrowerService(
         };
         const missing: Array<"identity_front" | "profile_photo"> = [];
         if (input.decision === "reviewed") {
-          if (!reviewable.identity_front || !input.identityFrontConfirmed)
-            missing.push("identity_front");
-          if (!reviewable.profile_photo || !input.profilePhotoConfirmed)
-            missing.push("profile_photo");
+          if (borrower.rows[0]?.registration_type !== "legacy") {
+            if (!reviewable.identity_front || !input.identityFrontConfirmed)
+              missing.push("identity_front");
+            if (!reviewable.profile_photo || !input.profilePhotoConfirmed)
+              missing.push("profile_photo");
+          }
           if (missing.length) return { status: "missing_documents", missing };
           if (!input.legalNameConfirmed) return { status: "missing_documents", missing: [] };
 

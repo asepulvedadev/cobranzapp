@@ -241,6 +241,28 @@ describe("shared API contracts", () => {
     }
   });
 
+  it("allows legacy borrowers to keep only the basic dossier", () => {
+    const result = borrowerCreateRequestSchema.safeParse({
+      fullName: "Cliente Antiguo",
+      registrationType: "legacy",
+      country: "CO",
+      documentType: "CC",
+      documentNumber: "1234567890",
+      phone: "+57 300 111 2233",
+      whatsappPhone: null,
+      homeAddress: "Calle 1 # 2-3",
+      workAddress: "Carrera 4 # 5-6",
+      homeAddressConfirmed: true,
+      workAddressConfirmed: true,
+      profilePhotoObjectKey: null,
+      consentVersion: "borrower-dossier-v1",
+      consentEvidenceRef: "legacy-client-registration",
+      emergencyContacts: [],
+      documents: [],
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("only accepts address corrections after both addresses are confirmed", () => {
     const payload = {
       homeAddress: "Calle 10 # 20-30, Cúcuta",
@@ -255,7 +277,7 @@ describe("shared API contracts", () => {
     ).toBe(false);
   });
 
-  it("requires the front and selfie but keeps the back optional for identity review", () => {
+  it("requires the legal name and lets the server apply new-versus-legacy review rules", () => {
     const review = {
       decision: "reviewed" as const,
       notes: "La evidencia coincide con la ficha manual.",
@@ -267,6 +289,9 @@ describe("shared API contracts", () => {
     expect(borrowerReviewRequestSchema.safeParse(review).success).toBe(true);
     expect(
       borrowerReviewRequestSchema.safeParse({ ...review, profilePhotoConfirmed: false }).success,
+    ).toBe(true);
+    expect(
+      borrowerReviewRequestSchema.safeParse({ ...review, legalNameConfirmed: false }).success,
     ).toBe(false);
     expect(
       borrowerReviewRequestSchema.safeParse({
