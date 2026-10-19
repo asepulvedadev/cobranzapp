@@ -36,6 +36,7 @@
 
 .notification-modal {
   max-width: 600px;
+  color: var(--panel-dark);
 }
 
 .notification-heading {
