@@ -684,6 +684,56 @@ describe("borrower creation security", () => {
     expect(read).toHaveBeenCalledWith(objectKey);
   });
 
+  it("removes a quarantined borrower image when its database registration fails", async () => {
+    const tenantId = tenantOwner.memberships[0]?.tenantId ?? "";
+    const borrowerId = "193a2db4-2349-4a48-8833-746a2a334260";
+    const objectKey = `tenant/${tenantId}/borrowers/${borrowerId}/quarantine/orphan.bin`;
+    const quarantine = vi.fn(async () => ({
+      objectKey,
+      mediaType: "image/jpeg",
+      sizeBytes: 5,
+      sha256: "a".repeat(64),
+    }));
+    const remove = vi.fn(async () => undefined);
+    const addDocument = vi.fn(async () => {
+      throw new Error("DATABASE_WRITE_FAILED");
+    });
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => tenantOwner) },
+        borrowerService: { addDocument } as unknown as BorrowerService,
+        documentStorage: { quarantine, remove } as unknown as BorrowerDocumentStorage,
+      }),
+    );
+    apps.push(app);
+    const boundary = "borrower-document-upload-boundary";
+    const payload = Buffer.concat([
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="category"\r\n\r\nidentity\r\n`,
+      ),
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="side"\r\n\r\nfront\r\n`),
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="cedula.jpg"\r\nContent-Type: image/jpeg\r\n\r\n`,
+      ),
+      Buffer.from([0xff, 0xd8, 0xff, 0x00, 0x01]),
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/tenants/${tenantId}/borrowers/${borrowerId}/documents`,
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+        "content-type": `multipart/form-data; boundary=${boundary}`,
+      },
+      payload,
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(remove).toHaveBeenCalledWith(objectKey);
+  });
+
   it("requires recent reauthentication before creating a dossier", async () => {
     const create = vi.fn();
     const app = buildApp(

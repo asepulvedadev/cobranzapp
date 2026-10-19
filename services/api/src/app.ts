@@ -3824,16 +3824,21 @@ export function buildApp(dependencies: AppDependencies) {
         mediaType,
         bytes: fileBytes,
       });
-      const result = await dependencies.borrowerService.addDocument(
-        {
-          userId: session.user.id,
-          platformRole: session.user.platformRole,
-          tenantRole: membership.role,
-        },
-        params.data.tenantId,
-        params.data.borrowerId,
-        { ...stored, category, side, requestId: request.id },
-      );
+      const result = await dependencies.borrowerService
+        .addDocument(
+          {
+            userId: session.user.id,
+            platformRole: session.user.platformRole,
+            tenantRole: membership.role,
+          },
+          params.data.tenantId,
+          params.data.borrowerId,
+          { ...stored, category, side, requestId: request.id },
+        )
+        .catch(async (error: unknown) => {
+          await dependencies.documentStorage?.remove(stored.objectKey).catch(() => undefined);
+          throw error;
+        });
       if (result.status !== "created") {
         await dependencies.documentStorage.remove(stored.objectKey).catch(() => undefined);
       }
