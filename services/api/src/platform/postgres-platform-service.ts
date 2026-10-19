@@ -5,6 +5,8 @@ import {
   buildMembershipEntitlement,
   membershipCatalog,
   membershipCatalogVersion,
+  membershipExtraEmployeePriceCop,
+  membershipMonthlyPriceCop,
 } from "../memberships/catalog.js";
 import type {
   CompanyCreationCode,
@@ -14,6 +16,9 @@ import type {
   PlatformActivityDirectory,
   PlatformOverview,
   PlatformService,
+  PlatformSubscription,
+  PlatformSubscriptionDirectory,
+  PlatformSubscriptionMutationResult,
   PlatformUserDirectory,
   PlatformUserMembershipUpdateResult,
   PlatformUserStatusUpdateResult,
@@ -134,6 +139,7 @@ type PlatformUserRow = {
   active_memberships: string;
   subscription_count: string;
   available_subscriptions: string;
+  eligible_for_subscription: boolean;
   membership_plan: MembershipPlan | null;
   membership_activated_at: Date | null;
   active_sessions: string;
@@ -200,12 +206,98 @@ function mapPlatformUser(user: PlatformUserRow): PlatformUserDirectory["users"][
     activeMemberships: Number(user.active_memberships),
     subscriptionCount: Number(user.subscription_count),
     availableSubscriptions: Number(user.available_subscriptions),
+    eligibleForSubscription: user.eligible_for_subscription,
     membershipPlan: user.membership_plan,
     membershipActivatedAt: user.membership_activated_at?.toISOString() ?? null,
     activeSessions: Number(user.active_sessions),
     lastSeenAt: user.last_seen_at?.toISOString() ?? null,
     createdAt: user.created_at.toISOString(),
   };
+}
+
+type PlatformSubscriptionRow = {
+  id: string;
+  user_id: string;
+  owner_display_name: string;
+  owner_email: string;
+  membership_plan: MembershipPlan;
+  status: PlatformSubscription["status"];
+  billing_cycle: PlatformSubscription["billingCycle"];
+  amount_cop: string;
+  monthly_equivalent_cop: string;
+  current_period_start: string;
+  current_period_end: string;
+  auto_renew: boolean;
+  internal_notes: string | null;
+  consumed_at: Date | null;
+  consumed_tenant_id: string | null;
+  tenant_name: string | null;
+  tenant_slug: string | null;
+  additional_employee_seats: number | null;
+  activated_at: Date;
+  deactivated_at: Date | null;
+  updated_at: Date;
+};
+
+function mapPlatformSubscription(row: PlatformSubscriptionRow): PlatformSubscription {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    ownerDisplayName: row.owner_display_name,
+    ownerEmail: row.owner_email,
+    membershipPlan: row.membership_plan,
+    status: row.status,
+    billingCycle: row.billing_cycle,
+    amountCop: Number(row.amount_cop),
+    monthlyEquivalentCop: Number(row.monthly_equivalent_cop),
+    currentPeriodStart: row.current_period_start,
+    currentPeriodEnd: row.current_period_end,
+    autoRenew: row.auto_renew,
+    internalNotes: row.internal_notes,
+    consumedAt: row.consumed_at?.toISOString() ?? null,
+    tenantId: row.consumed_tenant_id,
+    tenantName: row.tenant_name,
+    tenantSlug: row.tenant_slug,
+    additionalEmployeeSeats: row.additional_employee_seats ?? 0,
+    isAvailable: row.status === "active" && row.consumed_at === null,
+    activatedAt: row.activated_at.toISOString(),
+    deactivatedAt: row.deactivated_at?.toISOString() ?? null,
+    updatedAt: row.updated_at.toISOString(),
+  };
+}
+
+const subscriptionSelect = `
+  SELECT subscription.id, subscription.user_id,
+         app_user.display_name AS owner_display_name,
+         app_user.email::text AS owner_email,
+         subscription.membership_plan, subscription.status,
+         subscription.billing_cycle, subscription.amount_cop,
+         CASE subscription.billing_cycle
+           WHEN 'yearly' THEN round(subscription.amount_cop::numeric / 12)::bigint
+           ELSE subscription.amount_cop
+         END + COALESCE(tenant.additional_employee_seats, 0) * ${membershipExtraEmployeePriceCop}
+           AS monthly_equivalent_cop,
+         subscription.current_period_start::text,
+         subscription.current_period_end::text,
+         subscription.auto_renew, subscription.internal_notes,
+         subscription.consumed_at, subscription.consumed_tenant_id,
+         tenant.display_name AS tenant_name, tenant.slug::text AS tenant_slug,
+         tenant.additional_employee_seats,
+         subscription.activated_at, subscription.deactivated_at,
+         subscription.updated_at
+    FROM user_memberships subscription
+    JOIN users app_user ON app_user.id = subscription.user_id
+    LEFT JOIN tenants tenant ON tenant.id = subscription.consumed_tenant_id`;
+
+async function readSubscription(
+  client: Pick<PoolClient, "query">,
+  subscriptionId: string,
+): Promise<PlatformSubscription | null> {
+  const result = await client.query<PlatformSubscriptionRow>(
+    `${subscriptionSelect} WHERE subscription.id = $1`,
+    [subscriptionId],
+  );
+  return result.rows[0] ? mapPlatformSubscription(result.rows[0]) : null;
 }
 
 function tenantSlugSeed(displayName: string) {
@@ -644,6 +736,23 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
                      WHERE subscription.user_id = app_user.id
                        AND subscription.status = 'active' AND subscription.consumed_at IS NULL
                   ) AS available_subscriptions,
+                  (
+                    app_user.platform_role IS NULL
+                    AND app_user.status = 'active'
+                    AND (
+                      EXISTS (
+                        SELECT 1 FROM tenant_memberships owner_membership
+                         WHERE owner_membership.user_id = app_user.id
+                           AND owner_membership.status = 'active'
+                           AND owner_membership.role = 'owner'
+                      )
+                      OR NOT EXISTS (
+                        SELECT 1 FROM tenant_memberships any_membership
+                         WHERE any_membership.user_id = app_user.id
+                           AND any_membership.status = 'active'
+                      )
+                    )
+                  ) AS eligible_for_subscription,
                   active_membership.membership_plan,
                   active_membership.activated_at AS membership_activated_at,
                   (
@@ -673,6 +782,329 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           users: result.rows.map(mapPlatformUser),
           pagination: { page, pageSize: query.pageSize, total, totalPages },
         } satisfies PlatformUserDirectory;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async listSubscriptions(actorUserId, query) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setPlatformContext(client, actorUserId);
+        const filter = `($1::text IS NULL OR app_user.display_name ILIKE '%' || $1 || '%'
+                         OR app_user.email::text ILIKE '%' || $1 || '%'
+                         OR tenant.display_name ILIKE '%' || $1 || '%')
+                        AND ($2::text IS NULL OR subscription.status = $2)
+                        AND ($3::text IS NULL OR subscription.membership_plan = $3)
+                        AND ($4::text IS NULL
+                          OR ($4 = 'available' AND subscription.status = 'active'
+                            AND subscription.consumed_at IS NULL)
+                          OR ($4 = 'assigned' AND subscription.consumed_at IS NOT NULL))`;
+        const parameters = [query.search, query.status, query.plan, query.assignment];
+        const countResult = await client.query<{ total: string }>(
+          `SELECT count(*) AS total
+             FROM user_memberships subscription
+             JOIN users app_user ON app_user.id = subscription.user_id
+             LEFT JOIN tenants tenant ON tenant.id = subscription.consumed_tenant_id
+            WHERE ${filter}`,
+          parameters,
+        );
+        const total = Number(countResult.rows[0]?.total ?? 0);
+        const totalPages = Math.max(1, Math.ceil(total / query.pageSize));
+        const page = Math.min(query.page, totalPages);
+        const offset = (page - 1) * query.pageSize;
+        const [directoryResult, metricsResult] = await Promise.all([
+          client.query<PlatformSubscriptionRow>(
+            `${subscriptionSelect}
+              WHERE ${filter}
+              ORDER BY subscription.updated_at DESC, subscription.id DESC
+              LIMIT $5 OFFSET $6`,
+            [...parameters, query.pageSize, offset],
+          ),
+          client.query<{
+            total: string;
+            active: string;
+            available: string;
+            assigned: string;
+            monthly_recurring_revenue_cop: string;
+            expiring_within_seven_days: string;
+          }>(
+            `SELECT count(*) AS total,
+                    count(*) FILTER (WHERE subscription.status = 'active') AS active,
+                    count(*) FILTER (
+                      WHERE subscription.status = 'active' AND subscription.consumed_at IS NULL
+                    ) AS available,
+                    count(*) FILTER (
+                      WHERE subscription.status = 'active' AND subscription.consumed_at IS NOT NULL
+                    ) AS assigned,
+                    COALESCE(sum(
+                      CASE
+                        WHEN subscription.status <> 'active' THEN 0
+                        WHEN subscription.billing_cycle = 'yearly'
+                          THEN round(subscription.amount_cop::numeric / 12)::bigint
+                        ELSE subscription.amount_cop
+                      END + CASE WHEN subscription.status = 'active'
+                        THEN COALESCE(tenant.additional_employee_seats, 0) * ${membershipExtraEmployeePriceCop} ELSE 0 END
+                    ), 0) AS monthly_recurring_revenue_cop,
+                    count(*) FILTER (
+                      WHERE subscription.status = 'active'
+                        AND subscription.current_period_end BETWEEN CURRENT_DATE AND CURRENT_DATE + 7
+                    ) AS expiring_within_seven_days
+               FROM user_memberships subscription
+               LEFT JOIN tenants tenant ON tenant.id = subscription.consumed_tenant_id`,
+          ),
+        ]);
+        const metrics = metricsResult.rows[0];
+        await client.query("COMMIT");
+        return {
+          metrics: {
+            total: Number(metrics?.total ?? 0),
+            active: Number(metrics?.active ?? 0),
+            available: Number(metrics?.available ?? 0),
+            assigned: Number(metrics?.assigned ?? 0),
+            monthlyRecurringRevenueCop: Number(metrics?.monthly_recurring_revenue_cop ?? 0),
+            expiringWithinSevenDays: Number(metrics?.expiring_within_seven_days ?? 0),
+          },
+          subscriptions: directoryResult.rows.map(mapPlatformSubscription),
+          pagination: { page, pageSize: query.pageSize, total, totalPages },
+        } satisfies PlatformSubscriptionDirectory;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async createSubscription(actorUserId, input, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setPlatformContext(client, actorUserId);
+        const userResult = await client.query<{
+          id: string;
+          platform_role: "developer" | null;
+          status: "active" | "disabled";
+          eligible_for_subscription: boolean;
+        }>(
+          `SELECT app_user.id, app_user.platform_role, app_user.status,
+                  (
+                    EXISTS (
+                      SELECT 1 FROM tenant_memberships owner_membership
+                       WHERE owner_membership.user_id = app_user.id
+                         AND owner_membership.status = 'active'
+                         AND owner_membership.role = 'owner'
+                    )
+                    OR NOT EXISTS (
+                      SELECT 1 FROM tenant_memberships any_membership
+                       WHERE any_membership.user_id = app_user.id
+                         AND any_membership.status = 'active'
+                    )
+                  ) AS eligible_for_subscription
+             FROM users app_user
+            WHERE app_user.id = $1
+            FOR UPDATE`,
+          [input.userId],
+        );
+        const user = userResult.rows[0];
+        if (!user) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies PlatformSubscriptionMutationResult;
+        }
+        if (user.platform_role === "developer" || user.status !== "active") {
+          await client.query("ROLLBACK");
+          return { status: "protected" } satisfies PlatformSubscriptionMutationResult;
+        }
+        if (!user.eligible_for_subscription) {
+          await client.query("ROLLBACK");
+          return { status: "invalid_owner" } satisfies PlatformSubscriptionMutationResult;
+        }
+        const inserted = await client.query<{ id: string }>(
+          `INSERT INTO user_memberships (
+             user_id, membership_plan, assigned_by, billing_cycle, amount_cop,
+             current_period_start, current_period_end, auto_renew, internal_notes
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           RETURNING id`,
+          [
+            input.userId,
+            input.membershipPlan,
+            actorUserId,
+            input.billingCycle,
+            input.amountCop,
+            input.currentPeriodStart,
+            input.currentPeriodEnd,
+            input.autoRenew,
+            input.internalNotes || null,
+          ],
+        );
+        const subscriptionId = inserted.rows[0]?.id;
+        if (!subscriptionId) throw new Error("Subscription insert did not return a record");
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES (NULL, $1, 'subscription.created', 'subscription', $2, $3,
+                   jsonb_build_object(
+                     'ownerUserId', $4::text, 'membershipPlan', $5::text,
+                     'billingCycle', $6::text, 'amountCop', $7::bigint,
+                     'currentPeriodStart', $8::text, 'currentPeriodEnd', $9::text,
+                     'autoRenew', $10::boolean
+                   ))`,
+          [
+            actorUserId,
+            subscriptionId,
+            requestId,
+            input.userId,
+            input.membershipPlan,
+            input.billingCycle,
+            input.amountCop,
+            input.currentPeriodStart,
+            input.currentPeriodEnd,
+            input.autoRenew,
+          ],
+        );
+        const subscription = await readSubscription(client, subscriptionId);
+        if (!subscription) throw new Error("Created subscription could not be read");
+        await client.query("COMMIT");
+        return { status: "updated", subscription } satisfies PlatformSubscriptionMutationResult;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async updateSubscription(actorUserId, subscriptionId, input, requestId) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await setPlatformContext(client, actorUserId);
+        const currentResult = await client.query<{
+          membership_plan: MembershipPlan;
+          status: PlatformSubscription["status"];
+          consumed_tenant_id: string | null;
+        }>(
+          `SELECT membership_plan, status, consumed_tenant_id
+             FROM user_memberships WHERE id = $1 FOR UPDATE`,
+          [subscriptionId],
+        );
+        const current = currentResult.rows[0];
+        if (!current) {
+          await client.query("ROLLBACK");
+          return { status: "not_found" } satisfies PlatformSubscriptionMutationResult;
+        }
+
+        if (current.consumed_tenant_id && current.membership_plan !== input.membershipPlan) {
+          await lockTenantMembershipCapacity(client, current.consumed_tenant_id);
+          const tenantResult = await client.query<{
+            additional_employee_seats: number;
+            membership_entitlement_version: number;
+          }>(
+            `SELECT additional_employee_seats, membership_entitlement_version
+               FROM tenants WHERE id = $1 FOR UPDATE`,
+            [current.consumed_tenant_id],
+          );
+          const tenant = tenantResult.rows[0];
+          if (!tenant) {
+            await client.query("ROLLBACK");
+            return { status: "not_found" } satisfies PlatformSubscriptionMutationResult;
+          }
+          const employeeSeatLimit =
+            membershipCatalog[input.membershipPlan].includedEmployeeSeats +
+            tenant.additional_employee_seats;
+          const activeEmployeeResult = await client.query<{ count: string }>(
+            `SELECT count(*) AS count FROM tenant_memberships
+              WHERE tenant_id = $1 AND status = 'active' AND role IN ('supervisor', 'collector')`,
+            [current.consumed_tenant_id],
+          );
+          const activeEmployeeSeats = Number(activeEmployeeResult.rows[0]?.count ?? 0);
+          if (activeEmployeeSeats > employeeSeatLimit) {
+            await client.query("ROLLBACK");
+            return {
+              status: "seat_limit_conflict",
+              activeEmployeeSeats,
+              employeeSeatLimit,
+            } satisfies PlatformSubscriptionMutationResult;
+          }
+          const nextVersion = tenant.membership_entitlement_version + 1;
+          await client.query(
+            `UPDATE tenants
+                SET membership_plan = $2, membership_entitlement_version = $3, updated_at = now()
+              WHERE id = $1`,
+            [current.consumed_tenant_id, input.membershipPlan, nextVersion],
+          );
+          await insertEntitlementVersion(client, {
+            actorUserId,
+            additionalEmployeeSeats: tenant.additional_employee_seats,
+            membershipPlan: input.membershipPlan,
+            requestId,
+            tenantId: current.consumed_tenant_id,
+            version: nextVersion,
+          });
+        }
+
+        await client.query(
+          `UPDATE user_memberships
+              SET membership_plan = $2, status = $3, billing_cycle = $4,
+                  amount_cop = $5, current_period_start = $6, current_period_end = $7,
+                  auto_renew = $8, internal_notes = $9,
+                  deactivated_at = CASE WHEN $3 = 'active' THEN NULL ELSE COALESCE(deactivated_at, now()) END,
+                  updated_at = now()
+            WHERE id = $1`,
+          [
+            subscriptionId,
+            input.membershipPlan,
+            input.status,
+            input.billingCycle,
+            input.amountCop,
+            input.currentPeriodStart,
+            input.currentPeriodEnd,
+            input.autoRenew,
+            input.internalNotes || null,
+          ],
+        );
+        if (current.consumed_tenant_id && input.status !== "active") {
+          await client.query(
+            `UPDATE tenants SET status = 'suspended', updated_at = now()
+              WHERE id = $1 AND status = 'active'`,
+            [current.consumed_tenant_id],
+          );
+        }
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+           VALUES ($1, $2, 'subscription.updated', 'subscription', $3, $4,
+                   jsonb_build_object(
+                     'fromPlan', $5::text, 'toPlan', $6::text,
+                     'fromStatus', $7::text, 'toStatus', $8::text,
+                     'billingCycle', $9::text, 'amountCop', $10::bigint,
+                     'currentPeriodStart', $11::text, 'currentPeriodEnd', $12::text,
+                     'autoRenew', $13::boolean
+                   ))`,
+          [
+            current.consumed_tenant_id,
+            actorUserId,
+            subscriptionId,
+            requestId,
+            current.membership_plan,
+            input.membershipPlan,
+            current.status,
+            input.status,
+            input.billingCycle,
+            input.amountCop,
+            input.currentPeriodStart,
+            input.currentPeriodEnd,
+            input.autoRenew,
+          ],
+        );
+        const subscription = await readSubscription(client, subscriptionId);
+        if (!subscription) throw new Error("Updated subscription could not be read");
+        await client.query("COMMIT");
+        return { status: "updated", subscription } satisfies PlatformSubscriptionMutationResult;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -804,6 +1236,7 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             activeMemberships: 0,
             subscriptionCount: 0,
             availableSubscriptions: 0,
+            eligibleForSubscription: true,
             membershipPlan: null,
             membershipActivatedAt: null,
             activeSessions: 0,
@@ -1100,6 +1533,12 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
             tenantId,
             version: nextVersion,
           });
+          await client.query(
+            `UPDATE user_memberships
+                SET membership_plan = $2, updated_at = now()
+              WHERE consumed_tenant_id = $1 AND status = 'active'`,
+            [tenantId, membershipPlan],
+          );
           await client.query(
             `INSERT INTO audit_events
                (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
@@ -1477,10 +1916,18 @@ export function createPostgresPlatformService(pool: Pool): PlatformService {
           membership_plan: MembershipPlan;
           activated_at: Date;
         }>(
-          `INSERT INTO user_memberships (user_id, membership_plan, assigned_by)
-           VALUES ($1, $2, $3)
+          `INSERT INTO user_memberships (
+             user_id, membership_plan, assigned_by, amount_cop,
+             current_period_start, current_period_end
+           )
+           VALUES ($1, $2, $3, $4, CURRENT_DATE, (CURRENT_DATE + INTERVAL '1 month')::date)
            RETURNING id, membership_plan, activated_at`,
-          [userId, input.membershipPlan, actorUserId],
+          [
+            userId,
+            input.membershipPlan,
+            actorUserId,
+            membershipMonthlyPriceCop[input.membershipPlan],
+          ],
         );
         const membership = inserted.rows[0];
         if (!membership) throw new Error("User membership insert did not return a record");

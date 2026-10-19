@@ -65,6 +65,31 @@ const proEntitlement = {
   prioritySupport: false,
 };
 
+const platformSubscription = {
+  id: "963341cc-1bf6-471c-8505-b93a9e5b741e",
+  userId: tenantOwner.id,
+  ownerDisplayName: tenantOwner.displayName,
+  ownerEmail: tenantOwner.email,
+  membershipPlan: "pro" as const,
+  status: "active" as const,
+  billingCycle: "monthly" as const,
+  amountCop: 150_000,
+  monthlyEquivalentCop: 150_000,
+  currentPeriodStart: "2026-10-01",
+  currentPeriodEnd: "2026-11-01",
+  autoRenew: true,
+  internalNotes: null,
+  consumedAt: null,
+  tenantId: null,
+  tenantName: null,
+  tenantSlug: null,
+  additionalEmployeeSeats: 0,
+  isAvailable: true,
+  activatedAt: "2026-10-01T00:00:00.000Z",
+  deactivatedAt: null,
+  updatedAt: "2026-10-01T00:00:00.000Z",
+};
+
 function dependencies(overrides?: {
   authService?: Partial<AuthService>;
   borrowerService?: BorrowerService;
@@ -176,6 +201,46 @@ function dependencies(overrides?: {
     listUsers: vi.fn(async (_actor, query) => ({
       users: [],
       pagination: { page: query.page, pageSize: query.pageSize, total: 0, totalPages: 1 },
+    })),
+    listSubscriptions: vi.fn(async (_actor, query) => ({
+      metrics: {
+        total: 1,
+        active: 1,
+        available: 1,
+        assigned: 0,
+        monthlyRecurringRevenueCop: 150_000,
+        expiringWithinSevenDays: 0,
+      },
+      subscriptions: [platformSubscription],
+      pagination: { page: query.page, pageSize: query.pageSize, total: 1, totalPages: 1 },
+    })),
+    createSubscription: vi.fn(async (_actor, input) => ({
+      status: "updated" as const,
+      subscription: {
+        ...platformSubscription,
+        userId: input.userId,
+        membershipPlan: input.membershipPlan,
+        billingCycle: input.billingCycle,
+        amountCop: input.amountCop,
+        currentPeriodStart: input.currentPeriodStart,
+        currentPeriodEnd: input.currentPeriodEnd,
+        autoRenew: input.autoRenew,
+        internalNotes: input.internalNotes,
+      },
+    })),
+    updateSubscription: vi.fn(async (_actor, _subscriptionId, input) => ({
+      status: "updated" as const,
+      subscription: {
+        ...platformSubscription,
+        membershipPlan: input.membershipPlan,
+        status: input.status,
+        billingCycle: input.billingCycle,
+        amountCop: input.amountCop,
+        currentPeriodStart: input.currentPeriodStart,
+        currentPeriodEnd: input.currentPeriodEnd,
+        autoRenew: input.autoRenew,
+        internalNotes: input.internalNotes,
+      },
     })),
     createTenant: vi.fn(async (_actor, input) => ({
       id: "5c58269f-ce16-4250-82e2-c0c16621b0fb",
@@ -2016,6 +2081,99 @@ describe("developer platform", () => {
       developer.id,
       userId,
       { membershipPlan: "ultra" },
+      expect.any(String),
+    );
+  });
+
+  it("lists subscriptions with commercial filters and metrics", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/platform/subscriptions?status=active&plan=pro&assignment=available&page=2&pageSize=10&q=propietario",
+      headers: { cookie: "cobranzapp_session=session-token" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      metrics: { active: 1, monthlyRecurringRevenueCop: 150_000 },
+      subscriptions: [{ id: platformSubscription.id, isAvailable: true }],
+    });
+    expect(deps.platformService.listSubscriptions).toHaveBeenCalledWith(developer.id, {
+      search: "propietario",
+      status: "active",
+      plan: "pro",
+      assignment: "available",
+      page: 2,
+      pageSize: 10,
+    });
+  });
+
+  it("creates a manually billed owner subscription", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const payload = {
+      userId: tenantOwner.id,
+      membershipPlan: "ultra",
+      billingCycle: "yearly",
+      amountCop: 3_600_000,
+      currentPeriodStart: "2026-10-19",
+      currentPeriodEnd: "2027-10-19",
+      autoRenew: false,
+      internalNotes: "Pago confirmado por transferencia",
+    };
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/platform/subscriptions",
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload,
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      subscription: { membershipPlan: "ultra", billingCycle: "yearly", amountCop: 3_600_000 },
+    });
+    expect(deps.platformService.createSubscription).toHaveBeenCalledWith(
+      developer.id,
+      payload,
+      expect.any(String),
+    );
+  });
+
+  it("updates the subscription lifecycle from the developer console", async () => {
+    const deps = dependencies();
+    const app = buildApp(deps);
+    apps.push(app);
+    const payload = {
+      membershipPlan: "pro",
+      status: "suspended",
+      billingCycle: "monthly",
+      amountCop: 150_000,
+      currentPeriodStart: "2026-10-01",
+      currentPeriodEnd: "2026-11-01",
+      autoRenew: false,
+      internalNotes: "Pago pendiente",
+    };
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/v1/platform/subscriptions/${platformSubscription.id}`,
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      subscription: { status: "suspended", internalNotes: "Pago pendiente" },
+    });
+    expect(deps.platformService.updateSubscription).toHaveBeenCalledWith(
+      developer.id,
+      platformSubscription.id,
+      payload,
       expect.any(String),
     );
   });

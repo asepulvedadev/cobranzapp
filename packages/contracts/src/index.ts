@@ -291,6 +291,7 @@ export const platformUserSchema = z.object({
   activeMemberships: z.number().int().nonnegative(),
   subscriptionCount: z.number().int().nonnegative(),
   availableSubscriptions: z.number().int().nonnegative(),
+  eligibleForSubscription: z.boolean(),
   membershipPlan: membershipPlanSchema.nullable(),
   membershipActivatedAt: z.iso.datetime().nullable(),
   activeSessions: z.number().int().nonnegative(),
@@ -325,6 +326,95 @@ export const platformUserMembershipUpdateRequestSchema = z.object({
 export const platformUserMembershipUpdateResponseSchema = z.object({
   membershipPlan: membershipPlanSchema,
   activatedAt: z.iso.datetime(),
+});
+
+export const platformSubscriptionStatusSchema = z.enum([
+  "active",
+  "suspended",
+  "expired",
+  "cancelled",
+]);
+
+export const platformSubscriptionBillingCycleSchema = z.enum(["monthly", "yearly"]);
+
+export const platformSubscriptionSchema = z.object({
+  id: z.uuid(),
+  userId: z.uuid(),
+  ownerDisplayName: z.string().min(1),
+  ownerEmail: z.email(),
+  membershipPlan: membershipPlanSchema,
+  status: platformSubscriptionStatusSchema,
+  billingCycle: platformSubscriptionBillingCycleSchema,
+  amountCop: z.number().int().nonnegative(),
+  monthlyEquivalentCop: z.number().int().nonnegative(),
+  currentPeriodStart: z.iso.date(),
+  currentPeriodEnd: z.iso.date(),
+  autoRenew: z.boolean(),
+  internalNotes: z.string().nullable(),
+  consumedAt: z.iso.datetime().nullable(),
+  tenantId: z.uuid().nullable(),
+  tenantName: z.string().nullable(),
+  tenantSlug: z.string().nullable(),
+  additionalEmployeeSeats: z.number().int().nonnegative(),
+  isAvailable: z.boolean(),
+  activatedAt: z.iso.datetime(),
+  deactivatedAt: z.iso.datetime().nullable(),
+  updatedAt: z.iso.datetime(),
+});
+
+export const platformSubscriptionDirectoryQuerySchema = z.object({
+  q: z.string().trim().max(80).optional(),
+  status: platformSubscriptionStatusSchema.optional(),
+  plan: membershipPlanSchema.optional(),
+  assignment: z.enum(["available", "assigned"]).optional(),
+  ...pageQueryFields,
+});
+
+export const platformSubscriptionDirectorySchema = z.object({
+  metrics: z.object({
+    total: z.number().int().nonnegative(),
+    active: z.number().int().nonnegative(),
+    available: z.number().int().nonnegative(),
+    assigned: z.number().int().nonnegative(),
+    monthlyRecurringRevenueCop: z.number().int().nonnegative(),
+    expiringWithinSevenDays: z.number().int().nonnegative(),
+  }),
+  subscriptions: z.array(platformSubscriptionSchema),
+  pagination: platformPaginationSchema,
+});
+
+const subscriptionWriteFields = {
+  membershipPlan: membershipPlanSchema,
+  billingCycle: platformSubscriptionBillingCycleSchema,
+  amountCop: z.number().int().min(0).max(1_000_000_000_000),
+  currentPeriodStart: z.iso.date(),
+  currentPeriodEnd: z.iso.date(),
+  autoRenew: z.boolean(),
+  internalNotes: z.string().trim().max(500).nullable().default(null),
+};
+
+export const platformSubscriptionCreateRequestSchema = z
+  .object({
+    userId: z.uuid(),
+    ...subscriptionWriteFields,
+  })
+  .refine((value) => value.currentPeriodEnd >= value.currentPeriodStart, {
+    message: "La fecha final debe ser igual o posterior a la fecha inicial.",
+    path: ["currentPeriodEnd"],
+  });
+
+export const platformSubscriptionUpdateRequestSchema = z
+  .object({
+    ...subscriptionWriteFields,
+    status: platformSubscriptionStatusSchema,
+  })
+  .refine((value) => value.currentPeriodEnd >= value.currentPeriodStart, {
+    message: "La fecha final debe ser igual o posterior a la fecha inicial.",
+    path: ["currentPeriodEnd"],
+  });
+
+export const platformSubscriptionResponseSchema = z.object({
+  subscription: platformSubscriptionSchema,
 });
 
 export const platformOwnerCreatedResponseSchema = z.object({
@@ -1466,6 +1556,18 @@ export type PlatformUserDirectory = z.infer<typeof platformUserDirectorySchema>;
 export type PlatformUserStatusUpdateRequest = z.infer<typeof platformUserStatusUpdateRequestSchema>;
 export type PlatformUserMembershipUpdateRequest = z.infer<
   typeof platformUserMembershipUpdateRequestSchema
+>;
+export type PlatformSubscriptionStatus = z.infer<typeof platformSubscriptionStatusSchema>;
+export type PlatformSubscriptionBillingCycle = z.infer<
+  typeof platformSubscriptionBillingCycleSchema
+>;
+export type PlatformSubscription = z.infer<typeof platformSubscriptionSchema>;
+export type PlatformSubscriptionDirectory = z.infer<typeof platformSubscriptionDirectorySchema>;
+export type PlatformSubscriptionCreateRequest = z.infer<
+  typeof platformSubscriptionCreateRequestSchema
+>;
+export type PlatformSubscriptionUpdateRequest = z.infer<
+  typeof platformSubscriptionUpdateRequestSchema
 >;
 export type PlatformSystemStatus = z.infer<typeof platformSystemStatusSchema>;
 export type SupportAccessStatus = z.infer<typeof supportAccessStatusSchema>;

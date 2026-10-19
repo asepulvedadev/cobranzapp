@@ -27,6 +27,9 @@ import {
   platformActivityQuerySchema,
   platformMembershipEntitlementUpdateRequestSchema,
   platformMembershipPlanUpdateRequestSchema,
+  platformSubscriptionCreateRequestSchema,
+  platformSubscriptionDirectoryQuerySchema,
+  platformSubscriptionUpdateRequestSchema,
   platformTenantDirectoryQuerySchema,
   platformTenantStatusUpdateRequestSchema,
   platformUserDirectoryQuerySchema,
@@ -122,6 +125,7 @@ const verificationNetworkConsentParamsSchema = z.object({
 });
 const sessionIdParamsSchema = z.object({ sessionId: z.uuid() });
 const platformUserParamsSchema = z.object({ userId: z.uuid() });
+const platformSubscriptionParamsSchema = z.object({ subscriptionId: z.uuid() });
 const invitationTokenParamsSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{40,60}$/) });
 const invitationAcceptanceSchema = z.object({
   username: z
@@ -1116,6 +1120,160 @@ export function buildApp(dependencies: AppDependencies) {
       page: parsed.data.page,
       pageSize: parsed.data.pageSize,
     });
+  });
+
+  app.get("/v1/platform/subscriptions", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const parsed = platformSubscriptionDirectoryQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_SUBSCRIPTION_FILTERS",
+        "Revisa los filtros de suscripciones.",
+        request.id,
+      );
+    }
+    const listSubscriptions = dependencies.platformService.listSubscriptions;
+    if (!listSubscriptions) {
+      return sendError(
+        reply,
+        501,
+        "SUBSCRIPTIONS_UNAVAILABLE",
+        "La administración de suscripciones no está habilitada.",
+        request.id,
+      );
+    }
+    return listSubscriptions(session.user.id, {
+      search: parsed.data.q || null,
+      status: parsed.data.status ?? null,
+      plan: parsed.data.plan ?? null,
+      assignment: parsed.data.assignment ?? null,
+      page: parsed.data.page,
+      pageSize: parsed.data.pageSize,
+    });
+  });
+
+  app.post("/v1/platform/subscriptions", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const body = platformSubscriptionCreateRequestSchema.safeParse(request.body);
+    if (!body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_SUBSCRIPTION",
+        body.error.issues[0]?.message ?? "Revisa los datos de la suscripción.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const createSubscription = dependencies.platformService.createSubscription;
+    if (!createSubscription) {
+      return sendError(
+        reply,
+        501,
+        "SUBSCRIPTIONS_UNAVAILABLE",
+        "La administración de suscripciones no está habilitada.",
+        request.id,
+      );
+    }
+    const result = await createSubscription(session.user.id, body.data, request.id);
+    if (result.status === "not_found") {
+      return sendError(reply, 404, "USER_NOT_FOUND", "El propietario no existe.", request.id);
+    }
+    if (result.status === "protected") {
+      return sendError(
+        reply,
+        409,
+        "SUBSCRIPTION_OWNER_PROTECTED",
+        "La cuenta está deshabilitada o pertenece al desarrollo de la plataforma.",
+        request.id,
+      );
+    }
+    if (result.status === "invalid_owner") {
+      return sendError(
+        reply,
+        409,
+        "SUBSCRIPTION_OWNER_INVALID",
+        "La cuenta pertenece al personal de una empresa y no puede recibir suscripciones.",
+        request.id,
+      );
+    }
+    if (result.status !== "updated") {
+      return sendError(
+        reply,
+        409,
+        "SUBSCRIPTION_CREATE_REJECTED",
+        "No fue posible crear la suscripción.",
+        request.id,
+      );
+    }
+    return reply.code(201).send({ subscription: result.subscription });
+  });
+
+  app.patch("/v1/platform/subscriptions/:subscriptionId", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session || !requireDeveloper(session.user, request, reply)) return;
+    const params = platformSubscriptionParamsSchema.safeParse(request.params);
+    const body = platformSubscriptionUpdateRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_SUBSCRIPTION",
+        "Revisa el plan, estado, valor y periodo de la suscripción.",
+        request.id,
+      );
+    }
+    if (!(await requireRecentReauthentication(session, request, reply))) return;
+    const updateSubscription = dependencies.platformService.updateSubscription;
+    if (!updateSubscription) {
+      return sendError(
+        reply,
+        501,
+        "SUBSCRIPTIONS_UNAVAILABLE",
+        "La administración de suscripciones no está habilitada.",
+        request.id,
+      );
+    }
+    const result = await updateSubscription(
+      session.user.id,
+      params.data.subscriptionId,
+      body.data,
+      request.id,
+    );
+    if (result.status === "not_found") {
+      return sendError(
+        reply,
+        404,
+        "SUBSCRIPTION_NOT_FOUND",
+        "La suscripción no existe.",
+        request.id,
+      );
+    }
+    if (result.status === "seat_limit_conflict") {
+      return sendError(
+        reply,
+        409,
+        "EMPLOYEE_SEAT_LIMIT_CONFLICT",
+        `La empresa tiene ${result.activeEmployeeSeats} empleados activos y el plan permitiría ${result.employeeSeatLimit}.`,
+        request.id,
+      );
+    }
+    if (result.status !== "updated") {
+      return sendError(
+        reply,
+        409,
+        "SUBSCRIPTION_UPDATE_REJECTED",
+        "No fue posible actualizar la suscripción.",
+        request.id,
+      );
+    }
+    return reply.send({ subscription: result.subscription });
   });
 
   app.patch("/v1/platform/users/:userId/status", async (request, reply) => {

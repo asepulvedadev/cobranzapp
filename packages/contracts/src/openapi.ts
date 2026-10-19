@@ -57,6 +57,11 @@ import {
   platformMembershipPlanUpdateResponseSchema,
   platformOverviewSchema,
   platformOwnerCreatedResponseSchema,
+  platformSubscriptionCreateRequestSchema,
+  platformSubscriptionDirectoryQuerySchema,
+  platformSubscriptionDirectorySchema,
+  platformSubscriptionResponseSchema,
+  platformSubscriptionUpdateRequestSchema,
   platformSupportAccessResponseSchema,
   platformSystemStatusSchema,
   platformTenantDirectoryQuerySchema,
@@ -162,6 +167,11 @@ const documentedSchemas = {
   PlatformMembershipPlanUpdateResponse: platformMembershipPlanUpdateResponseSchema,
   PlatformOverview: platformOverviewSchema,
   PlatformOwnerCreatedResponse: platformOwnerCreatedResponseSchema,
+  PlatformSubscriptionCreateRequest: platformSubscriptionCreateRequestSchema,
+  PlatformSubscriptionDirectory: platformSubscriptionDirectorySchema,
+  PlatformSubscriptionDirectoryQuery: platformSubscriptionDirectoryQuerySchema,
+  PlatformSubscriptionResponse: platformSubscriptionResponseSchema,
+  PlatformSubscriptionUpdateRequest: platformSubscriptionUpdateRequestSchema,
   PlatformSupportAccessResponse: platformSupportAccessResponseSchema,
   PlatformSystemStatus: platformSystemStatusSchema,
   PlatformTenantDirectory: platformTenantDirectorySchema,
@@ -2263,6 +2273,110 @@ export function createOpenApiDocument(version: string) {
             "400": errorResponses["400"],
             "401": errorResponses["401"],
             "403": errorResponses["403"],
+          },
+        },
+      },
+      "/v1/platform/subscriptions": {
+        get: {
+          tags: ["Plataforma"],
+          operationId: "listPlatformSubscriptions",
+          security: sessionSecurity,
+          parameters: [
+            { name: "q", in: "query", schema: { type: "string", maxLength: 80 } },
+            {
+              name: "status",
+              in: "query",
+              schema: {
+                type: "string",
+                enum: ["active", "suspended", "expired", "cancelled"],
+              },
+            },
+            {
+              name: "plan",
+              in: "query",
+              schema: { type: "string", enum: ["pro", "ultra"] },
+            },
+            {
+              name: "assignment",
+              in: "query",
+              schema: { type: "string", enum: ["available", "assigned"] },
+            },
+            { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+            {
+              name: "pageSize",
+              in: "query",
+              schema: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+            },
+          ],
+          responses: {
+            "200": response(
+              "Directorio y resumen comercial de suscripciones.",
+              schemaReference("PlatformSubscriptionDirectory"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+          },
+        },
+        post: {
+          tags: ["Plataforma"],
+          operationId: "createPlatformSubscription",
+          security: sessionSecurity,
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("PlatformSubscriptionCreateRequest")),
+          },
+          responses: {
+            "201": response("Suscripción creada.", schemaReference("PlatformSubscriptionResponse")),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("El propietario no existe.", schemaReference("ApiError")),
+            "409": response(
+              "La cuenta no puede recibir suscripciones.",
+              schemaReference("ApiError"),
+            ),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
+          },
+        },
+      },
+      "/v1/platform/subscriptions/{subscriptionId}": {
+        patch: {
+          tags: ["Plataforma"],
+          operationId: "updatePlatformSubscription",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "subscriptionId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("PlatformSubscriptionUpdateRequest")),
+          },
+          responses: {
+            "200": response(
+              "Suscripción actualizada.",
+              schemaReference("PlatformSubscriptionResponse"),
+            ),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("La suscripción no existe.", schemaReference("ApiError")),
+            "409": response(
+              "El cambio entra en conflicto con el uso actual.",
+              schemaReference("ApiError"),
+            ),
+            "428": response(
+              "Confirmación reciente de contraseña requerida.",
+              schemaReference("ApiError"),
+            ),
           },
         },
       },

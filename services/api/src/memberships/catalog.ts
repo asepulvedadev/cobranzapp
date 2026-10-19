@@ -3,6 +3,11 @@ import type { MembershipEntitlement, MembershipPlan } from "@cobranzapp/contract
 export type { MembershipEntitlement, MembershipPlan } from "@cobranzapp/contracts";
 
 export const membershipCatalogVersion = 1;
+export const membershipMonthlyPriceCop: Record<MembershipPlan, number> = {
+  pro: 150_000,
+  ultra: 300_000,
+};
+export const membershipExtraEmployeePriceCop = 20_000;
 
 export const membershipCatalog: Record<
   MembershipPlan,

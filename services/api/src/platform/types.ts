@@ -5,6 +5,11 @@ import type {
   OwnerSubscriptionSummary,
   PlatformActivityDirectory,
   PlatformOverview,
+  PlatformSubscription,
+  PlatformSubscriptionCreateRequest,
+  PlatformSubscriptionDirectory,
+  PlatformSubscriptionStatus,
+  PlatformSubscriptionUpdateRequest,
   PlatformTenantDirectory,
   PlatformTenantStatus,
   PlatformUser,
@@ -23,6 +28,11 @@ export type {
   PlatformActivityDirectory,
   PlatformAuditActivity,
   PlatformOverview,
+  PlatformSubscription,
+  PlatformSubscriptionCreateRequest,
+  PlatformSubscriptionDirectory,
+  PlatformSubscriptionStatus,
+  PlatformSubscriptionUpdateRequest,
   PlatformUser,
   PlatformUserDirectory,
   PlatformUserMembershipUpdateRequest,
@@ -63,6 +73,22 @@ export type PlatformUserStatusUpdateResult =
     }
   | { status: "protected" }
   | { status: "not_found" };
+
+export type PlatformSubscriptionDirectoryQuery = {
+  search: string | null;
+  status: PlatformSubscriptionStatus | null;
+  plan: MembershipPlan | null;
+  assignment: "available" | "assigned" | null;
+  page: number;
+  pageSize: number;
+};
+
+export type PlatformSubscriptionMutationResult =
+  | { status: "updated"; subscription: PlatformSubscription }
+  | { status: "protected" }
+  | { status: "not_found" }
+  | { status: "invalid_owner" }
+  | { status: "seat_limit_conflict"; activeEmployeeSeats: number; employeeSeatLimit: number };
 
 export type PlatformUserMembershipUpdateResult =
   | { status: "updated"; membershipPlan: MembershipPlan; activatedAt: string }
@@ -136,6 +162,21 @@ export interface PlatformService {
   ): Promise<PlatformActivityDirectory>;
   listTenants(actorUserId: string, query: TenantDirectoryQuery): Promise<TenantDirectory>;
   listUsers(actorUserId: string, query: PlatformUserDirectoryQuery): Promise<PlatformUserDirectory>;
+  listSubscriptions?(
+    actorUserId: string,
+    query: PlatformSubscriptionDirectoryQuery,
+  ): Promise<PlatformSubscriptionDirectory>;
+  createSubscription?(
+    actorUserId: string,
+    input: PlatformSubscriptionCreateRequest,
+    requestId: string,
+  ): Promise<PlatformSubscriptionMutationResult>;
+  updateSubscription?(
+    actorUserId: string,
+    subscriptionId: string,
+    input: PlatformSubscriptionUpdateRequest,
+    requestId: string,
+  ): Promise<PlatformSubscriptionMutationResult>;
   systemStatus(actorUserId: string): Promise<PlatformDatabaseStatus>;
   createTenant(
     actorUserId: string,

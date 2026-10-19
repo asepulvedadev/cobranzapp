@@ -111,6 +111,15 @@ describe("OpenAPI contract", () => {
     expect(document.paths["/v1/platform/tenants"].get.operationId).toBe("listPlatformTenants");
     expect(document.paths["/v1/platform/tenants"].post.operationId).toBe("createPlatformTenant");
     expect(document.paths["/v1/platform/users"].get.operationId).toBe("listPlatformUsers");
+    expect(document.paths["/v1/platform/subscriptions"].get.operationId).toBe(
+      "listPlatformSubscriptions",
+    );
+    expect(document.paths["/v1/platform/subscriptions"].post.operationId).toBe(
+      "createPlatformSubscription",
+    );
+    expect(document.paths["/v1/platform/subscriptions/{subscriptionId}"].patch.operationId).toBe(
+      "updatePlatformSubscription",
+    );
     expect(document.paths["/v1/platform/users/{userId}/status"].patch.operationId).toBe(
       "updatePlatformUserStatus",
     );
