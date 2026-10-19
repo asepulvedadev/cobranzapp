@@ -149,7 +149,8 @@ fi
   api node dist/database/migrate.js
 # Named volumes are created as root by Docker. Prepare the private document store
 # for the non-root API user before the application starts writing profile photos.
-"${compose[@]}" run --rm --no-deps --user 0 api sh -lc \
+"${compose[@]}" run --rm --no-deps --user 0 \
+  --cap-add CHOWN --cap-add FOWNER --cap-add DAC_OVERRIDE api sh -lc \
   'mkdir -p /var/lib/cobranzapp/documents && chown -R 10001:10001 /var/lib/cobranzapp/documents && chmod 750 /var/lib/cobranzapp/documents'
 "${compose[@]}" up -d --wait --remove-orphans
 ./smoke-test.sh http://127.0.0.1:13200 http://127.0.0.1:18200
