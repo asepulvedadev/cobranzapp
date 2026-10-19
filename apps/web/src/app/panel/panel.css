@@ -2288,6 +2288,110 @@ html:has(.panel-shell) {
   font-size: 15px;
 }
 
+.collection-filter {
+  display: flex;
+  overflow-x: auto;
+  gap: 8px;
+  margin: 0;
+  padding: 2px 0 10px;
+  border: 0;
+  scrollbar-width: none;
+}
+
+.collection-filter legend {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.collection-filter::-webkit-scrollbar {
+  display: none;
+}
+
+.collection-filter button {
+  display: inline-flex;
+  min-width: max-content;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 13px;
+  border: 1px solid #d4dcd6;
+  border-radius: 999px;
+  background: #fff;
+  color: #435048;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.collection-filter button b {
+  display: grid;
+  min-width: 22px;
+  height: 22px;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #edf1ee;
+  font-size: 10px;
+}
+
+.collection-filter button.is-active {
+  border-color: var(--tenant-brand-primary, #15372b);
+  background: var(--tenant-brand-primary, #15372b);
+  color: var(--tenant-brand-accent, #fff);
+}
+
+.collection-filter button.is-active b {
+  background: rgb(255 255 255 / 0.24);
+}
+
+.loan-application-item.loan-application-overdue {
+  border-color: #e9aaa4;
+  box-shadow: inset 4px 0 0 var(--panel-danger);
+}
+
+.loan-application-item.loan-application-due {
+  border-color: #e3c36f;
+  box-shadow: inset 4px 0 0 #c28a00;
+}
+
+.collection-status-overdue {
+  background: #feeceb;
+  color: #9d2018;
+}
+
+.collection-status-today {
+  background: #fff3cf;
+  color: #785500;
+}
+
+.collection-empty {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 28px 16px;
+  border: 1px dashed #cdd6d0;
+  border-radius: 12px;
+  color: var(--panel-muted);
+  text-align: center;
+}
+
+.collection-empty svg {
+  color: var(--panel-green);
+}
+
+.collection-empty strong {
+  color: var(--panel-dark);
+}
+
+.collection-empty span {
+  font-size: 12px;
+}
+
 .payment-capture-form,
 .client-link-panel,
 .payment-receipt-success {
@@ -2301,6 +2405,19 @@ html:has(.panel-shell) {
   padding: 1.15rem;
   border-radius: 1rem;
   background: color-mix(in srgb, var(--tenant-brand-primary, #15372b) 7%, white);
+}
+
+.payment-capture-modal {
+  max-width: 560px;
+}
+
+.payment-capture-summary > div {
+  display: grid;
+  gap: 2px;
+}
+
+.payment-capture-summary > div b {
+  font-size: 1rem;
 }
 
 .payment-capture-summary span,
@@ -2328,6 +2445,7 @@ html:has(.panel-shell) {
 }
 
 .payment-method-picker label {
+  position: relative;
   display: grid;
   gap: 0.2rem;
   min-height: 5.4rem;
@@ -2335,6 +2453,14 @@ html:has(.panel-shell) {
   border: 1px solid #d8dfdb;
   border-radius: 0.9rem;
   cursor: pointer;
+}
+
+.payment-method-picker label > svg {
+  color: #5d6962;
+}
+
+.payment-method-picker label.is-selected > svg {
+  color: var(--tenant-brand-primary, #15372b);
 }
 
 .payment-method-picker label.is-selected {
@@ -2364,6 +2490,10 @@ html:has(.panel-shell) {
   cursor: pointer;
 }
 
+.payment-proof-picker > svg {
+  color: var(--tenant-brand-primary, #15372b);
+}
+
 .payment-proof-picker input {
   position: absolute;
   width: 1px;
@@ -2379,6 +2509,35 @@ html:has(.panel-shell) {
   gap: 1rem;
   padding: 0.8rem 0;
   border-top: 1px solid #e3e8e5;
+}
+
+.payment-overdue-warning,
+.payment-confirmation-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.payment-overdue-warning {
+  width: fit-content;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: #feeceb;
+  color: #9d2018;
+}
+
+.payment-confirmation-note {
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: #eef8f2;
+  color: #205e3a;
+}
+
+.payment-confirmation-note svg {
+  flex: 0 0 auto;
 }
 
 .payment-receipt-success {

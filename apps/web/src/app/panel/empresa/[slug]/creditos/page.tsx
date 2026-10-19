@@ -14,7 +14,7 @@ export default async function CreditsPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ cliente?: string; nuevo?: string }>;
+  searchParams: Promise<{ cliente?: string; nuevo?: string; cobros?: string }>;
 }) {
   const { slug } = await params;
   const query = await searchParams;
@@ -39,6 +39,17 @@ export default async function CreditsPage({
     "--tenant-brand-primary": overview.settings.primaryColor,
     "--tenant-brand-accent": overview.settings.accentColor,
   } as CSSProperties;
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: overview.tenant.timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const initialCollectionView = ["todos", "vencidos", "hoy", "proximos", "por-aprobar"].includes(
+    query.cobros ?? "",
+  )
+    ? query.cobros
+    : "todos";
 
   return (
     <div className="dashboard-page tenant-subpage" style={brandStyle}>
@@ -84,6 +95,8 @@ export default async function CreditsPage({
             }
             products={products}
             tenantId={overview.tenant.id}
+            today={today}
+            initialCollectionView={initialCollectionView}
           />
         </>
       )}

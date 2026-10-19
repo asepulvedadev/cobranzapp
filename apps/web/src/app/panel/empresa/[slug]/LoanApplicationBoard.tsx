@@ -1,5 +1,6 @@
 "use client";
 
+import { Bank, Camera, CheckCircle, Money, WarningCircle } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { fetchWithTimeout } from "../../../../lib/fetch-with-timeout";
@@ -19,6 +20,58 @@ import type {
 import { formatApiError } from "../../api-error";
 import { Modal } from "../../Modal";
 import { useSensitiveFetch } from "../../ReauthenticationProvider";
+import { prepareImageUpload } from "./image-upload";
+
+type CollectionView = "todos" | "vencidos" | "hoy" | "proximos" | "por-aprobar";
+
+const collectionViewLabels: Record<CollectionView, string> = {
+  todos: "Todos",
+  vencidos: "Vencidos",
+  hoy: "Hoy",
+  proximos: "Próximos",
+  "por-aprobar": "Por aprobar",
+};
+
+function normalizeCollectionView(value?: string): CollectionView {
+  return value && value in collectionViewLabels ? (value as CollectionView) : "todos";
+}
+
+function collectionPriority(application: LoanApplication, today: string) {
+  if ((application.overdueInstallments ?? 0) > 0) return 0;
+  if (application.status === "active" && application.nextDueDate === today) return 1;
+  if (["submitted", "under_review"].includes(application.status)) return 2;
+  if (application.status === "active") return 3;
+  return 4;
+}
+
+function matchesCollectionView(application: LoanApplication, view: CollectionView, today: string) {
+  if (view === "todos") return true;
+  if (view === "vencidos") return (application.overdueInstallments ?? 0) > 0;
+  if (view === "hoy") {
+    return (
+      application.status === "active" &&
+      (application.overdueInstallments ?? 0) === 0 &&
+      application.nextDueDate === today
+    );
+  }
+  if (view === "proximos") {
+    return (
+      application.status === "active" &&
+      (application.overdueInstallments ?? 0) === 0 &&
+      Boolean(application.nextDueDate && application.nextDueDate > today)
+    );
+  }
+  return ["submitted", "under_review"].includes(application.status);
+}
+
+function displayDate(value: string | null | undefined) {
+  if (!value) return "Sin fecha";
+  return new Intl.DateTimeFormat("es-CO", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T12:00:00.000Z`));
+}
 
 const statusLabels: Record<LoanApplication["status"], string> = {
   draft: "Borrador",
@@ -59,6 +112,8 @@ export function LoanApplicationBoard({
   actorRole,
   initialBorrowerId,
   openCreate = false,
+  today,
+  initialCollectionView,
 }: {
   tenantId: string;
   borrowers: Borrower[];
@@ -68,6 +123,8 @@ export function LoanApplicationBoard({
   actorRole: "owner" | "supervisor" | "collector";
   initialBorrowerId?: string;
   openCreate?: boolean;
+  today: string;
+  initialCollectionView?: string;
 }) {
   const router = useRouter();
   const sensitiveFetch = useSensitiveFetch();
@@ -81,6 +138,8 @@ export function LoanApplicationBoard({
   const [paymentConfirmation, setPaymentConfirmation] = useState<LoanApplication | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer">("cash");
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
+  const [paymentProofBusy, setPaymentProofBusy] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
   const [paymentReceipt, setPaymentReceipt] = useState<
     (LoanPayment & { borrowerName: string; whatsappPhone: string }) | null
   >(null);
@@ -96,6 +155,9 @@ export function LoanApplicationBoard({
   const [requestedPrincipal, setRequestedPrincipal] = useState("");
   const [frequency, setFrequency] = useState<LoanProduct["paymentFrequency"]>("daily");
   const [termCount, setTermCount] = useState(30);
+  const [collectionView, setCollectionView] = useState<CollectionView>(() =>
+    normalizeCollectionView(initialCollectionView),
+  );
   const selectedBorrower = borrowers.find(
     (borrower) =>
       borrower.id === initialBorrowerId &&
@@ -118,6 +180,33 @@ export function LoanApplicationBoard({
   };
 
   const selectedProduct = availableProducts.find((product) => product.id === productId) ?? null;
+  const collectionCounts: Record<CollectionView, number> = {
+    todos: applications.length,
+    vencidos: applications.filter((application) => (application.overdueInstallments ?? 0) > 0)
+      .length,
+    hoy: applications.filter(
+      (application) =>
+        application.status === "active" &&
+        (application.overdueInstallments ?? 0) === 0 &&
+        application.nextDueDate === today,
+    ).length,
+    proximos: applications.filter(
+      (application) =>
+        application.status === "active" &&
+        (application.overdueInstallments ?? 0) === 0 &&
+        Boolean(application.nextDueDate && application.nextDueDate > today),
+    ).length,
+    "por-aprobar": applications.filter((application) =>
+      ["submitted", "under_review"].includes(application.status),
+    ).length,
+  };
+  const visibleApplications = [...applications]
+    .filter((application) => matchesCollectionView(application, collectionView, today))
+    .sort((left, right) => {
+      const priority = collectionPriority(left, today) - collectionPriority(right, today);
+      if (priority !== 0) return priority;
+      return (left.nextDueDate ?? "9999-12-31").localeCompare(right.nextDueDate ?? "9999-12-31");
+    });
 
   function clearPreview() {
     setSchedulePreview(null);
@@ -212,9 +301,14 @@ export function LoanApplicationBoard({
   }
 
   async function recordPayment(application: LoanApplication) {
+    if (paymentMethod === "transfer" && !paymentProof) {
+      setPaymentError("Adjunta la imagen de la transferencia antes de confirmar.");
+      return;
+    }
     setPaymentApplicationId(application.id);
     setMessage("");
     setIsError(false);
+    setPaymentError("");
     const form = new FormData();
     form.set("installmentNumber", String(application.paidInstallments + 1));
     form.set("amount", application.nextPaymentAmount ?? application.installmentAmount);
@@ -228,8 +322,7 @@ export function LoanApplicationBoard({
       },
     ).catch(() => null);
     if (!response?.ok) {
-      setMessage(await errorMessage(response));
-      setIsError(true);
+      setPaymentError(await errorMessage(response));
       setPaymentApplicationId(null);
       return;
     }
@@ -245,8 +338,27 @@ export function LoanApplicationBoard({
     setPaymentMethod("cash");
     setPaymentProof(null);
     setMessage(`Pago de la cuota ${application.paidInstallments + 1} registrado.`);
+    setPaymentConfirmation(null);
     setPaymentApplicationId(null);
+    window.dispatchEvent(new Event("cobranzapp:collection-changed"));
     router.refresh();
+  }
+
+  async function selectPaymentProof(file: File | null) {
+    setPaymentError("");
+    if (!file) {
+      setPaymentProof(null);
+      return;
+    }
+    setPaymentProofBusy(true);
+    try {
+      setPaymentProof(await prepareImageUpload(file));
+    } catch {
+      setPaymentProof(null);
+      setPaymentError("No pudimos preparar esa imagen. Elige otra foto desde el celular.");
+    } finally {
+      setPaymentProofBusy(false);
+    }
   }
 
   async function openPaymentHistory(application: LoanApplication) {
@@ -341,7 +453,7 @@ export function LoanApplicationBoard({
       <div className="card-heading">
         <div>
           <span className="panel-eyebrow">Operación</span>
-          <h2>Créditos activos</h2>
+          <h2>Cobros y créditos</h2>
         </div>
         <div className="directory-header-actions">
           <span>{applications.length} registrados</span>
@@ -353,111 +465,152 @@ export function LoanApplicationBoard({
           : "Los créditos que creas se aprueban de inmediato; las solicitudes de cobradores requieren tu aprobación."}
       </p>
       {applications.length ? (
+        <fieldset className="collection-filter">
+          <legend>Filtrar cobros</legend>
+          {(Object.keys(collectionViewLabels) as CollectionView[])
+            .filter((view) => view !== "por-aprobar" || canReview)
+            .map((view) => (
+              <button
+                aria-pressed={collectionView === view}
+                className={collectionView === view ? "is-active" : ""}
+                key={view}
+                onClick={() => setCollectionView(view)}
+                type="button"
+              >
+                <span>{collectionViewLabels[view]}</span>
+                <b>{collectionCounts[view]}</b>
+              </button>
+            ))}
+        </fieldset>
+      ) : null}
+      {applications.length ? (
         <div className="loan-application-list">
-          {applications.map((application) => (
-            <article className="loan-application-item" key={application.id}>
-              <div className="loan-application-item-heading">
-                <div>
-                  <strong>{application.borrowerName}</strong>
-                  <small>
-                    {application.loanProductName} · {formatCop(application.requestedPrincipal)} ·{" "}
-                    {formatPercentage(application.nominalRate)}% total ·{" "}
-                    {frequencyLabels[application.paymentFrequency]}
-                    {" · "}
-                    {application.paidInstallments}/{application.requestedTermCount} cuotas
-                  </small>
-                  <small>
-                    Próxima cuota: {application.nextDueDate ?? "Sin fecha"}
-                    {(application.overdueInstallments ?? 0) > 0
-                      ? ` · ${application.overdueInstallments} vencida(s)`
-                      : " · Al día"}
-                  </small>
+          {visibleApplications.map((application) => {
+            const overdue = application.overdueInstallments ?? 0;
+            const dueToday =
+              application.status === "active" && overdue === 0 && application.nextDueDate === today;
+            return (
+              <article
+                className={`loan-application-item${overdue ? " loan-application-overdue" : dueToday ? " loan-application-due" : ""}`}
+                key={application.id}
+              >
+                <div className="loan-application-item-heading">
+                  <div>
+                    <strong>{application.borrowerName}</strong>
+                    <small>
+                      {application.loanProductName} · {formatCop(application.requestedPrincipal)} ·{" "}
+                      {formatPercentage(application.nominalRate)}% total ·{" "}
+                      {frequencyLabels[application.paymentFrequency]}
+                      {" · "}
+                      {application.paidInstallments}/{application.requestedTermCount} cuotas
+                    </small>
+                    <small>
+                      Próxima cuota: {application.nextDueDate ?? "Sin fecha"}
+                      {(application.overdueInstallments ?? 0) > 0
+                        ? ` · ${application.overdueInstallments} vencida(s)`
+                        : " · Al día"}
+                    </small>
+                  </div>
+                  <span
+                    className={`status ${overdue ? "collection-status-overdue" : dueToday ? "collection-status-today" : `status-${application.status}`}`}
+                  >
+                    {overdue
+                      ? `${overdue} ${overdue === 1 ? "vencida" : "vencidas"}`
+                      : dueToday
+                        ? "Cobrar hoy"
+                        : statusLabels[application.status]}
+                  </span>
                 </div>
-                <span className={`status status-${application.status}`}>
-                  {statusLabels[application.status]}
-                </span>
-              </div>
-              {application.purpose ? <p>{application.purpose}</p> : null}
-              {application.status === "draft" ? (
-                <button
-                  disabled={reviewingApplicationId !== null}
-                  onClick={() => void submitForReview(application)}
-                  type="button"
-                >
-                  {reviewingApplicationId === application.id ? "Enviando…" : "Enviar a revisión"}
-                </button>
-              ) : null}
-              {["submitted", "under_review"].includes(application.status) && canReview ? (
-                <button
-                  className="primary-action"
-                  disabled={approvingApplicationId !== null}
-                  onClick={() => setApprovalConfirmation(application)}
-                  type="button"
-                >
-                  {approvingApplicationId === application.id ? "Aprobando…" : "Revisar y aprobar"}
-                </button>
-              ) : null}
-              {application.status === "submitted" && !canReview ? (
-                <p className="form-help">Pendiente de aprobación por propietario o supervisor.</p>
-              ) : null}
-              {application.status === "active" ? (
-                <div className="loan-application-actions">
+                {application.purpose ? <p>{application.purpose}</p> : null}
+                {application.status === "draft" ? (
                   <button
-                    disabled={paymentApplicationId !== null}
-                    onClick={() => {
-                      setPaymentMethod("cash");
-                      setPaymentProof(null);
-                      setPaymentConfirmation(application);
-                    }}
+                    disabled={reviewingApplicationId !== null}
+                    onClick={() => void submitForReview(application)}
                     type="button"
                   >
-                    {paymentApplicationId === application.id
-                      ? "Registrando…"
-                      : `Registrar cuota ${application.paidInstallments + 1}`}
+                    {reviewingApplicationId === application.id ? "Enviando…" : "Enviar a revisión"}
                   </button>
-                  {application.renewalEligible === true ? (
-                    <form onSubmit={(event) => void renewApplication(event, application)}>
-                      <label>
-                        Dinero adicional para el cliente (COP)
-                        <input
-                          inputMode="numeric"
-                          name="excessAmount"
-                          onInput={(event) => {
-                            event.currentTarget.value = formatCopInput(event.currentTarget.value);
-                          }}
-                          pattern="[0-9.]+"
-                          required
-                        />
-                      </label>
-                      <button disabled={renewingApplicationId !== null} type="submit">
-                        {renewingApplicationId === application.id
-                          ? "Renovando…"
-                          : "Renovar con nuevo interés"}
-                      </button>
-                      <small>
-                        El nuevo crédito será el capital pendiente más este valor y cobrará el
-                        interés completo otra vez.
-                      </small>
-                    </form>
-                  ) : (
-                    <p className="renewal-progress-note">
-                      Renovación disponible al pagar 40 % del total con intereses. Lleva{" "}
-                      {renewalProgress(application).toFixed(2)} %.
-                    </p>
-                  )}
-                </div>
-              ) : null}
-              {application.paidInstallments > 0 ? (
-                <button
-                  className="loan-payment-history-button"
-                  onClick={() => void openPaymentHistory(application)}
-                  type="button"
-                >
-                  Ver pagos y comprobantes
-                </button>
-              ) : null}
-            </article>
-          ))}
+                ) : null}
+                {["submitted", "under_review"].includes(application.status) && canReview ? (
+                  <button
+                    className="primary-action"
+                    disabled={approvingApplicationId !== null}
+                    onClick={() => setApprovalConfirmation(application)}
+                    type="button"
+                  >
+                    {approvingApplicationId === application.id ? "Aprobando…" : "Revisar y aprobar"}
+                  </button>
+                ) : null}
+                {application.status === "submitted" && !canReview ? (
+                  <p className="form-help">Pendiente de aprobación por propietario o supervisor.</p>
+                ) : null}
+                {application.status === "active" ? (
+                  <div className="loan-application-actions">
+                    <button
+                      disabled={paymentApplicationId !== null}
+                      onClick={() => {
+                        setPaymentMethod("cash");
+                        setPaymentProof(null);
+                        setPaymentError("");
+                        setPaymentConfirmation(application);
+                      }}
+                      type="button"
+                    >
+                      {paymentApplicationId === application.id
+                        ? "Registrando…"
+                        : `Cobrar cuota ${application.paidInstallments + 1}`}
+                    </button>
+                    {application.renewalEligible === true ? (
+                      <form onSubmit={(event) => void renewApplication(event, application)}>
+                        <label>
+                          Dinero adicional para el cliente (COP)
+                          <input
+                            inputMode="numeric"
+                            name="excessAmount"
+                            onInput={(event) => {
+                              event.currentTarget.value = formatCopInput(event.currentTarget.value);
+                            }}
+                            pattern="[0-9.]+"
+                            required
+                          />
+                        </label>
+                        <button disabled={renewingApplicationId !== null} type="submit">
+                          {renewingApplicationId === application.id
+                            ? "Renovando…"
+                            : "Renovar con nuevo interés"}
+                        </button>
+                        <small>
+                          El nuevo crédito será el capital pendiente más este valor y cobrará el
+                          interés completo otra vez.
+                        </small>
+                      </form>
+                    ) : (
+                      <p className="renewal-progress-note">
+                        Renovación disponible al pagar 40 % del total con intereses. Lleva{" "}
+                        {renewalProgress(application).toFixed(2)} %.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+                {application.paidInstallments > 0 ? (
+                  <button
+                    className="loan-payment-history-button"
+                    onClick={() => void openPaymentHistory(application)}
+                    type="button"
+                  >
+                    Ver pagos y comprobantes
+                  </button>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+      ) : null}
+      {applications.length && !visibleApplications.length ? (
+        <div className="collection-empty">
+          <CheckCircle aria-hidden="true" size={28} weight="fill" />
+          <strong>No hay pendientes en este filtro</strong>
+          <span>Selecciona otro estado para consultar los demás créditos.</span>
         </div>
       ) : null}
       {!availableProducts.length ? (
@@ -626,30 +779,46 @@ export function LoanApplicationBoard({
         </p>
       ) : null}
       {paymentConfirmation ? (
-        <Modal onClose={() => setPaymentConfirmation(null)} title="Registrar pago">
+        <Modal
+          className="payment-capture-modal"
+          onClose={() => {
+            if (!paymentApplicationId) setPaymentConfirmation(null);
+          }}
+          title="Confirmar cobro"
+        >
           <form
             className="payment-capture-form"
             onSubmit={(event) => {
               event.preventDefault();
-              const application = paymentConfirmation;
-              setPaymentConfirmation(null);
-              void recordPayment(application);
+              void recordPayment(paymentConfirmation);
             }}
           >
             <header className="payment-capture-summary">
-              <span>
+              <div>
+                <span>Cliente</span>
+                <b>{paymentConfirmation.borrowerName}</b>
+              </div>
+              <small>
                 Cuota {paymentConfirmation.paidInstallments + 1} de{" "}
-                {paymentConfirmation.requestedTermCount}
-              </span>
+                {paymentConfirmation.requestedTermCount} · vence{" "}
+                {displayDate(paymentConfirmation.nextDueDate)}
+              </small>
               <strong>
                 {formatCop(
                   paymentConfirmation.nextPaymentAmount ?? paymentConfirmation.installmentAmount,
                 )}
               </strong>
-              <small>{paymentConfirmation.borrowerName}</small>
+              {(paymentConfirmation.overdueInstallments ?? 0) > 0 ? (
+                <span className="payment-overdue-warning">
+                  <WarningCircle aria-hidden="true" size={18} weight="fill" />
+                  {paymentConfirmation.overdueInstallments} cuota
+                  {paymentConfirmation.overdueInstallments === 1 ? "" : "s"} vencida
+                  {paymentConfirmation.overdueInstallments === 1 ? "" : "s"}
+                </span>
+              ) : null}
             </header>
             <fieldset className="payment-method-picker">
-              <legend>¿Cómo pagó?</legend>
+              <legend>¿Cómo recibiste el pago?</legend>
               <label className={paymentMethod === "cash" ? "is-selected" : ""}>
                 <input
                   checked={paymentMethod === "cash"}
@@ -660,6 +829,7 @@ export function LoanApplicationBoard({
                   }}
                   type="radio"
                 />
+                <Money aria-hidden="true" size={24} weight="fill" />
                 <strong>Efectivo</strong>
                 <small>Dinero recibido en persona</small>
               </label>
@@ -670,6 +840,7 @@ export function LoanApplicationBoard({
                   onChange={() => setPaymentMethod("transfer")}
                   type="radio"
                 />
+                <Bank aria-hidden="true" size={24} weight="fill" />
                 <strong>Transferencia</strong>
                 <small>Pago por banco o billetera</small>
               </label>
@@ -677,15 +848,24 @@ export function LoanApplicationBoard({
             {paymentMethod === "transfer" ? (
               <label className="payment-proof-picker">
                 <span>
-                  Imagen de la transferencia <small>Opcional</small>
+                  Comprobante de transferencia <small>Obligatorio</small>
                 </span>
+                <Camera aria-hidden="true" size={26} weight="regular" />
                 <input
-                  accept="image/jpeg,image/png,image/webp"
-                  capture="environment"
-                  onChange={(event) => setPaymentProof(event.target.files?.[0] ?? null)}
+                  accept="image/*"
+                  disabled={paymentProofBusy || paymentApplicationId !== null}
+                  onChange={(event) => void selectPaymentProof(event.target.files?.[0] ?? null)}
+                  required
                   type="file"
                 />
-                <strong>{paymentProof ? paymentProof.name : "Tomar foto o elegir imagen"}</strong>
+                <strong>
+                  {paymentProofBusy
+                    ? "Preparando imagen…"
+                    : paymentProof
+                      ? paymentProof.name
+                      : "Tomar foto o elegir de la galería"}
+                </strong>
+                {paymentProof ? <small>Imagen lista para guardar con este pago.</small> : null}
               </label>
             ) : null}
             <div className="payment-capture-balance">
@@ -703,12 +883,32 @@ export function LoanApplicationBoard({
                 )}
               </strong>
             </div>
+            <div className="payment-confirmation-note">
+              <CheckCircle aria-hidden="true" size={20} weight="fill" />
+              <span>Se guardarán la fecha, el cobrador, la forma de pago y el comprobante.</span>
+            </div>
+            {paymentError ? (
+              <p className="tenant-form-message form-message-error" role="alert">
+                {paymentError}
+              </p>
+            ) : null}
             <div className="borrower-step-actions">
-              <button onClick={() => setPaymentConfirmation(null)} type="button">
+              <button
+                disabled={paymentApplicationId !== null}
+                onClick={() => setPaymentConfirmation(null)}
+                type="button"
+              >
                 Cancelar
               </button>
-              <button disabled={paymentApplicationId !== null} type="submit">
-                {paymentApplicationId ? "Registrando…" : "Confirmar pago"}
+              <button
+                disabled={
+                  paymentApplicationId !== null ||
+                  paymentProofBusy ||
+                  (paymentMethod === "transfer" && !paymentProof)
+                }
+                type="submit"
+              >
+                {paymentApplicationId ? "Guardando pago…" : "Confirmar y generar recibo"}
               </button>
             </div>
           </form>
