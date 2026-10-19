@@ -10,6 +10,7 @@ const ownerUrl = process.env.TEST_MIGRATION_DATABASE_URL;
 describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
   const developerId = crypto.randomUUID();
   const tenantId = crypto.randomUUID();
+  const secondTenantId = crypto.randomUUID();
   const suffix = Date.now().toString(36);
   const documentNumber = Date.now().toString().slice(-10);
   const formattedDocumentNumber = `${documentNumber.slice(0, 1)}.${documentNumber.slice(1, 4)}.${documentNumber.slice(4, 7)}.${documentNumber.slice(7)}`;
@@ -40,15 +41,30 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
        VALUES ($1, $2, 'owner', 'active', $2)`,
       [tenantId, developerId],
     );
+    await ownerPool.query(
+      `INSERT INTO tenants (id, slug, display_name, created_by, membership_plan)
+       VALUES ($1, $2, 'Second Borrower Tenant', $3, 'pro')`,
+      [secondTenantId, `borrower-tenant-second-${suffix}`, developerId],
+    );
+    await ownerPool.query(
+      `INSERT INTO tenant_memberships (tenant_id, user_id, role, status, created_by)
+       VALUES ($1, $2, 'owner', 'active', $2)`,
+      [secondTenantId, developerId],
+    );
   });
 
   afterAll(async () => {
     if (ownerPool) {
+      await ownerPool.query("DELETE FROM audit_events WHERE tenant_id = $1", [secondTenantId]);
       await ownerPool.query("DELETE FROM audit_events WHERE tenant_id = $1", [tenantId]);
       await ownerPool.query("DELETE FROM loan_applications WHERE tenant_id = $1", [tenantId]);
       await ownerPool.query("DELETE FROM loan_products WHERE tenant_id = $1", [tenantId]);
       await ownerPool.query("DELETE FROM tenant_memberships WHERE tenant_id = $1", [tenantId]);
+      await ownerPool.query("DELETE FROM tenant_memberships WHERE tenant_id = $1", [
+        secondTenantId,
+      ]);
       await ownerPool.query("DELETE FROM tenants WHERE id = $1", [tenantId]);
+      await ownerPool.query("DELETE FROM tenants WHERE id = $1", [secondTenantId]);
       await ownerPool.query("DELETE FROM users WHERE id = $1", [developerId]);
       await ownerPool.end();
     }
@@ -124,6 +140,60 @@ describe.skipIf(!runtimeUrl || !ownerUrl)("PostgreSQL borrower dossier", () => {
     await expect(
       service.verifyShared(actor, tenantId, documentNumber, "borrower-adverse-verification-test"),
     ).resolves.toMatchObject({ registered: true, payerRating: "low", negativeReport: true });
+    const riskEntry = await service.createRiskEntry(actor, tenantId, {
+      documentNumber: formattedDocumentNumber,
+      category: "payment_default",
+      note: "Incumplimiento respaldado por el expediente interno.",
+      requestId: "verification-risk-create-test",
+    });
+    expect(riskEntry).toMatchObject({
+      status: "created",
+      entry: { documentLast4: documentNumber.slice(-4), status: "active" },
+    });
+    expect(JSON.stringify(riskEntry)).not.toContain(documentNumber);
+    await expect(service.listRiskEntries(actor, tenantId)).resolves.toHaveLength(1);
+    await expect(
+      service.verifyShared(actor, tenantId, documentNumber, "verification-risk-lookup-test"),
+    ).resolves.toMatchObject({ riskReportCount: 1, negativeReport: true });
+    if (riskEntry.status !== "created") throw new Error("Risk entry was not created");
+    await expect(
+      service.resolveRiskEntry(
+        actor,
+        tenantId,
+        riskEntry.entry.id,
+        "verification-risk-resolve-test",
+      ),
+    ).resolves.toMatchObject({ status: "resolved", entry: { status: "resolved" } });
+    await expect(
+      service.verifyShared(actor, tenantId, documentNumber, "verification-risk-resolved-test"),
+    ).resolves.toMatchObject({ riskReportCount: 0 });
+    const unknownDocumentNumber = `${documentNumber.slice(0, -1)}${
+      documentNumber.endsWith("9") ? "8" : "9"
+    }`;
+    await expect(
+      service.createRiskEntry(actor, tenantId, {
+        documentNumber: unknownDocumentNumber,
+        category: "unreachable",
+        note: "No fue posible localizar a la persona después de varios intentos.",
+        requestId: "verification-risk-without-borrower-test",
+      }),
+    ).resolves.toMatchObject({ status: "created" });
+    await expect(
+      service.verifyShared(actor, tenantId, unknownDocumentNumber, "verification-risk-only-test"),
+    ).resolves.toMatchObject({
+      registered: false,
+      payerRating: "low",
+      negativeReport: true,
+      riskReportCount: 1,
+    });
+    await expect(
+      service.verifyShared(
+        actor,
+        secondTenantId,
+        unknownDocumentNumber,
+        "verification-risk-tenant-isolation-test",
+      ),
+    ).resolves.toMatchObject({ riskReportCount: 0 });
     await expect(service.get(actor, tenantId, created.borrower.id)).resolves.toMatchObject({
       id: created.borrower.id,
       phone: "+57 300 222 3344",

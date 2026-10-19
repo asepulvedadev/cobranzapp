@@ -1505,10 +1505,44 @@ export const sharedClientVerificationSchema = z.object({
   activeCreditCount: z.number().int().nonnegative(),
   payerRating: z.enum(["good", "regular", "low", "no_data"]),
   negativeReport: z.boolean(),
+  riskReportCount: z.number().int().nonnegative(),
+  lastRiskReportedAt: z.iso.datetime().nullable(),
 });
 
 export const sharedClientVerificationResponseSchema = z.object({
   verification: sharedClientVerificationSchema,
+});
+
+export const verificationRiskCategorySchema = z.enum([
+  "repeated_late_payment",
+  "payment_default",
+  "unreachable",
+]);
+
+export const verificationRiskEntryCreateRequestSchema = z.object({
+  documentNumber: z.string().trim().min(4).max(32),
+  category: verificationRiskCategorySchema,
+  note: z.string().trim().min(10).max(500),
+});
+
+export const verificationRiskEntrySchema = z.object({
+  id: z.uuid(),
+  documentLast4: z.string().length(4),
+  category: verificationRiskCategorySchema,
+  note: z.string().min(10).max(500),
+  status: z.enum(["active", "resolved", "expired"]),
+  createdByName: z.string().min(1),
+  createdAt: z.iso.datetime(),
+  expiresAt: z.iso.datetime(),
+  resolvedAt: z.iso.datetime().nullable(),
+});
+
+export const verificationRiskEntryResponseSchema = z.object({
+  entry: verificationRiskEntrySchema,
+});
+
+export const verificationRiskDirectorySchema = z.object({
+  entries: z.array(verificationRiskEntrySchema),
 });
 
 export type ServiceStatus = z.infer<typeof serviceStatusSchema>;
@@ -1669,3 +1703,8 @@ export type Borrower = z.infer<typeof borrowerSchema>;
 export type BorrowerDirectory = z.infer<typeof borrowerDirectorySchema>;
 export type SharedClientVerificationRequest = z.infer<typeof sharedClientVerificationRequestSchema>;
 export type SharedClientVerification = z.infer<typeof sharedClientVerificationSchema>;
+export type VerificationRiskCategory = z.infer<typeof verificationRiskCategorySchema>;
+export type VerificationRiskEntryCreateRequest = z.infer<
+  typeof verificationRiskEntryCreateRequestSchema
+>;
+export type VerificationRiskEntry = z.infer<typeof verificationRiskEntrySchema>;

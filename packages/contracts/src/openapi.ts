@@ -110,6 +110,9 @@ import {
   verificationNetworkCorrectionResponseSchema,
   verificationNetworkQueryRequestSchema,
   verificationNetworkQueryResponseSchema,
+  verificationRiskDirectorySchema,
+  verificationRiskEntryCreateRequestSchema,
+  verificationRiskEntryResponseSchema,
 } from "./index.js";
 
 type OpenApiSchema = Record<string, unknown>;
@@ -223,6 +226,9 @@ const documentedSchemas = {
   VerificationNetworkCorrectionResponse: verificationNetworkCorrectionResponseSchema,
   VerificationNetworkQueryRequest: verificationNetworkQueryRequestSchema,
   VerificationNetworkQueryResponse: verificationNetworkQueryResponseSchema,
+  VerificationRiskDirectory: verificationRiskDirectorySchema,
+  VerificationRiskEntryCreateRequest: verificationRiskEntryCreateRequestSchema,
+  VerificationRiskEntryResponse: verificationRiskEntryResponseSchema,
   OrganizationStatusUpdateRequest: organizationStatusUpdateRequestSchema,
   ReauthenticationRequest: reauthenticationRequestSchema,
   ReauthenticationResponse: reauthenticationResponseSchema,
@@ -1956,6 +1962,83 @@ export function createOpenApiDocument(version: string) {
             "404": response("El cliente no existe.", schemaReference("ApiError")),
             "409": response("Faltan documentos aceptados.", schemaReference("ApiError")),
             "428": response("Reautenticación requerida.", schemaReference("ApiError")),
+            "503": response("El módulo no está habilitado.", schemaReference("ApiError")),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/verification-risk-entries": {
+        get: {
+          tags: ["Clientes"],
+          operationId: "listVerificationRiskEntries",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": response(
+              "Alertas internas de la empresa.",
+              schemaReference("VerificationRiskDirectory"),
+            ),
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "503": response("El módulo no está habilitado.", schemaReference("ApiError")),
+          },
+        },
+        post: {
+          tags: ["Clientes"],
+          operationId: "createVerificationRiskEntry",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: jsonContent(schemaReference("VerificationRiskEntryCreateRequest")),
+          },
+          responses: {
+            "201": response("Alerta registrada.", schemaReference("VerificationRiskEntryResponse")),
+            "400": errorResponses["400"],
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "409": response("Ya existe una alerta activa.", schemaReference("ApiError")),
+            "503": response("El módulo no está habilitado.", schemaReference("ApiError")),
+          },
+        },
+      },
+      "/v1/tenants/{tenantId}/verification-risk-entries/{entryId}/resolve": {
+        patch: {
+          tags: ["Clientes"],
+          operationId: "resolveVerificationRiskEntry",
+          security: sessionSecurity,
+          parameters: [
+            {
+              name: "tenantId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            {
+              name: "entryId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          responses: {
+            "200": response("Alerta retirada.", schemaReference("VerificationRiskEntryResponse")),
+            "401": errorResponses["401"],
+            "403": errorResponses["403"],
+            "404": response("La alerta no existe.", schemaReference("ApiError")),
             "503": response("El módulo no está habilitado.", schemaReference("ApiError")),
           },
         },

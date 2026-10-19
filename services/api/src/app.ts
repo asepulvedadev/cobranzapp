@@ -55,6 +55,7 @@ import {
   verificationNetworkConsentRequestSchema,
   verificationNetworkCorrectionRequestSchema,
   verificationNetworkQueryRequestSchema,
+  verificationRiskEntryCreateRequestSchema,
 } from "@cobranzapp/contracts";
 import { createOpenApiDocument } from "@cobranzapp/contracts/openapi";
 import type { IdentityExtractor, IdentityImage } from "@cobranzapp/hermes-ocr";
@@ -123,6 +124,7 @@ const verificationNetworkConsentParamsSchema = z.object({
   tenantId: z.uuid(),
   consentId: z.uuid(),
 });
+const verificationRiskEntryParamsSchema = z.object({ tenantId: z.uuid(), entryId: z.uuid() });
 const sessionIdParamsSchema = z.object({ sessionId: z.uuid() });
 const platformUserParamsSchema = z.object({ userId: z.uuid() });
 const platformSubscriptionParamsSchema = z.object({ subscriptionId: z.uuid() });
@@ -3104,6 +3106,163 @@ export function buildApp(dependencies: AppDependencies) {
       throw error;
     }
   });
+
+  app.get("/v1/tenants/:tenantId/verification-risk-entries", async (request, reply) => {
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 400, "INVALID_RISK_REGISTRY", "Empresa inválida.", request.id);
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo propietario o supervisor puede consultar este registro.",
+        request.id,
+      );
+    }
+    if (!dependencies.borrowerService) {
+      return sendError(
+        reply,
+        503,
+        "BORROWER_DOSSIER_UNAVAILABLE",
+        "El módulo de clientes requiere configurar su clave de protección.",
+        request.id,
+      );
+    }
+    const entries = await dependencies.borrowerService.listRiskEntries(
+      {
+        userId: session.user.id,
+        platformRole: session.user.platformRole,
+        tenantRole: membership.role,
+      },
+      params.data.tenantId,
+    );
+    return reply.send({ entries });
+  });
+
+  app.post("/v1/tenants/:tenantId/verification-risk-entries", async (request, reply) => {
+    if (!requireAllowedOrigin(request, reply)) return;
+    const session = await requireUser(request, reply);
+    if (!session) return;
+    const params = tenantIdParamsSchema.safeParse(request.params);
+    const body = verificationRiskEntryCreateRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendError(
+        reply,
+        400,
+        "INVALID_RISK_ENTRY",
+        "Ingresa una cédula, un motivo y una nota de al menos 10 caracteres.",
+        request.id,
+      );
+    }
+    const membership = tenantMembershipForSession(session, params.data.tenantId);
+    if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+      return sendError(
+        reply,
+        403,
+        "SCOPE_DENIED",
+        "Solo propietario o supervisor puede agregar una alerta.",
+        request.id,
+      );
+    }
+    if (!dependencies.borrowerService) {
+      return sendError(
+        reply,
+        503,
+        "BORROWER_DOSSIER_UNAVAILABLE",
+        "El módulo de clientes requiere configurar su clave de protección.",
+        request.id,
+      );
+    }
+    try {
+      const result = await dependencies.borrowerService.createRiskEntry(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        { ...body.data, requestId: request.id },
+      );
+      if (result.status === "duplicate") {
+        return sendError(
+          reply,
+          409,
+          "RISK_ENTRY_ALREADY_ACTIVE",
+          "Esta cédula ya tiene una alerta activa en la empresa.",
+          request.id,
+        );
+      }
+      return reply.code(201).send({ entry: result.entry });
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("INVALID_DOCUMENT_")) {
+        return sendError(
+          reply,
+          400,
+          "INVALID_RISK_ENTRY",
+          "Ingresa una cédula válida.",
+          request.id,
+        );
+      }
+      throw error;
+    }
+  });
+
+  app.patch(
+    "/v1/tenants/:tenantId/verification-risk-entries/:entryId/resolve",
+    async (request, reply) => {
+      if (!requireAllowedOrigin(request, reply)) return;
+      const session = await requireUser(request, reply);
+      if (!session) return;
+      const params = verificationRiskEntryParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return sendError(reply, 404, "RISK_ENTRY_NOT_FOUND", "La alerta no existe.", request.id);
+      }
+      const membership = tenantMembershipForSession(session, params.data.tenantId);
+      if (!membership || !["owner", "supervisor"].includes(membership.role)) {
+        return sendError(
+          reply,
+          403,
+          "SCOPE_DENIED",
+          "Solo propietario o supervisor puede retirar una alerta.",
+          request.id,
+        );
+      }
+      if (!dependencies.borrowerService) {
+        return sendError(
+          reply,
+          503,
+          "BORROWER_DOSSIER_UNAVAILABLE",
+          "El módulo de clientes requiere configurar su clave de protección.",
+          request.id,
+        );
+      }
+      const result = await dependencies.borrowerService.resolveRiskEntry(
+        {
+          userId: session.user.id,
+          platformRole: session.user.platformRole,
+          tenantRole: membership.role,
+        },
+        params.data.tenantId,
+        params.data.entryId,
+        request.id,
+      );
+      if (result.status === "not_found") {
+        return sendError(
+          reply,
+          404,
+          "RISK_ENTRY_NOT_FOUND",
+          "La alerta no existe o ya fue retirada.",
+          request.id,
+        );
+      }
+      return reply.send({ entry: result.entry });
+    },
+  );
 
   app.get("/v1/tenants/:tenantId/borrowers/:borrowerId", async (request, reply) => {
     const session = await requireUser(request, reply);

@@ -115,6 +115,11 @@ The product now has a consent-gated foundation for a shared verification network
 
 The network is disabled until the Colombian privacy policy, participant agreements, retention schedule and correction procedure are approved. A reported late/default event is not an automatic denial, does not block existing payments, and cannot be the sole credit decision factor. The tenant-local review lifecycle remains `Observation → Under review → Restricted / Dismissed → Resolved / Expired` for operational decisions inside the company.
 
+Owners and supervisors can also keep a tenant-local risk alert when they only know the document
+number. The number is encrypted, the lookup key is different for every tenant, the supporting note
+stays inside that company, entries expire after two years and can be resolved without erasing the
+audit trail. This internal register does not publish a person to the shared network.
+
 ### Catálogo de crédito en preparación
 
 Solo el propietario puede crear o ajustar productos de crédito como borradores con montos COP,

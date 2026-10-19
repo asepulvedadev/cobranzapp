@@ -22,6 +22,7 @@ import {
   tenantMemberProfileRequestSchema,
   tenantOverviewSchema,
   tenantSettingsUpdateRequestSchema,
+  verificationRiskEntryCreateRequestSchema,
 } from "./index.js";
 
 describe("shared API contracts", () => {
@@ -282,6 +283,23 @@ describe("shared API contracts", () => {
         consentConfirmed: true,
       }).success,
     ).toBe(true);
+  });
+
+  it("requires a factual note when registering an identity risk alert", () => {
+    expect(
+      verificationRiskEntryCreateRequestSchema.safeParse({
+        documentNumber: "1.234.567.890",
+        category: "payment_default",
+        note: "Incumplimiento confirmado el 15 de octubre.",
+      }).success,
+    ).toBe(true);
+    expect(
+      verificationRiskEntryCreateRequestSchema.safeParse({
+        documentNumber: "1234567890",
+        category: "payment_default",
+        note: "Malo",
+      }).success,
+    ).toBe(false);
   });
 
   it("keeps the credit term at one month, with a five-week exception", () => {

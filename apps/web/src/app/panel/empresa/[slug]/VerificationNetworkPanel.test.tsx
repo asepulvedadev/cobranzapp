@@ -13,4 +13,14 @@ describe("ClientVerificationSearch", () => {
     expect(html).toContain("Consulta autorizada");
     expect(html).toContain("Verificar cliente");
   });
+
+  it("offers managers a minimal risk registry without asking for invented client data", () => {
+    const html = renderToStaticMarkup(
+      <ClientVerificationSearch canManageRiskRegistry tenantId="tenant-1" />,
+    );
+
+    expect(html).toContain("Registrar una cédula");
+    expect(html).toContain("Agregar alerta");
+    expect(html).toContain("No necesitas crear un cliente ni inventar datos faltantes.");
+  });
 });

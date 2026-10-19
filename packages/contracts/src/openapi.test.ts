@@ -92,6 +92,13 @@ describe("OpenAPI contract", () => {
       document.paths["/v1/tenants/{tenantId}/verification-network/query"].post.operationId,
     ).toBe("queryVerificationNetwork");
     expect(
+      document.paths["/v1/tenants/{tenantId}/verification-risk-entries"].post.operationId,
+    ).toBe("createVerificationRiskEntry");
+    expect(
+      document.paths["/v1/tenants/{tenantId}/verification-risk-entries/{entryId}/resolve"].patch
+        .operationId,
+    ).toBe("resolveVerificationRiskEntry");
+    expect(
       document.paths["/v1/tenants/{tenantId}/verification-network/corrections"].post.operationId,
     ).toBe("openVerificationNetworkCorrection");
     expect(

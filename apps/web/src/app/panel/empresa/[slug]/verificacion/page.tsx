@@ -29,7 +29,10 @@ export default async function ClientVerificationPage({
           <p>Consulta rápida por número de cédula antes de iniciar una operación.</p>
         </div>
       </header>
-      <ClientVerificationSearch tenantId={overview.tenant.id} />
+      <ClientVerificationSearch
+        canManageRiskRegistry={["owner", "supervisor"].includes(membership.role)}
+        tenantId={overview.tenant.id}
+      />
     </div>
   );
 }

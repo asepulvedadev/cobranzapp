@@ -29,6 +29,7 @@ export type {
   SupportAccessRecord,
   TenantMemberProfile,
   TenantOverview,
+  VerificationRiskEntry,
 } from "@cobranzapp/contracts";
 
 export type AuditActivity = {

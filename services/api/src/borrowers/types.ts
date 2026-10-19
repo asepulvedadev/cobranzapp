@@ -11,6 +11,8 @@ import type {
   BorrowerOcrConfirmRequest,
   BorrowerOcrExtraction,
   BorrowerReviewRequest,
+  VerificationRiskEntry,
+  VerificationRiskEntryCreateRequest,
 } from "@cobranzapp/contracts";
 import type { TenantActor } from "../tenancy/types.js";
 
@@ -106,7 +108,17 @@ export type SharedClientVerification = {
   activeCreditCount: number;
   payerRating: "good" | "regular" | "low" | "no_data";
   negativeReport: boolean;
+  riskReportCount: number;
+  lastRiskReportedAt: string | null;
 };
+
+export type VerificationRiskEntryCreateResult =
+  | { status: "created"; entry: VerificationRiskEntry }
+  | { status: "duplicate"; entry: VerificationRiskEntry };
+
+export type VerificationRiskEntryResolveResult =
+  | { status: "resolved"; entry: VerificationRiskEntry }
+  | { status: "not_found" };
 
 export interface BorrowerService {
   list(
@@ -181,4 +193,16 @@ export interface BorrowerService {
     documentNumber: string,
     requestId: string,
   ): Promise<SharedClientVerification>;
+  listRiskEntries(actor: TenantActor, tenantId: string): Promise<VerificationRiskEntry[]>;
+  createRiskEntry(
+    actor: TenantActor,
+    tenantId: string,
+    input: VerificationRiskEntryCreateRequest & { requestId: string },
+  ): Promise<VerificationRiskEntryCreateResult>;
+  resolveRiskEntry(
+    actor: TenantActor,
+    tenantId: string,
+    entryId: string,
+    requestId: string,
+  ): Promise<VerificationRiskEntryResolveResult>;
 }

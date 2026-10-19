@@ -4,6 +4,7 @@ import type {
   BorrowerAddressLocation,
   BorrowerDocument,
   BorrowerOcrExtraction,
+  VerificationRiskEntry,
 } from "@cobranzapp/contracts";
 import type { Pool, PoolClient } from "pg";
 import type { TenantActor } from "../tenancy/types.js";
@@ -81,6 +82,32 @@ type AddressLocationRow = {
   error_code: string | null;
   geocoded_at: Date | null;
 };
+
+type VerificationRiskEntryRow = {
+  id: string;
+  document_last4: string;
+  category: VerificationRiskEntry["category"];
+  note: string;
+  status: VerificationRiskEntry["status"];
+  created_by_name: string;
+  created_at: Date;
+  expires_at: Date;
+  resolved_at: Date | null;
+};
+
+function mapVerificationRiskEntry(row: VerificationRiskEntryRow): VerificationRiskEntry {
+  return {
+    id: row.id,
+    documentLast4: row.document_last4,
+    category: row.category,
+    note: row.note,
+    status: row.status,
+    createdByName: row.created_by_name,
+    createdAt: row.created_at.toISOString(),
+    expiresAt: row.expires_at.toISOString(),
+    resolvedAt: row.resolved_at?.toISOString() ?? null,
+  };
+}
 
 type GeocodedAddress = {
   latitude: number;
@@ -1596,6 +1623,12 @@ export function createPostgresBorrowerService(
         documentType: "CC",
         documentNumber,
       });
+      const tenantLookupHmac = borrowerDocumentLookupHmac(identitySecret, {
+        tenantId,
+        country: "CO",
+        documentType: "CC",
+        documentNumber,
+      });
       return withTransaction(actor, tenantId, async (client) => {
         const result = await client.query<{
           full_name: string | null;
@@ -1604,6 +1637,13 @@ export function createPostgresBorrowerService(
           negative_report: boolean;
         }>("SELECT * FROM shared_client_verification($1)", [sharedLookupHmac]);
         const row = result.rows[0];
+        const riskSummary = (
+          await client.query<{ report_count: number; last_reported_at: Date | null }>(
+            "SELECT * FROM tenant_verification_risk_summary($1)",
+            [tenantLookupHmac],
+          )
+        ).rows[0];
+        const riskReportCount = Number(riskSummary?.report_count ?? 0);
         const adverseCollectionReport = row
           ? Boolean(
               (
@@ -1619,15 +1659,20 @@ export function createPostgresBorrowerService(
               registered: true,
               fullName: row.full_name,
               activeCreditCount: Number(row.active_credit_count),
-              payerRating: adverseCollectionReport ? "low" : row.payer_rating,
-              negativeReport: adverseCollectionReport || row.negative_report,
+              payerRating:
+                adverseCollectionReport || riskReportCount > 0 ? "low" : row.payer_rating,
+              negativeReport: adverseCollectionReport || riskReportCount > 0 || row.negative_report,
+              riskReportCount,
+              lastRiskReportedAt: riskSummary?.last_reported_at?.toISOString() ?? null,
             }
           : {
               registered: false,
               fullName: null,
               activeCreditCount: 0,
-              payerRating: "no_data",
-              negativeReport: false,
+              payerRating: riskReportCount > 0 ? "low" : "no_data",
+              negativeReport: riskReportCount > 0,
+              riskReportCount,
+              lastRiskReportedAt: riskSummary?.last_reported_at?.toISOString() ?? null,
             };
         await client.query(
           `INSERT INTO audit_events
@@ -1644,6 +1689,137 @@ export function createPostgresBorrowerService(
           ],
         );
         return verification;
+      });
+    },
+
+    async listRiskEntries(actor, tenantId) {
+      return withTransaction(actor, tenantId, async (client) => {
+        await client.query(
+          `UPDATE verification_risk_entries
+              SET status = 'expired'
+            WHERE tenant_id = $1 AND status = 'active' AND expires_at <= now()`,
+          [tenantId],
+        );
+        const result = await client.query<VerificationRiskEntryRow>(
+          `SELECT entry.id, entry.document_last4, entry.category, entry.note, entry.status,
+                  creator.display_name AS created_by_name, entry.created_at, entry.expires_at,
+                  entry.resolved_at
+             FROM verification_risk_entries entry
+             JOIN users creator ON creator.id = entry.created_by
+            WHERE entry.tenant_id = $1
+            ORDER BY (entry.status = 'active') DESC, entry.created_at DESC, entry.id DESC
+            LIMIT 100`,
+          [tenantId],
+        );
+        return result.rows.map(mapVerificationRiskEntry);
+      });
+    },
+
+    async createRiskEntry(actor, tenantId, input) {
+      const normalizedNumber = normalizeBorrowerDocumentNumber(input.documentNumber);
+      const documentLookupHmac = borrowerDocumentLookupHmac(identitySecret, {
+        tenantId,
+        country: "CO",
+        documentType: "CC",
+        documentNumber: normalizedNumber,
+      });
+      return withTransaction(actor, tenantId, async (client) => {
+        await client.query(
+          `UPDATE verification_risk_entries
+              SET status = 'expired'
+            WHERE tenant_id = $1
+              AND document_lookup_hmac = $2
+              AND status = 'active'
+              AND expires_at <= now()`,
+          [tenantId, documentLookupHmac],
+        );
+        const inserted = await client.query<VerificationRiskEntryRow>(
+          `WITH created AS (
+             INSERT INTO verification_risk_entries
+               (tenant_id, document_lookup_hmac, document_number_ciphertext, document_last4,
+                category, note, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (tenant_id, document_lookup_hmac) WHERE status = 'active'
+             DO NOTHING
+             RETURNING *
+           )
+           SELECT created.id, created.document_last4, created.category, created.note, created.status,
+                  creator.display_name AS created_by_name, created.created_at, created.expires_at,
+                  created.resolved_at
+             FROM created
+             JOIN users creator ON creator.id = created.created_by`,
+          [
+            tenantId,
+            documentLookupHmac,
+            encryptBorrowerDocumentNumber(identitySecret, normalizedNumber),
+            normalizedNumber.slice(-4),
+            input.category,
+            input.note,
+            actor.userId,
+          ],
+        );
+        const createdRow = inserted.rows[0];
+        if (createdRow) {
+          await client.query(
+            `INSERT INTO audit_events
+               (tenant_id, actor_user_id, action, target_type, target_id, request_id, metadata)
+             VALUES ($1, $2, 'verification.risk_entry_created', 'verification_risk_entry', $3, $4,
+                     jsonb_build_object('category', $5::text, 'documentLast4', $6::text))`,
+            [
+              tenantId,
+              actor.userId,
+              createdRow.id,
+              input.requestId,
+              input.category,
+              createdRow.document_last4,
+            ],
+          );
+          return { status: "created" as const, entry: mapVerificationRiskEntry(createdRow) };
+        }
+
+        const existing = await client.query<VerificationRiskEntryRow>(
+          `SELECT entry.id, entry.document_last4, entry.category, entry.note, entry.status,
+                  creator.display_name AS created_by_name, entry.created_at, entry.expires_at,
+                  entry.resolved_at
+             FROM verification_risk_entries entry
+             JOIN users creator ON creator.id = entry.created_by
+            WHERE entry.tenant_id = $1
+              AND entry.document_lookup_hmac = $2
+              AND entry.status = 'active'
+            LIMIT 1`,
+          [tenantId, documentLookupHmac],
+        );
+        const existingRow = existing.rows[0];
+        if (!existingRow) throw new Error("VERIFICATION_RISK_ENTRY_NOT_FOUND_AFTER_CONFLICT");
+        return { status: "duplicate" as const, entry: mapVerificationRiskEntry(existingRow) };
+      });
+    },
+
+    async resolveRiskEntry(actor, tenantId, entryId, requestId) {
+      return withTransaction(actor, tenantId, async (client) => {
+        const resolved = await client.query<VerificationRiskEntryRow>(
+          `WITH updated AS (
+             UPDATE verification_risk_entries
+                SET status = 'resolved', resolved_by = $3, resolved_at = now()
+              WHERE tenant_id = $1 AND id = $2 AND status = 'active' AND expires_at > now()
+              RETURNING *
+           )
+           SELECT updated.id, updated.document_last4, updated.category, updated.note, updated.status,
+                  creator.display_name AS created_by_name, updated.created_at, updated.expires_at,
+                  updated.resolved_at
+             FROM updated
+             JOIN users creator ON creator.id = updated.created_by`,
+          [tenantId, entryId, actor.userId],
+        );
+        const row = resolved.rows[0];
+        if (!row) return { status: "not_found" as const };
+        await client.query(
+          `INSERT INTO audit_events
+             (tenant_id, actor_user_id, action, target_type, target_id, request_id)
+           VALUES ($1, $2, 'verification.risk_entry_resolved', 'verification_risk_entry', $3, $4)`,
+          [tenantId, actor.userId, entryId, requestId],
+        );
+        return { status: "resolved" as const, entry: mapVerificationRiskEntry(row) };
       });
     },
   };

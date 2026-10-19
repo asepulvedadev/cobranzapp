@@ -2893,4 +2893,82 @@ describe("tenant onboarding", () => {
     });
     expect(verifyShared).not.toHaveBeenCalled();
   });
+
+  it("lets an owner register a minimal identity risk alert without reauthentication", async () => {
+    const entry = {
+      id: "e3dc4aac-cf0e-45df-82bc-ec4f1359bceb",
+      documentLast4: "7890",
+      category: "payment_default" as const,
+      note: "Incumplimiento confirmado el 15 de octubre.",
+      status: "active" as const,
+      createdByName: "Propietario",
+      createdAt: "2026-10-19T12:00:00.000Z",
+      expiresAt: "2028-10-19T12:00:00.000Z",
+      resolvedAt: null,
+    };
+    const createRiskEntry = vi.fn(async () => ({ status: "created" as const, entry }));
+    const deps = dependencies({
+      authService: { authenticate: vi.fn(async () => tenantOwner) },
+      borrowerService: { createRiskEntry } as unknown as BorrowerService,
+    });
+    const app = buildApp(deps);
+    apps.push(app);
+    const tenantId = tenantOwner.memberships[0]?.tenantId;
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/tenants/${tenantId}/verification-risk-entries`,
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: {
+        documentNumber: "1234567890",
+        category: "payment_default",
+        note: "Incumplimiento confirmado el 15 de octubre.",
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({ entry: { documentLast4: "7890" } });
+    expect(createRiskEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantRole: "owner" }),
+      tenantId,
+      expect.objectContaining({ documentNumber: "1234567890" }),
+    );
+    expect(deps.authService.isRecentlyReauthenticated).not.toHaveBeenCalled();
+  });
+
+  it("does not let collectors add identities to the risk registry", async () => {
+    const collector: AuthenticatedUser = {
+      ...tenantOwner,
+      memberships: tenantOwner.memberships.map((membership) => ({
+        ...membership,
+        role: "collector" as const,
+      })),
+    };
+    const createRiskEntry = vi.fn();
+    const deps = dependencies({
+      authService: { authenticate: vi.fn(async () => collector) },
+      borrowerService: { createRiskEntry } as unknown as BorrowerService,
+    });
+    const app = buildApp(deps);
+    apps.push(app);
+    const tenantId = collector.memberships[0]?.tenantId;
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/tenants/${tenantId}/verification-risk-entries`,
+      headers: {
+        cookie: "cobranzapp_session=session-token",
+        origin: "https://cobranzaap.tech",
+      },
+      payload: {
+        documentNumber: "1234567890",
+        category: "payment_default",
+        note: "Incumplimiento confirmado el 15 de octubre.",
+      },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(createRiskEntry).not.toHaveBeenCalled();
+  });
 });
