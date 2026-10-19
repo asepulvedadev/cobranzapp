@@ -15,6 +15,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { CurrentUser } from "../../lib/platform";
+import { CollectionNotificationCenter } from "./CollectionNotificationCenter";
 import { Modal } from "./Modal";
 
 type NavigationItem = {
@@ -183,6 +184,16 @@ export function PanelNavigation({
           </button>
         ) : null}
       </nav>
+      {currentMembership &&
+      ["owner", "supervisor", "collector"].includes(currentMembership.role) ? (
+        <CollectionNotificationCenter
+          membership={
+            currentMembership as CurrentUser["memberships"][number] & {
+              role: "owner" | "supervisor" | "collector";
+            }
+          }
+        />
+      ) : null}
       {moreOpen ? (
         <Modal className="navigation-sheet" onClose={() => setMoreOpen(false)} title="Más opciones">
           <nav aria-label="Opciones adicionales" className="navigation-sheet-list">
