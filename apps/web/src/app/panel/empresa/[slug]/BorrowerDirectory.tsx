@@ -333,7 +333,7 @@ export function BorrowerDirectory({
     if (
       step === 2 &&
       (!fieldValue("phone") ||
-        (registrationType === "new" && !fieldValue("whatsappPhone")) ||
+        !fieldValue("whatsappPhone") ||
         !fieldValue("homeAddress") ||
         !fieldValue("homeAddressLocality") ||
         !fieldValue("workAddress") ||
@@ -1130,13 +1130,11 @@ export function BorrowerDirectory({
                   Celular principal
                   <input id="borrower-phone" name="phone" maxLength={30} type="tel" />
                 </label>
-                {registrationType === "new" ? (
-                  <label className="borrower-field" htmlFor="borrower-whatsapp">
-                    WhatsApp
-                    <input id="borrower-whatsapp" name="whatsappPhone" maxLength={30} type="tel" />
-                    <small>Puede ser el mismo número</small>
-                  </label>
-                ) : null}
+                <label className="borrower-field" htmlFor="borrower-whatsapp">
+                  WhatsApp
+                  <input id="borrower-whatsapp" name="whatsappPhone" maxLength={30} type="tel" />
+                  <small>Puede ser el mismo número</small>
+                </label>
               </div>
               <div className="borrower-address-grid">
                 <fieldset className="borrower-address-card">
@@ -1297,7 +1295,7 @@ export function BorrowerDirectory({
               </p>
               <ul className="borrower-confirmation-list">
                 {registrationType === "legacy" ? (
-                  <li>Nombre, número de cédula, teléfono y direcciones verificadas.</li>
+                  <li>Nombre, número de cédula, teléfono, WhatsApp y direcciones verificadas.</li>
                 ) : (
                   <>
                     <li>Frente obligatorio y reverso opcional en almacenamiento privado.</li>

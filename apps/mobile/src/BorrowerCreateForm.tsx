@@ -223,10 +223,8 @@ export function BorrowerCreateForm({
       }
     }
     if (stepToValidate === 2) {
-      if (!phone.trim() || (registrationType === "new" && !whatsappPhone.trim())) {
-        return registrationType === "legacy"
-          ? "Completa el teléfono del cliente."
-          : "Completa el celular y WhatsApp.";
+      if (!phone.trim() || !whatsappPhone.trim()) {
+        return "Completa el celular y WhatsApp.";
       }
       if (
         !homeAddress.trim() ||
@@ -664,19 +662,15 @@ export function BorrowerCreateForm({
                     style={styles.input}
                     value={phone}
                   />
-                  {registrationType === "new" ? (
-                    <>
-                      <Text style={styles.label}>WhatsApp</Text>
-                      <TextInput
-                        keyboardType="phone-pad"
-                        onChangeText={setWhatsappPhone}
-                        placeholder="Número de WhatsApp"
-                        placeholderTextColor="#77817a"
-                        style={styles.input}
-                        value={whatsappPhone}
-                      />
-                    </>
-                  ) : null}
+                  <Text style={styles.label}>WhatsApp</Text>
+                  <TextInput
+                    keyboardType="phone-pad"
+                    onChangeText={setWhatsappPhone}
+                    placeholder="Número de WhatsApp"
+                    placeholderTextColor="#77817a"
+                    style={styles.input}
+                    value={whatsappPhone}
+                  />
                   <Text style={styles.label}>Dirección de casa</Text>
                   <TextInput
                     onChangeText={setHomeAddress}
@@ -835,11 +829,9 @@ export function BorrowerCreateForm({
                         : "Pendiente de registrar"}
                     </Text>
                     <Text style={styles.reviewText}>Celular: {phone || "Sin registrar"}</Text>
-                    {registrationType === "new" ? (
-                      <Text style={styles.reviewText}>
-                        WhatsApp: {whatsappPhone || "Sin registrar"}
-                      </Text>
-                    ) : null}
+                    <Text style={styles.reviewText}>
+                      WhatsApp: {whatsappPhone || "Sin registrar"}
+                    </Text>
                     <Text style={styles.reviewText}>
                       Casa: {composeAddress(homeAddress, homeAddressLocality) || "Sin registrar"}
                     </Text>
