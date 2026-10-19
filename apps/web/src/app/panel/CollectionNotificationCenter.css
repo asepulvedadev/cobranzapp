@@ -34,7 +34,7 @@
   line-height: 1;
 }
 
-.notification-modal {
+.panel-sidebar .notification-modal {
   max-width: 600px;
   color: var(--panel-dark);
 }
