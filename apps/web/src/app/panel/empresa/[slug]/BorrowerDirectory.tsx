@@ -111,6 +111,7 @@ export function BorrowerDirectory({
   const [homeAddressConfirmed, setHomeAddressConfirmed] = useState(false);
   const [workAddressConfirmed, setWorkAddressConfirmed] = useState(false);
   const [identityConfirmed, setIdentityConfirmed] = useState(false);
+  const [manualIdentity, setManualIdentity] = useState(false);
   const [createStep, setCreateStep] = useState(1);
   const [createdBorrowerId, setCreatedBorrowerId] = useState<string | null>(null);
   const [uploadedDocumentFields, setUploadedDocumentFields] = useState<string[]>([]);
@@ -169,6 +170,7 @@ export function BorrowerDirectory({
     setHomeAddressConfirmed(false);
     setWorkAddressConfirmed(false);
     setIdentityConfirmed(false);
+    setManualIdentity(false);
     setCreateStep(1);
   }
 
@@ -209,6 +211,33 @@ export function BorrowerDirectory({
             : null;
       if (front) void scanIdentityDocuments(front, back ?? undefined);
     }
+  }
+
+  function enableManualIdentity() {
+    ocrRunRef.current += 1;
+    setManualIdentity(true);
+    setIdentityConfirmed(false);
+    setOcrStatus("idle");
+    setOcrProgress(0);
+    setOcrMessage("");
+    setOcrExtraction(null);
+    setSelectedUploadNames((current) => {
+      const next = { ...current };
+      delete next.identityFront;
+      delete next.identityBack;
+      return next;
+    });
+    preparedUploadsRef.current.delete("identityFront");
+    preparedUploadsRef.current.delete("identityBack");
+    const frontInput = createFormRef.current?.elements.namedItem("identityFront");
+    const backInput = createFormRef.current?.elements.namedItem("identityBack");
+    if (frontInput instanceof HTMLInputElement) frontInput.value = "";
+    if (backInput instanceof HTMLInputElement) backInput.value = "";
+  }
+
+  function useIdentityDocument() {
+    setManualIdentity(false);
+    setIdentityConfirmed(false);
   }
 
   async function scanIdentityDocuments(front: File, back?: File) {
@@ -274,22 +303,21 @@ export function BorrowerDirectory({
 
   function validateCreateStep(step: number) {
     const errors: Record<number, string> = {
-      1: "Adjunta el frente de la cédula y la selfie, revisa los datos detectados y confirma que coinciden.",
+      1: manualIdentity
+        ? "Completa el nombre y la selfie. El tipo y número de documento son opcionales en el registro manual."
+        : "Adjunta el frente de la cédula y la selfie, revisa los datos detectados y confirma que coinciden.",
       2: "Completa el celular, WhatsApp, cada dirección y su barrio/municipio; luego confirma que fueron verificadas con el cliente.",
       3: "Registra al menos una referencia y el consentimiento del cliente.",
     };
     if (step === 1) {
-      const files = ["identityFront", "profilePhoto"].map((name) =>
-        createFormRef.current?.elements.namedItem(name),
-      );
+      const files = ["profilePhoto"].map((name) => createFormRef.current?.elements.namedItem(name));
       const hasFiles = files.every(
         (element) => element instanceof HTMLInputElement && element.files?.[0],
       );
       if (
         !fieldValue("fullName") ||
-        !fieldValue("documentNumber") ||
         !hasFiles ||
-        !identityConfirmed
+        (!manualIdentity && (!fieldValue("documentNumber") || !identityConfirmed))
       ) {
         setMessage(errors[step]);
         setIsError(true);
@@ -399,21 +427,25 @@ export function BorrowerDirectory({
     setIsError(false);
     setIsSubmitting(true);
     const form = new FormData(event.currentTarget);
-    if (!identityConfirmed) {
+    if (!manualIdentity && !identityConfirmed) {
       setCreateStep(1);
       setMessage("Vuelve a revisar y confirmar los datos detectados en el documento.");
       setIsError(true);
       setIsSubmitting(false);
       return;
     }
-    const requiredFiles = ["identityFront", "profilePhoto"];
+    const requiredFiles = ["profilePhoto"];
     if (
       requiredFiles.some((field) => {
         const file = form.get(field);
         return !(file instanceof File) || file.size === 0;
       })
     ) {
-      setMessage("Adjunta el frente de la cédula y la selfie antes de guardar.");
+      setMessage(
+        manualIdentity
+          ? "Adjunta la selfie antes de guardar."
+          : "Adjunta el frente de la cédula y la selfie antes de guardar.",
+      );
       setIsError(true);
       setIsSubmitting(false);
       return;
@@ -422,9 +454,12 @@ export function BorrowerDirectory({
     if (!borrowerId) {
       const payload = {
         fullName: String(form.get("fullName") ?? "").trim(),
-        country: "CO",
-        documentType: String(form.get("documentType") ?? "CC"),
-        documentNumber: String(form.get("documentNumber") ?? "").trim(),
+        country: manualIdentity && !String(form.get("documentNumber") ?? "").trim() ? null : "CO",
+        documentType:
+          manualIdentity && !String(form.get("documentNumber") ?? "").trim()
+            ? null
+            : String(form.get("documentType") ?? "CC"),
+        documentNumber: String(form.get("documentNumber") ?? "").trim() || null,
         phone: String(form.get("phone") ?? "").trim(),
         whatsappPhone: String(form.get("whatsappPhone") ?? "").trim(),
         homeAddress: composeAddress(
@@ -489,7 +524,7 @@ export function BorrowerDirectory({
       side?: "front" | "back";
       required: boolean;
     }> = [
-      { field: "identityFront", category: "identity", side: "front", required: true },
+      { field: "identityFront", category: "identity", side: "front", required: !manualIdentity },
       { field: "identityBack", category: "identity", side: "back", required: false },
       { field: "profilePhoto", category: "profile_photo", required: true },
     ];
@@ -775,15 +810,32 @@ export function BorrowerDirectory({
             <section aria-labelledby="borrower-step-document" hidden={createStep !== 1}>
               <div className="borrower-section-heading">
                 <div>
-                  <span className="borrower-section-kicker">Paso 1 · Documento</span>
-                  <h3 id="borrower-step-document">Primero, toma las fotos</h3>
+                  <span className="borrower-section-kicker">Paso 1 · Identidad</span>
+                  <h3 id="borrower-step-document">Registra los datos del cliente</h3>
                 </div>
-                <span className="borrower-required-note">Frente + selfie obligatorios</span>
+                <span className="borrower-required-note">
+                  {manualIdentity ? "Nombre + selfie obligatorios" : "Frente + selfie obligatorios"}
+                </span>
               </div>
               <p className="borrower-section-help">
-                Captura primero el frente de la cédula para leer el nombre y el número. El reverso
-                es opcional; la selfie actual del cliente sí es obligatoria.
+                {manualIdentity
+                  ? "No tienes que adjuntar la cédula ahora. Escribe los datos disponibles y podrás agregar el documento después desde el perfil."
+                  : "Captura primero el frente de la cédula para leer el nombre y el número. El reverso es opcional; la selfie actual del cliente sí es obligatoria."}
               </p>
+              <div className="borrower-manual-id-action">
+                {manualIdentity ? (
+                  <>
+                    <span>Registro manual activo · la foto de cédula queda pendiente.</span>
+                    <button onClick={useIdentityDocument} type="button">
+                      Usar foto de cédula
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={enableManualIdentity} type="button">
+                    Registrar datos manualmente (sin foto de cédula)
+                  </button>
+                )}
+              </div>
               <div className="borrower-upload-grid">
                 <label
                   className={`borrower-upload-card${selectedUploadNames.identityFront ? " is-selected" : ""}`}
@@ -799,7 +851,7 @@ export function BorrowerDirectory({
                     accept="image/*"
                     name="identityFront"
                     onChange={(event) => selectUpload(event, "identityFront")}
-                    required
+                    required={!manualIdentity}
                     type="file"
                   />
                   <span className="borrower-upload-cta">
@@ -871,14 +923,21 @@ export function BorrowerDirectory({
                   </div>
                 </div>
               ) : null}
-              {hasIdentityFrontPhoto ? (
+              {manualIdentity || hasIdentityFrontPhoto ? (
                 <div className="borrower-identity-review">
                   <div>
-                    <span className="borrower-section-kicker">Datos detectados</span>
-                    <h4>Verifica antes de continuar</h4>
+                    <span className="borrower-section-kicker">
+                      {manualIdentity ? "Datos ingresados manualmente" : "Datos detectados"}
+                    </span>
+                    <h4>
+                      {manualIdentity
+                        ? "Completa los datos disponibles"
+                        : "Verifica antes de continuar"}
+                    </h4>
                     <p>
-                      Corrige cualquier error de lectura. Estos datos se usarán para identificar al
-                      cliente.
+                      {manualIdentity
+                        ? "Puedes completar el tipo y número o dejarlos vacíos para agregarlos después."
+                        : "Corrige cualquier error de lectura. Estos datos se usarán para identificar al cliente."}
                     </p>
                   </div>
                   <div className="borrower-form-grid borrower-form-grid-identity">
@@ -959,24 +1018,30 @@ export function BorrowerDirectory({
                       ) : null}
                     </div>
                   ) : null}
-                  <label className="checkbox-row borrower-identity-confirmation">
-                    <input
-                      checked={identityConfirmed}
-                      disabled={ocrStatus === "processing"}
-                      onChange={(event) => setIdentityConfirmed(event.target.checked)}
-                      type="checkbox"
-                    />
-                    <span>Confirmo que el nombre y el documento coinciden con las fotos.</span>
-                  </label>
+                  {!manualIdentity ? (
+                    <label className="checkbox-row borrower-identity-confirmation">
+                      <input
+                        checked={identityConfirmed}
+                        disabled={ocrStatus === "processing"}
+                        onChange={(event) => setIdentityConfirmed(event.target.checked)}
+                        type="checkbox"
+                      />
+                      <span>Confirmo que el nombre y el documento coinciden con las fotos.</span>
+                    </label>
+                  ) : null}
                 </div>
               ) : (
                 <div className="borrower-photo-gate" role="status">
-                  Adjunta el frente para leer automáticamente los datos del cliente.
+                  Adjunta el frente para leer automáticamente o activa el registro manual.
                 </div>
               )}
               <div className="borrower-inline-tip">
                 <span aria-hidden="true">i</span>
-                <span>El reverso es opcional. La selfie del cliente sí es obligatoria.</span>
+                <span>
+                  {manualIdentity
+                    ? "La selfie sigue siendo obligatoria. Sin documento, el cliente queda pendiente de verificación."
+                    : "El reverso es opcional. La selfie del cliente sí es obligatoria."}
+                </span>
               </div>
             </section>
 

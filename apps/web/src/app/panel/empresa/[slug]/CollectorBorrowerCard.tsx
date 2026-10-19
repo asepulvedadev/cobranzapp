@@ -170,7 +170,9 @@ export function CollectorBorrowerCard({
           <div>
             <h3>{borrower.fullName}</h3>
             <p>
-              {borrower.identity.documentType} · •••• {borrower.identity.documentLast4}
+              {borrower.identity.documentType && borrower.identity.documentLast4
+                ? `${borrower.identity.documentType} · •••• ${borrower.identity.documentLast4}`
+                : "Documento pendiente de registrar"}
             </p>
           </div>
           <span

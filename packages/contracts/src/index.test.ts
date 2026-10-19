@@ -209,6 +209,38 @@ describe("shared API contracts", () => {
     ).toBe(false);
   });
 
+  it("allows a borrower to be created manually before the identity image is available", () => {
+    const result = borrowerCreateRequestSchema.safeParse({
+      fullName: "Cliente Sin Documento",
+      country: null,
+      documentType: null,
+      documentNumber: null,
+      phone: "+57 300 111 2233",
+      homeAddress: "Calle 1 # 2-3",
+      workAddress: "Carrera 4 # 5-6",
+      homeAddressConfirmed: true,
+      workAddressConfirmed: true,
+      profilePhotoObjectKey: null,
+      consentVersion: "borrower-dossier-v1",
+      consentEvidenceRef: "manual-001",
+      emergencyContacts: [
+        { fullName: "Contacto", relationship: "Hermano", phone: "+57 300 444 5566" },
+      ],
+      documents: [],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(
+        borrowerCreateRequestSchema.safeParse({
+          ...result.data,
+          country: "CO",
+          documentType: "CC",
+          documentNumber: null,
+        }).success,
+      ).toBe(false);
+    }
+  });
+
   it("only accepts address corrections after both addresses are confirmed", () => {
     const payload = {
       homeAddress: "Calle 10 # 20-30, Cúcuta",

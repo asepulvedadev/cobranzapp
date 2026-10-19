@@ -637,8 +637,9 @@ export function LoanApplicationBoard({
               <span>Cliente aprobado</span>
               <strong>{selectedBorrower.fullName}</strong>
               <small>
-                {selectedBorrower.identity.documentType} · ••••{" "}
-                {selectedBorrower.identity.documentLast4}
+                {selectedBorrower.identity.documentType && selectedBorrower.identity.documentLast4
+                  ? `${selectedBorrower.identity.documentType} · •••• ${selectedBorrower.identity.documentLast4}`
+                  : "Documento pendiente de registrar"}
               </small>
             </div>
             <label>

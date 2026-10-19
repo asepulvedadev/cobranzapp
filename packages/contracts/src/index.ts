@@ -1096,8 +1096,8 @@ const publicBorrowerSummarySchema = z.object({
   fullName: z.string().min(2),
   phone: z.string().min(7),
   whatsappPhone: z.string().nullable(),
-  documentType: z.string().min(2),
-  documentLast4: z.string().min(2).max(4),
+  documentType: z.string().min(2).nullable(),
+  documentLast4: z.string().min(2).max(4).nullable(),
 });
 export const borrowerPortalProfileSchema = z.object({
   company: publicCompanySchema,
@@ -1213,9 +1213,10 @@ export const borrowerDocumentInputSchema = z.object({
 export const borrowerCreateRequestSchema = z
   .object({
     fullName: z.string().trim().min(2).max(160),
-    country: z.string().trim().length(2).toUpperCase(),
-    documentType: z.string().trim().min(2).max(30),
-    documentNumber: z.string().trim().min(4).max(32),
+    /** Identity data may be entered without attaching a document image. */
+    country: z.string().trim().length(2).toUpperCase().nullable().optional().default(null),
+    documentType: z.string().trim().min(2).max(30).nullable().optional().default(null),
+    documentNumber: z.string().trim().min(4).max(32).nullable().optional().default(null),
     phone: z.string().trim().min(7).max(30),
     whatsappPhone: z.string().trim().min(7).max(30).nullable().optional(),
     homeAddress: z.string().trim().min(3).max(240),
@@ -1230,6 +1231,21 @@ export const borrowerCreateRequestSchema = z
     documents: z.array(borrowerDocumentInputSchema).max(3),
   })
   .superRefine((value, context) => {
+    const identityFields = [value.country, value.documentType, value.documentNumber];
+    const hasSomeIdentityData = identityFields.some(
+      (field) => field !== null && field !== undefined && field !== "",
+    );
+    const hasCompleteIdentityData = identityFields.every(
+      (field) => field !== null && field !== undefined && field !== "",
+    );
+    if (hasSomeIdentityData && !hasCompleteIdentityData) {
+      context.addIssue({
+        code: "custom",
+        path: ["documentNumber"],
+        message:
+          "Completa país, tipo y número del documento, o déjalos vacíos para registrarlo manualmente.",
+      });
+    }
     const identityDocuments = value.documents.filter(
       (document) => document.category === "identity",
     );
@@ -1254,9 +1270,9 @@ export const borrowerCreateRequestSchema = z
   });
 
 export const borrowerIdentitySchema = z.object({
-  country: z.string().length(2),
-  documentType: z.string().min(2),
-  documentLast4: z.string().min(2).max(4),
+  country: z.string().length(2).nullable(),
+  documentType: z.string().min(2).nullable(),
+  documentLast4: z.string().min(2).max(4).nullable(),
   verificationState: z.enum(["manual_pending", "reviewed", "rejected"]),
 });
 

@@ -5858,6 +5858,40 @@ html:has(.panel-shell) {
   text-align: center;
 }
 
+.borrower-manual-id-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px dashed #b9c6bf;
+  border-radius: 12px;
+  background: #fbfdfb;
+  color: var(--panel-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.borrower-manual-id-action button {
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid #246b4a;
+  border-radius: 9px;
+  background: #fff;
+  color: #155f3d;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .borrower-manual-id-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 .borrower-identity-review {
   display: grid;
   gap: 14px;

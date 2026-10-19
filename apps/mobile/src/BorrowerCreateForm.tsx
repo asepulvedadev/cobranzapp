@@ -62,6 +62,7 @@ export function BorrowerCreateForm({
   const [identityFront, setIdentityFront] = useState<SelectedImage | null>(null);
   const [identityBack, setIdentityBack] = useState<SelectedImage | null>(null);
   const [profilePhoto, setProfilePhoto] = useState<SelectedImage | null>(null);
+  const [manualIdentity, setManualIdentity] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
@@ -75,6 +76,24 @@ export function BorrowerCreateForm({
     if (busy) return;
     setOpen(false);
     setStep(1);
+    setMessage("");
+    setManualIdentity(false);
+    setIdentityFront(null);
+    setIdentityBack(null);
+    setOcrExtraction(null);
+  }
+
+  function enableManualIdentity() {
+    setManualIdentity(true);
+    setIdentityFront(null);
+    setIdentityBack(null);
+    setOcrExtraction(null);
+    setOcrBusy(false);
+    setMessage("");
+  }
+
+  function useIdentityDocument() {
+    setManualIdentity(false);
     setMessage("");
   }
 
@@ -188,9 +207,12 @@ export function BorrowerCreateForm({
 
   function stepError(stepToValidate: number) {
     if (stepToValidate === 1) {
-      if (!fullName.trim() || !documentNumber.trim()) return "Completa el nombre y la cédula.";
-      if (!identityFront || !profilePhoto) {
-        return "Carga el frente de la cédula y la selfie del cliente.";
+      if (!fullName.trim()) return "Completa el nombre del cliente.";
+      if (!profilePhoto) {
+        return "Carga la selfie del cliente.";
+      }
+      if (!manualIdentity && (!documentNumber.trim() || !identityFront)) {
+        return "Carga el frente de la cédula y completa su número.";
       }
     }
     if (stepToValidate === 2) {
@@ -240,7 +262,11 @@ export function BorrowerCreateForm({
 
   async function submit() {
     if (missingFields()) {
-      setMessage("Completa los datos requeridos, el frente de la cédula y la selfie del cliente.");
+      setMessage(
+        manualIdentity
+          ? "Completa los datos requeridos y la selfie del cliente."
+          : "Completa los datos requeridos, el frente de la cédula y la selfie del cliente.",
+      );
       return;
     }
     setBusy(true);
@@ -253,9 +279,9 @@ export function BorrowerCreateForm({
       } else {
         const payload = {
           fullName: fullName.trim(),
-          country: "CO",
-          documentType: documentType.trim().toUpperCase(),
-          documentNumber: documentNumber.trim(),
+          country: documentNumber.trim() ? "CO" : null,
+          documentType: documentNumber.trim() ? documentType.trim().toUpperCase() : null,
+          documentNumber: documentNumber.trim() || null,
           phone: phone.trim(),
           whatsappPhone: whatsappPhone.trim(),
           homeAddress: composeAddress(homeAddress, homeAddressLocality),
@@ -298,7 +324,7 @@ export function BorrowerCreateForm({
           image: identityFront,
           category: "identity" as const,
           side: "front" as const,
-          optional: false,
+          optional: manualIdentity,
         },
         {
           key: "identity-back" as const,
@@ -347,6 +373,7 @@ export function BorrowerCreateForm({
       setIdentityFront(null);
       setIdentityBack(null);
       setProfilePhoto(null);
+      setManualIdentity(false);
       setOcrExtraction(null);
       setStep(1);
       setCreatedBorrowerId(null);
@@ -423,6 +450,21 @@ export function BorrowerCreateForm({
               {step === 1 ? (
                 <>
                   <Text style={styles.sectionTitle}>Identidad</Text>
+                  <Text style={styles.addressHint}>
+                    {manualIdentity
+                      ? "Registro manual activo: la cédula puede agregarse después desde el perfil."
+                      : "Puedes leer la cédula automáticamente o ingresar los datos sin foto."}
+                  </Text>
+                  <Pressable
+                    onPress={manualIdentity ? useIdentityDocument : enableManualIdentity}
+                    style={styles.manualIdentityButton}
+                  >
+                    <Text style={styles.manualIdentityButtonText}>
+                      {manualIdentity
+                        ? "Usar foto de cédula"
+                        : "Registrar datos manualmente (sin foto de cédula)"}
+                    </Text>
+                  </Pressable>
                   <Text style={styles.label}>Nombre completo</Text>
                   <TextInput
                     onChangeText={setFullName}
@@ -455,7 +497,11 @@ export function BorrowerCreateForm({
                   <Text style={styles.label}>Documentos privados</Text>
                   <ImageButton
                     label={
-                      identityFront ? `✓ Frente · ${identityFront.name}` : "Cargar cédula · frente"
+                      identityFront
+                        ? `✓ Frente · ${identityFront.name}`
+                        : manualIdentity
+                          ? "Cédula · frente (opcional)"
+                          : "Cargar cédula · frente"
                     }
                     onPress={() =>
                       void pickImage((image) => {
@@ -696,7 +742,10 @@ export function BorrowerCreateForm({
                   <View style={styles.reviewBox}>
                     <Text style={styles.reviewText}>Cliente: {fullName || "Sin nombre"}</Text>
                     <Text style={styles.reviewText}>
-                      Cédula: {documentType.toUpperCase()} {documentNumber || "Sin número"}
+                      Documento:{" "}
+                      {documentNumber
+                        ? `${documentType.toUpperCase()} ${documentNumber}`
+                        : "Pendiente de registrar"}
                     </Text>
                     <Text style={styles.reviewText}>Celular: {phone || "Sin registrar"}</Text>
                     <Text style={styles.reviewText}>
@@ -815,6 +864,21 @@ const styles = {
   stepDotActive: { backgroundColor: "#fbbf24" },
   sectionTitle: { color: "#eef2ee", fontWeight: "800" as const, fontSize: 16, marginTop: 4 },
   addressHint: { color: "#99a39c", fontSize: 12, lineHeight: 18 },
+  manualIdentityButton: {
+    minHeight: 44,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#c79b28",
+    backgroundColor: "#2b2b20",
+    justifyContent: "center" as const,
+  },
+  manualIdentityButtonText: {
+    color: "#f7cf63",
+    fontSize: 13,
+    fontWeight: "800" as const,
+    textAlign: "center" as const,
+  },
   reviewBox: {
     gap: 6,
     padding: 12,

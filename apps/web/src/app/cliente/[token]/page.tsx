@@ -43,7 +43,9 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
         <span>{profile.company.name}</span>
         <h1>Hola, {profile.borrower.fullName.split(" ")[0]}</h1>
         <p>
-          {profile.borrower.documentType} · •••• {profile.borrower.documentLast4}
+          {profile.borrower.documentType && profile.borrower.documentLast4
+            ? `${profile.borrower.documentType} · •••• ${profile.borrower.documentLast4}`
+            : "Documento pendiente de registrar"}
         </p>
       </header>
 

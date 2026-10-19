@@ -49,7 +49,9 @@ export default async function ReceiptPage({ params }: { params: Promise<{ token:
           <div>
             <dt>Documento</dt>
             <dd>
-              {receipt.borrower.documentType} · •••• {receipt.borrower.documentLast4}
+              {receipt.borrower.documentType && receipt.borrower.documentLast4
+                ? `${receipt.borrower.documentType} · •••• ${receipt.borrower.documentLast4}`
+                : "Documento pendiente de registrar"}
             </dd>
           </div>
           <div>

@@ -49,9 +49,9 @@ type BorrowerRow = {
   assigned_collector_id: string | null;
   assigned_collector_name: string | null;
   consent_version: string;
-  country: string;
-  document_type: string;
-  document_last4: string;
+  country: string | null;
+  document_type: string | null;
+  document_last4: string | null;
   verification_state: Borrower["identity"]["verificationState"];
   created_at: Date;
 };
@@ -635,7 +635,9 @@ export function createPostgresBorrowerService(
       if (input.homeAddressConfirmed !== true || input.workAddressConfirmed !== true) {
         return { status: "addresses_unconfirmed" };
       }
-      const normalizedNumber = normalizeBorrowerDocumentNumber(input.documentNumber);
+      const normalizedNumber = input.documentNumber
+        ? normalizeBorrowerDocumentNumber(input.documentNumber)
+        : null;
       const homeAddress = normalizeBorrowerAddress(input.homeAddress);
       const workAddress = normalizeBorrowerAddress(input.workAddress);
       const creationPolicy = borrowerCreationPolicy(actor.tenantRole);
@@ -661,17 +663,21 @@ export function createPostgresBorrowerService(
               return { status: "invalid_object_key" };
             }
           }
-          const identityHmac = borrowerDocumentLookupHmac(identitySecret, {
-            tenantId,
-            country: input.country,
-            documentType: input.documentType,
-            documentNumber: normalizedNumber,
-          });
-          const sharedLookupHmac = borrowerSharedDocumentLookupHmac(identitySecret, {
-            country: input.country,
-            documentType: input.documentType,
-            documentNumber: normalizedNumber,
-          });
+          const identityHmac = normalizedNumber
+            ? borrowerDocumentLookupHmac(identitySecret, {
+                tenantId,
+                country: input.country ?? "CO",
+                documentType: input.documentType ?? "CC",
+                documentNumber: normalizedNumber,
+              })
+            : null;
+          const sharedLookupHmac = normalizedNumber
+            ? borrowerSharedDocumentLookupHmac(identitySecret, {
+                country: input.country ?? "CO",
+                documentType: input.documentType ?? "CC",
+                documentNumber: normalizedNumber,
+              })
+            : null;
           try {
             await client.query(
               `INSERT INTO borrowers
@@ -716,12 +722,14 @@ export function createPostgresBorrowerService(
               [
                 tenantId,
                 borrowerId,
-                input.country.toUpperCase(),
-                input.documentType.toUpperCase(),
-                encryptBorrowerDocumentNumber(identitySecret, normalizedNumber),
+                input.country?.toUpperCase() ?? null,
+                input.documentType?.toUpperCase() ?? null,
+                normalizedNumber
+                  ? encryptBorrowerDocumentNumber(identitySecret, normalizedNumber)
+                  : null,
                 identityHmac,
                 sharedLookupHmac,
-                normalizedNumber.slice(-4),
+                normalizedNumber?.slice(-4) ?? null,
               ],
             );
             await client.query(
@@ -781,6 +789,7 @@ export function createPostgresBorrowerService(
                 JSON.stringify({
                   documentType: input.documentType,
                   country: input.country,
+                  identityEntryMode: normalizedNumber ? "document" : "manual",
                   documentSides: input.documents.filter(
                     (document) => document.category === "identity",
                   ).length,
@@ -1092,8 +1101,8 @@ export function createPostgresBorrowerService(
         if (candidate.documentNumber) {
           const normalized = normalizeBorrowerDocumentNumber(candidate.documentNumber);
           const identity = await client.query<{
-            country: string;
-            document_type: string;
+            country: string | null;
+            document_type: string | null;
           }>(
             `SELECT country, document_type FROM borrower_identities
               WHERE tenant_id = $1 AND borrower_id = $2 FOR UPDATE`,
@@ -1101,28 +1110,35 @@ export function createPostgresBorrowerService(
           );
           const currentIdentity = identity.rows[0];
           if (!currentIdentity) return { status: "not_found" };
+          const identityCountry = currentIdentity.country ?? candidate.country ?? "CO";
+          const identityDocumentType =
+            currentIdentity.document_type ?? candidate.documentType ?? "CC";
           const lookup = borrowerDocumentLookupHmac(identitySecret, {
             tenantId,
-            country: currentIdentity.country,
-            documentType: currentIdentity.document_type,
+            country: identityCountry,
+            documentType: identityDocumentType,
             documentNumber: normalized,
           });
           const sharedLookup = borrowerSharedDocumentLookupHmac(identitySecret, {
-            country: currentIdentity.country,
-            documentType: currentIdentity.document_type,
+            country: identityCountry,
+            documentType: identityDocumentType,
             documentNumber: normalized,
           });
           await client.query(
             `UPDATE borrower_identities
-                SET document_number_ciphertext = $3,
-                    document_lookup_hmac = $4,
-                    shared_lookup_hmac = $5,
-                    document_last4 = $6,
+                SET country = COALESCE(country, $3),
+                    document_type = COALESCE(document_type, $4),
+                    document_number_ciphertext = $5,
+                    document_lookup_hmac = $6,
+                    shared_lookup_hmac = $7,
+                    document_last4 = $8,
                     updated_at = now()
               WHERE tenant_id = $1 AND borrower_id = $2`,
             [
               tenantId,
               borrowerId,
+              identityCountry,
+              identityDocumentType,
               encryptBorrowerDocumentNumber(identitySecret, normalized),
               lookup,
               sharedLookup,
