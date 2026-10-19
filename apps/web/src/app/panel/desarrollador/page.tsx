@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type {
   PlatformActivityDirectory,
   PlatformOverview,
+  PlatformSubscriptionDirectory,
   PlatformSystemStatus,
   PlatformUserDirectory,
   SupportAccessRecord,
@@ -11,11 +12,11 @@ import type {
 import { serverApi } from "../../../lib/server-api";
 import { ActivityFeed, activityActionLabel } from "../ActivityFeed";
 import { RegisterOwnerForm } from "./RegisterOwnerForm";
+import { SubscriptionManager } from "./SubscriptionManager";
 import { SupportAccessControl } from "./SupportAccessControl";
 import { TenantMembershipPlanControl } from "./TenantMembershipPlanControl";
 import { TenantReadiness } from "./TenantReadiness";
 import { TenantStatusButton } from "./TenantStatusButton";
-import { UserMembershipControl } from "./UserMembershipControl";
 import { UserStatusControl } from "./UserStatusControl";
 
 const statusLabels = {
@@ -58,6 +59,23 @@ function activityDirectoryHref(page: number, search: string, action: string | nu
   return `/panel/desarrollador${query ? `?${query}` : ""}#actividad`;
 }
 
+function subscriptionDirectoryHref(
+  page: number,
+  search: string,
+  status: string | null,
+  plan: string | null,
+  assignment: string | null,
+) {
+  const params = new URLSearchParams();
+  if (search) params.set("suscripcion", search);
+  if (status) params.set("estadoSuscripcion", status);
+  if (plan) params.set("planSuscripcion", plan);
+  if (assignment) params.set("asignacionSuscripcion", assignment);
+  if (page > 1) params.set("paginaSuscripcion", String(page));
+  const query = params.toString();
+  return `/panel/desarrollador${query ? `?${query}` : ""}#suscripciones`;
+}
+
 function jobStatusDetail(jobs: PlatformSystemStatus["jobs"]) {
   if (jobs.dead > 0) {
     return jobs.dead === 1 ? "1 trabajo en cola de errores" : `${jobs.dead} trabajos con error`;
@@ -88,6 +106,11 @@ export default async function DeveloperDashboard({
     actividad?: string | string[];
     accion?: string | string[];
     paginaActividad?: string | string[];
+    suscripcion?: string | string[];
+    estadoSuscripcion?: string | string[];
+    planSuscripcion?: string | string[];
+    asignacionSuscripcion?: string | string[];
+    paginaSuscripcion?: string | string[];
   }>;
 }) {
   const query = await searchParams;
@@ -127,6 +150,34 @@ export default async function DeveloperDashboard({
   });
   if (activitySearch) activityDirectoryQuery.set("q", activitySearch);
   if (activityAction) activityDirectoryQuery.set("action", activityAction);
+  const subscriptionSearch = (firstQueryValue(query.suscripcion) ?? "").trim().slice(0, 80);
+  const requestedSubscriptionStatus = firstQueryValue(query.estadoSuscripcion) ?? null;
+  const subscriptionStatus = ["active", "suspended", "expired", "cancelled"].includes(
+    requestedSubscriptionStatus ?? "",
+  )
+    ? requestedSubscriptionStatus
+    : null;
+  const requestedSubscriptionPlan = firstQueryValue(query.planSuscripcion) ?? null;
+  const subscriptionPlan = ["pro", "ultra"].includes(requestedSubscriptionPlan ?? "")
+    ? requestedSubscriptionPlan
+    : null;
+  const requestedAssignment = firstQueryValue(query.asignacionSuscripcion) ?? null;
+  const subscriptionAssignment = ["available", "assigned"].includes(requestedAssignment ?? "")
+    ? requestedAssignment
+    : null;
+  const requestedSubscriptionPage = Number(firstQueryValue(query.paginaSuscripcion));
+  const subscriptionPage =
+    Number.isInteger(requestedSubscriptionPage) && requestedSubscriptionPage > 0
+      ? requestedSubscriptionPage
+      : 1;
+  const subscriptionDirectoryQuery = new URLSearchParams({
+    page: String(subscriptionPage),
+    pageSize: "20",
+  });
+  if (subscriptionSearch) subscriptionDirectoryQuery.set("q", subscriptionSearch);
+  if (subscriptionStatus) subscriptionDirectoryQuery.set("status", subscriptionStatus);
+  if (subscriptionPlan) subscriptionDirectoryQuery.set("plan", subscriptionPlan);
+  if (subscriptionAssignment) subscriptionDirectoryQuery.set("assignment", subscriptionAssignment);
   const [
     response,
     directoryResponse,
@@ -134,6 +185,8 @@ export default async function DeveloperDashboard({
     activityDirectoryResponse,
     supportResponse,
     systemResponse,
+    subscriptionDirectoryResponse,
+    ownerOptionsResponse,
   ] = await Promise.all([
     serverApi("/v1/platform/overview"),
     serverApi(`/v1/platform/tenants?${directoryQuery}`),
@@ -141,6 +194,8 @@ export default async function DeveloperDashboard({
     serverApi(`/v1/platform/activity?${activityDirectoryQuery}`),
     serverApi("/v1/platform/support-access"),
     serverApi("/v1/platform/system-status"),
+    serverApi(`/v1/platform/subscriptions?${subscriptionDirectoryQuery}`),
+    serverApi("/v1/platform/users?page=1&pageSize=50&status=active"),
   ]);
   if (response.status === 401) redirect("/ingresar");
   if (response.status === 403) redirect("/ingresar?error=sin-acceso");
@@ -150,12 +205,20 @@ export default async function DeveloperDashboard({
   if (!activityDirectoryResponse.ok) throw new Error("No fue posible cargar la actividad");
   if (!supportResponse.ok) throw new Error("No fue posible cargar los accesos de soporte");
   if (!systemResponse.ok) throw new Error("No fue posible validar el estado de la plataforma");
+  if (!subscriptionDirectoryResponse.ok) throw new Error("No fue posible cargar las suscripciones");
+  if (!ownerOptionsResponse.ok) throw new Error("No fue posible cargar los propietarios");
   const overview = (await response.json()) as PlatformOverview;
   const directory = (await directoryResponse.json()) as TenantDirectory;
   const userDirectory = (await userDirectoryResponse.json()) as PlatformUserDirectory;
   const activityDirectory = (await activityDirectoryResponse.json()) as PlatformActivityDirectory;
   const { access } = (await supportResponse.json()) as { access: SupportAccessRecord[] };
   const system = (await systemResponse.json()) as PlatformSystemStatus;
+  const subscriptionDirectory =
+    (await subscriptionDirectoryResponse.json()) as PlatformSubscriptionDirectory;
+  const ownerOptionsDirectory = (await ownerOptionsResponse.json()) as PlatformUserDirectory;
+  const ownerOptions = ownerOptionsDirectory.users
+    .filter((user) => user.eligibleForSubscription)
+    .map((user) => ({ id: user.id, displayName: user.displayName, email: user.email }));
   const version =
     system.api.version === "development" ? "Desarrollo" : system.api.version.slice(0, 8);
   const schemaVersion = system.database.schemaVersion?.split("_")[0] ?? "Sin migraciones";
@@ -243,6 +306,102 @@ export default async function DeveloperDashboard({
           </div>
           <small>{jobStatusDetail(system.jobs)}</small>
         </article>
+      </section>
+
+      <section className="dashboard-card subscription-card" id="suscripciones">
+        <div className="card-heading subscription-heading">
+          <div>
+            <span className="panel-eyebrow">Control comercial</span>
+            <h2>Suscripciones</h2>
+          </div>
+          <span>Administración central</span>
+        </div>
+        <form className="subscription-filters" action="/panel/desarrollador#suscripciones">
+          <label className="subscription-search-field">
+            <span>Buscar</span>
+            <input
+              defaultValue={subscriptionSearch}
+              maxLength={80}
+              name="suscripcion"
+              placeholder="Propietario, correo o empresa"
+              type="search"
+            />
+          </label>
+          <label>
+            <span>Estado</span>
+            <select defaultValue={subscriptionStatus ?? ""} name="estadoSuscripcion">
+              <option value="">Todos</option>
+              <option value="active">Activa</option>
+              <option value="suspended">Suspendida</option>
+              <option value="expired">Vencida</option>
+              <option value="cancelled">Cancelada</option>
+            </select>
+          </label>
+          <label>
+            <span>Plan</span>
+            <select defaultValue={subscriptionPlan ?? ""} name="planSuscripcion">
+              <option value="">Todos</option>
+              <option value="pro">Pro</option>
+              <option value="ultra">Ultra</option>
+            </select>
+          </label>
+          <label>
+            <span>Asignación</span>
+            <select defaultValue={subscriptionAssignment ?? ""} name="asignacionSuscripcion">
+              <option value="">Todas</option>
+              <option value="available">Disponible</option>
+              <option value="assigned">Con empresa</option>
+            </select>
+          </label>
+          <div className="subscription-filter-actions">
+            <button type="submit">Aplicar</button>
+            {subscriptionSearch ||
+            subscriptionStatus ||
+            subscriptionPlan ||
+            subscriptionAssignment ? (
+              <a href="/panel/desarrollador#suscripciones">Limpiar</a>
+            ) : null}
+          </div>
+        </form>
+        <SubscriptionManager directory={subscriptionDirectory} owners={ownerOptions} />
+        {subscriptionDirectory.pagination.totalPages > 1 ? (
+          <nav className="tenant-directory-pagination" aria-label="Páginas de suscripciones">
+            {subscriptionDirectory.pagination.page > 1 ? (
+              <a
+                href={subscriptionDirectoryHref(
+                  subscriptionDirectory.pagination.page - 1,
+                  subscriptionSearch,
+                  subscriptionStatus,
+                  subscriptionPlan,
+                  subscriptionAssignment,
+                )}
+              >
+                Anterior
+              </a>
+            ) : (
+              <span aria-disabled="true">Anterior</span>
+            )}
+            <strong>
+              Página {subscriptionDirectory.pagination.page} de{" "}
+              {subscriptionDirectory.pagination.totalPages}
+            </strong>
+            {subscriptionDirectory.pagination.page < subscriptionDirectory.pagination.totalPages ? (
+              <a
+                href={subscriptionDirectoryHref(
+                  subscriptionDirectory.pagination.page + 1,
+                  subscriptionSearch,
+                  subscriptionStatus,
+                  subscriptionPlan,
+                  subscriptionAssignment,
+                )}
+              >
+                Siguiente
+              </a>
+            ) : (
+              <span aria-disabled="true">Siguiente</span>
+            )}
+          </nav>
+        ) : null}
       </section>
 
       <div className="dashboard-columns">
@@ -388,18 +547,6 @@ export default async function DeveloperDashboard({
             <p>Crea la cuenta que recibirá el acceso y podrá administrar varias empresas.</p>
             <RegisterOwnerForm />
           </aside>
-          <aside className="dashboard-card create-card">
-            <div className="card-heading">
-              <div>
-                <span className="panel-eyebrow">Suscripciones</span>
-                <h2>Activa desde Usuarios</h2>
-              </div>
-            </div>
-            <p>
-              Abre la sección Usuarios y activa Pro o Ultra directamente sobre el propietario. Cada
-              activación queda disponible para crear una empresa adicional.
-            </p>
-          </aside>
         </div>
       </div>
 
@@ -476,15 +623,16 @@ export default async function DeveloperDashboard({
                     <td data-label="Membresía comercial">
                       {user.platformRole === "developer" ? (
                         <span className="table-muted">Cuenta protegida</span>
+                      ) : !user.eligibleForSubscription ? (
+                        <span className="table-muted">Cuenta de personal</span>
                       ) : (
-                        <UserMembershipControl
-                          availableSubscriptions={user.availableSubscriptions}
-                          disabled={user.status !== "active"}
-                          membershipActivatedAt={user.membershipActivatedAt}
-                          membershipPlan={user.membershipPlan}
-                          subscriptionCount={user.subscriptionCount}
-                          userId={user.id}
-                        />
+                        <div className="user-subscription-summary">
+                          <strong>
+                            {user.availableSubscriptions} disponibles · {user.subscriptionCount}{" "}
+                            totales
+                          </strong>
+                          <a href="#suscripciones">Administrar suscripciones</a>
+                        </div>
                       )}
                     </td>
                     <td data-label="Sesiones">{user.activeSessions}</td>

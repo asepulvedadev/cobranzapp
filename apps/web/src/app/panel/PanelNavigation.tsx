@@ -2,6 +2,7 @@
 
 import {
   Buildings,
+  CreditCard,
   DotsThreeCircle,
   Gauge,
   MapPin,
@@ -70,10 +71,11 @@ export function PanelNavigation({
   } else if (isDeveloper) {
     primaryItems = [
       { href: effectiveDashboardHref, label: "Inicio", icon: Gauge },
+      { href: "/panel/desarrollador#suscripciones", label: "Suscripciones", icon: CreditCard },
       { href: "/panel/desarrollador#empresas", label: "Empresas", icon: Buildings },
-      { href: "/panel/desarrollador#usuarios", label: "Usuarios", icon: UsersThree },
     ];
     secondaryItems = [
+      { href: "/panel/desarrollador#usuarios", label: "Usuarios", icon: UsersThree },
       { href: "/panel/desarrollador#actividad", label: "Actividad", icon: Pulse },
       ...accountItems,
     ];
