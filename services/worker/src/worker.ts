@@ -10,6 +10,7 @@ import {
   safeErrorMessage,
 } from "./outbox.js";
 import { planNextDayRoutes } from "./routes.js";
+import { reconcileSubscriptions } from "./subscriptions.js";
 
 const config = z
   .object({
@@ -39,6 +40,7 @@ let stopping = false;
 let wakeSleep: (() => void) | null = null;
 let lastHeartbeat = 0;
 let lastRoutePlanningCheck = 0;
+let lastSubscriptionCheck = 0;
 const identityExtractor =
   config.HERMES_OCR_URL && config.HERMES_OCR_API_KEY
     ? createHermesIdentityExtractor({
@@ -85,6 +87,17 @@ async function sleep(milliseconds: number) {
 }
 
 async function tick() {
+  if (Date.now() - lastSubscriptionCheck >= 60_000) {
+    lastSubscriptionCheck = Date.now();
+    try {
+      const subscriptionSummary = await reconcileSubscriptions(pool);
+      if (subscriptionSummary.renewed > 0 || subscriptionSummary.expired > 0) {
+        log("info", "subscriptions_reconciled", subscriptionSummary);
+      }
+    } catch (error) {
+      log("error", "subscription_reconciliation_failed", { error: safeErrorMessage(error) });
+    }
+  }
   if (Date.now() - lastRoutePlanningCheck >= 60_000) {
     lastRoutePlanningCheck = Date.now();
     try {

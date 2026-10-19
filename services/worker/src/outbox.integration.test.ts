@@ -116,7 +116,7 @@ describe.skipIf(!appUrl || !workerUrl || !ownerUrl)("PostgreSQL outbox worker", 
   });
 
   it("keeps the worker role least-privileged", async () => {
-    await expect(workerPool.query("SELECT id FROM users LIMIT 1")).rejects.toThrow(
+    await expect(workerPool.query("SELECT id FROM auth_sessions LIMIT 1")).rejects.toThrow(
       /permission denied/,
     );
     await expect(
