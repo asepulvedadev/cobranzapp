@@ -5315,6 +5315,15 @@ export function buildApp(dependencies: AppDependencies) {
           request.id,
         );
       }
+      if (body.data.paymentMethod === "transfer" && !proofBytes) {
+        return sendError(
+          reply,
+          400,
+          "PAYMENT_PROOF_REQUIRED",
+          "Adjunta la imagen de la transferencia antes de confirmar el pago.",
+          request.id,
+        );
+      }
       if (proofBytes && body.data.paymentMethod !== "transfer") {
         return sendError(
           reply,

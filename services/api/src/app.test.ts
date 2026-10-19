@@ -403,6 +403,20 @@ function multipartImage(field: string, bytes: Buffer, boundary = "cobranzapp-tes
   };
 }
 
+function multipartFields(fields: Record<string, string>, boundary = "cobranzapp-fields-boundary") {
+  return {
+    boundary,
+    payload: Buffer.from(
+      `${Object.entries(fields)
+        .map(
+          ([name, value]) =>
+            `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`,
+        )
+        .join("")}--${boundary}--\r\n`,
+    ),
+  };
+}
+
 describe("collection route status", () => {
   it("activates a route through the owner-only status endpoint", async () => {
     const route: Route = {
@@ -973,6 +987,39 @@ describe("loan application creation", () => {
         message: "Aprueba la identidad del cliente antes de crearle un crédito.",
       },
     });
+  });
+});
+
+describe("loan payment evidence", () => {
+  it("requires an image before recording a transfer", async () => {
+    const recordPayment = vi.fn();
+    const app = buildApp(
+      dependencies({
+        authService: { authenticate: vi.fn(async () => tenantOwner) },
+        creditService: { recordPayment } as unknown as CreditService,
+      }),
+    );
+    apps.push(app);
+    const multipart = multipartFields({
+      installmentNumber: "1",
+      amount: "12000.00",
+      paymentMethod: "transfer",
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/tenants/5c58269f-ce16-4250-82e2-c0c16621b0fb/loan-applications/24c413bf-d371-4f7f-93f6-b23f0c770044/payments",
+      headers: {
+        origin: "https://cobranzaap.tech",
+        cookie: "cobranzapp_session=session-token",
+        "content-type": `multipart/form-data; boundary=${multipart.boundary}`,
+      },
+      payload: multipart.payload,
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ error: { code: "PAYMENT_PROOF_REQUIRED" } });
+    expect(recordPayment).not.toHaveBeenCalled();
   });
 });
 
