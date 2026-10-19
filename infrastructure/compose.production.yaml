@@ -58,6 +58,9 @@ services:
     restart: unless-stopped
     cpus: 1.0
     mem_limit: 1g
+    pids_limit: 256
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
 
   worker:
     image: ghcr.io/asepulvedadev/cobranzapp-worker:${IMAGE_TAG}
@@ -87,6 +90,9 @@ services:
     restart: unless-stopped
     cpus: 0.5
     mem_limit: 512m
+    pids_limit: 256
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
 
   web:
     image: ghcr.io/asepulvedadev/cobranzapp-web:${IMAGE_TAG}
@@ -109,6 +115,9 @@ services:
     restart: unless-stopped
     cpus: 0.75
     mem_limit: 768m
+    pids_limit: 256
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
 
 networks:
   frontend:

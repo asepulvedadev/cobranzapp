@@ -134,11 +134,14 @@ async function main() {
       }
     }
 
+    // Every migration must grant only the operations its runtime path needs.
+    // A blanket default grant silently expands the API blast radius whenever
+    // a new table is introduced and defeats least-privilege reviews.
     await client.query(
-      `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${appRole}`,
+      `ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM ${appRole}`,
     );
     await client.query(
-      `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO ${appRole}`,
+      `ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM ${appRole}`,
     );
   } finally {
     await client
