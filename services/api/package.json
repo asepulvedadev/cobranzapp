@@ -19,7 +19,7 @@
     "@cobranzapp/financial": "workspace:*",
     "@cobranzapp/hermes-ocr": "workspace:*",
     "@fastify/multipart": "^9.4.0",
-    "fastify": "5.12.5",
+    "fastify": "5.12.6",
     "otpauth": "9.5.2",
     "pg": "8.23.1",
     "qrcode": "1.5.4",
